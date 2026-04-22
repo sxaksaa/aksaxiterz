@@ -3,6 +3,8 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 use App\Models\Product;
@@ -14,6 +16,11 @@ use App\Models\Package;
 
 use Laravel\Socialite\Facades\Socialite;
 
+/*
+|--------------------------------------------------------------------------
+| HOME
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function (Request $request) {
 
     $categories = Category::all();
@@ -35,44 +42,119 @@ Route::get('/', function (Request $request) {
     return view('home', compact('categories', 'products'));
 });
 
+/*
+|--------------------------------------------------------------------------
+| PRODUCT DETAIL
+|--------------------------------------------------------------------------
+*/
 Route::get('/product/{id}', function ($id) {
     $product = Product::with(['features', 'packages'])->findOrFail($id);
     return view('product-detail', compact('product'));
 });
 
-Route::post('/process-order/{id}', function ($id) {
+/*
+|--------------------------------------------------------------------------
+| PAYMENT (WAJIB LOGIN)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
 
-    $product = Product::findOrFail($id);
-    $package = Package::findOrFail(request('package_id'));
+    // MIDTRANS
+    Route::post('/process-order/{id}', function ($id) {
 
-    $order = Order::create([
-        'product_id' => $product->id,
-        'status' => 'pending',
-        'payment_method' => 'midtrans',
-        'user_id' => auth()->id(),
-        'price' => $package->price,
-        'package_id' => $package->id
-    ]);
+        $user = Auth::user();
+        $product = Product::findOrFail($id);
+        $package = Package::findOrFail(request('package_id'));
 
-    \Midtrans\Config::$serverKey = config('midtrans.serverKey');
-    \Midtrans\Config::$isProduction = false;
-    \Midtrans\Config::$isSanitized = true;
-    \Midtrans\Config::$is3ds = true;
+        $order = Order::create([
+            'product_id' => $product->id,
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'payment_method' => 'midtrans',
+            'price' => $package->price,
+            'package_id' => $package->id
+        ]);
 
-    $params = [
-        'transaction_details' => [
-            'order_id' => $order->id,
-            'gross_amount' => $package->price,
-        ]
-    ];
+        $midtransOrderId = 'ORDER-' . $order->id . '-' . time();
 
-    $snapToken = \Midtrans\Snap::getSnapToken($params);
+        \Midtrans\Config::$serverKey = config('midtrans.serverKey');
+        \Midtrans\Config::$isProduction = false;
 
-    return response()->json([
-        'snapToken' => $snapToken
-    ]);
+        $params = [
+            'transaction_details' => [
+                'order_id' => $midtransOrderId,
+                'gross_amount' => $package->price,
+            ]
+        ];
+
+        $snapToken = \Midtrans\Snap::getSnapToken($params);
+
+        return view('midtrans-pay', compact('snapToken'));
+    });
+
+    // CRYPTO
+    Route::post('/pay-crypto/{product}', function ($productId) {
+
+        $user = Auth::user();
+        $product = Product::findOrFail($productId);
+        $package = Package::findOrFail(request('package_id'));
+        $coin = request('coin');
+
+        $orderId = 'ORD-' . strtoupper(Str::random(10));
+
+        // simpan order
+        Order::create([
+            'product_id' => $product->id,
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'payment_method' => 'crypto',
+            'price' => $package->price_usdt,
+            'package_id' => $package->id
+        ]);
+
+        // simpan license sementara
+        License::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'license_key' => '-',
+            'duration' => $package->name,
+            'order_id' => $orderId,
+        ]);
+
+        // 🔥 NOWPAYMENTS INVOICE
+        $response = Http::withHeaders([
+            'x-api-key' => config('services.nowpayments.key')
+        ])->post(config('services.nowpayments.url') . '/invoice', [
+
+            "price_amount" => $package->price_usdt,
+            "price_currency" => $coin,
+            "pay_currency" => $coin,
+
+            "order_id" => $orderId,
+            "order_description" => $product->name . ' - ' . $package->name,
+
+            "ipn_callback_url" => "https://stability-xxxxx.ngrok-free.app/crypto-callback",
+
+            "success_url" => url('/licenses'),
+            "cancel_url" => url('/'),
+        ]);
+
+        $data = $response->json();
+
+        if (!isset($data['invoice_url'])) {
+            return $data;
+        }
+
+        return redirect($data['invoice_url']);
+    });
+
 });
 
+/*
+|--------------------------------------------------------------------------
+| MIDTRANS CALLBACK
+|--------------------------------------------------------------------------
+*/
 Route::post('/midtrans-callback', function (Request $request) {
 
     $data = $request->all();
@@ -80,8 +162,7 @@ Route::post('/midtrans-callback', function (Request $request) {
 
     if ($data['transaction_status'] == 'settlement' || $data['transaction_status'] == 'capture') {
 
-        $order->status = 'paid';
-        $order->save();
+        $order->update(['status' => 'paid']);
 
         $package = Package::find($order->package_id);
 
@@ -91,29 +172,68 @@ Route::post('/midtrans-callback', function (Request $request) {
             'license_key' => strtoupper(Str::random(16)),
             'duration' => $package->name
         ]);
-
-        return response()->json(['message' => 'License created']);
     }
 
-    return response()->json(['message' => 'Ignored']);
+    return response()->json(['message' => 'ok']);
 });
 
-Route::get('/success', function () {
+/*
+|--------------------------------------------------------------------------
+| CRYPTO CALLBACK
+|--------------------------------------------------------------------------
+*/
+Route::post('/crypto-callback', function () {
 
-    $license = License::where('user_id', auth()->id())
-        ->latest()
-        ->first();
+    $data = request()->all();
 
-    return view('success', compact('license'));
-})->middleware('auth');
+    Log::info('CRYPTO CALLBACK:', $data);
 
+    if (!isset($data['payment_status'])) {
+        return response()->json(['status' => 'no status']);
+    }
+
+    if ($data['payment_status'] !== 'finished') {
+        return response()->json(['status' => 'not finished']);
+    }
+
+    $orderId = $data['order_id'] ?? null;
+
+    $license = License::where('order_id', $orderId)->first();
+
+    if ($license && $license->license_key === '-') {
+        $license->update([
+            'license_key' => strtoupper(Str::random(16))
+        ]);
+    }
+
+    return response()->json(['status' => 'success']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| LICENSE PAGE
+|--------------------------------------------------------------------------
+*/
 Route::get('/licenses', function () {
-    $licenses = License::where('user_id', auth()->id())
-        ->latest()
-        ->get();
+    $licenses = License::where('user_id', auth()->id())->latest()->get();
     return view('licenses', compact('licenses'));
 })->middleware('auth');
 
+/*
+|--------------------------------------------------------------------------
+| SUCCESS PAGE
+|--------------------------------------------------------------------------
+*/
+Route::get('/success', function () {
+    $license = License::where('user_id', auth()->id())->latest()->first();
+    return view('success', compact('license'));
+})->middleware('auth');
+
+/*
+|--------------------------------------------------------------------------
+| GOOGLE LOGIN
+|--------------------------------------------------------------------------
+*/
 Route::get('/auth/google', function () {
     return Socialite::driver('google')->redirect();
 });
@@ -129,29 +249,26 @@ Route::get('/auth/google/callback', function () {
         'password' => bcrypt('randompassword')
     ]);
 
-    Auth::login($user);
+    Auth::login($user, true);
 
     return redirect('/');
 });
 
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
 Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
 });
 
-Route::get('/fake-paid/{id}', function ($id) {
-
-    $order = \App\Models\Order::findOrFail($id);
-
-    $order->status = 'paid';
-    $order->save();
-
-    \App\Models\License::create([
-        'user_id' => auth()->id(),
-        'product_id' => $order->product_id,
-        'license_key' => strtoupper(\Illuminate\Support\Str::random(16)),
-        'duration' => '7 Hari'
-    ]);
-
-    return "Order dipaksa PAID & license dibuat 🔥";
+/*
+|--------------------------------------------------------------------------
+| DEBUG
+|--------------------------------------------------------------------------
+*/
+Route::get('/debug-user', function () {
+    return auth()->user();
 });

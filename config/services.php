@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'nowpayments' => [
+        'key' => env('NOWPAYMENTS_API_KEY'),
+        'url' => env('NOWPAYMENTS_URL'),
+    ],
+
 ];
