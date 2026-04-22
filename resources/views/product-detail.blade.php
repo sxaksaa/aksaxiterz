@@ -1,14 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
-    <!-- SKELETON -->
     <div id="skeleton" class="max-w-5xl mx-auto px-12 py-10 space-y-4 animate-pulse">
         <div class="h-6 bg-[#1f1f25] w-1/3 rounded"></div>
         <div class="h-4 bg-[#1f1f25] w-1/2 rounded"></div>
         <div class="h-32 bg-[#1f1f25] rounded-xl"></div>
     </div>
 
-    <!-- CONTENT -->
     <div id="content" class="hidden max-w-5xl mx-auto px-12 py-10 fade-up">
 
         <h1 class="text-2xl font-semibold mb-2">
@@ -19,7 +17,6 @@
             {{ $product->description }}
         </p>
 
-        <!-- FEATURES -->
         <div class="bg-[#15151B] border border-[#27272A] rounded-xl p-5 mb-10">
             <h3 class="mb-3 font-semibold">Features</h3>
 
@@ -30,7 +27,6 @@
             </ul>
         </div>
 
-        <!-- PACKAGE -->
         <h2 class="mb-4 font-semibold">Pilih Paket</h2>
 
         <div class="flex gap-4 mb-10 flex-wrap">
@@ -40,12 +36,10 @@
 
                     <p class="text-sm mb-1">{{ $p->name }}</p>
                     <p class="text-[#C084FC] font-semibold">Rp {{ number_format($p->price) }}</p>
-
                 </div>
             @endforeach
         </div>
 
-        <!-- SUMMARY -->
         <div class="bg-[#15151B] border border-[#27272A] rounded-2xl p-6">
 
             <h3 class="mb-4 font-semibold">Ringkasan</h3>
@@ -62,13 +56,13 @@
 
             @auth
 
-                <!-- 🔥 MIDTRANS FIX (PAKAI FORM, BUKAN FETCH) -->
+                <!-- MIDTRANS -->
                 <form method="POST" action="/process-order/{{ $product->id }}">
                     @csrf
-
                     <input type="hidden" name="package_id" id="selectedPackageIdMidtrans">
 
                     <button type="submit" id="payBtn" disabled
+                        onclick="this.innerText='Processing...';"
                         class="w-full bg-gray-600 text-gray-300 py-3 rounded-xl transition mb-4">
                         Pilih paket dulu
                     </button>
@@ -86,14 +80,13 @@
                     </select>
                 </div>
 
-                <!-- CRYPTO FORM -->
                 <form method="POST" action="/pay-crypto/{{ $product->id }}">
                     @csrf
-
                     <input type="hidden" name="coin" id="selectedCoin">
                     <input type="hidden" name="package_id" id="selectedPackageIdCrypto">
 
                     <button type="submit" id="cryptoBtn" disabled
+                        onclick="this.innerText='Processing...';"
                         class="w-full bg-gray-600 text-gray-300 py-3 rounded-xl transition">
                         Pilih paket & network dulu
                     </button>
@@ -124,7 +117,6 @@
             document.getElementById('selectedPackage').innerText = name;
             document.getElementById('totalPrice').innerText = "Rp " + price.toLocaleString();
 
-            // 🔥 kirim ke kedua form
             document.getElementById('selectedPackageIdMidtrans').value = packageId;
             document.getElementById('selectedPackageIdCrypto').value = packageId;
 
@@ -134,12 +126,11 @@
 
             event.currentTarget.classList.add('border-[#9333EA]');
 
-            // aktifkan midtrans
             const btn = document.getElementById('payBtn');
             btn.disabled = false;
-            btn.innerText = "Checkout Midtrans";
+            btn.innerText = "Checkout Midtrans 🚀";
             btn.classList.remove("bg-gray-600");
-            btn.classList.add("bg-[#9333EA]", "cursor-pointer");
+            btn.classList.add("bg-[#9333EA]");
 
             checkCryptoReady();
         }
@@ -156,16 +147,25 @@
                 document.getElementById('selectedCoin').value = coin;
 
                 btn.disabled = false;
-                btn.innerText = "Bayar Crypto";
-
+                btn.innerText = "Bayar Crypto 🚀";
                 btn.classList.remove("bg-gray-600");
-                btn.classList.add("bg-green-500", "cursor-pointer");
+                btn.classList.add("bg-green-500");
 
             } else {
-
                 btn.disabled = true;
                 btn.innerText = "Pilih paket & network dulu";
             }
         }
+
+        // AUTO REFRESH
+        setInterval(() => {
+            fetch('/check-order')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'paid') {
+                        window.location.href = '/licenses';
+                    }
+                });
+        }, 3000);
     </script>
 @endsection
