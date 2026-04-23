@@ -64,42 +64,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/process-order/{id}', function ($id) {
 
         $user = Auth::user();
-        $packageId = request('package_id'); // 🔥 TAMBAHAN
-        // 🔥 AMBIL ORDER VALID SAJA
-        $existing = Order::where('user_id', $user->id)
+        $packageId = request('package_id');
+
+        // 🔥 CANCEL SEMUA ORDER PENDING (KONSISTEN DENGAN CRYPTO)
+        Order::where('user_id', $user->id)
             ->where('status', 'pending')
-            ->whereNotNull('order_id')
-            ->latest()
-            ->first();
-
-        // ✅ lanjut bayar midtrans
-        if ($existing && $existing->order_id && $existing->payment_method === 'midtrans') {
-
-            // 🔥 kalau paket sama → lanjut
-            if ($existing->package_id == $packageId) {
-
-                \Midtrans\Config::$serverKey = config('midtrans.serverKey');
-
-                $params = [
-                    'transaction_details' => [
-                        'order_id' => $existing->order_id,
-                        'gross_amount' => $existing->price,
-                    ]
-                ];
-
-                $snapToken = \Midtrans\Snap::getSnapToken($params);
-
-                return view('midtrans-pay', compact('snapToken'));
-            }
-
-            // 🔥 kalau beda paket → cancel APAPUN metodenya
-            $existing->update(['status' => 'cancelled']);
-        }
+            ->update(['status' => 'cancelled']);
 
         $product = Product::findOrFail($id);
-        $package = Package::findOrFail(request('package_id'));
+        $package = Package::findOrFail($packageId);
 
-        // 🔥 PASTI ADA ORDER_ID
+        // 🔥 CREATE ORDER BARU
         $orderId = 'ORD-' . strtoupper(Str::random(10));
 
         Order::create([
@@ -112,6 +87,7 @@ Route::middleware('auth')->group(function () {
             'package_id' => $package->id
         ]);
 
+        // 🔥 MIDTRANS CONFIG
         \Midtrans\Config::$serverKey = config('midtrans.serverKey');
 
         $params = [
@@ -127,49 +103,21 @@ Route::middleware('auth')->group(function () {
     });
 
     // 🔥 CRYPTO
-    // 🔥 CRYPTO
     Route::post('/pay-crypto/{product}', function ($productId) {
 
         $user = Auth::user();
         $packageId = request('package_id');
+        $coin = request('coin');
 
-        $existing = Order::where('user_id', $user->id)
+        // 🔥 CANCEL ORDER LAMA
+        Order::where('user_id', $user->id)
             ->where('status', 'pending')
-            ->whereNotNull('order_id')
-            ->latest()
-            ->first();
-
-        // lanjut order lama kalau sama
-        if ($existing && $existing->order_id && $existing->payment_method === 'crypto') {
-
-            if ($existing->package_id == $packageId) {
-                return redirect()->away("https://nowpayments.io/payment/?iid=" . $existing->order_id);
-            }
-
-            $existing->update(['status' => 'cancelled']);
-        }
+            ->update(['status' => 'cancelled']);
 
         $product = Product::findOrFail($productId);
         $package = Package::findOrFail($packageId);
-        $coin = request('coin');
 
-        // 🔥 AMBIL MINIMUM DARI API
-        $minResponse = Http::withHeaders([
-            'x-api-key' => config('services.nowpayments.key')
-        ])->get(config('services.nowpayments.url') . '/min-amount', [
-            'currency_from' => 'usd',
-            'currency_to' => $coin,
-            'amount' => $package->price_usdt
-        ])->json();
-
-        $minAmount = $minResponse['min_amount'] ?? 0;
-
-        // 🔥 VALIDASI DULU (INI YANG KURANG)
-        if ($package->price_usdt < $minAmount) {
-            return back()->with('error', "Minimal untuk $coin adalah \${$minAmount} 😅");
-        }
-
-        // 🔥 BARU CREATE ORDER
+        // 🔥 CREATE ORDER BARU
         $orderId = 'ORD-' . strtoupper(Str::random(10));
 
         Order::create([
@@ -182,6 +130,37 @@ Route::middleware('auth')->group(function () {
             'package_id' => $package->id
         ]);
 
+        // =========================
+        // 🔥 STEP 1: VALIDASI (/payment)
+        // =========================
+        $check = Http::withHeaders([
+            'x-api-key' => config('services.nowpayments.key')
+        ])->post(config('services.nowpayments.url') . '/payment', [
+
+            "price_amount" => $package->price_usdt,
+            "price_currency" => "usd",
+            "pay_currency" => $coin,
+        ]);
+
+        $checkData = $check->json();
+
+        // ❌ kalau gagal → STOP (NO REDIRECT)
+        if (isset($checkData['message'])) {
+
+            $msg = $checkData['message'];
+
+            if (str_contains($msg, 'less than minimal')) {
+                $msg = "Minimum payment is higher. Try another network 🙏";
+            }
+
+            Order::where('order_id', $orderId)->update(['status' => 'cancelled']);
+
+            return back()->withErrors(['payment' => $msg]);
+        }
+
+        // =========================
+        // 🔥 STEP 2: BUAT INVOICE (/invoice)
+        // =========================
         $response = Http::withHeaders([
             'x-api-key' => config('services.nowpayments.key')
         ])->post(config('services.nowpayments.url') . '/invoice', [
@@ -200,11 +179,18 @@ Route::middleware('auth')->group(function () {
         ]);
 
         $data = $response->json();
-
+        Order::where('order_id', $orderId)->update([
+            'payment_url' => $data['invoice_url']
+        ]);
+        // ❌ safety check
         if (!isset($data['invoice_url'])) {
-            return $data;
+
+            Order::where('order_id', $orderId)->update(['status' => 'cancelled']);
+
+            return back()->with('error', 'Payment failed');
         }
 
+        // ✅ baru redirect
         return redirect($data['invoice_url']);
     });
 });
@@ -364,3 +350,24 @@ Route::get('/orders', function () {
 
     return view('orders', compact('orders'));
 })->middleware('auth');
+
+
+Route::get('/api/products', function (Request $request) {
+
+    $query = \App\Models\Product::with('packages');
+
+    if ($request->search) {
+        $query->where('name', 'like', '%' . $request->search . '%');
+    }
+
+    if ($request->category) {
+        $category = \App\Models\Category::where('slug', $request->category)->first();
+        if ($category) {
+            $query->where('category_id', $category->id);
+        }
+    }
+
+    $products = $query->get();
+
+    return view('partials.product-card', compact('products'));
+});

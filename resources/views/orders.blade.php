@@ -1,79 +1,109 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="max-w-5xl mx-auto px-6 py-10">
 
-        <h1 class="text-2xl font-semibold mb-6">Riwayat Order</h1>
+<div class="max-w-5xl mx-auto px-6 py-10">
 
-        <div class="bg-[#15151B] border border-[#27272A] rounded-xl overflow-hidden">
 
-            <table class="w-full text-sm">
-                <thead class="bg-[#1f1f25] text-gray-400">
-                    <tr>
-                        <th class="p-3 text-left">Order ID</th>
-                        <th class="p-3 text-left">Produk</th>
-                        <th class="p-3 text-left">Paket</th>
-                        <th class="p-3 text-left">Metode</th>
-                        <th class="p-3 text-left">Harga</th>
-                        <th class="p-3 text-left">Status</th>
-                    </tr>
-                </thead>
+<h1 class="text-2xl font-semibold mb-6">Riwayat Order</h1>
 
-                <tbody>
-                    @forelse ($orders as $order)
-                        <tr class="border-t border-[#27272A]">
+<div class="bg-[#15151B] border border-[#27272A] rounded-xl overflow-hidden">
 
-                            <td class="p-3 text-xs text-gray-400">
-                                {{ $order->order_id }}
-                            </td>
+    <table class="w-full text-sm">
 
-                            <td class="p-3">
-                                {{ $order->product->name }}
-                            </td>
+        <!-- HEADER -->
+        <thead class="bg-[#1f1f25] text-gray-400">
+            <tr>
+                <th class="p-3 text-left">Order ID</th>
+                <th class="p-3 text-left">Produk</th>
+                <th class="p-3 text-left">Paket</th>
+                <th class="p-3 text-left">Metode</th>
+                <th class="p-3 text-left">Harga</th>
+                <th class="p-3 text-left">Status</th>
+                <th class="p-3 text-left">Action</th>
+            </tr>
+        </thead>
 
-                            <td class="p-3">
-                                {{ $order->package->name }}
-                            </td>
+        <!-- BODY -->
+        <tbody>
+            @forelse ($orders as $order)
+            <tr class="border-t border-[#27272A]">
 
-                            <td class="p-3">
-                                @if ($order->payment_method == 'crypto')
-                                    <span class="text-green-400">Crypto (USDT)</span>
-                                @else
-                                    <span class="text-blue-400">Midtrans</span>
-                                @endif
-                            </td>
+                <td class="p-3 text-xs text-gray-400">
+                    {{ $order->order_id }}
+                </td>
 
-                            <td class="p-3 text-[#C084FC]">
-                                @if ($order->payment_method == 'crypto')
-                                    ${{ $order->price }}
-                                @else
-                                    Rp {{ number_format($order->price) }}
-                                @endif
-                            </td>
+                <td class="p-3">
+                    {{ $order->product->name ?? '-' }}
+                </td>
 
-                            <td class="p-3">
-                                @if ($order->status == 'paid')
-                                    <span class="text-green-400">✔ Paid</span>
-                                @elseif($order->status == 'pending')
-                                    <span class="text-yellow-400">⏳ Pending</span>
-                                @else
-                                    <span class="text-red-400">✖ Cancelled</span>
-                                @endif
-                            </td>
+                <td class="p-3">
+                    {{ $order->package->name ?? '-' }}
+                </td>
 
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="p-6 text-center text-gray-400">
-                                Belum ada order 😅
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
+                <td class="p-3">
+                    @if ($order->payment_method == 'crypto')
+                        <span class="text-green-400">Crypto (USDT)</span>
+                    @else
+                        <span class="text-blue-400">Midtrans</span>
+                    @endif
+                </td>
 
-            </table>
+                <td class="p-3 text-[#C084FC]">
+                    @if ($order->payment_method == 'crypto')
+                        ${{ $order->price }}
+                    @else
+                        Rp {{ number_format($order->price) }}
+                    @endif
+                </td>
 
-        </div>
+                <td class="p-3">
+                    @if ($order->status == 'paid')
+                        <span class="text-green-400">✔ Paid</span>
+                    @elseif($order->status == 'pending')
+                        <span class="text-yellow-400">⏳ Pending</span>
+                    @else
+                        <span class="text-red-400">✖ Cancelled</span>
+                    @endif
+                </td>
 
-    </div>
+                <!-- 🔥 ACTION LOGIC -->
+                <td class="p-3">
+
+                    {{-- CRYPTO → CONTINUE --}}
+                    @if ($order->status === 'pending' && $order->payment_method === 'crypto' && $order->payment_url)
+                        <a href="{{ $order->payment_url }}" target="_blank"
+                           class="text-purple-400 text-xs underline">
+                            Continue →
+                        </a>
+
+                    {{-- MIDTRANS → PAY AGAIN --}}
+                    @elseif ($order->status === 'pending' && $order->payment_method === 'midtrans')
+                        <a href="/product/{{ $order->product_id }}"
+                           class="text-blue-400 text-xs underline">
+                            Pay Again →
+                        </a>
+
+                    @else
+                        -
+                    @endif
+
+                </td>
+
+            </tr>
+            @empty
+            <tr>
+                <td colspan="7" class="p-6 text-center text-gray-400">
+                    Belum ada order 😅
+                </td>
+            </tr>
+            @endforelse
+        </tbody>
+
+    </table>
+
+</div>
+
+
+</div>
 @endsection
