@@ -16,7 +16,7 @@ border-b border-[#27272A] transition-transform duration-300">
         <div id="navMenu" class="hidden md:flex absolute left-1/2 -translate-x-1/2 gap-10 text-sm">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
-                Home
+                Products
             </a>
 
             @auth
@@ -102,7 +102,7 @@ transition-all duration-300 ease-out">
 
     <div class="flex flex-col gap-4 text-sm">
 
-        <a href="/" onclick="toggleMobileMenu(event)" class="nav-item">Home</a>
+        <a href="/" onclick="toggleMobileMenu(event)" class="nav-item">Products</a>
 
         @auth
             <a href="/orders" onclick="toggleMobileMenu(event)" class="nav-item">Orders</a>
