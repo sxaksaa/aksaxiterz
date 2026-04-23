@@ -38,7 +38,7 @@ Route::get('/', function (Request $request) {
         $query->where('name', 'like', '%' . $request->search . '%');
     }
 
-    $products = $query->get();
+    $products = $query->with('packages')->get();
 
     return view('home', compact('categories', 'products'));
 });
@@ -319,3 +319,13 @@ Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
 });
+
+Route::get('/orders', function () {
+
+    $orders = Order::with(['product', 'package'])
+        ->where('user_id', auth()->id())
+        ->latest()
+        ->get();
+
+    return view('orders', compact('orders'));
+})->middleware('auth');

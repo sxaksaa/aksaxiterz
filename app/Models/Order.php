@@ -15,4 +15,14 @@ class Order extends Model
         'price',
         'package_id'
     ];
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function package()
+    {
+        return $this->belongsTo(Package::class);
+    }
 }
