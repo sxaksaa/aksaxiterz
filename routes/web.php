@@ -73,7 +73,7 @@ Route::middleware('auth')->group(function () {
             ->first();
 
         // ✅ lanjut bayar midtrans
-        if ($existing && $existing->order_id) {
+        if ($existing && $existing->order_id && $existing->payment_method === 'midtrans') {
 
             // 🔥 kalau paket sama → lanjut
             if ($existing->package_id == $packageId) {
@@ -127,18 +127,20 @@ Route::middleware('auth')->group(function () {
     });
 
     // 🔥 CRYPTO
+    // 🔥 CRYPTO
     Route::post('/pay-crypto/{product}', function ($productId) {
 
         $user = Auth::user();
-        $packageId = request('package_id'); // 🔥 TAMBAHAN
+        $packageId = request('package_id');
+
         $existing = Order::where('user_id', $user->id)
             ->where('status', 'pending')
             ->whereNotNull('order_id')
             ->latest()
             ->first();
 
-        // ✅ lanjut bayar crypto
-        if ($existing && $existing->order_id) {
+        // lanjut order lama kalau sama
+        if ($existing && $existing->order_id && $existing->payment_method === 'crypto') {
 
             if ($existing->package_id == $packageId) {
                 return redirect()->away("https://nowpayments.io/payment/?iid=" . $existing->order_id);
@@ -148,9 +150,26 @@ Route::middleware('auth')->group(function () {
         }
 
         $product = Product::findOrFail($productId);
-        $package = Package::findOrFail(request('package_id'));
+        $package = Package::findOrFail($packageId);
         $coin = request('coin');
 
+        // 🔥 AMBIL MINIMUM DARI API
+        $minResponse = Http::withHeaders([
+            'x-api-key' => config('services.nowpayments.key')
+        ])->get(config('services.nowpayments.url') . '/min-amount', [
+            'currency_from' => 'usd',
+            'currency_to' => $coin,
+            'amount' => $package->price_usdt
+        ])->json();
+
+        $minAmount = $minResponse['min_amount'] ?? 0;
+
+        // 🔥 VALIDASI DULU (INI YANG KURANG)
+        if ($package->price_usdt < $minAmount) {
+            return back()->with('error', "Minimal untuk $coin adalah \${$minAmount} 😅");
+        }
+
+        // 🔥 BARU CREATE ORDER
         $orderId = 'ORD-' . strtoupper(Str::random(10));
 
         Order::create([
@@ -168,7 +187,7 @@ Route::middleware('auth')->group(function () {
         ])->post(config('services.nowpayments.url') . '/invoice', [
 
             "price_amount" => $package->price_usdt,
-            "price_currency" => $coin,
+            "price_currency" => "usd",
             "pay_currency" => $coin,
 
             "order_id" => $orderId,
@@ -270,8 +289,24 @@ Route::get('/check-order', function () {
         ->latest()
         ->first();
 
+    if (!$order) {
+        return response()->json(['status' => null]);
+    }
+
+    // 🔥 HITUNG SISA WAKTU (15 menit)
+    $expireAt = \Carbon\Carbon::parse($order->created_at)->addMinutes(15);
+    $now = \Carbon\Carbon::now();
+
+    $remaining = $expireAt->diffInSeconds($now, false);
+
+    // 🔥 kalau sudah lewat → cancel
+    if ($remaining <= 0 && $order->status === 'pending') {
+        $order->update(['status' => 'cancelled']);
+    }
+
     return response()->json([
-        'status' => $order?->status
+        'status' => $order->status,
+        'remaining' => max(0, $remaining)
     ]);
 })->middleware('auth');
 
