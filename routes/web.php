@@ -89,10 +89,6 @@ Route::middleware('auth')->group(function () {
             ->middleware('throttle:10,1');
     });
 
-    // 🔥 CRYPTO (CONTROLLER)
-    Route::post('/pay-crypto/{product}', [PaymentController::class, 'payCrypto'])
-        ->middleware('throttle:10,1');
-
     // CHECK ORDER
     Route::get('/check-order', function () {
 
@@ -265,3 +261,8 @@ Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
 });
+
+
+Route::get('/login', function () {
+    return redirect('/auth/google');
+})->name('login');
