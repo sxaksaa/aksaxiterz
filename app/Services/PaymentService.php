@@ -54,7 +54,7 @@ class PaymentService
 
     public function createCrypto($user, $productId, $packageId, $coin)
     {
-        $allowedCoins = ['usdttrc20','usdtbsc','usdterc20','usdtmatic','usdtton'];
+        $allowedCoins = ['usdttrc20', 'usdtbsc', 'usdterc20', 'usdtmatic', 'usdtton'];
 
         if (!in_array($coin, $allowedCoins)) {
             throw new \Exception('Invalid payment method');
@@ -77,7 +77,19 @@ class PaymentService
             'price' => $package->price_usdt,
             'package_id' => $package->id
         ]);
+        $minMap = [
+            'usdterc20' => 1,
+            'usdttrc20' => 10,
+            'usdtbsc' => 1,
+            'usdtmatic' => 1,
+            'usdtton' => 1
+        ];
 
+        $amount = $package->price_usdt;
+
+        if (isset($minMap[$coin]) && $amount < $minMap[$coin]) {
+            throw new \Exception("Miniimum Payment {$coin} is \${$minMap[$coin]}");
+        }
         try {
 
             $response = Http::withHeaders([
@@ -108,7 +120,6 @@ class PaymentService
             ]);
 
             return $data['invoice_url'];
-
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: ' . $e->getMessage());

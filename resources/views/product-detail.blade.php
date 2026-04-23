@@ -32,7 +32,7 @@
 
                 <div class="text-lg">💳</div>
                 <div>Transfer / E-Wallet</div>
-                <span class="text-xs text-gray-400">Bank, Dana, OVO, etc</span>
+                <span class="text-xs text-gray-400">QRIS All Payment (Bank, Dana, GoPay, etc)</span>
 
             </div>
 
@@ -41,7 +41,7 @@
 
                 <div class="text-lg">🪙</div>
                 <div>Crypto</div>
-                <span class="text-xs text-gray-400">USDT & more</span>
+                <span class="text-xs text-gray-400">USDT Adress</span>
 
             </div>
 
@@ -58,27 +58,33 @@
 
             <div id="dropdownList" class="hidden absolute w-full mt-2 card-glow overflow-hidden z-50">
 
-                <div onclick="selectNetwork('usdttrc20','USDT (TRC20) ⭐ Recommended')" class="dropdown-item">
-                    USDT (TRC20) ⭐ Recommended
-                </div>
+    <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)')" class="dropdown-item flex items-baseline gap-2">
+        <span class="font-bold text-white">BSC</span>
+        <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
+        <span class="text-xs italic text-yellow-500 ml-auto">⭐ Recommended</span>
+    </div>
 
-                <div onclick="selectNetwork('usdtbsc','USDT (BSC)')" class="dropdown-item">
-                    USDT (BSC)
-                </div>
+    <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)')" class="dropdown-item flex items-baseline gap-2">
+        <span class="font-bold text-white">TRX</span>
+        <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
+    </div>
 
-                <div onclick="selectNetwork('usdterc20','USDT (ERC20)')" class="dropdown-item">
-                    USDT (ERC20)
-                </div>
+    <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)')" class="dropdown-item flex items-baseline gap-2">
+        <span class="font-bold text-white">ETH</span>
+        <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
+    </div>
 
-                <div onclick="selectNetwork('usdtmatic','USDT (Polygon)')" class="dropdown-item">
-                    USDT (Polygon)
-                </div>
+    <div onclick="selectNetwork('usdtmatic','POL Polygon POS')" class="dropdown-item flex items-baseline gap-2">
+        <span class="font-bold text-white">POL</span>
+        <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
+    </div>
 
-                <div onclick="selectNetwork('usdtton','USDT (TON)')" class="dropdown-item">
-                    USDT (TON)
-                </div>
+    <div onclick="selectNetwork('usdtton','TON The Open Network (TON)')" class="dropdown-item flex items-baseline gap-2">
+        <span class="font-bold text-white">TON</span>
+        <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
+    </div>
 
-            </div>
+</div>
 
         </div>
 
@@ -350,18 +356,20 @@
 
             if (selectedPayment === 'crypto') {
 
-                if (!selectedCoin) {
-                    alert('Select network');
-                    return;
-                }
+    if (!selectedCoin) {
+        alert('Select network');
+        return;
+    }
 
-                document.getElementById('crypto_package').value = selectedPackageId;
-                document.getElementById('crypto_coin').value = selectedCoin;
 
-                const form = document.getElementById('cryptoForm');
-                form.action = `/pay-crypto/${productId}`;
-                form.submit();
-            }
+
+    document.getElementById('crypto_package').value = selectedPackageId;
+    document.getElementById('crypto_coin').value = selectedCoin;
+
+    const form = document.getElementById('cryptoForm');
+    form.action = `/pay-crypto/${productId}`;
+    form.submit();
+}
         };
     </script>
 @endsection

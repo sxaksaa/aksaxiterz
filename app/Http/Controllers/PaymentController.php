@@ -39,7 +39,6 @@ class PaymentController extends Controller
             );
 
             return view('midtrans-pay', compact('snapToken'));
-
         } catch (\Exception $e) {
 
             Log::error('MIDTRANS ERROR: ' . $e->getMessage());
@@ -71,12 +70,13 @@ class PaymentController extends Controller
             );
 
             return redirect($url);
-
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: ' . $e->getMessage());
 
-            return back()->with('error', $e->getMessage());
+            return back()->withErrors([
+                'payment' => $e->getMessage()
+            ]);
         }
     }
 }
