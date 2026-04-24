@@ -10,20 +10,38 @@ class FeatureSeeder extends Seeder
 {
     public function run(): void
     {
-        $aurora = Product::where('name', 'AuroraVN')->first();
+        // 🔥 Aurora
+        $aurora = Product::where('name', 'Aurora-VN')->firstOrFail();
 
-        $features = [
-            'Smooth ESP',
+        $auroraFeatures = [
             'Aimbot',
-            'Silent aim',
-            'FOV',
-            '120 FPS'
+            'ESP Enemy',
+            'ESP Item',
+            'Pull Player',
+            'etc'
         ];
 
-        foreach ($features as $f) {
+        foreach ($auroraFeatures as $f) {
             Feature::updateOrCreate(
                 [
                     'product_id' => $aurora->id,
+                    'name' => $f
+                ]
+            );
+        }
+
+        // 🔥 XG-Team
+        $xg = Product::where('name', 'XG-Team')->firstOrFail();
+
+        $xgFeatures = [
+            'Remove Logo PC',
+            '120 FPS Unlocked On Free Fire Setting'
+        ];
+
+        foreach ($xgFeatures as $f) {
+            Feature::updateOrCreate(
+                [
+                    'product_id' => $xg->id,
                     'name' => $f
                 ]
             );

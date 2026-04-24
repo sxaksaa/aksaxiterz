@@ -2,6 +2,8 @@
 
 return [
 
+    'payment_dev_mode' => env('PAYMENT_DEV_MODE', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Name

@@ -13,20 +13,18 @@ class ProductSeeder extends Seeder
         $category = Category::where('slug', 'free-fire')->first();
 
         $product1 = Product::updateOrCreate(
-            ['name' => 'AuroraVN'],
+            ['name' => 'Aurora-VN'],
             [
-                'description' => 'Aurora access',
+                'description' => 'Aurora ',
                 'category_id' => $category->id,
-                'price' => 0 // 🔥 TAMBAH INI
             ]
         );
 
         $product2 = Product::updateOrCreate(
-            ['name' => 'XG'],
+            ['name' => 'XG-Team'],
             [
                 'description' => 'XG access',
                 'category_id' => $category->id,
-                'price' => 0 // 🔥 TAMBAH INI
             ]
         );
     }

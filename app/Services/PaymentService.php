@@ -6,10 +6,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-
+use App\Models\LicenseStock;
+use App\Models\License;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\Package;
+
 
 class PaymentService
 {
@@ -20,6 +22,15 @@ class PaymentService
         $package = Package::where('id', $packageId)
             ->where('product_id', $productId)
             ->firstOrFail();
+
+        $stock = LicenseStock::where('product_id', $product->id)
+            ->where('package_id', $package->id)
+            ->where('is_sold', false)
+            ->first();
+
+        if (!$stock) {
+            throw new \Exception('Stock habis 😭');
+        }
 
         $orderId = 'ORD-' . strtoupper(Str::random(10));
 
@@ -65,6 +76,15 @@ class PaymentService
         $package = Package::where('id', $packageId)
             ->where('product_id', $productId)
             ->firstOrFail();
+
+        $stock = LicenseStock::where('product_id', $product->id)
+            ->where('package_id', $package->id)
+            ->where('is_sold', false)
+            ->first();
+
+        if (!$stock) {
+            throw new \Exception('Stock habis 😭');
+        }
 
         $orderId = 'ORD-' . strtoupper(Str::random(10));
 

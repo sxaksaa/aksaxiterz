@@ -14,6 +14,7 @@ use App\Models\License;
 use App\Models\User;
 use App\Models\Category;
 use App\Models\Package;
+use App\Models\LicenseStock;
 
 use App\Http\Controllers\PaymentController;
 
@@ -41,6 +42,12 @@ Route::get('/', function (Request $request) {
     }
 
     $products = $query->with('packages')->get();
+
+    foreach ($products as $product) {
+        $product->stock = LicenseStock::where('product_id', $product->id)
+            ->where('is_sold', false)
+            ->count();
+    }
     return view('home', compact('categories', 'products'));
 });
 
@@ -59,6 +66,12 @@ Route::get('/api/products', function (Request $request) {
     }
 
     $products = $query->get();
+
+    foreach ($products as $product) {
+        $product->stock = LicenseStock::where('product_id', $product->id)
+            ->where('is_sold', false)
+            ->count();
+    }
     return view('partials.product-card', compact('products'));
 });
 
@@ -127,108 +140,7 @@ Route::middleware('auth')->group(function () {
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| CALLBACKS (PUBLIC)
-|--------------------------------------------------------------------------
-*/
 
-// 🔥 MIDTRANS CALLBACK (SECURE)
-Route::post('/midtrans-callback', function (Request $request) {
-
-    $data = $request->all();
-
-    $serverKey = config('midtrans.serverKey');
-
-    $hashed = hash(
-        "sha512",
-        $data['order_id'] .
-            $data['status_code'] .
-            $data['gross_amount'] .
-            $serverKey
-    );
-
-    if ($hashed !== $data['signature_key']) {
-        return response()->json(['error' => 'invalid signature']);
-    }
-
-    $order = Order::where('order_id', $data['order_id'])->first();
-
-    if (!$order) {
-        return response()->json(['error' => 'order not found']);
-    }
-
-    if (in_array($data['transaction_status'], ['settlement', 'capture'])) {
-
-        if ($order->status !== 'paid') {
-
-            $order->update(['status' => 'paid']);
-
-            License::create([
-                'product_id' => $order->product_id,
-                'user_id' => $order->user_id,
-                'license_key' => strtoupper(Str::random(16)),
-                'duration' => Package::find($order->package_id)->name,
-                'order_id' => $order->order_id
-            ]);
-        }
-    }
-
-    return response()->json(['message' => 'ok']);
-});
-
-// 🔥 CRYPTO CALLBACK
-Route::post('/crypto-callback', function (Request $request) {
-    $signature = $request->header('x-nowpayments-sig');
-
-    $expected = hash_hmac(
-        'sha512',
-        $request->getContent(),
-        config('services.nowpayments.key')
-    );
-
-    if (!$signature || $signature !== $expected) {
-        \Log::warning('INVALID CRYPTO SIGNATURE', $request->all());
-        return response()->json(['error' => 'invalid signature']);
-    }
-
-    $data = $request->all();
-
-    Log::info('CRYPTO CALLBACK:', $data);
-
-    if (!isset($data['payment_id'])) {
-        return response()->json(['status' => 'invalid payment']);
-    }
-
-    if (($data['payment_status'] ?? '') !== 'finished') {
-        return response()->json(['status' => 'not finished']);
-    }
-
-    $order = Order::where('order_id', $data['order_id'] ?? null)->first();
-
-    if (!$order) {
-        return response()->json(['status' => 'order not found']);
-    }
-
-    if ((float)$data['price_amount'] !== (float)$order->price) {
-        return response()->json(['status' => 'invalid amount']);
-    }
-
-    if ($order->status !== 'paid') {
-
-        $order->update(['status' => 'paid']);
-
-        License::create([
-            'user_id' => $order->user_id,
-            'product_id' => $order->product_id,
-            'license_key' => strtoupper(Str::random(16)),
-            'duration' => Package::find($order->package_id)->name,
-            'order_id' => $order->order_id
-        ]);
-    }
-
-    return response()->json(['status' => 'success']);
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -266,3 +178,12 @@ Route::post('/logout', function () {
 Route::get('/login', function () {
     return redirect('/auth/google');
 })->name('login');
+
+
+
+Route::post('/midtrans-callback', [PaymentController::class, 'midtransCallback']);
+Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);
+
+Route::get('/success', function () {
+    return redirect('/licenses');
+});

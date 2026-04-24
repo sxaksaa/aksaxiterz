@@ -37,7 +37,7 @@ border-b border-[#27272A] transition-transform duration-300">
         <div class="flex items-center gap-3">
 
             <!-- MOBILE MENU BUTTON -->
-            <button id="menuBtn" onclick="toggleMobileMenu(event)" class="md:hidden text-white text-xl">
+            <button id="menuBtn" onclick="toggleMobileMenu(event)" class="md:hidden text-white text-2xl p-2">
                 ☰
             </button>
 

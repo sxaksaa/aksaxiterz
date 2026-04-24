@@ -10,8 +10,8 @@ class PackageSeeder extends Seeder
 {
     public function run(): void
     {
-        $aurora = Product::where('name', 'AuroraVN')->first();
-        $xg = Product::where('name', 'XG')->first();
+        $aurora = Product::where('name', 'Aurora-VN')->first();
+        $xg = Product::where('name', 'XG-Team')->first();
 
         // 🔥 AuroraVN
         Package::updateOrCreate(

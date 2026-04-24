@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Aksaxiterz</title>
     @vite('resources/css/app.css')
@@ -12,4 +13,5 @@
     @yield('content')
 
 </body>
+
 </html>

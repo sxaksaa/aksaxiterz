@@ -1,13 +1,16 @@
 @extends('layouts.app')
 
 @section('content')
-    <div id="skeleton" class="max-w-5xl mx-auto px-12 py-10 space-y-4 animate-pulse">
+    @php
+        $stock = \App\Models\LicenseStock::where('product_id', $product->id)->where('is_sold', false)->count();
+    @endphp
+    <div id="skeleton" class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10 space-y-4 animate-pulse">
         <div class="h-6 bg-[#1f1f25] w-1/3 rounded"></div>
         <div class="h-4 bg-[#1f1f25] w-1/2 rounded"></div>
         <div class="h-32 bg-[#1f1f25] rounded-xl"></div>
     </div>
 
-    <div id="content" class="hidden max-w-5xl mx-auto px-12 py-10 fade-up">
+    <div id="content" class="hidden max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10 fade-up">
 
         <h1 class="text-2xl font-semibold mb-2">{{ $product->name }}</h1>
         <p class="text-gray-400 mb-6">{{ $product->description }}</p>
@@ -25,7 +28,7 @@
         <!-- PAYMENT -->
         <h2 class="mb-4 font-semibold">Payment Method</h2>
 
-        <div class="grid grid-cols-2 gap-4 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
 
             <div onclick="selectPayment('midtrans')" id="btnMid"
                 class="card-glow p-5 cursor-pointer payment-card flex flex-col items-center justify-center gap-1">
@@ -58,33 +61,37 @@
 
             <div id="dropdownList" class="hidden absolute w-full mt-2 card-glow overflow-hidden z-50">
 
-    <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)')" class="dropdown-item flex items-baseline gap-2">
-        <span class="font-bold text-white">BSC</span>
-        <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
-        <span class="text-xs italic text-yellow-500 ml-auto">⭐ Recommended</span>
-    </div>
+                <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)')"
+                    class="dropdown-item flex items-baseline gap-2">
+                    <span class="font-bold text-white">BSC</span>
+                    <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
+                    <span class="text-xs italic text-yellow-500 ml-auto">⭐ Recommended</span>
+                </div>
 
-    <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)')" class="dropdown-item flex items-baseline gap-2">
-        <span class="font-bold text-white">TRX</span>
-        <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
-    </div>
+                <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)')"
+                    class="dropdown-item flex items-baseline gap-2">
+                    <span class="font-bold text-white">TRX</span>
+                    <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
+                </div>
 
-    <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)')" class="dropdown-item flex items-baseline gap-2">
-        <span class="font-bold text-white">ETH</span>
-        <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
-    </div>
+                <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)')"
+                    class="dropdown-item flex items-baseline gap-2">
+                    <span class="font-bold text-white">ETH</span>
+                    <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
+                </div>
 
-    <div onclick="selectNetwork('usdtmatic','POL Polygon POS')" class="dropdown-item flex items-baseline gap-2">
-        <span class="font-bold text-white">POL</span>
-        <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
-    </div>
+                <div onclick="selectNetwork('usdtmatic','POL Polygon POS')" class="dropdown-item flex items-baseline gap-2">
+                    <span class="font-bold text-white">POL</span>
+                    <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
+                </div>
 
-    <div onclick="selectNetwork('usdtton','TON The Open Network (TON)')" class="dropdown-item flex items-baseline gap-2">
-        <span class="font-bold text-white">TON</span>
-        <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
-    </div>
+                <div onclick="selectNetwork('usdtton','TON The Open Network (TON)')"
+                    class="dropdown-item flex items-baseline gap-2">
+                    <span class="font-bold text-white">TON</span>
+                    <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
+                </div>
 
-</div>
+            </div>
 
         </div>
 
@@ -104,7 +111,7 @@
                 @endphp
 
                 <div onclick="selectPackage(event, {{ $p->price }}, {{ $p->id }}, '{{ $p->name }}', {{ $p->price_usdt }})"
-                    class="card-glow p-4 w-44 relative cursor-pointer package transition">
+                    class="card-glow p-4 w-full sm:w-44 relative cursor-pointer package transition">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
@@ -124,7 +131,7 @@
         </div>
 
         <!-- SUMMARY -->
-        <div id="summaryBox" class="hidden card-glow p-6 fade-up transition-all duration-300">
+        <div id="summaryBox" class="hidden card-glow p-4 sm:p-6 fade-up transition-all duration-300">
 
             <h3 class="mb-4 font-semibold">Order Summary</h3>
 
@@ -138,8 +145,13 @@
                 <span id="totalPrice" class="text-[#C084FC]">-</span>
             </div>
 
-            <button id="payMainBtn" class="btn-main mt-4 w-full">
-                Pay Now 🚀
+            <button id="payMainBtn"
+                class="btn-main mt-4 w-full 
+    {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
+                {{ $stock <= 0 ? 'disabled' : '' }}>
+
+                {{ $stock <= 0 ? 'Out of Stock' : 'Pay Now' }}
+
             </button>
             <!-- MIDTRANS FORM -->
             <form id="midForm" method="POST" class="hidden">
@@ -156,7 +168,7 @@
         </div>
     </div> {{-- content --}}
 
-    @if($errors->has('payment'))
+    @if ($errors->has('payment'))
         <div id="toastError"
             class="
     fixed bottom-6 right-6 z-50
@@ -356,20 +368,20 @@
 
             if (selectedPayment === 'crypto') {
 
-    if (!selectedCoin) {
-        alert('Select network');
-        return;
-    }
+                if (!selectedCoin) {
+                    alert('Select network');
+                    return;
+                }
 
 
 
-    document.getElementById('crypto_package').value = selectedPackageId;
-    document.getElementById('crypto_coin').value = selectedCoin;
+                document.getElementById('crypto_package').value = selectedPackageId;
+                document.getElementById('crypto_coin').value = selectedCoin;
 
-    const form = document.getElementById('cryptoForm');
-    form.action = `/pay-crypto/${productId}`;
-    form.submit();
-}
+                const form = document.getElementById('cryptoForm');
+                form.action = `/pay-crypto/${productId}`;
+                form.submit();
+            }
         };
     </script>
 @endsection
