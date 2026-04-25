@@ -28,7 +28,6 @@ border-b border-[#27272A] transition-transform duration-300">
                 </a>
             @endauth
 
-            <!-- 🔥 INDICATOR -->
             <span id="navIndicator" class="nav-indicator"></span>
 
         </div>
@@ -37,8 +36,8 @@ border-b border-[#27272A] transition-transform duration-300">
         <div class="flex items-center gap-3">
 
             <!-- MOBILE MENU BUTTON -->
-            <button id="menuBtn" onclick="toggleMobileMenu(event)" class="md:hidden text-white text-2xl p-2">
-                ☰
+            <button id="menuBtn" onclick="toggleMobileMenu(event)" class="md:hidden text-white text-sm p-2">
+                Menu
             </button>
 
             <!-- DESKTOP PROFILE -->
@@ -87,8 +86,6 @@ border-b border-[#27272A] transition-transform duration-300">
 
 
 </nav>
-
-<!-- 🔥 MOBILE MENU -->
 
 <div id="mobileMenu"
     class="md:hidden fixed top-[64px] left-0 w-full 
@@ -148,7 +145,6 @@ transition-all duration-300 ease-out">
         color: #C084FC;
     }
 
-    /* INDICATOR */
     .nav-indicator {
         position: absolute;
         bottom: -6px;
@@ -173,12 +169,12 @@ transition-all duration-300 ease-out">
             menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
             menu.classList.add('opacity-100', 'translate-y-0');
 
-            btn.innerText = '✖';
+            btn.innerText = 'Close';
         } else {
             menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
             menu.classList.remove('opacity-100', 'translate-y-0');
 
-            btn.innerText = '☰';
+            btn.innerText = 'Menu';
         }
     }
 
@@ -194,7 +190,7 @@ transition-all duration-300 ease-out">
                 menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
                 menu.classList.remove('opacity-100', 'translate-y-0');
 
-                button.innerText = '☰';
+                button.innerText = 'Menu';
                 mobileOpen = false;
             }
         }

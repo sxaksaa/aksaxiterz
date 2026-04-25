@@ -20,7 +20,7 @@
             <h3 class="mb-3 font-semibold">Features</h3>
             <ul class="space-y-1 text-sm text-gray-300">
                 @foreach ($product->features as $f)
-                    <li>✔ {{ $f->name }}</li>
+                    <li>{{ $f->name }}</li>
                 @endforeach
             </ul>
         </div>
@@ -33,7 +33,6 @@
             <div onclick="selectPayment('midtrans')" id="btnMid"
                 class="card-glow p-5 cursor-pointer payment-card flex flex-col items-center justify-center gap-1">
 
-                <div class="text-lg">💳</div>
                 <div>Transfer / E-Wallet</div>
                 <span class="text-xs text-gray-400">QRIS All Payment (Bank, Dana, GoPay, etc)</span>
 
@@ -42,9 +41,8 @@
             <div onclick="selectPayment('crypto')" id="btnCrypto"
                 class="card-glow p-5 cursor-pointer payment-card flex flex-col items-center justify-center gap-1">
 
-                <div class="text-lg">🪙</div>
                 <div>Crypto</div>
-                <span class="text-xs text-gray-400">USDT Adress</span>
+                <span class="text-xs text-gray-400">USDT Address</span>
 
             </div>
 
@@ -56,7 +54,7 @@
             <div onclick="toggleDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
 
                 <span id="selectedText">Select Network</span>
-                <span id="arrow" class="transition-transform">⌄</span>
+                <span id="arrow" class="transition-transform">v</span>
             </div>
 
             <div id="dropdownList" class="hidden absolute w-full mt-2 card-glow overflow-hidden z-50">
@@ -65,7 +63,7 @@
                     class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">BSC</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
-                    <span class="text-xs italic text-yellow-500 ml-auto">⭐ Recommended</span>
+                    <span class="text-xs italic text-yellow-500 ml-auto">Recommended</span>
                 </div>
 
                 <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)')"
@@ -103,10 +101,10 @@
                 @php
                     $badge = null;
                     if (str_contains($p->name, '30')) {
-                        $badge = '⭐ Best Deal';
+                        $badge = 'Best Deal';
                     }
                     if (str_contains($p->name, '90')) {
-                        $badge = '💎 Premium';
+                        $badge = 'Premium';
                     }
                 @endphp
 
@@ -182,7 +180,7 @@
 ">
 
             <div class="font-semibold text-red-400 mb-1">
-                Payment Failed 😢
+                Payment Failed
             </div>
 
             <div>
@@ -341,6 +339,8 @@
         ========================= */
         document.getElementById('payMainBtn').onclick = function() {
 
+            if (this.disabled) return;
+
             if (!selectedPackageId) {
                 alert('Select package first');
                 return;
@@ -352,8 +352,9 @@
             }
 
             this.innerText = "Processing...";
+            this.classList.remove('btn-main')
+            this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
-
 
             const productId = {{ $product->id }};
 
@@ -362,6 +363,7 @@
                 document.getElementById('mid_package').value = selectedPackageId;
 
                 const form = document.getElementById('midForm');
+                sessionStorage.setItem('last_product', window.location.href)
                 form.action = `/process-order/${productId}`;
                 form.submit();
             }
@@ -370,10 +372,14 @@
 
                 if (!selectedCoin) {
                     alert('Select network');
+
+                    this.disabled = false
+                    this.innerText = "Pay Now"
+                    this.classList.remove('bg-gray-500', 'cursor-not-allowed')
+                    this.classList.add('btn-main')
+
                     return;
                 }
-
-
 
                 document.getElementById('crypto_package').value = selectedPackageId;
                 document.getElementById('crypto_coin').value = selectedCoin;
@@ -383,5 +389,14 @@
                 form.submit();
             }
         };
+
+        window.addEventListener('pageshow', function() {
+            const btn = document.getElementById('payMainBtn')
+            if (btn) {
+                btn.disabled = false
+                btn.innerText = "Pay Now"
+                btn.classList.remove('bg-gray-500', 'cursor-not-allowed')
+            }
+        });
     </script>
 @endsection

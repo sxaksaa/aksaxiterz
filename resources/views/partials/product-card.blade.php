@@ -4,10 +4,10 @@
         $badge = null;
 
         if ($minPackage && $minPackage->price <= 50000) {
-            $badge = '🔥 Hot';
+            $badge = 'Hot';
         }
         if ($minPackage && $minPackage->price >= 100000) {
-            $badge = '💎 Premium';
+            $badge = 'Premium';
         }
     @endphp
 

@@ -13,7 +13,7 @@ class PackageSeeder extends Seeder
         $aurora = Product::where('name', 'Aurora-VN')->first();
         $xg = Product::where('name', 'XG-Team')->first();
 
-        // 🔥 AuroraVN
+        // AuroraVN
         Package::updateOrCreate(
             ['product_id' => $aurora->id, 'name' => '1 Hari'],
             ['price' => 20000, 'price_usdt' => 1.25]
@@ -29,7 +29,7 @@ class PackageSeeder extends Seeder
             ['price' => 250000, 'price_usdt' => 15]
         );
 
-        // 🔥 XG
+        // XG
         Package::updateOrCreate(
             ['product_id' => $xg->id, 'name' => '7 Hari'],
             ['price' => 80000, 'price_usdt' => 5]

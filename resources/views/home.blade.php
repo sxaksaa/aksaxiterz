@@ -3,7 +3,7 @@
 @section('content')
     <!-- LOADING -->
     <div id="pageLoader" class="fixed inset-0 
-    g-black/80 hidden items-center justify-center z-50">
+    bg-black/80 hidden items-center justify-center z-50">
         <div class="flex flex-col items-center gap-4">
             <div class="w-10 h-10 border-4 border-[#9333EA] border-t-transparent rounded-full animate-spin"></div>
             <span class="text-sm text-gray-300">Loading...</span>

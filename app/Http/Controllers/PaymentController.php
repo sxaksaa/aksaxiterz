@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 use App\Models\Order;
@@ -16,11 +15,50 @@ use App\Services\PaymentService;
 
 class PaymentController extends Controller
 {
-    protected $paymentService;
+    protected PaymentService $paymentService;
 
     public function __construct(PaymentService $paymentService)
     {
         $this->paymentService = $paymentService;
+    }
+
+    public function payAgain($orderId)
+    {
+        $user = Auth::user();
+
+        $order = Order::findOrFail($orderId);
+
+        if ($order->user_id !== $user->id) {
+            abort(403);
+        }
+
+        if ($order->status === 'paid') {
+            return back()->withErrors(['msg' => 'Already paid']);
+        }
+
+        Order::where('user_id', $user->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'cancelled']);
+
+        if ($order->payment_method === 'midtrans') {
+            $snapToken = $this->paymentService->createMidtrans(
+                $user,
+                $order->product_id,
+                $order->package_id
+            );
+
+            return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
+        } else {
+
+            $url = $this->paymentService->createCrypto(
+                $user,
+                $order->product_id,
+                $order->package_id,
+                'usdttrc20'
+            );
+
+            return redirect($url);
+        }
     }
 
     /*
@@ -33,13 +71,21 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
+        if ($this->hasTooManyRecentOrders($user->id)) {
+            return back()->withErrors([
+                'payment' => 'Terlalu banyak request, coba lagi nanti'
+            ]);
+        }
+
+        if ($this->hasPendingOrder($user->id)) {
+            return back()->withErrors([
+                'payment' => 'Masih ada pembayaran aktif'
+            ]);
+        }
+
         $request->validate([
             'package_id' => 'required|exists:packages,id'
         ]);
-
-        Order::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->update(['status' => 'cancelled']);
 
         try {
             $snapToken = $this->paymentService->createMidtrans(
@@ -48,7 +94,7 @@ class PaymentController extends Controller
                 $request->package_id
             );
 
-            return view('midtrans-pay', compact('snapToken'));
+            return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
         } catch (\Exception $e) {
             Log::error('MIDTRANS ERROR: ' . $e->getMessage());
 
@@ -66,29 +112,43 @@ class PaymentController extends Controller
 
     public function midtransCallback(Request $request)
     {
-        Log::info('MIDTRANS CALLBACK', $request->all());
-
         $serverKey = config('midtrans.serverKey');
+
+        if (!$serverKey) {
+            Log::error('MIDTRANS CALLBACK ERROR: missing server key');
+
+            return response()->json(['error' => 'server not configured'], 500);
+        }
 
         $hashed = hash(
             'sha512',
             $request->order_id .
-            $request->status_code .
-            $request->gross_amount .
-            $serverKey
+                $request->status_code .
+                $request->gross_amount .
+                $serverKey
         );
 
-        if ($hashed !== $request->signature_key) {
+        if (!hash_equals($hashed, (string) $request->signature_key)) {
             return response()->json(['error' => 'Invalid signature'], 403);
         }
 
         DB::beginTransaction();
 
         try {
+            $order = Order::where('order_id', $request->order_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $order = Order::where('order_id', $request->order_id)->firstOrFail();
+            if (
+                $order->payment_method !== 'midtrans' ||
+                !$this->sameAmount($request->gross_amount, $order->price)
+            ) {
+                DB::rollBack();
+                return response()->json(['error' => 'Invalid amount'], 403);
+            }
 
             if ($order->status === 'paid') {
+                DB::commit();
                 return response()->json(['msg' => 'already']);
             }
 
@@ -101,13 +161,15 @@ class PaymentController extends Controller
             }
 
             if (in_array($request->transaction_status, ['cancel', 'deny', 'expire'])) {
-                $order->update(['status' => 'cancelled']);
+
+                if ($order->status !== 'paid') {
+                    $order->update(['status' => 'cancelled']);
+                }
             }
 
             DB::commit();
 
             return response()->json(['msg' => 'ok']);
-
         } catch (\Exception $e) {
 
             DB::rollBack();
@@ -128,17 +190,24 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
+        if ($this->hasTooManyRecentOrders($user->id)) {
+            return back()->withErrors([
+                'payment' => 'Terlalu banyak request'
+            ]);
+        }
+
+        if ($this->hasPendingOrder($user->id)) {
+            return back()->withErrors([
+                'payment' => 'Masih ada pembayaran aktif'
+            ]);
+        }
+
         $request->validate([
             'package_id' => 'required|exists:packages,id',
             'coin' => 'required|string|max:20'
         ]);
 
-        Order::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->update(['status' => 'cancelled']);
-
         try {
-
             $url = $this->paymentService->createCrypto(
                 $user,
                 $productId,
@@ -147,13 +216,12 @@ class PaymentController extends Controller
             );
 
             return redirect($url);
-
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: ' . $e->getMessage());
 
             return back()->withErrors([
-                'payment' => $e->getMessage()
+                'payment' => 'Payment failed'
             ]);
         }
     }
@@ -167,18 +235,25 @@ class PaymentController extends Controller
     public function cryptoCallback(Request $request)
     {
         $signature = $request->header('x-nowpayments-sig');
+        $ipnSecret = config('services.nowpayments.ipn_secret');
 
-        $expected = hash_hmac(
-            'sha512',
-            $request->getContent(),
-            config('services.nowpayments.key')
-        );
+        if (!$ipnSecret) {
+            Log::error('NOWPayments CALLBACK ERROR: missing IPN secret');
 
-        if (!$signature || $signature !== $expected) {
-            return response()->json(['error' => 'invalid signature']);
+            return response()->json(['error' => 'server not configured'], 500);
         }
 
-        $data = $request->all();
+        $data = json_decode($request->getContent(), true);
+
+        if (!is_array($data)) {
+            return response()->json(['error' => 'invalid payload'], 400);
+        }
+
+        $expected = $this->nowpaymentsSignature($data, $ipnSecret);
+
+        if (!$signature || !hash_equals($expected, $signature)) {
+            return response()->json(['error' => 'invalid signature'], 403);
+        }
 
         if (($data['payment_status'] ?? '') !== 'finished') {
             return response()->json(['status' => 'not finished']);
@@ -187,10 +262,21 @@ class PaymentController extends Controller
         DB::beginTransaction();
 
         try {
+            $order = Order::where('order_id', $data['order_id'] ?? null)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $order = Order::where('order_id', $data['order_id'])->firstOrFail();
+            if (
+                $order->payment_method !== 'crypto' ||
+                strtolower((string) ($data['price_currency'] ?? '')) !== 'usd' ||
+                !$this->sameAmount($data['price_amount'] ?? null, $order->price)
+            ) {
+                DB::rollBack();
+                return response()->json(['error' => 'invalid amount'], 403);
+            }
 
             if ($order->status === 'paid') {
+                DB::commit();
                 return response()->json(['status' => 'already']);
             }
 
@@ -199,7 +285,6 @@ class PaymentController extends Controller
             DB::commit();
 
             return response()->json(['status' => 'success']);
-
         } catch (\Exception $e) {
 
             DB::rollBack();
@@ -212,12 +297,16 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | 🔥 CORE LOGIC (DIPAKAI SEMUA PAYMENT)
+    | CORE LOGIC
     |--------------------------------------------------------------------------
     */
 
     private function generateLicense($order)
     {
+        if ($order->status === 'paid' || License::where('order_id', $order->order_id)->exists()) {
+            return;
+        }
+
         $package = Package::findOrFail($order->package_id);
 
         $stock = LicenseStock::where('product_id', $order->product_id)
@@ -226,8 +315,8 @@ class PaymentController extends Controller
             ->lockForUpdate()
             ->first();
 
-        if (!$stock) {
-            throw new \Exception('Stock habis 😭');
+        if (!$stock || $stock->is_sold) {
+            throw new \Exception('Stock invalid');
         }
 
         $stock->update([
@@ -245,5 +334,49 @@ class PaymentController extends Controller
             'duration' => $package->name,
             'order_id' => $order->order_id
         ]);
+    }
+
+    private function hasTooManyRecentOrders(int $userId): bool
+    {
+        return Order::where('user_id', $userId)
+            ->where('created_at', '>', now()->subMinute())
+            ->count() >= 5;
+    }
+
+    private function hasPendingOrder(int $userId): bool
+    {
+        return Order::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->where(function ($query) {
+                $query->whereNull('expired_at')
+                    ->orWhere('expired_at', '>', now());
+            })
+            ->exists();
+    }
+
+    private function sameAmount($first, $second): bool
+    {
+        return round((float) $first, 4) === round((float) $second, 4);
+    }
+
+    private function nowpaymentsSignature(array $payload, string $secret): string
+    {
+        $sortedPayload = $this->sortPayload($payload);
+        $json = json_encode($sortedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return hash_hmac('sha512', $json, $secret);
+    }
+
+    private function sortPayload(array $payload): array
+    {
+        ksort($payload);
+
+        foreach ($payload as $key => $value) {
+            if (is_array($value)) {
+                $payload[$key] = $this->sortPayload($value);
+            }
+        }
+
+        return $payload;
     }
 }

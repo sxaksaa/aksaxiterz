@@ -3,8 +3,6 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -13,7 +11,6 @@ use App\Models\Order;
 use App\Models\License;
 use App\Models\User;
 use App\Models\Category;
-use App\Models\Package;
 use App\Models\LicenseStock;
 
 use App\Http\Controllers\PaymentController;
@@ -48,6 +45,7 @@ Route::get('/', function (Request $request) {
             ->where('is_sold', false)
             ->count();
     }
+
     return view('home', compact('categories', 'products'));
 });
 
@@ -72,6 +70,7 @@ Route::get('/api/products', function (Request $request) {
             ->where('is_sold', false)
             ->count();
     }
+
     return view('partials.product-card', compact('products'));
 });
 
@@ -92,17 +91,25 @@ Route::get('/product/{id}', function ($id) {
 */
 Route::middleware('auth')->group(function () {
 
-    // 🔥 MIDTRANS
-    Route::middleware('auth')->group(function () {
+    // Pay again
+    Route::post('/pay-again/{order}', [PaymentController::class, 'payAgain']);
 
-        Route::post('/process-order/{id}', [PaymentController::class, 'payMidtrans'])
-            ->middleware('throttle:10,1');
+    // Midtrans pay page
+    Route::get('/midtrans-pay', function (Request $request) {
+        return view('midtrans-pay', [
+            'snapToken' => $request->token
+        ]);
+    })->name('midtrans.pay.page');
 
-        Route::post('/pay-crypto/{product}', [PaymentController::class, 'payCrypto'])
-            ->middleware('throttle:10,1');
-    });
+    // Midtrans
+    Route::post('/process-order/{id}', [PaymentController::class, 'payMidtrans'])
+        ->middleware('throttle:5,1');
 
-    // CHECK ORDER
+    // Crypto
+    Route::post('/pay-crypto/{product}', [PaymentController::class, 'payCrypto'])
+        ->middleware('throttle:5,1');
+
+    // Check latest order for polling.
     Route::get('/check-order', function () {
 
         $order = Order::where('user_id', auth()->id())->latest()->first();
@@ -111,7 +118,7 @@ Route::middleware('auth')->group(function () {
             return response()->json(['status' => null]);
         }
 
-        $expireAt = Carbon::parse($order->created_at)->addMinutes(15);
+        $expireAt = $order->expired_at;
         $remaining = $expireAt->diffInSeconds(Carbon::now(), false);
 
         if ($remaining <= 0 && $order->status === 'pending') {
@@ -124,23 +131,28 @@ Route::middleware('auth')->group(function () {
         ]);
     });
 
-    // LICENSE
+    // License
     Route::get('/licenses', function () {
         $licenses = License::where('user_id', auth()->id())->latest()->get();
         return view('licenses', compact('licenses'));
     });
 
-    // ORDERS
+    // Orders
     Route::get('/orders', function () {
-        $orders = Order::with(['product', 'package'])
+
+        \App\Models\Order::where('status', 'pending')
+            ->whereNotNull('expired_at')
+            ->where('expired_at', '<', now()->subSeconds(2))
+            ->update(['status' => 'cancelled']);
+
+        $orders = \App\Models\Order::with(['product', 'package'])
             ->where('user_id', auth()->id())
             ->latest()
             ->get();
+
         return view('orders', compact('orders'));
     });
 });
-
-
 
 /*
 |--------------------------------------------------------------------------
@@ -174,12 +186,15 @@ Route::post('/logout', function () {
     return redirect('/');
 });
 
-
 Route::get('/login', function () {
     return redirect('/auth/google');
 })->name('login');
 
-
+/*
+|--------------------------------------------------------------------------
+| CALLBACKS
+|--------------------------------------------------------------------------
+*/
 
 Route::post('/midtrans-callback', [PaymentController::class, 'midtransCallback']);
 Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);

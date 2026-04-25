@@ -43,6 +43,7 @@ return [
 
     'nowpayments' => [
         'key' => env('NOWPAYMENTS_API_KEY'),
+        'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
         'url' => env('NOWPAYMENTS_URL'),
         'ipn' => env('NOWPAYMENTS_IPN'),
     ],

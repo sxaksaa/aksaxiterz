@@ -10,7 +10,7 @@ class FeatureSeeder extends Seeder
 {
     public function run(): void
     {
-        // 🔥 Aurora
+        // Aurora
         $aurora = Product::where('name', 'Aurora-VN')->firstOrFail();
 
         $auroraFeatures = [
@@ -30,7 +30,7 @@ class FeatureSeeder extends Seeder
             );
         }
 
-        // 🔥 XG-Team
+        // XG-Team
         $xg = Product::where('name', 'XG-Team')->firstOrFail();
 
         $xgFeatures = [

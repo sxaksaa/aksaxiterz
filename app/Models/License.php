@@ -12,7 +12,7 @@ class License extends Model
         'product_id',
         'license_key',
         'duration',
-        'order_id' // 🔥 WAJIB ADA INI
+        'order_id',
     ];
 
     public function product()

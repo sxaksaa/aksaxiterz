@@ -7,13 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     protected $fillable = [
-        'order_id', // 🔥 INI YANG PENTING
-        'user_id',
+        'order_id',
         'product_id',
+        'user_id',
         'status',
         'payment_method',
         'price',
-        'package_id'
+        'package_id',
+        'payment_url',
+        'expired_at',
+    ];
+
+    protected $casts = [
+        'expired_at' => 'datetime',
+        'price' => 'decimal:4',
     ];
 
     public function product()

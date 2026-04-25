@@ -61,7 +61,7 @@
                 </div>
 
             @empty
-                <p class="text-gray-400 fade-up text-sm">Belum ada license 😢</p>
+                <p class="text-gray-400 fade-up text-sm">Belum ada license</p>
             @endforelse
 
         </div>

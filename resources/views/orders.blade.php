@@ -15,11 +15,21 @@
                         <span>{{ $order->order_id }}</span>
                         <span>
                             @if ($order->status == 'paid')
-                                <span class="text-green-400">✔ Paid</span>
+                                <span class="text-green-400">Paid</span>
+                            @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
+                                <span class="text-red-400">Expired</span>
                             @elseif($order->status == 'pending')
-                                <span class="text-yellow-400">⏳ Pending</span>
+                                <span class="text-yellow-400">Pending</span>
+
+                                @if ($order->expired_at && now()->lt($order->expired_at))
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        <span class="countdown text-yellow-400 animate-pulse"
+                                            data-expire="{{ $order->expired_at }}">
+                                        </span>
+                                    </div>
+                                @endif
                             @else
-                                <span class="text-red-400">✖ Cancelled</span>
+                                <span class="text-red-400">Cancelled</span>
                             @endif
                         </span>
                     </div>
@@ -50,20 +60,36 @@
 
                     <!-- ACTION -->
                     <div class="pt-2">
-                        @if ($order->status === 'pending' && $order->payment_method === 'crypto' && $order->payment_url)
+                        @if (
+                            $order->status === 'pending' &&
+                                $order->payment_method === 'crypto' &&
+                                $order->payment_url &&
+                                $order->expired_at &&
+                                now()->lt($order->expired_at))
                             <a href="{{ $order->payment_url }}" target="_blank" class="text-purple-400 text-xs underline">
-                                Continue →
+                                Continue
                             </a>
-                        @elseif ($order->status === 'pending' && $order->payment_method === 'midtrans')
-                            <a href="/product/{{ $order->product_id }}" class="text-blue-400 text-xs underline">
-                                Pay Again →
-                            </a>
+                        @elseif (
+                            $order->status === 'pending' &&
+                                $order->payment_method === 'midtrans' &&
+                                $order->expired_at &&
+                                now()->lt($order->expired_at))
+                            <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
+                                @csrf
+                                <button type="submit" class="pay-btn text-blue-400 text-xs underline">
+                                    Pay Again
+                                </button>
+                            </form>
+                        @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
+                            <span class="text-red-400 text-xs">Expired</span>
+                        @else
+                            <span class="text-gray-500 text-xs">-</span>
                         @endif
                     </div>
 
                 </div>
             @empty
-                <p class="text-gray-400 text-sm">Belum ada order 😅</p>
+                <p class="text-gray-400 text-sm">Belum ada order</p>
             @endforelse
 
         </div>
@@ -111,24 +137,48 @@
 
                             <td class="p-3">
                                 @if ($order->status == 'paid')
-                                    <span class="text-green-400">✔ Paid</span>
+                                    <span class="text-green-400">Paid</span>
+                                @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
+                                    <span class="text-red-400">Expired</span>
                                 @elseif($order->status == 'pending')
-                                    <span class="text-yellow-400">⏳ Pending</span>
+                                    <span class="text-yellow-400">Pending</span>
+
+                                    @if ($order->expired_at && now()->lt($order->expired_at))
+                                        <div class="text-xs text-gray-400">
+                                            <span class="countdown text-yellow-400 animate-pulse"
+                                                data-expire="{{ $order->expired_at }}">
+                                            </span>
+                                        </div>
+                                    @endif
                                 @else
-                                    <span class="text-red-400">✖ Cancelled</span>
+                                    <span class="text-red-400">Cancelled</span>
                                 @endif
                             </td>
 
                             <td class="p-3">
-                                @if ($order->status === 'pending' && $order->payment_method === 'crypto' && $order->payment_url)
+                                @if (
+                                    $order->status === 'pending' &&
+                                        $order->payment_method === 'crypto' &&
+                                        $order->payment_url &&
+                                        $order->expired_at &&
+                                        now()->lt($order->expired_at))
                                     <a href="{{ $order->payment_url }}" target="_blank"
                                         class="text-purple-400 text-xs underline">
-                                        Continue →
+                                        Continue
                                     </a>
-                                @elseif ($order->status === 'pending' && $order->payment_method === 'midtrans')
-                                    <a href="/product/{{ $order->product_id }}" class="text-blue-400 text-xs underline">
-                                        Pay Again →
-                                    </a>
+                                @elseif (
+                                    $order->status === 'pending' &&
+                                        $order->payment_method === 'midtrans' &&
+                                        $order->expired_at &&
+                                        now()->lt($order->expired_at))
+                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
+                                        @csrf
+                                        <button type="submit" class="pay-btn text-blue-400 text-xs underline">
+                                            Pay Again
+                                        </button>
+                                    </form>
+                                @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
+                                    <span class="text-red-400 text-xs">Expired</span>
                                 @else
                                     -
                                 @endif
@@ -138,7 +188,7 @@
                     @empty
                         <tr>
                             <td colspan="7" class="p-6 text-center text-gray-400">
-                                Belum ada order 😅
+                                Belum ada order
                             </td>
                         </tr>
                     @endforelse
@@ -149,4 +199,61 @@
         </div>
 
     </div>
+
+    <script>
+    // Countdown tiap detik.
+    setInterval(() => {
+        document.querySelectorAll('.countdown').forEach(el => {
+
+            const expireTime = new Date(el.dataset.expire).getTime()
+            const now = new Date().getTime()
+            const diff = expireTime - now
+
+            if (diff <= 0) {
+                el.innerText = "Expired"
+                el.classList.remove("text-yellow-400")
+                el.classList.add("text-red-400")
+                return
+            }
+
+            const minutes = Math.floor(diff / 60000)
+            const seconds = Math.floor((diff % 60000) / 1000)
+
+            el.innerText = `${minutes}m ${seconds}s`
+        })
+    }, 1000)
+
+
+    // Auto refresh saat status order berubah.
+    setInterval(() => {
+
+        if (window.stopAutoCheck) return
+
+        fetch('/check-order')
+            .then(res => res.json())
+            .then(data => {
+
+                if (!data.status) return
+
+                if (data.status !== 'pending') {
+                    location.reload()
+                }
+
+            })
+
+    }, 3000)
+
+    document.querySelectorAll('.pay-again-form').forEach(form => {
+        form.addEventListener('submit', function() {
+
+            const btn = form.querySelector('.pay-btn')
+
+            btn.disabled = true
+            btn.innerText = "Processing..."
+            btn.classList.add('pointer-events-none', 'text-gray-400')
+
+            window.stopAutoCheck = true
+        })
+    })
+    </script>
 @endsection

@@ -9,7 +9,11 @@ class LicenseStock extends Model
     protected $fillable = [
         'license_key',
         'product_id',
-        'package_id', // tambah ini
-        'is_sold'
+        'package_id',
+        'is_sold',
+    ];
+
+    protected $casts = [
+        'is_sold' => 'boolean',
     ];
 }
