@@ -9,14 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('license_stocks', function (Blueprint $table) {
-            $table->renameColumn('is_sold', 'is_sold');
+            $table->renameColumn('is_used', 'is_sold');
         });
     }
 
     public function down(): void
     {
         Schema::table('license_stocks', function (Blueprint $table) {
-            $table->renameColumn('is_sold', 'is_sold');
+            $table->renameColumn('is_sold', 'is_used');
         });
     }
 };

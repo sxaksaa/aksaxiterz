@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
+use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
 {
@@ -18,7 +18,6 @@ class ProductSeeder extends Seeder
             [
                 'description' => 'Aurora ',
                 'category_id' => $category->id,
-                'price' => 20000,
             ]
         );
 
@@ -27,7 +26,6 @@ class ProductSeeder extends Seeder
             [
                 'description' => 'XG access',
                 'category_id' => $category->id,
-                'price' => 80000,
             ]
         );
 
@@ -36,7 +34,6 @@ class ProductSeeder extends Seeder
             [
                 'description' => 'Produk khusus untuk tes alur pembayaran asli dengan nominal rendah.',
                 'category_id' => $testingCategory->id,
-                'price' => 1,
             ]
         );
     }

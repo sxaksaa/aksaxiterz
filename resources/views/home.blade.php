@@ -49,13 +49,13 @@
 
         @php $active = request('category'); @endphp
 
-        <a href="#" onclick="filterCategory('', this)"
+        <a href="#" onclick="filterCategory('', this); return false;"
             class="category-chip {{ !$active ? 'active' : '' }}">
             All
         </a>
 
         @foreach ($categories as $category)
-            <a href="#" onclick="filterCategory('{{ $category->slug }}', this)"
+            <a href="#" onclick="filterCategory('{{ $category->slug }}', this); return false;"
                 class="category-chip {{ $active == $category->slug ? 'active' : '' }}">
                 {{ $category->name }}
             </a>
@@ -76,7 +76,7 @@
         document.addEventListener('DOMContentLoaded', () => {
 
             let timeout;
-            let currentCategory = '';
+            let currentCategory = @json(request('category', ''));
 
             const searchInput = document.getElementById('searchInput');
             const container = document.getElementById('productContainer');
@@ -109,7 +109,12 @@
 
                 container.style.opacity = 0;
 
-                fetch(`/api/products?search=${search}&category=${category}`)
+                const params = new URLSearchParams({
+                    search,
+                    category,
+                });
+
+                fetch(`/api/products?${params.toString()}`)
                     .then(res => res.text())
                     .then(html => {
 

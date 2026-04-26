@@ -44,7 +44,7 @@ border-b border-[#27272A] transition-transform duration-300">
             @auth
                 <div class="relative hidden md:block">
 
-                    <button onclick="toggleDropdown()"
+                    <button onclick="toggleProfileDropdown()"
                         class="flex items-center gap-2 text-gray-300 hover:text-white transition">
 
                         <span
@@ -197,7 +197,7 @@ transition-all duration-300 ease-out">
     });
 
     /* DROPDOWN PROFILE */
-    function toggleDropdown() {
+    function toggleProfileDropdown() {
         document.getElementById("dropdown").classList.toggle("hidden");
     }
 
@@ -212,10 +212,10 @@ transition-all duration-300 ease-out">
         indicator.style.left = el.offsetLeft + "px";
     }
 
-    window.onload = () => {
+    window.addEventListener('load', () => {
         activeItem = document.querySelector(".nav-item.active");
         if (activeItem) moveIndicator(activeItem);
-    };
+    });
 
     document.querySelectorAll(".nav-item").forEach(item => {
 

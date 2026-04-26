@@ -2,13 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\LicenseStock;
+use App\Models\Order;
+use App\Models\Package;
+use App\Models\Product;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Models\LicenseStock;
-use App\Models\Product;
-use App\Models\Order;
-use App\Models\Package;
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class PaymentService
 {
@@ -20,7 +22,7 @@ class PaymentService
         'usdtton',
     ];
 
-    public function createMidtrans($user, $productId, $packageId)
+    public function createMidtrans($user, $productId, $packageId, ?Order $order = null)
     {
         $product = Product::findOrFail($productId);
 
@@ -28,44 +30,49 @@ class PaymentService
             ->where('product_id', $productId)
             ->firstOrFail();
 
+        if ($order) {
+            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'midtrans');
+        }
+
         $stock = LicenseStock::where('product_id', $product->id)
             ->where('package_id', $package->id)
             ->where('is_sold', false)
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             throw new \Exception('Stock habis');
         }
 
-        $orderId = 'ORD-' . strtoupper(Str::random(10));
+        if (! $order) {
+            $order = Order::create([
+                'order_id' => 'ORD-'.strtoupper(Str::random(10)),
+                'product_id' => $product->id,
+                'user_id' => $user->id,
+                'status' => 'pending',
+                'payment_method' => 'midtrans',
+                'price' => $package->price,
+                'package_id' => $package->id,
+                'expired_at' => now()->addMinutes(10),
+            ]);
+        }
 
-        $order = Order::create([
-            'order_id' => $orderId,
-            'product_id' => $product->id,
-            'user_id' => $user->id,
-            'status' => 'pending',
-            'payment_method' => 'midtrans',
-            'price' => $package->price,
-            'package_id' => $package->id,
-            'expired_at' => now()->addMinutes(10),
-        ]);
-
-        \Midtrans\Config::$serverKey = config('midtrans.serverKey');
-        \Midtrans\Config::$isProduction = config('midtrans.isProduction', false);
+        Config::$serverKey = config('midtrans.serverKey');
+        Config::$isProduction = config('midtrans.isProduction', false);
+        Config::$curlOptions = $this->gatewayCurlOptions();
 
         $params = [
             'transaction_details' => [
-                'order_id' => $orderId,
-                'gross_amount' => $package->price,
+                'order_id' => $order->order_id,
+                'gross_amount' => (int) round((float) $order->price),
             ],
             'customer_details' => [
                 'first_name' => $user->name,
                 'email' => $user->email,
-            ]
+            ],
         ];
 
         try {
-            $snapToken = \Midtrans\Snap::getSnapToken($params);
+            $snapToken = Snap::getSnapToken($params);
         } catch (\Exception $e) {
             $order->update(['status' => 'cancelled']);
 
@@ -75,11 +82,11 @@ class PaymentService
         return $snapToken;
     }
 
-    public function createCrypto($user, $productId, $packageId, $coin)
+    public function createCrypto($user, $productId, $packageId, $coin, ?Order $order = null)
     {
         $coin = strtolower($coin);
 
-        if (!in_array($coin, self::ALLOWED_COINS, true)) {
+        if (! in_array($coin, self::ALLOWED_COINS, true)) {
             throw new \Exception('Invalid payment method');
         }
 
@@ -89,19 +96,22 @@ class PaymentService
             ->where('product_id', $productId)
             ->firstOrFail();
 
+        if ($order) {
+            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'crypto');
+        }
+
         $stock = LicenseStock::where('product_id', $product->id)
             ->where('package_id', $package->id)
             ->where('is_sold', false)
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             throw new \Exception('Stock habis');
         }
 
-        $amount = $package->price_usdt;
-        // 🔥 CUSTOM MINIMUM (PUNYA KAMU SENDIRI)
+        $amount = (float) ($order?->price ?? $package->price_usdt);
         $customMin = [
-            'usdttrc20' => 10, // TRC20 = $10
+            'usdttrc20' => 10,
             'usdtbsc' => 1,
             'usdterc20' => 1,
             'usdtmatic' => 1,
@@ -109,42 +119,43 @@ class PaymentService
         ];
 
         if (isset($customMin[$coin]) && $amount < $customMin[$coin]) {
-            throw new \Exception("Minimum payment {$coin} is \${$customMin[$coin]}");
+            throw new \Exception("Minimum crypto payment for {$coin} is \${$customMin[$coin]}");
         }
 
-        $orderId = 'ORD-' . strtoupper(Str::random(10));
-
-        $order = Order::create([
-            'order_id' => $orderId,
-            'product_id' => $product->id,
-            'user_id' => $user->id,
-            'status' => 'pending',
-            'payment_method' => 'crypto',
-            'price' => $package->price_usdt,
-            'package_id' => $package->id,
-            'expired_at' => now()->addMinutes(10),
-        ]);
+        if (! $order) {
+            $order = Order::create([
+                'order_id' => 'ORD-'.strtoupper(Str::random(10)),
+                'product_id' => $product->id,
+                'user_id' => $user->id,
+                'status' => 'pending',
+                'payment_method' => 'crypto',
+                'price' => $amount,
+                'package_id' => $package->id,
+                'expired_at' => now()->addMinutes(10),
+            ]);
+        }
 
         try {
-            $response = Http::withHeaders([
-                'x-api-key' => config('services.nowpayments.key')
-            ])->post(config('services.nowpayments.url') . '/invoice', [
-                'price_amount' => $package->price_usdt,
-                'price_currency' => 'usd',
-                'pay_currency' => $coin,
-                'is_fixed_rate' => false,
-                'order_id' => $orderId,
-                'order_description' => $product->name . ' - ' . $package->name,
-                'ipn_callback_url' => config('services.nowpayments.ipn'),
-                'success_url' => url('/licenses'),
-                'cancel_url' => url('/'),
-            ]);
+            $response = Http::withOptions($this->gatewayHttpOptions())
+                ->withHeaders([
+                    'x-api-key' => config('services.nowpayments.key'),
+                ])->post(config('services.nowpayments.url').'/invoice', [
+                    'price_amount' => $amount,
+                    'price_currency' => 'usd',
+                    'pay_currency' => $coin,
+                    'is_fixed_rate' => false,
+                    'order_id' => $order->order_id,
+                    'order_description' => $product->name.' - '.$package->name,
+                    'ipn_callback_url' => config('services.nowpayments.ipn'),
+                    'success_url' => url('/licenses'),
+                    'cancel_url' => url('/'),
+                ]);
 
             $data = $response->json();
 
-            if (!isset($data['invoice_url'])) {
+            if (! isset($data['invoice_url'])) {
                 Log::warning('NOWPayments invoice response missing URL', [
-                    'order_id' => $orderId,
+                    'order_id' => $order->order_id,
                     'status' => $response->status(),
                 ]);
 
@@ -152,13 +163,13 @@ class PaymentService
             }
 
             $order->update([
-                'payment_url' => $data['invoice_url']
+                'payment_url' => $data['invoice_url'],
             ]);
 
             return $data['invoice_url'];
         } catch (\Exception $e) {
 
-            Log::error('CRYPTO ERROR: ' . $e->getMessage());
+            Log::error('CRYPTO ERROR: '.$e->getMessage());
 
             $order->update(['status' => 'cancelled']);
 
@@ -171,21 +182,22 @@ class PaymentService
         $apiKey = config('services.nowpayments.key');
         $baseUrl = config('services.nowpayments.url');
 
-        if (!$apiKey || !$baseUrl) {
+        if (! $apiKey || ! $baseUrl) {
             return;
         }
 
         try {
-            $response = Http::withHeaders([
-                'x-api-key' => $apiKey,
-            ])->get(rtrim($baseUrl, '/') . '/min-amount', [
-                'currency_from' => 'usd',
-                'currency_to' => $coin,
-                'fiat_equivalent' => 'usd',
-                'is_fixed_rate' => false,
-            ]);
+            $response = Http::withOptions($this->gatewayHttpOptions())
+                ->withHeaders([
+                    'x-api-key' => $apiKey,
+                ])->get(rtrim($baseUrl, '/').'/min-amount', [
+                    'currency_from' => 'usd',
+                    'currency_to' => $coin,
+                    'fiat_equivalent' => 'usd',
+                    'is_fixed_rate' => false,
+                ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return;
             }
 
@@ -200,7 +212,7 @@ class PaymentService
                 throw $e;
             }
 
-            Log::warning('NOWPayments minimum check failed: ' . $e->getMessage());
+            Log::warning('NOWPayments minimum check failed: '.$e->getMessage());
         }
     }
 
@@ -213,5 +225,35 @@ class PaymentService
         }
 
         return null;
+    }
+
+    private function ensurePayableOrder(Order $order, $user, int $productId, int $packageId, string $method): void
+    {
+        if (
+            (int) $order->user_id !== (int) $user->id ||
+            (int) $order->product_id !== $productId ||
+            (int) $order->package_id !== $packageId ||
+            $order->payment_method !== $method ||
+            $order->status !== 'pending'
+        ) {
+            throw new \Exception('Invalid order');
+        }
+    }
+
+    private function gatewayCurlOptions(): array
+    {
+        return [
+            CURLOPT_HTTPHEADER => [],
+            CURLOPT_PROXY => '',
+            CURLOPT_NOPROXY => '*',
+        ];
+    }
+
+    private function gatewayHttpOptions(): array
+    {
+        return [
+            'proxy' => '',
+            'curl' => $this->gatewayCurlOptions(),
+        ];
     }
 }

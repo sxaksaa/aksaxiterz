@@ -16,6 +16,7 @@ class Order extends Model
         'package_id',
         'payment_url',
         'expired_at',
+        'replaced_by',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Order extends Model
     {
         return $this->belongsTo(Package::class);
     }
+
     public function user()
     {
         return $this->belongsTo(User::class);

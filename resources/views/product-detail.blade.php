@@ -67,7 +67,7 @@
         <!-- CRYPTO -->
         <div id="cryptoBox" class="hidden relative mb-6 fade-up z-10">
 
-            <div onclick="toggleDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
+            <div onclick="toggleCryptoDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
 
                 <span id="selectedText">Select Network</span>
                 <div id="minInfo" class="text-xs text-gray-400 mt-2 hidden">
@@ -131,7 +131,7 @@
                     }
                 @endphp
 
-                <div onclick="selectPackage(event, {{ $p->price }}, {{ $p->id }}, '{{ $p->name }}', {{ $p->price_usdt }})"
+                <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }})"
                     class="panel-card p-4 relative cursor-pointer package transition">
 
                     @if ($badge)
@@ -231,11 +231,12 @@
         let selectedPrice = 0;
         let selectedUsd = 0;
         let dropdownOpen = false;
+        const hasStock = @json($stock > 0);
 
-        window.onload = () => {
+        window.addEventListener('load', () => {
             document.getElementById('skeleton').style.display = 'none';
             document.getElementById('content').classList.remove('hidden');
-        };
+        });
 
         /* =========================
            PAYMENT
@@ -310,7 +311,7 @@
         /* =========================
            DROPDOWN
         ========================= */
-        function toggleDropdown(e) {
+        function toggleCryptoDropdown(e) {
 
             e.stopPropagation();
 
@@ -382,6 +383,11 @@
                 return;
             }
 
+            if (selectedPayment === 'crypto' && !selectedCoin) {
+                alert('Select network first');
+                return;
+            }
+
             this.innerText = "Processing...";
             this.classList.add('opacity-60')
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
@@ -413,8 +419,7 @@
 
                     this.disabled = false
                     this.innerText = "Pay Now"
-                    this.classList.remove('bg-gray-500', 'cursor-not-allowed')
-                    this.classList.add('btn-main')
+                    this.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
 
                     return;
                 }
@@ -431,9 +436,15 @@
         window.addEventListener('pageshow', function() {
             const btn = document.getElementById('payMainBtn')
             if (btn) {
+                if (!hasStock) {
+                    btn.disabled = true
+                    btn.innerText = "Out of Stock"
+                    return
+                }
+
                 btn.disabled = false
                 btn.innerText = "Pay Now"
-                btn.classList.remove('bg-gray-500', 'cursor-not-allowed')
+                btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             }
         });
     </script>

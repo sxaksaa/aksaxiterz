@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\License;
+use App\Models\LicenseStock;
+use App\Models\Order;
+use App\Models\Package;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-
-use App\Models\Order;
-use App\Models\License;
-use App\Models\Package;
-use App\Models\LicenseStock;
-use App\Services\PaymentService;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -36,9 +35,8 @@ class PaymentController extends Controller
             return back()->withErrors(['msg' => 'Already paid']);
         }
 
-        // 🔥 buat order baru
         $newOrder = Order::create([
-            'order_id' => 'ORD-' . strtoupper(\Str::random(10)),
+            'order_id' => 'ORD-'.strtoupper(\Str::random(10)),
             'user_id' => $user->id,
             'product_id' => $oldOrder->product_id,
             'package_id' => $oldOrder->package_id,
@@ -48,38 +46,48 @@ class PaymentController extends Controller
             'expired_at' => now()->addMinutes(10),
         ]);
 
-        // 🔥 tandai order lama diganti
         $oldOrder->update([
             'status' => 'cancelled',
-            'replaced_by' => $newOrder->id
+            'replaced_by' => $newOrder->id,
         ]);
 
-        // 🔥 cancel pending lain (opsional)
         Order::where('user_id', $user->id)
             ->where('status', 'pending')
             ->where('id', '!=', $newOrder->id)
             ->update(['status' => 'cancelled']);
 
-        // 🔥 lanjut payment
-        if ($newOrder->payment_method === 'midtrans') {
+        try {
+            if ($newOrder->payment_method === 'midtrans') {
 
-            $snapToken = $this->paymentService->createMidtrans(
-                $user,
-                $newOrder->product_id,
-                $newOrder->package_id
-            );
+                $snapToken = $this->paymentService->createMidtrans(
+                    $user,
+                    $newOrder->product_id,
+                    $newOrder->package_id,
+                    $newOrder
+                );
 
-            return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
-        } else {
+                return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
+            }
 
             $url = $this->paymentService->createCrypto(
                 $user,
                 $newOrder->product_id,
                 $newOrder->package_id,
-                'usdttrc20'
+                'usdttrc20',
+                $newOrder
             );
 
             return redirect($url);
+        } catch (\Exception $e) {
+            $newOrder->update(['status' => 'cancelled']);
+
+            Log::error('PAY AGAIN ERROR: '.$e->getMessage());
+
+            return back()->withErrors([
+                'payment' => str_starts_with($e->getMessage(), 'Minimum crypto payment')
+                    ? $e->getMessage()
+                    : 'Payment failed',
+            ]);
         }
     }
 
@@ -95,7 +103,7 @@ class PaymentController extends Controller
 
         if ($this->hasTooManyRecentOrders($user->id)) {
             return back()->withErrors([
-                'payment' => 'Terlalu banyak request, coba lagi nanti'
+                'payment' => 'Terlalu banyak request, coba lagi nanti',
             ]);
         }
 
@@ -105,7 +113,7 @@ class PaymentController extends Controller
         }
 
         $request->validate([
-            'package_id' => 'required|exists:packages,id'
+            'package_id' => 'required|exists:packages,id',
         ]);
 
         try {
@@ -117,10 +125,10 @@ class PaymentController extends Controller
 
             return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
         } catch (\Exception $e) {
-            Log::error('MIDTRANS ERROR: ' . $e->getMessage());
+            Log::error('MIDTRANS ERROR: '.$e->getMessage());
 
             return back()->withErrors([
-                'payment' => 'Payment failed'
+                'payment' => 'Payment failed',
             ]);
         }
     }
@@ -135,7 +143,7 @@ class PaymentController extends Controller
     {
         $serverKey = config('midtrans.serverKey');
 
-        if (!$serverKey) {
+        if (! $serverKey) {
             Log::error('MIDTRANS CALLBACK ERROR: missing server key');
 
             return response()->json(['error' => 'server not configured'], 500);
@@ -143,13 +151,13 @@ class PaymentController extends Controller
 
         $hashed = hash(
             'sha512',
-            $request->order_id .
-                $request->status_code .
-                $request->gross_amount .
+            $request->order_id.
+                $request->status_code.
+                $request->gross_amount.
                 $serverKey
         );
 
-        if (!hash_equals($hashed, (string) $request->signature_key)) {
+        if (! hash_equals($hashed, (string) $request->signature_key)) {
             return response()->json(['error' => 'Invalid signature'], 403);
         }
 
@@ -162,14 +170,16 @@ class PaymentController extends Controller
 
             if (
                 $order->payment_method !== 'midtrans' ||
-                !$this->sameAmount($request->gross_amount, $order->price)
+                ! $this->sameAmount($request->gross_amount, $order->price)
             ) {
                 DB::rollBack();
+
                 return response()->json(['error' => 'Invalid amount'], 403);
             }
 
             if ($order->status === 'paid') {
                 DB::commit();
+
                 return response()->json(['msg' => 'already']);
             }
 
@@ -195,7 +205,7 @@ class PaymentController extends Controller
 
             DB::rollBack();
 
-            Log::error('MIDTRANS CALLBACK ERROR: ' . $e->getMessage());
+            Log::error('MIDTRANS CALLBACK ERROR: '.$e->getMessage());
 
             return response()->json(['error' => 'failed'], 500);
         }
@@ -213,7 +223,7 @@ class PaymentController extends Controller
 
         if ($this->hasTooManyRecentOrders($user->id)) {
             return back()->withErrors([
-                'payment' => 'Terlalu banyak request'
+                'payment' => 'Terlalu banyak request',
             ]);
         }
 
@@ -224,7 +234,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
-            'coin' => 'required|string|max:20'
+            'coin' => 'required|string|max:20',
         ]);
 
         try {
@@ -238,12 +248,12 @@ class PaymentController extends Controller
             return redirect($url);
         } catch (\Exception $e) {
 
-            Log::error('CRYPTO ERROR: ' . $e->getMessage());
+            Log::error('CRYPTO ERROR: '.$e->getMessage());
 
             return back()->withErrors([
                 'payment' => str_starts_with($e->getMessage(), 'Minimum crypto payment')
                     ? $e->getMessage()
-                    : 'Payment failed'
+                    : 'Payment failed',
             ]);
         }
     }
@@ -259,7 +269,7 @@ class PaymentController extends Controller
         $signature = $request->header('x-nowpayments-sig');
         $ipnSecret = config('services.nowpayments.ipn_secret');
 
-        if (!$ipnSecret) {
+        if (! $ipnSecret) {
             Log::error('NOWPayments CALLBACK ERROR: missing IPN secret');
 
             return response()->json(['error' => 'server not configured'], 500);
@@ -267,13 +277,13 @@ class PaymentController extends Controller
 
         $data = json_decode($request->getContent(), true);
 
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             return response()->json(['error' => 'invalid payload'], 400);
         }
 
         $expected = $this->nowpaymentsSignature($data, $ipnSecret);
 
-        if (!$signature || !hash_equals($expected, $signature)) {
+        if (! $signature || ! hash_equals($expected, $signature)) {
             return response()->json(['error' => 'invalid signature'], 403);
         }
 
@@ -291,14 +301,16 @@ class PaymentController extends Controller
             if (
                 $order->payment_method !== 'crypto' ||
                 strtolower((string) ($data['price_currency'] ?? '')) !== 'usd' ||
-                !$this->sameAmount($data['price_amount'] ?? null, $order->price)
+                ! $this->sameAmount($data['price_amount'] ?? null, $order->price)
             ) {
                 DB::rollBack();
+
                 return response()->json(['error' => 'invalid amount'], 403);
             }
 
             if ($order->status === 'paid') {
                 DB::commit();
+
                 return response()->json(['status' => 'already']);
             }
 
@@ -311,7 +323,7 @@ class PaymentController extends Controller
 
             DB::rollBack();
 
-            Log::error('CRYPTO CALLBACK ERROR: ' . $e->getMessage());
+            Log::error('CRYPTO CALLBACK ERROR: '.$e->getMessage());
 
             return response()->json(['error' => 'failed'], 500);
         }
@@ -337,16 +349,16 @@ class PaymentController extends Controller
             ->lockForUpdate()
             ->first();
 
-        if (!$stock || $stock->is_sold) {
+        if (! $stock || $stock->is_sold) {
             throw new \Exception('Stock invalid');
         }
 
         $stock->update([
-            'is_sold' => true
+            'is_sold' => true,
         ]);
 
         $order->update([
-            'status' => 'paid'
+            'status' => 'paid',
         ]);
 
         License::create([
@@ -354,7 +366,7 @@ class PaymentController extends Controller
             'product_id' => $order->product_id,
             'license_key' => $stock->license_key,
             'duration' => $package->name,
-            'order_id' => $order->order_id
+            'order_id' => $order->order_id,
         ]);
     }
 

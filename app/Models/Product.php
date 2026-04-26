@@ -3,17 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Feature;
-use App\Models\Package;
-use App\Models\LicenseStock;
-use App\Models\Category;
 
 class Product extends Model
 {
     protected $fillable = [
         'category_id',
         'name',
-        'price',
         'description',
     ];
 

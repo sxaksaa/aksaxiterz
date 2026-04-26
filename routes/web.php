@@ -1,20 +1,16 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-
-use App\Models\Product;
-use App\Models\Order;
-use App\Models\License;
-use App\Models\User;
-use App\Models\Category;
-use App\Models\LicenseStock;
-
 use App\Http\Controllers\PaymentController;
-
+use App\Models\Category;
+use App\Models\License;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 /*
@@ -35,7 +31,7 @@ Route::get('/', function (Request $request) {
     }
 
     if ($request->search) {
-        $query->where('name', 'like', '%' . $request->search . '%');
+        $query->where('name', 'like', '%'.$request->search.'%');
     }
 
     $products = $query->get();
@@ -47,7 +43,7 @@ Route::get('/api/products', function (Request $request) {
     $query = Product::with(['category', 'packages'])->withCount('availableLicenseStocks');
 
     if ($request->search) {
-        $query->where('name', 'like', '%' . $request->search . '%');
+        $query->where('name', 'like', '%'.$request->search.'%');
     }
 
     if ($request->category) {
@@ -88,6 +84,9 @@ Route::middleware('auth')->group(function () {
     // Midtrans pay page
     Route::get('/midtrans-pay', function () {
         $token = request('token');
+
+        abort_if(blank($token), 404);
+
         return view('midtrans-pay', compact('token'));
     })->name('midtrans.pay.page');
 
@@ -104,14 +103,21 @@ Route::middleware('auth')->group(function () {
 
         $order = Order::where('user_id', auth()->id())->latest()->first();
 
-        if (!$order->expired_at) {
+        if (! $order) {
             return response()->json([
-                'status' => $order->status,
-                'remaining' => 0
+                'status' => null,
+                'remaining' => 0,
             ]);
         }
 
-        $remaining = $order->expired_at->diffInSeconds(Carbon::now(), false);
+        if (! $order->expired_at) {
+            return response()->json([
+                'status' => $order->status,
+                'remaining' => 0,
+            ]);
+        }
+
+        $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
 
         if ($remaining <= 0 && $order->status === 'pending') {
             $order->update(['status' => 'cancelled']);
@@ -119,30 +125,39 @@ Route::middleware('auth')->group(function () {
 
         return response()->json([
             'status' => $order->status,
-            'remaining' => max(0, abs($remaining))
+            'remaining' => max(0, (int) $remaining),
         ]);
     });
 
     // License
     Route::get('/licenses', function () {
         $licenses = License::where('user_id', auth()->id())->latest()->get();
+
         return view('licenses', compact('licenses'));
     });
 
     // Orders
     Route::get('/orders', function () {
 
-        \App\Models\Order::where('status', 'pending')
+        Order::where('status', 'pending')
             ->whereNotNull('expired_at')
             ->where('expired_at', '<', now())
             ->update(['status' => 'cancelled']);
 
-        $orders = \App\Models\Order::with(['product', 'package'])
+        $orders = Order::with(['product', 'package'])
             ->where('user_id', auth()->id())
             ->latest()
             ->get();
 
         return view('orders', compact('orders'));
+    });
+
+    Route::get('/orders-data', function () {
+        return Order::with(['product', 'package'])
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->take(10)
+            ->get();
     });
 });
 
@@ -164,7 +179,7 @@ Route::get('/auth/google/callback', function () {
         ['email' => $googleUser->email],
         [
             'name' => $googleUser->name,
-            'password' => bcrypt(Str::random(16))
+            'password' => bcrypt(Str::random(16)),
         ]
     );
 
@@ -175,6 +190,7 @@ Route::get('/auth/google/callback', function () {
 
 Route::post('/logout', function () {
     Auth::logout();
+
     return redirect('/');
 });
 
@@ -194,17 +210,3 @@ Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);
 Route::get('/success', function () {
     return redirect('/licenses');
 });
-
-
-Route::get('/orders-data', function () {
-    return \App\Models\Order::with(['product', 'package'])
-        ->where('user_id', auth()->id())
-        ->latest()
-        ->take(10)
-        ->get();
-});
-
-
-Route::get('/midtrans-pay/{token}', function ($token) {
-    return view('midtrans-pay', compact('token'));
-})->name('midtrans.pay.page');
