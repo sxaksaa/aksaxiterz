@@ -176,11 +176,11 @@
             </div>
 
             <button id="payMainBtn"
-                class="btn-main mt-4 w-full 
+                class="btn-main mt-4 w-full
     {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
                 {{ $stock <= 0 ? 'disabled' : '' }}>
 
-                {{ $stock <= 0 ? 'Out of Stock' : 'Pay Now' }}
+                {{ $stock <= 0 ? 'Out of Stock' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
 
             </button>
             <!-- MIDTRANS FORM -->
@@ -198,41 +198,29 @@
         </div>
     </div>
 
-    @if ($errors->has('payment'))
-        <div id="toastError"
-            class="
+    @php $paymentError = $errors->first('payment'); @endphp
+    <div id="checkoutToast"
+        class="
     fixed bottom-6 right-6 z-50
-    bg-red-500/10 border border-red-500/30
-    text-red-300 text-sm
+    bg-[#15151B]/95 border border-[#9333EA]/40
+    text-gray-200 text-sm
     px-5 py-3 rounded-xl
     shadow-xl backdrop-blur-md
+    max-w-[calc(100vw-2rem)] sm:max-w-sm
 
-    opacity-0 translate-y-6
+    {{ $paymentError ? '' : 'opacity-0 translate-y-6 pointer-events-none' }}
     transition-all duration-300
 ">
 
-            <div class="font-semibold text-red-400 mb-1">
-                Payment Failed
-            </div>
-
-            <div>
-                {{ $errors->first('payment') }}
-            </div>
-
+        <div id="checkoutToastTitle" class="font-semibold text-[#C084FC] mb-1">
+            {{ $paymentError ? 'Payment Failed' : 'Checkout' }}
         </div>
 
-        <script>
-            const toast = document.getElementById('toastError');
+        <div id="checkoutToastMessage">
+            {{ $paymentError }}
+        </div>
 
-            setTimeout(() => {
-                toast.classList.remove('opacity-0', 'translate-y-6');
-            }, 100);
-
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-6');
-            }, 4000);
-        </script>
-    @endif
+    </div>
 
     <script>
         let selectedPackageId = null;
@@ -243,12 +231,48 @@
         let selectedPackageStock = 0;
         let dropdownOpen = false;
         const hasStock = @json($stock > 0);
+        const isAuthenticated = @json(auth()->check());
+        const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        let toastTimer = null;
 
         window.addEventListener('load', () => {
             document.getElementById('skeleton').style.display = 'none';
             document.getElementById('content').classList.remove('hidden');
+
+            @if ($paymentError)
+                setTimeout(() => showToast('Payment Failed', @json($paymentError)), 100);
+            @endif
         });
+
+        function showToast(title, message, redirectAfter = null) {
+            const toast = document.getElementById('checkoutToast');
+            const toastTitle = document.getElementById('checkoutToastTitle');
+            const toastMessage = document.getElementById('checkoutToastMessage');
+
+            if (!toast || !toastTitle || !toastMessage) return;
+
+            toastTitle.innerText = title;
+            toastMessage.innerText = message;
+            toast.classList.remove('opacity-0', 'translate-y-6', 'pointer-events-none');
+
+            clearTimeout(toastTimer);
+
+            if (redirectAfter) {
+                toastTimer = setTimeout(() => {
+                    window.location.href = redirectAfter;
+                }, 900);
+                return;
+            }
+
+            toastTimer = setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-6', 'pointer-events-none');
+            }, 4000);
+        }
+
+        function requireLogin() {
+            showToast('Login required', 'Please login with Google before checkout.', loginUrl);
+        }
 
         /* =========================
            PAYMENT
@@ -423,7 +447,11 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                const error = new Error(data.message || 'Payment failed');
+                const message = response.status === 401 ?
+                    'Please login with Google before checkout.' :
+                    (data.message || 'Payment failed');
+                const error = new Error(message);
+                error.status = response.status;
                 error.redirectUrl = data.redirect_url;
                 throw error;
             }
@@ -506,7 +534,7 @@
             if (!btn || !hasStock) return;
 
             btn.disabled = false;
-            btn.innerText = 'Pay Now';
+            btn.innerText = isAuthenticated ? 'Pay Now' : 'Login to Pay';
             btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none');
         }
 
@@ -517,23 +545,28 @@
 
             if (this.disabled) return;
 
+            if (!isAuthenticated) {
+                requireLogin();
+                return;
+            }
+
             if (!selectedPackageId) {
-                alert('Select package first');
+                showToast('Select package', 'Select a package first.');
                 return;
             }
 
             if (selectedPackageStock <= 0) {
-                alert('This package is out of stock');
+                showToast('Out of stock', 'This package is out of stock.');
                 return;
             }
 
             if (!selectedPayment) {
-                alert('Select payment method');
+                showToast('Select payment', 'Select a payment method.');
                 return;
             }
 
             if (selectedPayment === 'crypto' && !selectedCoin) {
-                alert('Select network first');
+                showToast('Select network', 'Select a crypto network first.');
                 return;
             }
 
@@ -560,7 +593,12 @@
                         return;
                     }
 
-                    alert(error.message || 'Payment failed');
+                    if (error.status === 401) {
+                        requireLogin();
+                        return;
+                    }
+
+                    showToast('Payment failed', error.message || 'Payment failed');
                     resetPayButton();
                 }
             }
@@ -570,10 +608,10 @@
                 let min = networkMinimum(selectedCoin);
 
                 if (selectedUsd < min) {
-                    alert(`Minimum payment for ${selectedCoin} is $${min}`);
+                    showToast('Minimum payment', `Minimum payment for ${selectedCoin} is $${min}.`);
 
                     this.disabled = false
-                    this.innerText = "Pay Now"
+                    this.innerText = isAuthenticated ? "Pay Now" : "Login to Pay"
                     this.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
 
                     return;
@@ -602,7 +640,12 @@
                         return;
                     }
 
-                    alert(error.message || 'Payment failed');
+                    if (error.status === 401) {
+                        requireLogin();
+                        return;
+                    }
+
+                    showToast('Payment failed', error.message || 'Payment failed');
                     resetPayButton();
                 }
             }
@@ -618,7 +661,7 @@
                 }
 
                 btn.disabled = false
-                btn.innerText = "Pay Now"
+                btn.innerText = isAuthenticated ? "Pay Now" : "Login to Pay"
                 btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             }
         });

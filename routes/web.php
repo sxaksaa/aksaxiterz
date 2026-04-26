@@ -190,7 +190,13 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/auth/google', function () {
+Route::get('/auth/google', function (Request $request) {
+    $redirect = $request->query('redirect');
+
+    if (is_string($redirect) && str_starts_with($redirect, url('/'))) {
+        session(['login_redirect' => $redirect]);
+    }
+
     return Socialite::driver('google')->redirect();
 });
 
@@ -209,7 +215,7 @@ Route::get('/auth/google/callback', function () {
 
     Auth::login($user, true);
 
-    return redirect('/');
+    return redirect(session()->pull('login_redirect', '/'));
 });
 
 Route::post('/logout', function () {
