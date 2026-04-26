@@ -24,6 +24,11 @@ class PaymentService
 
     public function createMidtrans($user, $productId, $packageId, ?Order $order = null)
     {
+        return $this->createMidtransPayment($user, $productId, $packageId, $order)['snap_token'];
+    }
+
+    public function createMidtransPayment($user, $productId, $packageId, ?Order $order = null): array
+    {
         $product = Product::findOrFail($productId);
 
         $package = Package::where('id', $packageId)
@@ -79,10 +84,18 @@ class PaymentService
             throw $e;
         }
 
-        return $snapToken;
+        return [
+            'snap_token' => $snapToken,
+            'order' => $order->fresh(),
+        ];
     }
 
     public function createCrypto($user, $productId, $packageId, $coin, ?Order $order = null)
+    {
+        return $this->createCryptoPayment($user, $productId, $packageId, $coin, $order)['payment_url'];
+    }
+
+    public function createCryptoPayment($user, $productId, $packageId, $coin, ?Order $order = null): array
     {
         $coin = strtolower($coin);
 
@@ -166,7 +179,10 @@ class PaymentService
                 'payment_url' => $data['invoice_url'],
             ]);
 
-            return $data['invoice_url'];
+            return [
+                'payment_url' => $data['invoice_url'],
+                'order' => $order->fresh(),
+            ];
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: '.$e->getMessage());

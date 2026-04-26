@@ -1,5 +1,12 @@
 @extends('layouts.app')
 
+@push('head')
+    <script
+        src="{{ config('midtrans.isProduction') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
+        data-client-key="{{ config('midtrans.clientKey') }}">
+    </script>
+@endpush
+
 @section('content')
     @php
         $stock = $product->available_license_stocks_count ?? 0;
@@ -174,13 +181,13 @@
 
             </button>
             <!-- MIDTRANS FORM -->
-            <form id="midForm" method="POST" class="hidden">
+            <form id="midForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="mid_package">
             </form>
 
             <!-- CRYPTO FORM -->
-            <form id="cryptoForm" method="POST" class="hidden">
+            <form id="cryptoForm" method="POST" action="/pay-crypto/{{ $product->id }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="crypto_package">
                 <input type="hidden" name="coin" id="crypto_coin">
@@ -232,6 +239,7 @@
         let selectedUsd = 0;
         let dropdownOpen = false;
         const hasStock = @json($stock > 0);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         window.addEventListener('load', () => {
             document.getElementById('skeleton').style.display = 'none';
@@ -366,10 +374,63 @@
             }
         }
 
+        async function fetchPaymentJson(form) {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: new FormData(form),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const error = new Error(data.message || 'Payment failed');
+                error.redirectUrl = data.redirect_url;
+                throw error;
+            }
+
+            return data;
+        }
+
+        function openMidtransPayment(token) {
+            if (!window.snap) {
+                window.location.href = `/midtrans-pay?token=${encodeURIComponent(token)}`;
+                return;
+            }
+
+            window.snap.pay(token, {
+                onSuccess: function() {
+                    window.location.href = '/licenses';
+                },
+                onPending: function() {
+                    window.location.href = '/orders';
+                },
+                onError: function() {
+                    window.location.href = '/orders';
+                },
+                onClose: function() {
+                    window.location.href = '/orders';
+                },
+            });
+        }
+
+        function resetPayButton() {
+            const btn = document.getElementById('payMainBtn');
+            if (!btn || !hasStock) return;
+
+            btn.disabled = false;
+            btn.innerText = 'Pay Now';
+            btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none');
+        }
+
         /* =========================
            PAY BUTTON
         ========================= */
-        document.getElementById('payMainBtn').onclick = function() {
+        document.getElementById('payMainBtn').onclick = async function() {
 
             if (this.disabled) return;
 
@@ -400,9 +461,20 @@
                 document.getElementById('mid_package').value = selectedPackageId;
 
                 const form = document.getElementById('midForm');
-                sessionStorage.setItem('last_product', window.location.href)
-                form.action = `/process-order/${productId}`;
-                form.submit();
+                sessionStorage.setItem('last_product', window.location.href);
+
+                try {
+                    const data = await fetchPaymentJson(form);
+                    openMidtransPayment(data.snap_token);
+                } catch (error) {
+                    if (error.redirectUrl) {
+                        window.location.href = error.redirectUrl;
+                        return;
+                    }
+
+                    alert(error.message || 'Payment failed');
+                    resetPayButton();
+                }
             }
 
             if (selectedPayment === 'crypto') {
@@ -424,12 +496,35 @@
                     return;
                 }
 
+                const invoiceTab = window.open('', '_blank', 'noopener');
+
                 document.getElementById('crypto_package').value = selectedPackageId;
                 document.getElementById('crypto_coin').value = selectedCoin;
 
                 const form = document.getElementById('cryptoForm');
-                form.action = `/pay-crypto/${productId}`;
-                form.submit();
+
+                try {
+                    const data = await fetchPaymentJson(form);
+
+                    if (invoiceTab) {
+                        invoiceTab.location.href = data.payment_url;
+                        window.location.href = '/orders';
+                    } else {
+                        window.location.href = data.payment_url;
+                    }
+                } catch (error) {
+                    if (invoiceTab) {
+                        invoiceTab.close();
+                    }
+
+                    if (error.redirectUrl) {
+                        window.location.href = error.redirectUrl;
+                        return;
+                    }
+
+                    alert(error.message || 'Payment failed');
+                    resetPayButton();
+                }
             }
         };
 

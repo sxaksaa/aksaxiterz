@@ -152,6 +152,20 @@ Route::middleware('auth')->group(function () {
         return view('orders', compact('orders'));
     });
 
+    Route::get('/orders-fragment', function () {
+        Order::where('status', 'pending')
+            ->whereNotNull('expired_at')
+            ->where('expired_at', '<', now())
+            ->update(['status' => 'cancelled']);
+
+        $orders = Order::with(['product', 'package'])
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->get();
+
+        return view('partials.orders-list', compact('orders'));
+    });
+
     Route::get('/orders-data', function () {
         return Order::with(['product', 'package'])
             ->where('user_id', auth()->id())

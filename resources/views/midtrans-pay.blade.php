@@ -13,6 +13,9 @@
         },
         onError: function() {
             window.location.href = "/orders";
+        },
+        onClose: function() {
+            window.location.href = "/orders";
         }
     });
 </script>

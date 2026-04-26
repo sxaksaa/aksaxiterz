@@ -1,248 +1,198 @@
 @extends('layouts.app')
 
+@push('head')
+    <script
+        src="{{ config('midtrans.isProduction') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
+        data-client-key="{{ config('midtrans.clientKey') }}">
+    </script>
+@endpush
+
 @section('content')
     <div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10">
 
         <h1 class="text-xl sm:text-2xl font-semibold mb-6">Riwayat Order</h1>
 
-        {{-- 🔥 NOTIF GLOBAL --}}
         @if (session('info'))
             <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
                 {{ session('info') }}
             </div>
         @endif
 
-        <!-- ================= MOBILE (CARD) ================= -->
-
-        <div class="space-y-4 md:hidden">
-
-            @forelse ($orders as $order)
-                <div class="bg-[#15151B] border border-[#27272A] rounded-xl p-4 space-y-2">
-
-                    <div class="flex justify-between text-xs text-gray-400">
-                        <span>{{ $order->order_id }}</span>
-                        <span>
-                            @if ($order->status == 'paid')
-                                <span class="text-green-400">Paid</span>
-                            @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                                <span class="text-red-400">Expired</span>
-                            @elseif($order->status == 'pending')
-                                <span class="text-yellow-400">Pending</span>
-
-                                @if ($order->expired_at && now()->lt($order->expired_at))
-                                    <div class="text-xs text-gray-400 mt-1">
-                                        <span class="countdown text-yellow-400 animate-pulse"
-                                            data-expire="{{ $order->expired_at }}">
-                                        </span>
-                                    </div>
-                                @endif
-                            @else
-                                <span class="text-red-400">Cancelled (Replaced)</span>
-                            @endif
-                        </span>
-                    </div>
-
-                    <div class="text-sm font-semibold">
-                        {{ $order->product->name ?? '-' }}
-                    </div>
-
-                    <div class="text-xs text-gray-400">
-                        {{ $order->package->name ?? '-' }}
-                    </div>
-
-                    <div class="text-xs">
-                        @if ($order->payment_method == 'crypto')
-                            <span class="text-green-400">Crypto (USDT)</span>
-                        @else
-                            <span class="text-blue-400">Midtrans</span>
-                        @endif
-                    </div>
-
-                    <div class="text-[#C084FC] text-sm">
-                        @if ($order->payment_method == 'crypto')
-                            ${{ $order->price }}
-                        @else
-                            Rp {{ number_format($order->price) }}
-                        @endif
-                    </div>
-
-                    <!-- ACTION -->
-                    <div class="pt-2">
-                        @if (
-                            $order->status === 'pending' &&
-                                $order->payment_method === 'crypto' &&
-                                $order->payment_url &&
-                                $order->expired_at &&
-                                now()->lt($order->expired_at))
-                            <a href="{{ $order->payment_url }}" target="_blank" class="text-purple-400 text-xs underline">
-                                Continue
-                            </a>
-                        @elseif (
-                            $order->status === 'pending' &&
-                                $order->payment_method === 'midtrans' &&
-                                $order->expired_at &&
-                                now()->lt($order->expired_at))
-                            <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
-                                @csrf
-                                <button type="submit" class="pay-btn text-blue-400 text-xs underline">
-                                    Pay Again
-                                </button>
-                            </form>
-                        @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                            <span class="text-red-400 text-xs">Expired</span>
-                        @else
-                            <span class="text-gray-500 text-xs">-</span>
-                        @endif
-                    </div>
-
-                </div>
-            @empty
-                <p class="text-gray-400 text-sm">Belum ada order</p>
-            @endforelse
-
-        </div>
-
-        <!-- ================= DESKTOP (TABLE) ================= -->
-
-        <div class="hidden md:block bg-[#15151B] border border-[#27272A] rounded-xl overflow-hidden">
-
-            <table class="w-full text-sm">
-
-                <thead class="bg-[#1f1f25] text-gray-400">
-                    <tr>
-                        <th class="p-3 text-left">Order ID</th>
-                        <th class="p-3 text-left">Produk</th>
-                        <th class="p-3 text-left">Paket</th>
-                        <th class="p-3 text-left">Metode</th>
-                        <th class="p-3 text-left">Harga</th>
-                        <th class="p-3 text-left">Status</th>
-                        <th class="p-3 text-left">Action</th>
-                    </tr>
-                </thead>
-
-                <tbody id="ordersTable">
-                    @forelse ($orders as $order)
-                        <tr class="border-t border-[#27272A]">
-
-                            <td class="p-3 text-xs text-gray-400">{{ $order->order_id }}</td>
-                            <td class="p-3">{{ $order->product->name ?? '-' }}</td>
-                            <td class="p-3">{{ $order->package->name ?? '-' }}</td>
-
-                            <td class="p-3">
-                                @if ($order->payment_method == 'crypto')
-                                    <span class="text-purple-400">Crypto (USDT)</span>
-                                @else
-                                    <span class="text-blue-400">Midtrans</span>
-                                @endif
-                            </td>
-
-                            <td class="p-3 text-[#C084FC]">
-                                @if ($order->payment_method == 'crypto')
-                                    ${{ $order->price }}
-                                @else
-                                    Rp {{ number_format($order->price) }}
-                                @endif
-                            </td>
-
-                            <td class="p-3">
-                                @if ($order->status == 'paid')
-                                    <span class="text-green-400">Paid</span>
-                                @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                                    <span class="text-red-400">Expired</span>
-                                @elseif($order->status == 'pending')
-                                    <span class="text-yellow-400">Pending</span>
-
-                                    @if ($order->expired_at && now()->lt($order->expired_at))
-                                        <div class="text-xs text-gray-400">
-                                            <span class="countdown text-yellow-400 animate-pulse"
-                                                data-expire="{{ $order->expired_at }}">
-                                            </span>
-                                        </div>
-                                    @endif
-                                @else
-                                    <span class="text-red-400">Cancelled (Replaced)</span>
-                                @endif
-                            </td>
-
-                            <td class="p-3">
-                                @if (
-                                    $order->status === 'pending' &&
-                                        $order->payment_method === 'crypto' &&
-                                        $order->payment_url &&
-                                        $order->expired_at &&
-                                        now()->lt($order->expired_at))
-                                    <a href="{{ $order->payment_url }}" target="_blank"
-                                        class="text-purple-400 text-xs underline">
-                                        Continue
-                                    </a>
-                                @elseif (
-                                    $order->status === 'pending' &&
-                                        $order->payment_method === 'midtrans' &&
-                                        $order->expired_at &&
-                                        now()->lt($order->expired_at))
-                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="text-blue-400 text-xs underline">
-                                            Pay Again
-                                        </button>
-                                    </form>
-                                @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                                    <span class="text-red-400 text-xs">Expired</span>
-                                @else
-                                    -
-                                @endif
-                            </td>
-
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="p-6 text-center text-gray-400">
-                                Belum ada order
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-
-            </table>
-
+        <div id="ordersContent">
+            @include('partials.orders-list', ['orders' => $orders])
         </div>
 
     </div>
 
     <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        let lastPolledStatus = null;
+        let ordersRefreshing = false;
+
+        async function fetchPaymentJson(url, formData) {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: formData,
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const error = new Error(data.message || 'Payment failed');
+                error.redirectUrl = data.redirect_url;
+                throw error;
+            }
+
+            return data;
+        }
+
+        async function refreshOrders() {
+            if (ordersRefreshing) return;
+
+            ordersRefreshing = true;
+
+            try {
+                const response = await fetch('/orders-fragment', {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) return;
+
+                document.getElementById('ordersContent').innerHTML = await response.text();
+                updateCountdowns();
+            } finally {
+                ordersRefreshing = false;
+            }
+        }
+
+        function openMidtransPayment(token) {
+            if (!window.snap) {
+                window.location.href = `/midtrans-pay?token=${encodeURIComponent(token)}`;
+                return;
+            }
+
+            window.snap.pay(token, {
+                onSuccess: function() {
+                    window.location.href = '/licenses';
+                },
+                onPending: function() {
+                    window.location.href = '/orders';
+                },
+                onError: function() {
+                    window.location.href = '/orders';
+                },
+                onClose: function() {
+                    refreshOrders();
+                },
+            });
+        }
+
+        function handlePaymentResponse(data) {
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
+
+            if (data.method === 'midtrans' && data.snap_token) {
+                openMidtransPayment(data.snap_token);
+                return;
+            }
+
+            if (data.method === 'crypto' && data.payment_url) {
+                const invoiceTab = window.open(data.payment_url, '_blank', 'noopener');
+
+                if (!invoiceTab) {
+                    window.location.href = data.payment_url;
+                    return;
+                }
+
+                refreshOrders();
+            }
+        }
+
+        document.addEventListener('submit', async function(e) {
+            const form = e.target.closest('.pay-again-form');
+            if (!form) return;
+
+            e.preventDefault();
+
+            const button = form.querySelector('button[type="submit"]');
+            const originalText = button?.innerText;
+
+            if (button) {
+                button.disabled = true;
+                button.innerText = 'Processing...';
+                button.classList.add('opacity-60', 'pointer-events-none');
+            }
+
+            try {
+                const data = await fetchPaymentJson(form.action, new FormData(form));
+                await refreshOrders();
+                handlePaymentResponse(data);
+            } catch (error) {
+                if (error.redirectUrl) {
+                    window.location.href = error.redirectUrl;
+                    return;
+                }
+
+                alert(error.message || 'Payment failed');
+                await refreshOrders();
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerText = originalText || 'Pay Again';
+                    button.classList.remove('opacity-60', 'pointer-events-none');
+                }
+            }
+        });
+
         setInterval(() => {
             fetch('/check-order')
                 .then(res => res.json())
                 .then(data => {
-
                     if (!data.status) return;
 
-                    if (data.status !== 'pending') {
-                        location.reload();
-                    }
+                    if (data.status !== lastPolledStatus) {
+                        lastPolledStatus = data.status;
 
+                        if (data.status !== 'pending') {
+                            refreshOrders();
+                        }
+                    }
                 });
         }, 5000);
 
-        setInterval(() => {
+        function updateCountdowns() {
             document.querySelectorAll('.countdown').forEach(el => {
-
-                const expireTime = new Date(el.dataset.expire).getTime()
-                const now = new Date().getTime()
-                const diff = expireTime - now
+                const expireTime = new Date(el.dataset.expire).getTime();
+                const now = new Date().getTime();
+                const diff = expireTime - now;
 
                 if (diff <= 0) {
-                    el.innerText = "Expired"
-                    el.classList.remove("text-yellow-400")
-                    el.classList.add("text-red-400")
-                    return
+                    el.innerText = 'Expired';
+                    el.classList.remove('text-yellow-400');
+                    el.classList.add('text-red-400');
+                    return;
                 }
 
-                const minutes = Math.floor(diff / 60000)
-                const seconds = Math.floor((diff % 60000) / 1000)
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
 
-                el.innerText = `${minutes}m ${seconds}s`
-            })
-        }, 1000)
+                el.innerText = `${minutes}m ${seconds}s`;
+            });
+        }
+
+        setInterval(updateCountdowns, 1000);
+
+        window.addEventListener('pageshow', function() {
+            refreshOrders();
+        });
     </script>
 @endsection

@@ -21,7 +21,7 @@ class PaymentController extends Controller
         $this->paymentService = $paymentService;
     }
 
-    public function payAgain($orderId)
+    public function payAgain(Request $request, $orderId)
     {
         $user = Auth::user();
 
@@ -59,17 +59,25 @@ class PaymentController extends Controller
         try {
             if ($newOrder->payment_method === 'midtrans') {
 
-                $snapToken = $this->paymentService->createMidtrans(
+                $payment = $this->paymentService->createMidtransPayment(
                     $user,
                     $newOrder->product_id,
                     $newOrder->package_id,
                     $newOrder
                 );
 
-                return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
+                if ($this->wantsPaymentJson($request)) {
+                    return response()->json([
+                        'method' => 'midtrans',
+                        'snap_token' => $payment['snap_token'],
+                        'order_id' => $payment['order']->order_id,
+                    ]);
+                }
+
+                return redirect()->route('midtrans.pay.page', ['token' => $payment['snap_token']]);
             }
 
-            $url = $this->paymentService->createCrypto(
+            $payment = $this->paymentService->createCryptoPayment(
                 $user,
                 $newOrder->product_id,
                 $newOrder->package_id,
@@ -77,17 +85,21 @@ class PaymentController extends Controller
                 $newOrder
             );
 
-            return redirect($url);
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'method' => 'crypto',
+                    'payment_url' => $payment['payment_url'],
+                    'order_id' => $payment['order']->order_id,
+                ]);
+            }
+
+            return redirect($payment['payment_url']);
         } catch (\Exception $e) {
             $newOrder->update(['status' => 'cancelled']);
 
             Log::error('PAY AGAIN ERROR: '.$e->getMessage());
 
-            return back()->withErrors([
-                'payment' => str_starts_with($e->getMessage(), 'Minimum crypto payment')
-                    ? $e->getMessage()
-                    : 'Payment failed',
-            ]);
+            return $this->paymentErrorResponse($request, $e);
         }
     }
 
@@ -102,12 +114,17 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         if ($this->hasTooManyRecentOrders($user->id)) {
-            return back()->withErrors([
-                'payment' => 'Terlalu banyak request, coba lagi nanti',
-            ]);
+            return $this->paymentErrorResponse($request, 'Terlalu banyak request, coba lagi nanti', 429);
         }
 
         if ($this->hasPendingOrder($user->id)) {
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'message' => 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders',
+                    'redirect_url' => url('/orders'),
+                ], 409);
+            }
+
             return redirect('/orders')
                 ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
         }
@@ -117,19 +134,25 @@ class PaymentController extends Controller
         ]);
 
         try {
-            $snapToken = $this->paymentService->createMidtrans(
+            $payment = $this->paymentService->createMidtransPayment(
                 $user,
                 $id,
                 $request->package_id
             );
 
-            return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'method' => 'midtrans',
+                    'snap_token' => $payment['snap_token'],
+                    'order_id' => $payment['order']->order_id,
+                ]);
+            }
+
+            return redirect()->route('midtrans.pay.page', ['token' => $payment['snap_token']]);
         } catch (\Exception $e) {
             Log::error('MIDTRANS ERROR: '.$e->getMessage());
 
-            return back()->withErrors([
-                'payment' => 'Payment failed',
-            ]);
+            return $this->paymentErrorResponse($request, $e);
         }
     }
 
@@ -222,12 +245,17 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         if ($this->hasTooManyRecentOrders($user->id)) {
-            return back()->withErrors([
-                'payment' => 'Terlalu banyak request',
-            ]);
+            return $this->paymentErrorResponse($request, 'Terlalu banyak request', 429);
         }
 
         if ($this->hasPendingOrder($user->id)) {
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'message' => 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders',
+                    'redirect_url' => url('/orders'),
+                ], 409);
+            }
+
             return redirect('/orders')
                 ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
         }
@@ -238,23 +266,27 @@ class PaymentController extends Controller
         ]);
 
         try {
-            $url = $this->paymentService->createCrypto(
+            $payment = $this->paymentService->createCryptoPayment(
                 $user,
                 $productId,
                 $request->package_id,
                 $request->coin
             );
 
-            return redirect($url);
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'method' => 'crypto',
+                    'payment_url' => $payment['payment_url'],
+                    'order_id' => $payment['order']->order_id,
+                ]);
+            }
+
+            return redirect($payment['payment_url']);
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: '.$e->getMessage());
 
-            return back()->withErrors([
-                'payment' => str_starts_with($e->getMessage(), 'Minimum crypto payment')
-                    ? $e->getMessage()
-                    : 'Payment failed',
-            ]);
+            return $this->paymentErrorResponse($request, $e);
         }
     }
 
@@ -412,5 +444,29 @@ class PaymentController extends Controller
         }
 
         return $payload;
+    }
+
+    private function wantsPaymentJson(Request $request): bool
+    {
+        return $request->expectsJson() || $request->ajax();
+    }
+
+    private function paymentErrorResponse(Request $request, \Exception|string $error, int $status = 422)
+    {
+        $message = $error instanceof \Exception ? $error->getMessage() : $error;
+
+        if (! str_starts_with($message, 'Minimum crypto payment') && $error instanceof \Exception) {
+            $message = 'Payment failed';
+        }
+
+        if ($this->wantsPaymentJson($request)) {
+            return response()->json([
+                'message' => $message,
+            ], $status);
+        }
+
+        return back()->withErrors([
+            'payment' => $message,
+        ]);
     }
 }
