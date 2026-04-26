@@ -2,6 +2,9 @@
 <div class="space-y-4 md:hidden">
 
     @forelse ($orders as $order)
+        @php
+            $orderDate = $order->created_at?->timezone(config('app.timezone'));
+        @endphp
         <div class="bg-[#15151B] border border-[#27272A] rounded-xl p-4 space-y-2">
 
             <div class="flex justify-between text-xs text-gray-400">
@@ -33,6 +36,16 @@
 
             <div class="text-xs text-gray-400">
                 {{ $order->package->name ?? '-' }}
+            </div>
+
+            <div class="rounded-lg bg-white/5 px-3 py-2 text-xs text-gray-400">
+                <div class="text-[10px] uppercase tracking-wide text-gray-500">Order Date</div>
+                <div class="mt-1 text-gray-200">
+                    {{ $orderDate?->format('l, d F Y') ?? '-' }}
+                </div>
+                <div>
+                    {{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}
+                </div>
             </div>
 
             <div class="text-xs">
@@ -98,6 +111,7 @@
                 <th class="p-3 text-left">Package</th>
                 <th class="p-3 text-left">Method</th>
                 <th class="p-3 text-left">Price</th>
+                <th class="p-3 text-left">Order Date</th>
                 <th class="p-3 text-left">Status</th>
                 <th class="p-3 text-left">Action</th>
             </tr>
@@ -105,6 +119,9 @@
 
         <tbody id="ordersTable">
             @forelse ($orders as $order)
+                @php
+                    $orderDate = $order->created_at?->timezone(config('app.timezone'));
+                @endphp
                 <tr class="border-t border-[#27272A]">
 
                     <td class="p-3 text-xs text-gray-400">{{ $order->order_id }}</td>
@@ -125,6 +142,11 @@
                         @else
                             Rp {{ number_format($order->price) }}
                         @endif
+                    </td>
+
+                    <td class="p-3 text-xs text-gray-300 whitespace-nowrap">
+                        <div>{{ $orderDate?->format('l, d F Y') ?? '-' }}</div>
+                        <div class="text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</div>
                     </td>
 
                     <td class="p-3">
@@ -179,7 +201,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="p-6 text-center text-gray-400">
+                    <td colspan="8" class="p-6 text-center text-gray-400">
                         No orders yet
                     </td>
                 </tr>
