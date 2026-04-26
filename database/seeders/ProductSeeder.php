@@ -32,7 +32,7 @@ class ProductSeeder extends Seeder
         Product::updateOrCreate(
             ['name' => 'Testing Payment'],
             [
-                'description' => 'Produk khusus untuk tes alur pembayaran asli dengan nominal rendah.',
+                'description' => 'Low-cost product for testing the real payment flow.',
                 'category_id' => $testingCategory->id,
             ]
         );

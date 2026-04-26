@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Product;
 use App\Models\Feature;
+use App\Models\Product;
+use Illuminate\Database\Seeder;
 
 class FeatureSeeder extends Seeder
 {
@@ -13,56 +13,39 @@ class FeatureSeeder extends Seeder
         // Aurora
         $aurora = Product::where('name', 'Aurora-VN')->firstOrFail();
 
-        $auroraFeatures = [
-            'Aimbot',
-            'ESP Enemy',
-            'ESP Item',
-            'Pull Player',
-            'etc'
-        ];
-
-        foreach ($auroraFeatures as $f) {
-            Feature::updateOrCreate(
-                [
-                    'product_id' => $aurora->id,
-                    'name' => $f
-                ]
-            );
-        }
+        $this->syncFeatures($aurora, [
+            'Holo',
+            'Pull',
+            'Etc',
+        ]);
 
         // XG-Team
         $xg = Product::where('name', 'XG-Team')->firstOrFail();
 
-        $xgFeatures = [
+        $this->syncFeatures($xg, [
             'Remove Logo PC',
-            '120 FPS Unlocked On Free Fire Setting'
-        ];
-
-        foreach ($xgFeatures as $f) {
-            Feature::updateOrCreate(
-                [
-                    'product_id' => $xg->id,
-                    'name' => $f
-                ]
-            );
-        }
+            '120 FPS Unlocked On Free Fire Setting',
+        ]);
 
         // Testing Payment
         $testing = Product::where('name', 'Testing Payment')->firstOrFail();
 
-        $testingFeatures = [
+        $this->syncFeatures($testing, [
             'Midtrans real payment flow test',
             'Crypto invoice flow test',
-            'Dummy license delivery'
-        ];
+            'Dummy license delivery',
+        ]);
+    }
 
-        foreach ($testingFeatures as $f) {
-            Feature::updateOrCreate(
-                [
-                    'product_id' => $testing->id,
-                    'name' => $f
-                ]
-            );
+    private function syncFeatures(Product $product, array $features): void
+    {
+        Feature::where('product_id', $product->id)->delete();
+
+        foreach ($features as $feature) {
+            Feature::create([
+                'product_id' => $product->id,
+                'name' => $feature,
+            ]);
         }
     }
 }

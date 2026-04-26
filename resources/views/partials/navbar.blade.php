@@ -42,16 +42,22 @@ border-b border-[#27272A] transition-transform duration-300">
 
             <!-- DESKTOP PROFILE -->
             @auth
+                @php $user = auth()->user(); @endphp
                 <div class="relative hidden md:block">
 
                     <button onclick="toggleProfileDropdown()"
                         class="flex items-center gap-2 text-gray-300 hover:text-white transition">
 
-                        <span
-                            class="w-8 h-8 flex items-center justify-center 
-            bg-[#9333EA]/20 text-[#C084FC] rounded-full text-xs font-bold">
-                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                        </span>
+                        @if ($user->avatar)
+                            <img src="{{ $user->avatar }}" alt="{{ $user->name }}"
+                                class="w-8 h-8 rounded-full object-cover border border-[#9333EA]/40">
+                        @else
+                            <span
+                                class="w-8 h-8 flex items-center justify-center
+                bg-[#9333EA]/20 text-[#C084FC] rounded-full text-xs font-bold">
+                                {{ strtoupper(substr($user->name, 0, 1)) }}
+                            </span>
+                        @endif
 
                     </button>
 
@@ -60,7 +66,7 @@ border-b border-[#27272A] transition-transform duration-300">
         bg-[#15151B] border border-[#27272A] rounded-xl shadow-lg overflow-hidden">
 
                         <div class="px-4 py-3 text-xs text-gray-400 border-b border-[#27272A]">
-                            {{ auth()->user()->name }}
+                            {{ $user->name }}
                         </div>
 
                         <form action="/logout" method="POST">
@@ -105,8 +111,17 @@ transition-all duration-300 ease-out">
             <a href="/orders" onclick="toggleMobileMenu(event)" class="nav-item">Orders</a>
             <a href="/licenses" onclick="toggleMobileMenu(event)" class="nav-item">Licenses</a>
 
-            <div class="border-t border-[#27272A] pt-3 text-xs text-gray-400">
-                {{ auth()->user()->name }}
+            <div class="border-t border-[#27272A] pt-3 text-xs text-gray-400 flex items-center gap-2">
+                @if (auth()->user()->avatar)
+                    <img src="{{ auth()->user()->avatar }}" alt="{{ auth()->user()->name }}"
+                        class="w-7 h-7 rounded-full object-cover border border-[#9333EA]/40">
+                @else
+                    <span
+                        class="w-7 h-7 flex items-center justify-center bg-[#9333EA]/20 text-[#C084FC] rounded-full text-[10px] font-bold">
+                        {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                    </span>
+                @endif
+                <span>{{ auth()->user()->name }}</span>
             </div>
 
             <form action="/logout" method="POST">

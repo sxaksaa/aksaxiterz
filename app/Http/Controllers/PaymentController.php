@@ -114,24 +114,14 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         if ($this->hasTooManyRecentOrders($user->id)) {
-            return $this->paymentErrorResponse($request, 'Terlalu banyak request, coba lagi nanti', 429);
-        }
-
-        if ($this->hasPendingOrder($user->id)) {
-            if ($this->wantsPaymentJson($request)) {
-                return response()->json([
-                    'message' => 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders',
-                    'redirect_url' => url('/orders'),
-                ], 409);
-            }
-
-            return redirect('/orders')
-                ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
+            return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
         }
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
         ]);
+
+        $this->cancelPendingOrders($user->id);
 
         try {
             $payment = $this->paymentService->createMidtransPayment(
@@ -245,25 +235,15 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         if ($this->hasTooManyRecentOrders($user->id)) {
-            return $this->paymentErrorResponse($request, 'Terlalu banyak request', 429);
-        }
-
-        if ($this->hasPendingOrder($user->id)) {
-            if ($this->wantsPaymentJson($request)) {
-                return response()->json([
-                    'message' => 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders',
-                    'redirect_url' => url('/orders'),
-                ], 409);
-            }
-
-            return redirect('/orders')
-                ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
+            return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
         }
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
             'coin' => 'required|string|max:20',
         ]);
+
+        $this->cancelPendingOrders($user->id);
 
         try {
             $payment = $this->paymentService->createCryptoPayment(
@@ -409,15 +389,11 @@ class PaymentController extends Controller
             ->count() >= 5;
     }
 
-    private function hasPendingOrder(int $userId): bool
+    private function cancelPendingOrders(int $userId): void
     {
-        return Order::where('user_id', $userId)
+        Order::where('user_id', $userId)
             ->where('status', 'pending')
-            ->where(function ($query) {
-                $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>', now());
-            })
-            ->exists();
+            ->update(['status' => 'cancelled']);
     }
 
     private function sameAmount($first, $second): bool

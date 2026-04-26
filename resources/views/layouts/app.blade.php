@@ -16,6 +16,11 @@
 
     @yield('content')
 
+    <script>
+        ['contextmenu', 'copy', 'cut', 'dragstart', 'selectstart'].forEach((eventName) => {
+            document.addEventListener(eventName, (event) => event.preventDefault());
+        });
+    </script>
 </body>
 
 </html>

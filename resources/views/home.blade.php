@@ -9,32 +9,12 @@
     </div>
 
     <section class="page-shell pt-6 md:pt-10 pb-5">
-        <div class="grid gap-5 md:grid-cols-[1fr_360px] md:items-end">
-            <div>
-                <p class="text-sm font-semibold text-[#C084FC] mb-2">Digital license store</p>
-                <h1 class="text-3xl md:text-5xl font-bold tracking-normal mb-3">Pilih produk, bayar, license langsung masuk.</h1>
-                <p class="text-sm md:text-base text-gray-400 max-w-2xl">
-                    Flow dibuat untuk pembayaran otomatis via Midtrans atau crypto, dengan stok license yang dikunci saat callback berhasil.
-                </p>
-            </div>
-
-            <div class="panel-card p-4">
-                <div class="text-xs uppercase text-gray-500 mb-1">Live flow</div>
-                <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div class="rounded-lg bg-white/5 p-3">
-                        <div class="font-semibold text-white">Order</div>
-                        <div class="text-gray-500 mt-1">10 min</div>
-                    </div>
-                    <div class="rounded-lg bg-white/5 p-3">
-                        <div class="font-semibold text-white">Pay</div>
-                        <div class="text-gray-500 mt-1">Auto</div>
-                    </div>
-                    <div class="rounded-lg bg-white/5 p-3">
-                        <div class="font-semibold text-white">License</div>
-                        <div class="text-gray-500 mt-1">Instant</div>
-                    </div>
-                </div>
-            </div>
+        <div class="max-w-3xl">
+            <p class="text-sm font-semibold text-[#C084FC] mb-2">Digital license store</p>
+            <h1 class="text-3xl md:text-5xl font-bold tracking-normal mb-3">Choose a product, pay, and get your license instantly.</h1>
+            <p class="text-sm md:text-base text-gray-400 max-w-2xl">
+                Automated checkout with Midtrans or crypto, with license stock delivered after a successful payment callback.
+            </p>
         </div>
     </section>
 

@@ -22,7 +22,7 @@
                             </div>
                         @endif
                     @else
-                        <span class="text-red-400">Cancelled (Replaced)</span>
+                        <span class="text-red-400">Cancelled</span>
                     @endif
                 </span>
             </div>
@@ -81,7 +81,7 @@
 
         </div>
     @empty
-        <p class="text-gray-400 text-sm">Belum ada order</p>
+        <p class="text-gray-400 text-sm">No orders yet</p>
     @endforelse
 
 </div>
@@ -94,10 +94,10 @@
         <thead class="bg-[#1f1f25] text-gray-400">
             <tr>
                 <th class="p-3 text-left">Order ID</th>
-                <th class="p-3 text-left">Produk</th>
-                <th class="p-3 text-left">Paket</th>
-                <th class="p-3 text-left">Metode</th>
-                <th class="p-3 text-left">Harga</th>
+                <th class="p-3 text-left">Product</th>
+                <th class="p-3 text-left">Package</th>
+                <th class="p-3 text-left">Method</th>
+                <th class="p-3 text-left">Price</th>
                 <th class="p-3 text-left">Status</th>
                 <th class="p-3 text-left">Action</th>
             </tr>
@@ -143,7 +143,7 @@
                                 </div>
                             @endif
                         @else
-                            <span class="text-red-400">Cancelled (Replaced)</span>
+                            <span class="text-red-400">Cancelled</span>
                         @endif
                     </td>
 
@@ -180,7 +180,7 @@
             @empty
                 <tr>
                     <td colspan="7" class="p-6 text-center text-gray-400">
-                        Belum ada order
+                        No orders yet
                     </td>
                 </tr>
             @endforelse

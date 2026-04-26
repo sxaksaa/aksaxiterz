@@ -27,11 +27,11 @@
                             </h2>
 
                             <p class="text-xs sm:text-sm text-gray-400">
-                                {{ $license->duration }}
+                                {{ str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $license->duration) }}
                             </p>
 
                             <p class="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                Dibeli: {{ $license->created_at->format('d M Y, H:i') }}
+                                Purchased: {{ $license->created_at->format('d M Y, H:i') }}
                             </p>
                         </div>
 
@@ -61,7 +61,7 @@
                 </div>
 
             @empty
-                <p class="text-gray-400 fade-up text-sm">Belum ada license</p>
+                <p class="text-gray-400 fade-up text-sm">No licenses yet</p>
             @endforelse
 
         </div>

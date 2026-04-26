@@ -30,13 +30,16 @@
         </p>
 
         <div class="mt-auto flex items-end justify-between gap-4">
-            <span class="price">
-                @if ($minPackage)
-                    Rp {{ number_format($minPackage->price) }} / ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
-                @else
-                    -
-                @endif
-            </span>
+            <div>
+                <div class="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Start from</div>
+                <span class="price">
+                    @if ($minPackage)
+                        Rp {{ number_format($minPackage->price) }} / ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
+                    @else
+                        -
+                    @endif
+                </span>
+            </div>
 
             <span class="text-xs {{ $stock > 0 ? 'text-[#C084FC]' : 'text-red-300' }}">
                 {{ $stock > 0 ? $stock . ' stock' : 'Out of stock' }}

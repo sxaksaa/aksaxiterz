@@ -20,4 +20,9 @@ class LicenseStock extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function package()
+    {
+        return $this->belongsTo(Package::class);
+    }
 }

@@ -16,4 +16,14 @@ class Package extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function licenseStocks()
+    {
+        return $this->hasMany(LicenseStock::class);
+    }
+
+    public function availableLicenseStocks()
+    {
+        return $this->hasMany(LicenseStock::class)->where('is_sold', false);
+    }
 }

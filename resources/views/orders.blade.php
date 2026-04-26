@@ -10,7 +10,7 @@
 @section('content')
     <div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10">
 
-        <h1 class="text-xl sm:text-2xl font-semibold mb-6">Riwayat Order</h1>
+        <h1 class="text-xl sm:text-2xl font-semibold mb-6">Order History</h1>
 
         @if (session('info'))
             <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
@@ -106,14 +106,17 @@
             }
 
             if (data.method === 'crypto' && data.payment_url) {
-                const invoiceTab = window.open(data.payment_url, '_blank', 'noopener');
+                const invoiceTab = window.open(data.payment_url, '_blank');
 
-                if (!invoiceTab) {
+                if (invoiceTab) {
+                    try {
+                        invoiceTab.opener = null;
+                    } catch (error) {}
+
+                    refreshOrders();
+                } else {
                     window.location.href = data.payment_url;
-                    return;
                 }
-
-                refreshOrders();
             }
         }
 

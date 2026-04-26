@@ -45,7 +45,7 @@ class PaymentService
             ->first();
 
         if (! $stock) {
-            throw new \Exception('Stock habis');
+            throw new \Exception('Out of stock');
         }
 
         if (! $order) {
@@ -63,7 +63,7 @@ class PaymentService
 
         Config::$serverKey = config('midtrans.serverKey');
         Config::$isProduction = config('midtrans.isProduction', false);
-        Config::$curlOptions = $this->gatewayCurlOptions();
+        Config::$curlOptions = $this->midtransCurlOptions();
 
         $params = [
             'transaction_details' => [
@@ -119,7 +119,7 @@ class PaymentService
             ->first();
 
         if (! $stock) {
-            throw new \Exception('Stock habis');
+            throw new \Exception('Out of stock');
         }
 
         $amount = (float) ($order?->price ?? $package->price_usdt);
@@ -170,6 +170,7 @@ class PaymentService
                 Log::warning('NOWPayments invoice response missing URL', [
                     'order_id' => $order->order_id,
                     'status' => $response->status(),
+                    'body' => $response->json() ?? $response->body(),
                 ]);
 
                 throw new \Exception('No invoice URL');
@@ -259,7 +260,6 @@ class PaymentService
     private function gatewayCurlOptions(): array
     {
         return [
-            CURLOPT_HTTPHEADER => [],
             CURLOPT_PROXY => '',
             CURLOPT_NOPROXY => '*',
         ];
@@ -270,6 +270,13 @@ class PaymentService
         return [
             'proxy' => '',
             'curl' => $this->gatewayCurlOptions(),
+        ];
+    }
+
+    private function midtransCurlOptions(): array
+    {
+        return $this->gatewayCurlOptions() + [
+            CURLOPT_HTTPHEADER => [],
         ];
     }
 }

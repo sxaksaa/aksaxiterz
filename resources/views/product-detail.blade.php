@@ -77,43 +77,41 @@
             <div onclick="toggleCryptoDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
 
                 <span id="selectedText">Select Network</span>
-                <div id="minInfo" class="text-xs text-gray-400 mt-2 hidden">
-                    Minimum: -
-                </div>
                 <span id="arrow" class="transition-transform">v</span>
             </div>
 
             <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
 
                 <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)', event)"
-                    class="dropdown-item flex items-baseline gap-2">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtbsc" data-min="1">
                     <span class="font-bold text-white">BSC</span>
                     <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
                 </div>
 
                 <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)', event)"
-                    class="dropdown-item flex items-baseline gap-2">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdttrc20" data-min="10">
                     <span class="font-bold text-white">TRX</span>
                     <span class="text-xs text-gray-500 ml-auto">Min $10</span>
                     <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
                 </div>
 
                 <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)', event)"
-                    class="dropdown-item flex items-baseline gap-2">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdterc20" data-min="1">
                     <span class="font-bold text-white">ETH</span>
                     <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
                 </div>
 
-                <div onclick="selectNetwork('usdtmatic','POL Polygon POS', event)" class="dropdown-item flex items-baseline gap-2">
+                <div onclick="selectNetwork('usdtmatic','POL Polygon POS', event)"
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtmatic" data-min="1">
                     <span class="font-bold text-white">POL</span>
                     <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
                 </div>
 
                 <div onclick="selectNetwork('usdtton','TON The Open Network (TON)', event)"
-                    class="dropdown-item flex items-baseline gap-2">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtton" data-min="1">
                     <span class="font-bold text-white">TON</span>
                     <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
@@ -128,6 +126,7 @@
         <div class="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($product->packages as $p)
                 @php
+                    $packageStock = $p->available_license_stocks_count ?? 0;
                     $badge = null;
                     if (str_contains($p->name, 'Testing')) {
                         $badge = 'Test Flow';
@@ -138,20 +137,24 @@
                     }
                 @endphp
 
-                <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }})"
-                    class="panel-card p-4 relative cursor-pointer package transition">
+                <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }}, {{ $packageStock }})"
+                    class="panel-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
                     @endif
 
                     <p class="text-sm mb-1">
-                        {{ str_replace('Hari', 'Days', $p->name) }}
+                        {{ str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name) }}
                     </p>
 
                     <p class="text-[#C084FC] font-semibold price-text" data-idr="Rp {{ number_format($p->price) }}"
                         data-usd="${{ rtrim(rtrim($p->price_usdt, '0'), '.') }}">
                         Rp {{ number_format($p->price) }}
+                    </p>
+
+                    <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-red-300' }}">
+                        {{ $packageStock > 0 ? $packageStock . ' left' : 'Out of stock' }}
                     </p>
 
                 </div>
@@ -237,6 +240,7 @@
         let selectedCoin = null;
         let selectedPrice = 0;
         let selectedUsd = 0;
+        let selectedPackageStock = 0;
         let dropdownOpen = false;
         const hasStock = @json($stock > 0);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -268,6 +272,7 @@
             document.getElementById('cryptoBox')
                 .classList.toggle('hidden', type !== 'crypto');
 
+            refreshNetworkAvailability();
             updateAllPrices();
             updatePrice();
             showSummary();
@@ -276,11 +281,16 @@
         /* =========================
            PACKAGE
         ========================= */
-        function selectPackage(e, price, id, name, usd) {
+        function selectPackage(e, price, id, name, usd, stock) {
+            if (stock <= 0) {
+                alert('This package is out of stock');
+                return;
+            }
 
             selectedPackageId = id;
             selectedPrice = price;
             selectedUsd = usd;
+            selectedPackageStock = stock;
 
             document.querySelectorAll('.package')
                 .forEach(el => el.classList.remove('active'));
@@ -288,7 +298,8 @@
             e.currentTarget.classList.add('active');
 
             document.getElementById('selectedPackage')
-                .innerText = name.replace('Hari', 'Days');
+                .innerText = formatPackageName(name);
+            refreshNetworkAvailability();
             updatePrice();
             showSummary();
         }
@@ -316,6 +327,37 @@
             document.getElementById('totalPrice').innerText = text;
         }
 
+        function networkMinimum(coin) {
+            return coin === 'usdttrc20' ? 10 : 1;
+        }
+
+        function isNetworkDisabled(coin) {
+            return selectedUsd > 0 && selectedUsd < networkMinimum(coin);
+        }
+
+        function refreshNetworkAvailability() {
+            document.querySelectorAll('.dropdown-item').forEach(item => {
+                const coin = item.dataset.coin;
+                const disabled = isNetworkDisabled(coin);
+
+                item.classList.toggle('disabled', disabled);
+                item.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            });
+
+            if (selectedCoin && isNetworkDisabled(selectedCoin)) {
+                selectedCoin = null;
+                document.getElementById('selectedText').innerText = 'Select Network';
+            }
+        }
+
+        function formatPackageName(name) {
+            return name
+                .replace('1 Hari', '1 Day')
+                .replace('7 Hari', '7 Days')
+                .replace('30 Hari', '30 Days')
+                .replace('Hari', 'Days');
+        }
+
         /* =========================
            DROPDOWN
         ========================= */
@@ -333,6 +375,9 @@
         }
 
         function selectNetwork(value, text, e) {
+            if (e?.currentTarget?.classList.contains('disabled')) {
+                return;
+            }
 
             selectedCoin = value;
 
@@ -343,16 +388,6 @@
             document.getElementById('dropdownList').classList.add('hidden');
             document.getElementById('arrow').style.transform = 'rotate(0deg)';
 
-            // 🔥 MINIMUM LOGIC
-            let min = 1;
-
-            if (value === 'usdttrc20') {
-                min = 10;
-            }
-
-            const minInfo = document.getElementById('minInfo');
-            minInfo.innerHTML = `Min payment: <span class="text-yellow-400">$${min}</span>`;
-            minInfo.classList.remove('hidden');
         }
 
         window.addEventListener('click', function(e) {
@@ -394,6 +429,54 @@
             }
 
             return data;
+        }
+
+        function prepareCryptoTab() {
+            const tab = window.open('about:blank', '_blank');
+
+            if (!tab) {
+                return null;
+            }
+
+            try {
+                tab.opener = null;
+                tab.document.title = 'Opening payment...';
+                tab.document.body.innerHTML =
+                    '<p style="font-family: system-ui, sans-serif; padding: 24px;">Opening payment...</p>';
+            } catch (error) {
+                // Some browsers restrict access quickly after opening a tab.
+            }
+
+            return tab;
+        }
+
+        function openCryptoInvoice(tab, paymentUrl) {
+            if (!paymentUrl) {
+                throw new Error('Crypto invoice URL is not available');
+            }
+
+            if (tab && !tab.closed) {
+                tab.location.replace(paymentUrl);
+                return true;
+            }
+
+            const newTab = window.open(paymentUrl, '_blank');
+
+            if (newTab) {
+                try {
+                    newTab.opener = null;
+                } catch (error) {}
+
+                return true;
+            }
+
+            return false;
+        }
+
+        function closeCryptoTab(tab) {
+            if (tab && !tab.closed) {
+                tab.close();
+            }
         }
 
         function openMidtransPayment(token) {
@@ -439,6 +522,11 @@
                 return;
             }
 
+            if (selectedPackageStock <= 0) {
+                alert('This package is out of stock');
+                return;
+            }
+
             if (!selectedPayment) {
                 alert('Select payment method');
                 return;
@@ -479,12 +567,7 @@
 
             if (selectedPayment === 'crypto') {
 
-                // 🔥 CEK MINIMUM
-                let min = 1;
-
-                if (selectedCoin === 'usdttrc20') {
-                    min = 10;
-                }
+                let min = networkMinimum(selectedCoin);
 
                 if (selectedUsd < min) {
                     alert(`Minimum payment for ${selectedCoin} is $${min}`);
@@ -496,7 +579,7 @@
                     return;
                 }
 
-                const invoiceTab = window.open('', '_blank', 'noopener');
+                const invoiceTab = prepareCryptoTab();
 
                 document.getElementById('crypto_package').value = selectedPackageId;
                 document.getElementById('crypto_coin').value = selectedCoin;
@@ -506,16 +589,13 @@
                 try {
                     const data = await fetchPaymentJson(form);
 
-                    if (invoiceTab) {
-                        invoiceTab.location.href = data.payment_url;
+                    if (openCryptoInvoice(invoiceTab, data.payment_url)) {
                         window.location.href = '/orders';
                     } else {
                         window.location.href = data.payment_url;
                     }
                 } catch (error) {
-                    if (invoiceTab) {
-                        invoiceTab.close();
-                    }
+                    closeCryptoTab(invoiceTab);
 
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;

@@ -21,7 +21,10 @@ use Laravel\Socialite\Facades\Socialite;
 
 Route::get('/', function (Request $request) {
     $categories = Category::all();
-    $query = Product::with(['category', 'packages'])->withCount('availableLicenseStocks');
+    $query = Product::with([
+        'category',
+        'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
+    ])->withCount('availableLicenseStocks');
 
     if ($request->category) {
         $category = Category::where('slug', $request->category)->first();
@@ -40,7 +43,10 @@ Route::get('/', function (Request $request) {
 });
 
 Route::get('/api/products', function (Request $request) {
-    $query = Product::with(['category', 'packages'])->withCount('availableLicenseStocks');
+    $query = Product::with([
+        'category',
+        'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
+    ])->withCount('availableLicenseStocks');
 
     if ($request->search) {
         $query->where('name', 'like', '%'.$request->search.'%');
@@ -64,7 +70,10 @@ Route::get('/api/products', function (Request $request) {
 |--------------------------------------------------------------------------
 */
 Route::get('/product/{id}', function ($id) {
-    $product = Product::with(['features', 'packages'])
+    $product = Product::with([
+        'features',
+        'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
+    ])
         ->withCount('availableLicenseStocks')
         ->findOrFail($id);
 
@@ -193,6 +202,7 @@ Route::get('/auth/google/callback', function () {
         ['email' => $googleUser->email],
         [
             'name' => $googleUser->name,
+            'avatar' => $googleUser->getAvatar(),
             'password' => bcrypt(Str::random(16)),
         ]
     );
