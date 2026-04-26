@@ -4,12 +4,41 @@
 </script>
 
 <script>
+    const orderId = @json($orderId ?? null);
+    const csrfToken = @json(csrf_token());
+
+    async function syncMidtransOrder(id) {
+        if (!id) return null;
+
+        const response = await fetch(`/sync-midtrans-order/${encodeURIComponent(id)}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+        });
+
+        return response.json().catch(() => null);
+    }
+
+    async function finishMidtransPayment(result, redirectUrl) {
+        let syncResult = null;
+
+        try {
+            syncResult = await syncMidtransOrder(orderId || result?.order_id);
+        } finally {
+            const target = redirectUrl === "/licenses" && syncResult?.status !== "paid" ? "/orders" : redirectUrl;
+            window.location.href = target;
+        }
+    }
+
     window.snap.pay("{{ $token }}", {
-        onSuccess: function() {
-            window.location.href = "/licenses";
+        onSuccess: function(result) {
+            finishMidtransPayment(result, "/licenses");
         },
-        onPending: function() {
-            window.location.href = "/orders";
+        onPending: function(result) {
+            finishMidtransPayment(result, "/orders");
         },
         onError: function() {
             window.location.href = "/orders";

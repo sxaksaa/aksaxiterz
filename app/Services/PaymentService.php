@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Midtrans\Config;
 use Midtrans\Snap;
+use Midtrans\Transaction;
 
 class PaymentService
 {
@@ -88,6 +89,17 @@ class PaymentService
             'snap_token' => $snapToken,
             'order' => $order->fresh(),
         ];
+    }
+
+    public function getMidtransStatus(string $orderId): array
+    {
+        Config::$serverKey = config('midtrans.serverKey');
+        Config::$isProduction = config('midtrans.isProduction', false);
+        Config::$curlOptions = $this->midtransCurlOptions();
+
+        $status = Transaction::status($orderId);
+
+        return json_decode(json_encode($status), true) ?: [];
     }
 
     public function createCrypto($user, $productId, $packageId, $coin, ?Order $order = null)

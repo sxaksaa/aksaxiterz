@@ -481,18 +481,51 @@
             }
         }
 
-        function openMidtransPayment(token) {
+        async function syncMidtransOrder(orderId) {
+            if (!orderId) return null;
+
+            const response = await fetch(`/sync-midtrans-order/${encodeURIComponent(orderId)}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            });
+
+            return response.json().catch(() => null);
+        }
+
+        async function finishMidtransPayment(orderId, redirectUrl) {
+            let syncResult = null;
+
+            try {
+                syncResult = await syncMidtransOrder(orderId);
+            } finally {
+                const target = redirectUrl === '/licenses' && syncResult?.status !== 'paid' ? '/orders' : redirectUrl;
+                window.location.href = target;
+            }
+        }
+
+        function openMidtransPayment(token, orderId) {
             if (!window.snap) {
-                window.location.href = `/midtrans-pay?token=${encodeURIComponent(token)}`;
+                const target = new URL('/midtrans-pay', window.location.origin);
+                target.searchParams.set('token', token);
+
+                if (orderId) {
+                    target.searchParams.set('order_id', orderId);
+                }
+
+                window.location.href = target.toString();
                 return;
             }
 
             window.snap.pay(token, {
-                onSuccess: function() {
-                    window.location.href = '/licenses';
+                onSuccess: function(result) {
+                    finishMidtransPayment(orderId || result?.order_id, '/licenses');
                 },
-                onPending: function() {
-                    window.location.href = '/orders';
+                onPending: function(result) {
+                    finishMidtransPayment(orderId || result?.order_id, '/orders');
                 },
                 onError: function() {
                     window.location.href = '/orders';
@@ -562,7 +595,7 @@
 
                 try {
                     const data = await fetchPaymentJson(form);
-                    openMidtransPayment(data.snap_token);
+                    openMidtransPayment(data.snap_token, data.order_id);
                 } catch (error) {
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;

@@ -96,15 +96,18 @@ Route::middleware('auth')->group(function () {
     // Midtrans pay page
     Route::get('/midtrans-pay', function () {
         $token = request('token');
+        $orderId = request('order_id');
 
         abort_if(blank($token), 404);
 
-        return view('midtrans-pay', compact('token'));
+        return view('midtrans-pay', compact('token', 'orderId'));
     })->name('midtrans.pay.page');
 
     // Midtrans
     Route::post('/process-order/{id}', [PaymentController::class, 'payMidtrans'])
         ->middleware('throttle:5,1');
+    Route::post('/sync-midtrans-order/{orderId}', [PaymentController::class, 'syncMidtransOrder'])
+        ->middleware('throttle:10,1');
 
     // Crypto
     Route::post('/pay-crypto/{id}', [PaymentController::class, 'payCrypto'])
@@ -126,6 +129,8 @@ Route::middleware('auth')->group(function () {
             return response()->json([
                 'status' => $order->status,
                 'remaining' => 0,
+                'order_id' => $order->order_id,
+                'payment_method' => $order->payment_method,
             ]);
         }
 
@@ -138,6 +143,8 @@ Route::middleware('auth')->group(function () {
         return response()->json([
             'status' => $order->status,
             'remaining' => max(0, (int) $remaining),
+            'order_id' => $order->order_id,
+            'payment_method' => $order->payment_method,
         ]);
     });
 

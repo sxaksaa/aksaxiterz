@@ -74,7 +74,10 @@ class PaymentController extends Controller
                     ]);
                 }
 
-                return redirect()->route('midtrans.pay.page', ['token' => $payment['snap_token']]);
+                return redirect()->route('midtrans.pay.page', [
+                    'token' => $payment['snap_token'],
+                    'order_id' => $payment['order']->order_id,
+                ]);
             }
 
             $payment = $this->paymentService->createCryptoPayment(
@@ -138,11 +141,79 @@ class PaymentController extends Controller
                 ]);
             }
 
-            return redirect()->route('midtrans.pay.page', ['token' => $payment['snap_token']]);
+            return redirect()->route('midtrans.pay.page', [
+                'token' => $payment['snap_token'],
+                'order_id' => $payment['order']->order_id,
+            ]);
         } catch (\Exception $e) {
             Log::error('MIDTRANS ERROR: '.$e->getMessage());
 
             return $this->paymentErrorResponse($request, $e);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MIDTRANS STATUS SYNC
+    |--------------------------------------------------------------------------
+    */
+
+    public function syncMidtransOrder(Request $request, string $orderId)
+    {
+        $order = Order::where('order_id', $orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($order->payment_method !== 'midtrans') {
+            abort(404);
+        }
+
+        if ($order->status === 'paid') {
+            return response()->json([
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+            ]);
+        }
+
+        try {
+            $payload = $this->paymentService->getMidtransStatus($order->order_id);
+
+            DB::beginTransaction();
+
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $this->validMidtransOrderPayload($lockedOrder, $payload)) {
+                DB::rollBack();
+
+                return response()->json(['error' => 'Invalid Midtrans status'], 403);
+            }
+
+            if ($lockedOrder->status !== 'paid') {
+                $this->applyMidtransStatus($lockedOrder, $payload);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'order_id' => $lockedOrder->order_id,
+                'status' => $lockedOrder->fresh()->status,
+            ]);
+        } catch (\Exception $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            Log::warning('MIDTRANS SYNC ERROR: '.$e->getMessage(), [
+                'order_id' => $order->order_id,
+            ]);
+
+            return response()->json([
+                'order_id' => $order->order_id,
+                'status' => $order->fresh()->status,
+                'message' => 'Payment is still being verified.',
+            ], 202);
         }
     }
 
@@ -181,10 +252,7 @@ class PaymentController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (
-                $order->payment_method !== 'midtrans' ||
-                ! $this->sameAmount($request->gross_amount, $order->price)
-            ) {
+            if (! $this->validMidtransOrderPayload($order, $request->all())) {
                 DB::rollBack();
 
                 return response()->json(['error' => 'Invalid amount'], 403);
@@ -196,20 +264,7 @@ class PaymentController extends Controller
                 return response()->json(['msg' => 'already']);
             }
 
-            if (
-                ($request->transaction_status === 'capture' && $request->fraud_status === 'accept') ||
-                $request->transaction_status === 'settlement'
-            ) {
-
-                $this->generateLicense($order);
-            }
-
-            if (in_array($request->transaction_status, ['cancel', 'deny', 'expire'])) {
-
-                if ($order->status !== 'paid') {
-                    $order->update(['status' => 'cancelled']);
-                }
-            }
+            $this->applyMidtransStatus($order, $request->all());
 
             DB::commit();
 
@@ -346,6 +401,34 @@ class PaymentController extends Controller
     | CORE LOGIC
     |--------------------------------------------------------------------------
     */
+
+    private function validMidtransOrderPayload(Order $order, array $payload): bool
+    {
+        $grossAmount = $payload['gross_amount'] ?? null;
+
+        return $order->payment_method === 'midtrans'
+            && is_numeric($grossAmount)
+            && $this->sameAmount($grossAmount, $order->price);
+    }
+
+    private function applyMidtransStatus(Order $order, array $payload): void
+    {
+        $transactionStatus = $payload['transaction_status'] ?? null;
+        $fraudStatus = $payload['fraud_status'] ?? null;
+
+        if (
+            ($transactionStatus === 'capture' && $fraudStatus === 'accept') ||
+            $transactionStatus === 'settlement'
+        ) {
+            $this->generateLicense($order);
+
+            return;
+        }
+
+        if (in_array($transactionStatus, ['cancel', 'deny', 'expire'], true) && $order->status !== 'paid') {
+            $order->update(['status' => 'cancelled']);
+        }
+    }
 
     private function generateLicense($order)
     {
