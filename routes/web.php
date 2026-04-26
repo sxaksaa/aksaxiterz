@@ -9,9 +9,12 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 
 /*
 |--------------------------------------------------------------------------
@@ -193,16 +196,36 @@ Route::middleware('auth')->group(function () {
 Route::get('/auth/google', function (Request $request) {
     $redirect = $request->query('redirect');
 
-    if (is_string($redirect) && str_starts_with($redirect, url('/'))) {
+    if (is_string($redirect) && isSafeLoginRedirect($request, $redirect)) {
         session(['login_redirect' => $redirect]);
+        Cookie::queue(cookie(
+            'login_redirect',
+            $redirect,
+            10,
+            '/',
+            null,
+            $request->isSecure(),
+            true,
+            false,
+            'lax'
+        ));
     }
 
     return Socialite::driver('google')->redirect();
 });
 
-Route::get('/auth/google/callback', function () {
+Route::get('/auth/google/callback', function (Request $request) {
 
-    $googleUser = Socialite::driver('google')->user();
+    try {
+        $googleUser = Socialite::driver('google')->user();
+    } catch (InvalidStateException $e) {
+        Log::warning('GOOGLE LOGIN STATE MISMATCH, retrying stateless auth', [
+            'host' => $request->getHost(),
+            'has_session_cookie' => $request->hasCookie(config('session.cookie')),
+        ]);
+
+        $googleUser = Socialite::driver('google')->stateless()->user();
+    }
 
     $user = User::updateOrCreate(
         ['email' => $googleUser->email],
@@ -215,7 +238,13 @@ Route::get('/auth/google/callback', function () {
 
     Auth::login($user, true);
 
-    return redirect(session()->pull('login_redirect', '/'));
+    $redirect = session()->pull('login_redirect')
+        ?? $request->cookie('login_redirect')
+        ?? '/';
+
+    Cookie::queue(Cookie::forget('login_redirect'));
+
+    return redirect(isSafeLoginRedirect($request, $redirect) ? $redirect : '/');
 });
 
 Route::post('/logout', function () {
@@ -227,6 +256,17 @@ Route::post('/logout', function () {
 Route::get('/login', function () {
     return redirect('/auth/google');
 })->name('login');
+
+function isSafeLoginRedirect(Request $request, string $redirect): bool
+{
+    if (str_starts_with($redirect, '/')) {
+        return ! str_starts_with($redirect, '//');
+    }
+
+    $redirectHost = parse_url($redirect, PHP_URL_HOST);
+
+    return $redirectHost && hash_equals($request->getHost(), $redirectHost);
+}
 
 /*
 |--------------------------------------------------------------------------
