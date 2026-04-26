@@ -193,10 +193,20 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/auth/google', function (Request $request) {
+$isSafeLoginRedirect = function (Request $request, string $redirect): bool {
+    if (str_starts_with($redirect, '/')) {
+        return ! str_starts_with($redirect, '//');
+    }
+
+    $redirectHost = parse_url($redirect, PHP_URL_HOST);
+
+    return $redirectHost && hash_equals($request->getHost(), $redirectHost);
+};
+
+Route::get('/auth/google', function (Request $request) use ($isSafeLoginRedirect) {
     $redirect = $request->query('redirect');
 
-    if (is_string($redirect) && isSafeLoginRedirect($request, $redirect)) {
+    if (is_string($redirect) && $isSafeLoginRedirect($request, $redirect)) {
         session(['login_redirect' => $redirect]);
         Cookie::queue(cookie(
             'login_redirect',
@@ -214,7 +224,7 @@ Route::get('/auth/google', function (Request $request) {
     return Socialite::driver('google')->redirect();
 });
 
-Route::get('/auth/google/callback', function (Request $request) {
+Route::get('/auth/google/callback', function (Request $request) use ($isSafeLoginRedirect) {
 
     try {
         $googleUser = Socialite::driver('google')->user();
@@ -244,7 +254,7 @@ Route::get('/auth/google/callback', function (Request $request) {
 
     Cookie::queue(Cookie::forget('login_redirect'));
 
-    return redirect(isSafeLoginRedirect($request, $redirect) ? $redirect : '/');
+    return redirect($isSafeLoginRedirect($request, $redirect) ? $redirect : '/');
 });
 
 Route::post('/logout', function () {
@@ -256,17 +266,6 @@ Route::post('/logout', function () {
 Route::get('/login', function () {
     return redirect('/auth/google');
 })->name('login');
-
-function isSafeLoginRedirect(Request $request, string $redirect): bool
-{
-    if (str_starts_with($redirect, '/')) {
-        return ! str_starts_with($redirect, '//');
-    }
-
-    $redirectHost = parse_url($redirect, PHP_URL_HOST);
-
-    return $redirectHost && hash_equals($request->getHost(), $redirectHost);
-}
 
 /*
 |--------------------------------------------------------------------------
