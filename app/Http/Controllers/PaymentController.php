@@ -26,25 +26,47 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        $order = Order::findOrFail($orderId);
+        $oldOrder = Order::findOrFail($orderId);
 
-        if ($order->user_id !== $user->id) {
+        if ($oldOrder->user_id !== $user->id) {
             abort(403);
         }
 
-        if ($order->status === 'paid') {
+        if ($oldOrder->status === 'paid') {
             return back()->withErrors(['msg' => 'Already paid']);
         }
 
+        // 🔥 buat order baru
+        $newOrder = Order::create([
+            'order_id' => 'ORD-' . strtoupper(\Str::random(10)),
+            'user_id' => $user->id,
+            'product_id' => $oldOrder->product_id,
+            'package_id' => $oldOrder->package_id,
+            'status' => 'pending',
+            'payment_method' => $oldOrder->payment_method,
+            'price' => $oldOrder->price,
+            'expired_at' => now()->addMinutes(10),
+        ]);
+
+        // 🔥 tandai order lama diganti
+        $oldOrder->update([
+            'status' => 'cancelled',
+            'replaced_by' => $newOrder->id
+        ]);
+
+        // 🔥 cancel pending lain (opsional)
         Order::where('user_id', $user->id)
             ->where('status', 'pending')
+            ->where('id', '!=', $newOrder->id)
             ->update(['status' => 'cancelled']);
 
-        if ($order->payment_method === 'midtrans') {
+        // 🔥 lanjut payment
+        if ($newOrder->payment_method === 'midtrans') {
+
             $snapToken = $this->paymentService->createMidtrans(
                 $user,
-                $order->product_id,
-                $order->package_id
+                $newOrder->product_id,
+                $newOrder->package_id
             );
 
             return redirect()->route('midtrans.pay.page', ['token' => $snapToken]);
@@ -52,8 +74,8 @@ class PaymentController extends Controller
 
             $url = $this->paymentService->createCrypto(
                 $user,
-                $order->product_id,
-                $order->package_id,
+                $newOrder->product_id,
+                $newOrder->package_id,
                 'usdttrc20'
             );
 

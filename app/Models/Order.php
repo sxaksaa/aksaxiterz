@@ -32,4 +32,8 @@ class Order extends Model
     {
         return $this->belongsTo(Package::class);
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

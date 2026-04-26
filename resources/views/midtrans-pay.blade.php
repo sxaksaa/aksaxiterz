@@ -4,7 +4,7 @@
 </script>
 
 <script>
-    window.snap.pay("{{ $Token }}", {
+    window.snap.pay("{{ $token }}", {
         onSuccess: function() {
             window.location.href = "/licenses";
         },

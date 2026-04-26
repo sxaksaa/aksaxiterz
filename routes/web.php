@@ -86,10 +86,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain']);
 
     // Midtrans pay page
-    Route::get('/midtrans-pay', function (Request $request) {
-        return view('midtrans-pay', [
-            'snapToken' => $request->token
-        ]);
+    Route::get('/midtrans-pay', function () {
+        $token = request('token');
+        return view('midtrans-pay', compact('token'));
     })->name('midtrans.pay.page');
 
     // Midtrans

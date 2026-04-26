@@ -16,4 +16,8 @@ class LicenseStock extends Model
     protected $casts = [
         'is_sold' => 'boolean',
     ];
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
 }

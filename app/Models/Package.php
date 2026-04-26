@@ -12,4 +12,8 @@ class Package extends Model
         'price',
         'price_usdt',
     ];
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
 }

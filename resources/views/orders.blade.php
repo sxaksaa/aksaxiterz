@@ -180,10 +180,12 @@
                                         $order->payment_method === 'midtrans' &&
                                         $order->expired_at &&
                                         now()->lt($order->expired_at))
-                                    <a href="/pay-again/{{ $order->id }}" target="_blank"
-   class="text-blue-400 text-xs underline">
-    Pay Again
-</a>
+                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit" class="text-blue-400 text-xs underline">
+                                            Pay Again
+                                        </button>
+                                    </form>
                                 @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
                                     <span class="text-red-400 text-xs">Expired</span>
                                 @else
@@ -221,7 +223,7 @@
 
                 });
         }, 5000);
-        
+
         setInterval(() => {
             document.querySelectorAll('.countdown').forEach(el => {
 
