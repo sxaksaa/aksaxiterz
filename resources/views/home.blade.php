@@ -3,10 +3,17 @@
 @section('content')
     <section class="page-shell pt-6 md:pt-10 pb-5">
         <div class="max-w-3xl">
-            <p class="text-sm font-semibold text-[#C084FC] mb-2">Digital license store</p>
-            <h1 class="text-3xl md:text-5xl font-bold tracking-normal mb-3">Choose a product, pay, and get your license instantly.</h1>
+            <p class="text-sm font-semibold text-[#C084FC] mb-2">Gaming Tools Platform</p>
+
+            <h1 class="text-3xl md:text-5xl font-bold tracking-normal mb-3">
+                Unlock the tools you need to stay ahead and elevate your gameplay instantly.
+            </h1>
+
             <p class="text-sm md:text-base text-gray-400 max-w-2xl">
-                Automated checkout with Midtrans or crypto, with license stock delivered after a successful payment callback.
+                Secure checkout with instant delivery — no waiting, no hassle.
+            </p>
+            <p class="text-sm md:text-base text-gray-400 max-w-2xl">
+                Seamlessly available across Android, iOS, PC, and laptop.
             </p>
         </div>
     </section>
@@ -80,8 +87,9 @@
 
                 window.showAppToast?.(
                     'Category selected',
-                    categoryName === 'All' ? 'Showing all products.' : `Showing ${categoryName}.`,
-                    { variant: 'success' }
+                    categoryName === 'All' ? 'Showing all products.' : `Showing ${categoryName}.`, {
+                        variant: 'success'
+                    }
                 );
             }
 
