@@ -135,6 +135,8 @@
                 button.classList.add('opacity-60', 'pointer-events-none');
             }
 
+            window.showAppToast?.('Payment retry', 'Preparing your payment link.');
+
             try {
                 const data = await fetchPaymentJson(form.action, new FormData(form));
                 await refreshOrders();
@@ -145,7 +147,9 @@
                     return;
                 }
 
-                alert(error.message || 'Payment failed');
+                window.showAppToast?.('Payment failed', error.message || 'Payment failed', {
+                    variant: 'error',
+                });
                 await refreshOrders();
             } finally {
                 if (button) {

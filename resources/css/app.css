@@ -125,6 +125,55 @@
         border: 1px solid rgba(147, 51, 234, 0.28);
     }
 
+    .app-toast {
+        @apply fixed right-4 z-50 w-[calc(100vw-2rem)] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md transition-all duration-300 sm:right-6;
+        bottom: 1.25rem;
+        transform: translateY(1rem);
+        opacity: 0;
+        pointer-events: none;
+        background: rgba(21, 21, 27, 0.96);
+        border-color: rgba(147, 51, 234, 0.42);
+        color: #d4d4d8;
+        box-shadow:
+            0 20px 45px rgba(0, 0, 0, 0.34),
+            0 0 0 1px rgba(147, 51, 234, 0.1);
+    }
+
+    .app-toast.is-visible {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .app-toast-title {
+        @apply mb-1 font-semibold;
+        color: #c084fc;
+    }
+
+    .app-toast-message {
+        color: #a1a1aa;
+    }
+
+    .app-toast[data-variant="success"] {
+        border-color: rgba(192, 132, 252, 0.58);
+    }
+
+    .app-toast[data-variant="warning"] {
+        border-color: rgba(250, 204, 21, 0.46);
+    }
+
+    .app-toast[data-variant="warning"] .app-toast-title {
+        color: #fde68a;
+    }
+
+    .app-toast[data-variant="error"] {
+        border-color: rgba(248, 113, 113, 0.5);
+    }
+
+    .app-toast[data-variant="error"] .app-toast-title {
+        color: #fca5a5;
+    }
+
     .price {
         color: #c084fc;
         font-weight: 700;

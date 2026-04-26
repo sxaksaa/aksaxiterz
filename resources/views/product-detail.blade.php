@@ -11,13 +11,8 @@
     @php
         $stock = $product->available_license_stocks_count ?? 0;
     @endphp
-    <div id="skeleton" class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10 space-y-4 animate-pulse">
-        <div class="h-6 bg-[#1f1f25] w-1/3 rounded"></div>
-        <div class="h-4 bg-[#1f1f25] w-1/2 rounded"></div>
-        <div class="h-32 bg-[#1f1f25] rounded-xl"></div>
-    </div>
 
-    <div id="content" class="hidden page-shell py-6 md:py-10 fade-up">
+    <div id="content" class="page-shell py-6 md:py-10">
 
         <div class="grid gap-5 md:grid-cols-[1fr_320px] md:items-start mb-8">
             <div>
@@ -199,29 +194,6 @@
     </div>
 
     @php $paymentError = $errors->first('payment'); @endphp
-    <div id="checkoutToast"
-        class="
-    fixed bottom-6 right-6 z-50
-    bg-[#15151B]/95 border border-[#9333EA]/40
-    text-gray-200 text-sm
-    px-5 py-3 rounded-xl
-    shadow-xl backdrop-blur-md
-    max-w-[calc(100vw-2rem)] sm:max-w-sm
-
-    {{ $paymentError ? '' : 'opacity-0 translate-y-6 pointer-events-none' }}
-    transition-all duration-300
-">
-
-        <div id="checkoutToastTitle" class="font-semibold text-[#C084FC] mb-1">
-            {{ $paymentError ? 'Payment Failed' : 'Checkout' }}
-        </div>
-
-        <div id="checkoutToastMessage">
-            {{ $paymentError }}
-        </div>
-
-    </div>
-
     <script>
         let selectedPackageId = null;
         let selectedPayment = null;
@@ -234,44 +206,22 @@
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        let toastTimer = null;
 
-        window.addEventListener('load', () => {
-            document.getElementById('skeleton').style.display = 'none';
-            document.getElementById('content').classList.remove('hidden');
+        @if ($paymentError)
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(() => showToast('Payment failed', @json($paymentError), null, 'error'), 100);
+            });
+        @endif
 
-            @if ($paymentError)
-                setTimeout(() => showToast('Payment Failed', @json($paymentError)), 100);
-            @endif
-        });
-
-        function showToast(title, message, redirectAfter = null) {
-            const toast = document.getElementById('checkoutToast');
-            const toastTitle = document.getElementById('checkoutToastTitle');
-            const toastMessage = document.getElementById('checkoutToastMessage');
-
-            if (!toast || !toastTitle || !toastMessage) return;
-
-            toastTitle.innerText = title;
-            toastMessage.innerText = message;
-            toast.classList.remove('opacity-0', 'translate-y-6', 'pointer-events-none');
-
-            clearTimeout(toastTimer);
-
-            if (redirectAfter) {
-                toastTimer = setTimeout(() => {
-                    window.location.href = redirectAfter;
-                }, 900);
-                return;
-            }
-
-            toastTimer = setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-6', 'pointer-events-none');
-            }, 4000);
+        function showToast(title, message, redirectAfter = null, variant = 'info') {
+            window.showAppToast?.(title, message, {
+                redirectAfter,
+                variant,
+            });
         }
 
         function requireLogin() {
-            showToast('Login required', 'Please login with Google before checkout.', loginUrl);
+            showToast('Login required', 'Please login with Google before checkout.', loginUrl, 'warning');
         }
 
         /* =========================
@@ -300,6 +250,14 @@
             updateAllPrices();
             updatePrice();
             showSummary();
+
+            showToast(
+                'Payment selected',
+                type === 'crypto' ? 'Crypto payment is active. Choose a network next.' :
+                'Transfer and e-wallet payment is active.',
+                null,
+                'success'
+            );
         }
 
         /* =========================
@@ -307,7 +265,7 @@
         ========================= */
         function selectPackage(e, price, id, name, usd, stock) {
             if (stock <= 0) {
-                alert('This package is out of stock');
+                showToast('Out of stock', 'This package is out of stock.', null, 'warning');
                 return;
             }
 
@@ -326,6 +284,17 @@
             refreshNetworkAvailability();
             updatePrice();
             showSummary();
+
+            const priceText = selectedPayment === 'crypto' ?
+                `$${Number(usd).toLocaleString()}` :
+                `Rp ${Number(price).toLocaleString()}`;
+
+            showToast(
+                'Package selected',
+                `${formatPackageName(name)} - ${priceText} (${stock} left).`,
+                null,
+                'success'
+            );
         }
 
         /* =========================
@@ -369,8 +338,10 @@
             });
 
             if (selectedCoin && isNetworkDisabled(selectedCoin)) {
+                const min = networkMinimum(selectedCoin);
                 selectedCoin = null;
                 document.getElementById('selectedText').innerText = 'Select Network';
+                showToast('Network reset', `Selected package is below the $${min} minimum.`, null, 'warning');
             }
         }
 
@@ -400,6 +371,8 @@
 
         function selectNetwork(value, text, e) {
             if (e?.currentTarget?.classList.contains('disabled')) {
+                const min = networkMinimum(value);
+                showToast('Network unavailable', `This network needs at least $${min}.`, null, 'warning');
                 return;
             }
 
@@ -412,6 +385,7 @@
             document.getElementById('dropdownList').classList.add('hidden');
             document.getElementById('arrow').style.transform = 'rotate(0deg)';
 
+            showToast('Network selected', text, null, 'success');
         }
 
         window.addEventListener('click', function(e) {
@@ -551,24 +525,26 @@
             }
 
             if (!selectedPackageId) {
-                showToast('Select package', 'Select a package first.');
+                showToast('Select package', 'Select a package first.', null, 'warning');
                 return;
             }
 
             if (selectedPackageStock <= 0) {
-                showToast('Out of stock', 'This package is out of stock.');
+                showToast('Out of stock', 'This package is out of stock.', null, 'warning');
                 return;
             }
 
             if (!selectedPayment) {
-                showToast('Select payment', 'Select a payment method.');
+                showToast('Select payment', 'Select a payment method.', null, 'warning');
                 return;
             }
 
             if (selectedPayment === 'crypto' && !selectedCoin) {
-                showToast('Select network', 'Select a crypto network first.');
+                showToast('Select network', 'Select a crypto network first.', null, 'warning');
                 return;
             }
+
+            showToast('Checkout started', 'Preparing your payment link.');
 
             this.innerText = "Processing...";
             this.classList.add('opacity-60')
@@ -598,7 +574,7 @@
                         return;
                     }
 
-                    showToast('Payment failed', error.message || 'Payment failed');
+                    showToast('Payment failed', error.message || 'Payment failed', null, 'error');
                     resetPayButton();
                 }
             }
@@ -608,7 +584,7 @@
                 let min = networkMinimum(selectedCoin);
 
                 if (selectedUsd < min) {
-                    showToast('Minimum payment', `Minimum payment for ${selectedCoin} is $${min}.`);
+                    showToast('Minimum payment', `Minimum payment for ${selectedCoin} is $${min}.`, null, 'warning');
 
                     this.disabled = false
                     this.innerText = isAuthenticated ? "Pay Now" : "Login to Pay"
@@ -645,7 +621,7 @@
                         return;
                     }
 
-                    showToast('Payment failed', error.message || 'Payment failed');
+                    showToast('Payment failed', error.message || 'Payment failed', null, 'error');
                     resetPayButton();
                 }
             }

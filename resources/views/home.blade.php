@@ -1,13 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-    <div id="pageLoader" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
-        <div class="flex flex-col items-center gap-4">
-            <div class="w-10 h-10 border-4 border-[#9333EA] border-t-transparent rounded-full animate-spin"></div>
-            <span class="text-sm text-gray-300">Loading...</span>
-        </div>
-    </div>
-
     <section class="page-shell pt-6 md:pt-10 pb-5">
         <div class="max-w-3xl">
             <p class="text-sm font-semibold text-[#C084FC] mb-2">Digital license store</p>
@@ -76,6 +69,7 @@
             window.filterCategory = function(cat, el) {
 
                 currentCategory = cat;
+                const categoryName = el?.textContent?.trim() || 'All';
 
                 document.querySelectorAll('.category-chip')
                     .forEach(e => e.classList.remove('active'));
@@ -83,11 +77,15 @@
                 el.classList.add('active');
 
                 fetchProducts(searchInput.value, cat);
+
+                window.showAppToast?.(
+                    'Category selected',
+                    categoryName === 'All' ? 'Showing all products.' : `Showing ${categoryName}.`,
+                    { variant: 'success' }
+                );
             }
 
             function fetchProducts(search, category) {
-
-                container.style.opacity = 0;
 
                 const params = new URLSearchParams({
                     search,
@@ -97,20 +95,10 @@
                 fetch(`/api/products?${params.toString()}`)
                     .then(res => res.text())
                     .then(html => {
-
-                        setTimeout(() => {
-                            container.innerHTML = html;
-                            container.style.opacity = 1;
-                        }, 150);
-
+                        container.innerHTML = html;
                     });
             }
 
         });
-
-        /* LOADER */
-        function showLoader() {
-            document.getElementById('pageLoader').classList.remove('hidden');
-        }
     </script>
 @endsection
