@@ -68,44 +68,6 @@
 
     </div>
 
-    <style>
-        /* FADE UP */
-        .fade-up {
-            animation: fadeUp 0.5s ease;
-        }
-
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(15px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* CARD HOVER */
-        .card-hover {
-            transition: all 0.25s ease;
-        }
-
-        .card-hover:hover {
-            transform: translateY(-4px) scale(1.01);
-        }
-
-        /* BUTTON PRESS */
-        .btn-press:active {
-            transform: scale(0.96);
-        }
-
-        /* GLOW */
-        .glow-hover:hover {
-            box-shadow: 0 0 20px rgba(147, 51, 234, 0.25);
-        }
-    </style>
-
     <script>
         function copyKey(event, id) {
 

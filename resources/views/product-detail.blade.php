@@ -2,7 +2,7 @@
 
 @section('content')
     @php
-        $stock = \App\Models\LicenseStock::where('product_id', $product->id)->where('is_sold', false)->count();
+        $stock = $product->available_license_stocks_count ?? 0;
     @endphp
     <div id="skeleton" class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10 space-y-4 animate-pulse">
         <div class="h-6 bg-[#1f1f25] w-1/3 rounded"></div>
@@ -10,38 +10,54 @@
         <div class="h-32 bg-[#1f1f25] rounded-xl"></div>
     </div>
 
-    <div id="content" class="hidden max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10 fade-up">
+    <div id="content" class="hidden page-shell py-6 md:py-10 fade-up">
 
-        <h1 class="text-2xl font-semibold mb-2">{{ $product->name }}</h1>
-        <p class="text-gray-400 mb-6">{{ $product->description }}</p>
+        <div class="grid gap-5 md:grid-cols-[1fr_320px] md:items-start mb-8">
+            <div>
+                <a href="/" class="text-sm text-[#C084FC] hover:text-white transition">Back to products</a>
+                <h1 class="text-3xl md:text-5xl font-bold mt-3 mb-3">{{ $product->name }}</h1>
+                <p class="text-gray-400 max-w-2xl">{{ $product->description }}</p>
+            </div>
 
-        <!-- FEATURES -->
-        <div class="card-glow p-5 mb-10">
+            <div class="panel-card p-4">
+                <div class="text-xs uppercase text-gray-500 mb-2">Availability</div>
+                <div class="flex items-end justify-between">
+                    <div>
+                        <div class="text-2xl font-bold {{ $stock > 0 ? 'text-[#C084FC]' : 'text-red-300' }}">
+                            {{ $stock }}
+                        </div>
+                        <div class="text-sm text-gray-400">license ready</div>
+                    </div>
+                    <div class="text-xs text-gray-500">Auto delivery after paid</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-card p-5 mb-8">
             <h3 class="mb-3 font-semibold">Features</h3>
-            <ul class="space-y-1 text-sm text-gray-300">
+            <ul class="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
                 @foreach ($product->features as $f)
-                    <li>{{ $f->name }}</li>
+                    <li class="rounded-lg bg-white/5 px-3 py-2">{{ $f->name }}</li>
                 @endforeach
             </ul>
         </div>
 
-        <!-- PAYMENT -->
         <h2 class="mb-4 font-semibold">Payment Method</h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
 
             <div onclick="selectPayment('midtrans')" id="btnMid"
-                class="card-glow p-5 cursor-pointer payment-card flex flex-col items-center justify-center gap-1">
+                class="panel-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                <div>Transfer / E-Wallet</div>
+                <div class="font-semibold">Transfer / E-Wallet</div>
                 <span class="text-xs text-gray-400">QRIS All Payment (Bank, Dana, GoPay, etc)</span>
 
             </div>
 
             <div onclick="selectPayment('crypto')" id="btnCrypto"
-                class="card-glow p-5 cursor-pointer payment-card flex flex-col items-center justify-center gap-1">
+                class="panel-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                <div>Crypto</div>
+                <div class="font-semibold">Crypto</div>
                 <span class="text-xs text-gray-400">USDT Address</span>
 
             </div>
@@ -49,43 +65,50 @@
         </div>
 
         <!-- CRYPTO -->
-        <div id="cryptoBox" class="hidden relative mb-6 fade-up">
+        <div id="cryptoBox" class="hidden relative mb-6 fade-up z-10">
 
             <div onclick="toggleDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
 
                 <span id="selectedText">Select Network</span>
+                <div id="minInfo" class="text-xs text-gray-400 mt-2 hidden">
+                    Minimum: -
+                </div>
                 <span id="arrow" class="transition-transform">v</span>
             </div>
 
-            <div id="dropdownList" class="hidden absolute w-full mt-2 card-glow overflow-hidden z-50">
+            <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
 
-                <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)')"
+                <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)', event)"
                     class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">BSC</span>
+                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
-                    <span class="text-xs italic text-yellow-500 ml-auto">Recommended</span>
                 </div>
 
-                <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)')"
+                <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)', event)"
                     class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">TRX</span>
+                    <span class="text-xs text-gray-500 ml-auto">Min $10</span>
                     <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
                 </div>
 
-                <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)')"
+                <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)', event)"
                     class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">ETH</span>
+                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
                 </div>
 
-                <div onclick="selectNetwork('usdtmatic','POL Polygon POS')" class="dropdown-item flex items-baseline gap-2">
+                <div onclick="selectNetwork('usdtmatic','POL Polygon POS', event)" class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">POL</span>
+                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
                 </div>
 
-                <div onclick="selectNetwork('usdtton','TON The Open Network (TON)')"
+                <div onclick="selectNetwork('usdtton','TON The Open Network (TON)', event)"
                     class="dropdown-item flex items-baseline gap-2">
                     <span class="font-bold text-white">TON</span>
+                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
                     <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
                 </div>
 
@@ -93,23 +116,23 @@
 
         </div>
 
-        <!-- PACKAGE -->
         <h2 class="mb-4 font-semibold">Select Package</h2>
 
-        <div class="flex gap-4 mb-10 flex-wrap">
+        <div class="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($product->packages as $p)
                 @php
                     $badge = null;
-                    if (str_contains($p->name, '30')) {
+                    if (str_contains($p->name, 'Testing')) {
+                        $badge = 'Test Flow';
+                    } elseif (str_contains($p->name, '30')) {
                         $badge = 'Best Deal';
-                    }
-                    if (str_contains($p->name, '90')) {
+                    } elseif (str_contains($p->name, '90')) {
                         $badge = 'Premium';
                     }
                 @endphp
 
                 <div onclick="selectPackage(event, {{ $p->price }}, {{ $p->id }}, '{{ $p->name }}', {{ $p->price_usdt }})"
-                    class="card-glow p-4 w-full sm:w-44 relative cursor-pointer package transition">
+                    class="panel-card p-4 relative cursor-pointer package transition">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
@@ -128,8 +151,7 @@
             @endforeach
         </div>
 
-        <!-- SUMMARY -->
-        <div id="summaryBox" class="hidden card-glow p-4 sm:p-6 fade-up transition-all duration-300">
+        <div id="summaryBox" class="hidden panel-card p-4 sm:p-6 fade-up transition-all duration-300">
 
             <h3 class="mb-4 font-semibold">Order Summary</h3>
 
@@ -164,7 +186,7 @@
                 <input type="hidden" name="coin" id="crypto_coin">
             </form>
         </div>
-    </div> {{-- content --}}
+    </div>
 
     @if ($errors->has('payment'))
         <div id="toastError"
@@ -301,9 +323,7 @@
             arrow.style.transform = dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)';
         }
 
-        function selectNetwork(value, text) {
-
-            const el = event.target;
+        function selectNetwork(value, text, e) {
 
             selectedCoin = value;
 
@@ -313,6 +333,17 @@
 
             document.getElementById('dropdownList').classList.add('hidden');
             document.getElementById('arrow').style.transform = 'rotate(0deg)';
+
+            // 🔥 MINIMUM LOGIC
+            let min = 1;
+
+            if (value === 'usdttrc20') {
+                min = 10;
+            }
+
+            const minInfo = document.getElementById('minInfo');
+            minInfo.innerHTML = `Min payment: <span class="text-yellow-400">$${min}</span>`;
+            minInfo.classList.remove('hidden');
         }
 
         window.addEventListener('click', function(e) {
@@ -352,7 +383,7 @@
             }
 
             this.innerText = "Processing...";
-            this.classList.remove('btn-main')
+            this.classList.add('opacity-60')
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
 
@@ -370,8 +401,15 @@
 
             if (selectedPayment === 'crypto') {
 
-                if (!selectedCoin) {
-                    alert('Select network');
+                // 🔥 CEK MINIMUM
+                let min = 1;
+
+                if (selectedCoin === 'usdttrc20') {
+                    min = 10;
+                }
+
+                if (selectedUsd < min) {
+                    alert(`Minimum payment for ${selectedCoin} is $${min}`);
 
                     this.disabled = false
                     this.innerText = "Pay Now"

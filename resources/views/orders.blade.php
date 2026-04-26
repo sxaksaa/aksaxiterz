@@ -5,7 +5,15 @@
 
         <h1 class="text-xl sm:text-2xl font-semibold mb-6">Riwayat Order</h1>
 
+        {{-- 🔥 NOTIF GLOBAL --}}
+        @if (session('info'))
+            <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
+                {{ session('info') }}
+            </div>
+        @endif
+
         <!-- ================= MOBILE (CARD) ================= -->
+
         <div class="space-y-4 md:hidden">
 
             @forelse ($orders as $order)
@@ -29,7 +37,7 @@
                                     </div>
                                 @endif
                             @else
-                                <span class="text-red-400">Cancelled</span>
+                                <span class="text-red-400">Cancelled (Replaced)</span>
                             @endif
                         </span>
                     </div>
@@ -95,6 +103,7 @@
         </div>
 
         <!-- ================= DESKTOP (TABLE) ================= -->
+
         <div class="hidden md:block bg-[#15151B] border border-[#27272A] rounded-xl overflow-hidden">
 
             <table class="w-full text-sm">
@@ -111,7 +120,7 @@
                     </tr>
                 </thead>
 
-                <tbody>
+                <tbody id="ordersTable">
                     @forelse ($orders as $order)
                         <tr class="border-t border-[#27272A]">
 
@@ -121,7 +130,7 @@
 
                             <td class="p-3">
                                 @if ($order->payment_method == 'crypto')
-                                    <span class="text-green-400">Crypto (USDT)</span>
+                                    <span class="text-purple-400">Crypto (USDT)</span>
                                 @else
                                     <span class="text-blue-400">Midtrans</span>
                                 @endif
@@ -151,7 +160,7 @@
                                         </div>
                                     @endif
                                 @else
-                                    <span class="text-red-400">Cancelled</span>
+                                    <span class="text-red-400">Cancelled (Replaced)</span>
                                 @endif
                             </td>
 
@@ -171,12 +180,10 @@
                                         $order->payment_method === 'midtrans' &&
                                         $order->expired_at &&
                                         now()->lt($order->expired_at))
-                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
-                                        @csrf
-                                        <button type="submit" class="pay-btn text-blue-400 text-xs underline">
-                                            Pay Again
-                                        </button>
-                                    </form>
+                                    <a href="/pay-again/{{ $order->id }}" target="_blank"
+   class="text-blue-400 text-xs underline">
+    Pay Again
+</a>
                                 @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
                                     <span class="text-red-400 text-xs">Expired</span>
                                 @else
@@ -201,59 +208,39 @@
     </div>
 
     <script>
-    // Countdown tiap detik.
-    setInterval(() => {
-        document.querySelectorAll('.countdown').forEach(el => {
+        setInterval(() => {
+            fetch('/check-order')
+                .then(res => res.json())
+                .then(data => {
 
-            const expireTime = new Date(el.dataset.expire).getTime()
-            const now = new Date().getTime()
-            const diff = expireTime - now
+                    if (!data.status) return;
 
-            if (diff <= 0) {
-                el.innerText = "Expired"
-                el.classList.remove("text-yellow-400")
-                el.classList.add("text-red-400")
-                return
-            }
+                    if (data.status !== 'pending') {
+                        location.reload();
+                    }
 
-            const minutes = Math.floor(diff / 60000)
-            const seconds = Math.floor((diff % 60000) / 1000)
+                });
+        }, 5000);
+        
+        setInterval(() => {
+            document.querySelectorAll('.countdown').forEach(el => {
 
-            el.innerText = `${minutes}m ${seconds}s`
-        })
-    }, 1000)
+                const expireTime = new Date(el.dataset.expire).getTime()
+                const now = new Date().getTime()
+                const diff = expireTime - now
 
-
-    // Auto refresh saat status order berubah.
-    setInterval(() => {
-
-        if (window.stopAutoCheck) return
-
-        fetch('/check-order')
-            .then(res => res.json())
-            .then(data => {
-
-                if (!data.status) return
-
-                if (data.status !== 'pending') {
-                    location.reload()
+                if (diff <= 0) {
+                    el.innerText = "Expired"
+                    el.classList.remove("text-yellow-400")
+                    el.classList.add("text-red-400")
+                    return
                 }
 
+                const minutes = Math.floor(diff / 60000)
+                const seconds = Math.floor((diff % 60000) / 1000)
+
+                el.innerText = `${minutes}m ${seconds}s`
             })
-
-    }, 3000)
-
-    document.querySelectorAll('.pay-again-form').forEach(form => {
-        form.addEventListener('submit', function() {
-
-            const btn = form.querySelector('.pay-btn')
-
-            btn.disabled = true
-            btn.innerText = "Processing..."
-            btn.classList.add('pointer-events-none', 'text-gray-400')
-
-            window.stopAutoCheck = true
-        })
-    })
+        }, 1000)
     </script>
 @endsection

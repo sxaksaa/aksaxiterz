@@ -10,21 +10,33 @@ class ProductSeeder extends Seeder
 {
     public function run(): void
     {
-        $category = Category::where('slug', 'free-fire')->first();
+        $category = Category::where('slug', 'free-fire')->firstOrFail();
+        $testingCategory = Category::where('slug', 'testing-payment')->firstOrFail();
 
-        $product1 = Product::updateOrCreate(
+        Product::updateOrCreate(
             ['name' => 'Aurora-VN'],
             [
                 'description' => 'Aurora ',
                 'category_id' => $category->id,
+                'price' => 20000,
             ]
         );
 
-        $product2 = Product::updateOrCreate(
+        Product::updateOrCreate(
             ['name' => 'XG-Team'],
             [
                 'description' => 'XG access',
                 'category_id' => $category->id,
+                'price' => 80000,
+            ]
+        );
+
+        Product::updateOrCreate(
+            ['name' => 'Testing Payment'],
+            [
+                'description' => 'Produk khusus untuk tes alur pembayaran asli dengan nominal rendah.',
+                'category_id' => $testingCategory->id,
+                'price' => 1,
             ]
         );
     }

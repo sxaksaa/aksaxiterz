@@ -13,5 +13,10 @@ class CategorySeeder extends Seeder
             ['slug' => 'free-fire'],
             ['name' => 'Free Fire']
         );
+
+        Category::updateOrCreate(
+            ['slug' => 'testing-payment'],
+            ['name' => 'Testing Payment']
+        );
     }
 }

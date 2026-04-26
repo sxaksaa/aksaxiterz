@@ -1,52 +1,73 @@
 @extends('layouts.app')
 
 @section('content')
-    <!-- LOADING -->
-    <div id="pageLoader" class="fixed inset-0 
-    bg-black/80 hidden items-center justify-center z-50">
+    <div id="pageLoader" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
         <div class="flex flex-col items-center gap-4">
             <div class="w-10 h-10 border-4 border-[#9333EA] border-t-transparent rounded-full animate-spin"></div>
             <span class="text-sm text-gray-300">Loading...</span>
         </div>
     </div>
 
-    <!-- SEARCH -->
-    <div class="px-4 sm:px-6 md:px-12 pt-6 md:pt-10 pb-4 md:pb-6">
-        <div class="max-w-xl mx-auto">
+    <section class="page-shell pt-6 md:pt-10 pb-5">
+        <div class="grid gap-5 md:grid-cols-[1fr_360px] md:items-end">
+            <div>
+                <p class="text-sm font-semibold text-[#C084FC] mb-2">Digital license store</p>
+                <h1 class="text-3xl md:text-5xl font-bold tracking-normal mb-3">Pilih produk, bayar, license langsung masuk.</h1>
+                <p class="text-sm md:text-base text-gray-400 max-w-2xl">
+                    Flow dibuat untuk pembayaran otomatis via Midtrans atau crypto, dengan stok license yang dikunci saat callback berhasil.
+                </p>
+            </div>
+
+            <div class="panel-card p-4">
+                <div class="text-xs uppercase text-gray-500 mb-1">Live flow</div>
+                <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div class="rounded-lg bg-white/5 p-3">
+                        <div class="font-semibold text-white">Order</div>
+                        <div class="text-gray-500 mt-1">10 min</div>
+                    </div>
+                    <div class="rounded-lg bg-white/5 p-3">
+                        <div class="font-semibold text-white">Pay</div>
+                        <div class="text-gray-500 mt-1">Auto</div>
+                    </div>
+                    <div class="rounded-lg bg-white/5 p-3">
+                        <div class="font-semibold text-white">License</div>
+                        <div class="text-gray-500 mt-1">Instant</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="page-shell pb-4 md:pb-6">
+        <div class="max-w-2xl">
             <input type="text" id="searchInput" placeholder="Search tools, products..."
                 class="search-bar w-full text-sm md:text-base" value="{{ request('search') }}">
         </div>
     </div>
 
-    <!-- CATEGORY -->
-    <div class="px-4 sm:px-6 md:px-12 pb-6 md:pb-10 flex gap-2 md:gap-3 flex-wrap justify-center">
+    <div class="page-shell pb-6 md:pb-10 flex gap-2 md:gap-3 flex-wrap">
 
         @php $active = request('category'); @endphp
 
         <a href="#" onclick="filterCategory('', this)"
-            class="category-chip text-xs md:text-sm px-3 py-1 md:px-4 md:py-2 {{ !$active ? 'active' : '' }}">
+            class="category-chip {{ !$active ? 'active' : '' }}">
             All
         </a>
 
         @foreach ($categories as $category)
             <a href="#" onclick="filterCategory('{{ $category->slug }}', this)"
-                class="category-chip text-xs md:text-sm px-3 py-1 md:px-4 md:py-2 {{ $active == $category->slug ? 'active' : '' }}">
+                class="category-chip {{ $active == $category->slug ? 'active' : '' }}">
                 {{ $category->name }}
             </a>
         @endforeach
 
     </div>
 
-    <!-- PRODUCTS -->
-    <div class="w-full px-4 sm:px-6 md:px-12 pb-16 md:pb-20">
-        <div class="max-w-6xl mx-auto">
+    <div class="page-shell pb-16 md:pb-20">
+        <div id="productContainer"
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 transition-opacity duration-200">
 
-            <div id="productContainer"
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 transition-opacity duration-200">
-
-                @include('partials.product-card', ['products' => $products])
-
-            </div>
+            @include('partials.product-card', ['products' => $products])
 
         </div>
     </div>

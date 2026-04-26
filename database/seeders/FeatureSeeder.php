@@ -46,5 +46,23 @@ class FeatureSeeder extends Seeder
                 ]
             );
         }
+
+        // Testing Payment
+        $testing = Product::where('name', 'Testing Payment')->firstOrFail();
+
+        $testingFeatures = [
+            'Midtrans real payment flow test',
+            'Crypto invoice flow test',
+            'Dummy license delivery'
+        ];
+
+        foreach ($testingFeatures as $f) {
+            Feature::updateOrCreate(
+                [
+                    'product_id' => $testing->id,
+                    'name' => $f
+                ]
+            );
+        }
     }
 }

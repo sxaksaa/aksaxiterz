@@ -1,39 +1,47 @@
 @foreach ($products as $product)
     @php
         $minPackage = $product->packages->sortBy('price')->first();
+        $stock = $product->available_license_stocks_count ?? 0;
         $badge = null;
 
         if ($minPackage && $minPackage->price <= 50000) {
-            $badge = 'Hot';
+            $badge = 'Low Price';
         }
         if ($minPackage && $minPackage->price >= 100000) {
             $badge = 'Premium';
         }
+        if ($product->category?->slug === 'testing-payment') {
+            $badge = 'Testing';
+        }
     @endphp
 
-    <a href="/product/{{ $product->id }}" onclick="showLoader()" class="card-glow fade-up p-5 block relative">
+    <a href="/product/{{ $product->id }}" onclick="showLoader()" class="product-card fade-up p-5 flex min-h-56 flex-col">
 
         @if ($badge)
             <div class="badge">{{ $badge }}</div>
         @endif
 
-        <h2 class="text-lg font-semibold mb-2">
-            {{ $product->name }}
-        </h2>
+        <div class="text-xs text-gray-500 mb-4">{{ $product->category->name ?? 'Product' }}</div>
 
-        <p class="text-gray-400 text-sm mb-4 line-clamp-2">
+        <h2 class="text-xl font-semibold mb-2 pr-20">{{ $product->name }}</h2>
+
+        <p class="text-gray-400 text-sm mb-6 line-clamp-3">
             {{ $product->description }}
         </p>
 
-        <span class="price">
-            @if ($minPackage)
-                Rp {{ number_format($minPackage->price) }}
-                /
-                ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
-            @else
-                -
-            @endif
-        </span>
+        <div class="mt-auto flex items-end justify-between gap-4">
+            <span class="price">
+                @if ($minPackage)
+                    Rp {{ number_format($minPackage->price) }} / ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
+                @else
+                    -
+                @endif
+            </span>
+
+            <span class="text-xs {{ $stock > 0 ? 'text-[#C084FC]' : 'text-red-300' }}">
+                {{ $stock > 0 ? $stock . ' stock' : 'Out of stock' }}
+            </span>
+        </div>
 
     </a>
 @endforeach

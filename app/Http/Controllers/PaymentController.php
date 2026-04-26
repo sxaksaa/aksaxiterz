@@ -78,9 +78,8 @@ class PaymentController extends Controller
         }
 
         if ($this->hasPendingOrder($user->id)) {
-            return back()->withErrors([
-                'payment' => 'Masih ada pembayaran aktif'
-            ]);
+            return redirect('/orders')
+                ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
         }
 
         $request->validate([
@@ -197,9 +196,8 @@ class PaymentController extends Controller
         }
 
         if ($this->hasPendingOrder($user->id)) {
-            return back()->withErrors([
-                'payment' => 'Masih ada pembayaran aktif'
-            ]);
+            return redirect('/orders')
+                ->with('info', 'Kamu masih punya pembayaran aktif, lanjutkan di halaman Orders');
         }
 
         $request->validate([
@@ -221,7 +219,9 @@ class PaymentController extends Controller
             Log::error('CRYPTO ERROR: ' . $e->getMessage());
 
             return back()->withErrors([
-                'payment' => 'Payment failed'
+                'payment' => str_starts_with($e->getMessage(), 'Minimum crypto payment')
+                    ? $e->getMessage()
+                    : 'Payment failed'
             ]);
         }
     }

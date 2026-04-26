@@ -25,7 +25,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 Route::get('/', function (Request $request) {
     $categories = Category::all();
-    $query = Product::query();
+    $query = Product::with(['category', 'packages'])->withCount('availableLicenseStocks');
 
     if ($request->category) {
         $category = Category::where('slug', $request->category)->first();
@@ -38,19 +38,13 @@ Route::get('/', function (Request $request) {
         $query->where('name', 'like', '%' . $request->search . '%');
     }
 
-    $products = $query->with('packages')->get();
-
-    foreach ($products as $product) {
-        $product->stock = LicenseStock::where('product_id', $product->id)
-            ->where('is_sold', false)
-            ->count();
-    }
+    $products = $query->get();
 
     return view('home', compact('categories', 'products'));
 });
 
 Route::get('/api/products', function (Request $request) {
-    $query = Product::with('packages');
+    $query = Product::with(['category', 'packages'])->withCount('availableLicenseStocks');
 
     if ($request->search) {
         $query->where('name', 'like', '%' . $request->search . '%');
@@ -65,12 +59,6 @@ Route::get('/api/products', function (Request $request) {
 
     $products = $query->get();
 
-    foreach ($products as $product) {
-        $product->stock = LicenseStock::where('product_id', $product->id)
-            ->where('is_sold', false)
-            ->count();
-    }
-
     return view('partials.product-card', compact('products'));
 });
 
@@ -80,7 +68,10 @@ Route::get('/api/products', function (Request $request) {
 |--------------------------------------------------------------------------
 */
 Route::get('/product/{id}', function ($id) {
-    $product = Product::with(['features', 'packages'])->findOrFail($id);
+    $product = Product::with(['features', 'packages'])
+        ->withCount('availableLicenseStocks')
+        ->findOrFail($id);
+
     return view('product-detail', compact('product'));
 });
 
@@ -92,7 +83,7 @@ Route::get('/product/{id}', function ($id) {
 Route::middleware('auth')->group(function () {
 
     // Pay again
-    Route::post('/pay-again/{order}', [PaymentController::class, 'payAgain']);
+    Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain']);
 
     // Midtrans pay page
     Route::get('/midtrans-pay', function (Request $request) {
@@ -106,7 +97,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1');
 
     // Crypto
-    Route::post('/pay-crypto/{product}', [PaymentController::class, 'payCrypto'])
+    Route::post('/pay-crypto/{id}', [PaymentController::class, 'payCrypto'])
         ->middleware('throttle:5,1');
 
     // Check latest order for polling.
@@ -114,12 +105,14 @@ Route::middleware('auth')->group(function () {
 
         $order = Order::where('user_id', auth()->id())->latest()->first();
 
-        if (!$order) {
-            return response()->json(['status' => null]);
+        if (!$order->expired_at) {
+            return response()->json([
+                'status' => $order->status,
+                'remaining' => 0
+            ]);
         }
 
-        $expireAt = $order->expired_at;
-        $remaining = $expireAt->diffInSeconds(Carbon::now(), false);
+        $remaining = $order->expired_at->diffInSeconds(Carbon::now(), false);
 
         if ($remaining <= 0 && $order->status === 'pending') {
             $order->update(['status' => 'cancelled']);
@@ -142,7 +135,7 @@ Route::middleware('auth')->group(function () {
 
         \App\Models\Order::where('status', 'pending')
             ->whereNotNull('expired_at')
-            ->where('expired_at', '<', now()->subSeconds(2))
+            ->where('expired_at', '<', now())
             ->update(['status' => 'cancelled']);
 
         $orders = \App\Models\Order::with(['product', 'package'])
@@ -202,3 +195,17 @@ Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);
 Route::get('/success', function () {
     return redirect('/licenses');
 });
+
+
+Route::get('/orders-data', function () {
+    return \App\Models\Order::with(['product', 'package'])
+        ->where('user_id', auth()->id())
+        ->latest()
+        ->take(10)
+        ->get();
+});
+
+
+Route::get('/midtrans-pay/{token}', function ($token) {
+    return view('midtrans-pay', compact('token'));
+})->name('midtrans.pay.page');

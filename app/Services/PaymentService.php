@@ -98,18 +98,18 @@ class PaymentService
             throw new \Exception('Stock habis');
         }
 
-        $minMap = [
-            'usdterc20' => 1,
-            'usdttrc20' => 10,
+        $amount = $package->price_usdt;
+        // 🔥 CUSTOM MINIMUM (PUNYA KAMU SENDIRI)
+        $customMin = [
+            'usdttrc20' => 10, // TRC20 = $10
             'usdtbsc' => 1,
+            'usdterc20' => 1,
             'usdtmatic' => 1,
-            'usdtton' => 1
+            'usdtton' => 1,
         ];
 
-        $amount = $package->price_usdt;
-
-        if (isset($minMap[$coin]) && $amount < $minMap[$coin]) {
-            throw new \Exception("Minimum payment {$coin} is \${$minMap[$coin]}");
+        if (isset($customMin[$coin]) && $amount < $customMin[$coin]) {
+            throw new \Exception("Minimum payment {$coin} is \${$customMin[$coin]}");
         }
 
         $orderId = 'ORD-' . strtoupper(Str::random(10));
@@ -132,6 +132,7 @@ class PaymentService
                 'price_amount' => $package->price_usdt,
                 'price_currency' => 'usd',
                 'pay_currency' => $coin,
+                'is_fixed_rate' => false,
                 'order_id' => $orderId,
                 'order_description' => $product->name . ' - ' . $package->name,
                 'ipn_callback_url' => config('services.nowpayments.ipn'),
@@ -163,5 +164,54 @@ class PaymentService
 
             throw $e;
         }
+    }
+
+    private function ensureNowpaymentsMinimum(string $coin, float $amount): void
+    {
+        $apiKey = config('services.nowpayments.key');
+        $baseUrl = config('services.nowpayments.url');
+
+        if (!$apiKey || !$baseUrl) {
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'x-api-key' => $apiKey,
+            ])->get(rtrim($baseUrl, '/') . '/min-amount', [
+                'currency_from' => 'usd',
+                'currency_to' => $coin,
+                'fiat_equivalent' => 'usd',
+                'is_fixed_rate' => false,
+            ]);
+
+            if (!$response->successful()) {
+                return;
+            }
+
+            $data = $response->json();
+            $minimum = $this->extractMinimumUsd($data);
+
+            if ($minimum !== null && $amount < $minimum) {
+                throw new \Exception("Minimum crypto payment for {$coin} is about \${$minimum}");
+            }
+        } catch (\Exception $e) {
+            if (str_starts_with($e->getMessage(), 'Minimum crypto payment')) {
+                throw $e;
+            }
+
+            Log::warning('NOWPayments minimum check failed: ' . $e->getMessage());
+        }
+    }
+
+    private function extractMinimumUsd(array $data): ?float
+    {
+        foreach (['fiat_equivalent', 'min_amount', 'min_amount_fiat'] as $key) {
+            if (isset($data[$key]) && is_numeric($data[$key])) {
+                return (float) $data[$key];
+            }
+        }
+
+        return null;
     }
 }

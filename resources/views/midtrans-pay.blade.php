@@ -4,9 +4,9 @@
 </script>
 
 <script>
-    window.snap.pay("{{ $snapToken }}", {
+    window.snap.pay("{{ $Token }}", {
         onSuccess: function() {
-            window.location.href = "/success";
+            window.location.href = "/licenses";
         },
         onPending: function() {
             window.location.href = "/orders";
