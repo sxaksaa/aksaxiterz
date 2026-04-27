@@ -45,19 +45,13 @@
                 <div class="mt-5 border-t border-[#27272A] pt-5">
                     <h3 class="text-sm font-semibold text-white">{{ $business['name'] ?? 'Aksa Xiterz' }}</h3>
                     <div class="mt-3 grid gap-2 text-xs leading-5 text-gray-400">
-                        @if (!empty($support['email']))
-                            <a href="mailto:{{ $support['email'] }}" class="footer-link break-all">{{ $support['email'] }}</a>
-                        @endif
-                        @if (!empty($support['phone']))
-                            <a href="tel:{{ preg_replace('/\s+/', '', $support['phone']) }}" class="footer-link">
-                                {{ $support['phone'] }}
-                            </a>
-                        @endif
                         <span>{{ $support['hours'] ?? 'Daily support' }}</span>
                         @if (!empty($discordUrl))
                             <a href="{{ $discordUrl }}" target="_blank" rel="noopener noreferrer" class="footer-link">
                                 Discord Support
                             </a>
+                        @else
+                            <span class="text-yellow-300">Discord support link is not configured yet.</span>
                         @endif
                     </div>
                 </div>

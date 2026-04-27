@@ -8,8 +8,6 @@ return [
     ],
 
     'support' => [
-        'email' => env('AKSA_SUPPORT_EMAIL', 'support@aksaxiterz.com'),
-        'phone' => env('AKSA_SUPPORT_PHONE'),
         'hours' => env('AKSA_SUPPORT_HOURS', 'Daily, 09:00-22:00 WIB'),
     ],
 

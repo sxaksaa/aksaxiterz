@@ -140,7 +140,7 @@ return [
                 [
                     'title' => 'Review Process',
                     'body' => [
-                        'Contact support within 7 days of payment and include your order ID, account email, product name, package, payment method, and a short explanation.',
+                        'Contact Discord support within 7 days of payment and include your order ID, login account, product name, package, payment method, and a short explanation.',
                         'We may first offer a replacement license, setup help, or package correction. If a refund is approved, processing time depends on the payment provider and payment method.',
                     ],
                 ],
@@ -172,7 +172,7 @@ return [
                     'items' => [
                         'Check the Orders page to confirm the payment status.',
                         'Check the My Licenses page after payment has settled.',
-                        'Include your order ID, account email, product name, selected package, and payment method when asking for help.',
+                        'Include your order ID, login account, product name, selected package, and payment method when asking for help on Discord.',
                     ],
                 ],
                 [

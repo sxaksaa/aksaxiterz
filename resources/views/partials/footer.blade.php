@@ -1,6 +1,5 @@
 @php
     $discordUrl = config('links.discord_url');
-    $supportEmail = config('links.support.email');
 @endphp
 
 <footer class="mt-8 border-t border-[#27272A] bg-[#09090C]/80">
@@ -56,9 +55,6 @@
                     <a href="/privacy" class="footer-link">Privacy Policy</a>
                     <a href="/refund-policy" class="footer-link">Refund Policy</a>
                     <a href="/contact" class="footer-link">Contact</a>
-                    @if ($supportEmail)
-                        <a href="mailto:{{ $supportEmail }}" class="footer-link">{{ $supportEmail }}</a>
-                    @endif
                 </div>
             </div>
         </div>
