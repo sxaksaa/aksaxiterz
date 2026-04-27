@@ -162,7 +162,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1');
     Route::post('/sync-midtrans-order/{orderId}', [PaymentController::class, 'syncMidtransOrder'])
         ->middleware('throttle:10,1');
-    Route::post('/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
+    Route::match(['get', 'post'], '/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
         ->middleware('throttle:20,1');
 
     // Crypto

@@ -169,7 +169,7 @@ class PaymentController extends Controller
         }
 
         if ($order->status === 'paid') {
-            return response()->json([
+            return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
             ]);
@@ -240,7 +240,7 @@ class PaymentController extends Controller
             return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
-                'message' => 'Crypto payment is still being verified.',
+                'message' => 'Crypto payment link is missing its payment ID.',
             ], 202);
         }
 
@@ -248,7 +248,19 @@ class PaymentController extends Controller
             $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
 
             if (! $this->validNowpaymentsOrderPayload($order, $payload)) {
-                return $this->syncCryptoResponse($request, ['error' => 'Invalid crypto status'], 403);
+                Log::warning('CRYPTO SYNC INVALID PAYLOAD', [
+                    'order_id' => $order->order_id,
+                    'payment_id' => $paymentId,
+                    'order_price' => (string) $order->price,
+                    'provider_order_id' => $payload['order_id'] ?? null,
+                    'provider_price_amount' => $payload['price_amount'] ?? null,
+                    'provider_price_currency' => $payload['price_currency'] ?? null,
+                    'provider_status' => $payload['payment_status'] ?? null,
+                ]);
+
+                return $this->syncCryptoResponse($request, [
+                    'error' => 'NOWPayments data does not match this order.',
+                ], 403);
             }
 
             $providerStatus = strtolower((string) ($payload['payment_status'] ?? ''));
@@ -278,7 +290,9 @@ class PaymentController extends Controller
             if (! $this->validNowpaymentsOrderPayload($lockedOrder, $payload)) {
                 DB::rollBack();
 
-                return $this->syncCryptoResponse($request, ['error' => 'Invalid crypto status'], 403);
+                return $this->syncCryptoResponse($request, [
+                    'error' => 'NOWPayments data does not match this order.',
+                ], 403);
             }
 
             if ($lockedOrder->status !== 'paid') {
@@ -307,12 +321,13 @@ class PaymentController extends Controller
 
             Log::warning('CRYPTO SYNC ERROR: '.$e->getMessage(), [
                 'order_id' => $order->order_id,
+                'payment_id' => $paymentId,
             ]);
 
             return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->fresh()->status,
-                'message' => 'Crypto payment is still being verified.',
+                'message' => $this->publicCryptoSyncError($e),
             ], 202);
         }
     }
@@ -534,6 +549,19 @@ class PaymentController extends Controller
         );
     }
 
+    private function publicCryptoSyncError(\Exception $error): string
+    {
+        if ($error->getMessage() === 'No license stock available for this package') {
+            return 'Payment is verified, but no license stock is available for this package.';
+        }
+
+        if ($error->getMessage() === 'Unable to verify crypto payment') {
+            return 'NOWPayments could not be reached. Please try Verify again.';
+        }
+
+        return 'Crypto payment is still being verified.';
+    }
+
     private function validNowpaymentsOrderPayload(Order $order, array $payload): bool
     {
         return $order->payment_method === 'crypto' &&
@@ -584,7 +612,7 @@ class PaymentController extends Controller
             ->first();
 
         if (! $stock || $stock->is_sold) {
-            throw new \Exception('Stock invalid');
+            throw new \Exception('No license stock available for this package');
         }
 
         $stock->update([
