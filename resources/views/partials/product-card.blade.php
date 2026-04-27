@@ -1,4 +1,4 @@
-@foreach ($products as $product)
+@forelse ($products as $product)
     @php
         $minPackage = $product->packages->sortBy('price')->first();
         $stock = $product->available_license_stocks_count ?? 0;
@@ -47,4 +47,8 @@
         </div>
 
     </a>
-@endforeach
+@empty
+    <div class="empty-state sm:col-span-2 lg:col-span-3">
+        No products match this filter yet.
+    </div>
+@endforelse

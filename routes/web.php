@@ -57,7 +57,7 @@ Route::get('/', function (Request $request) {
     return view('home', compact('categories', 'products'));
 });
 
-Route::get('/api/products', function (Request $request) {
+$productsFragment = function (Request $request) {
     $showTestProducts = (bool) config('links.show_test_products');
 
     $query = Product::with([
@@ -86,7 +86,10 @@ Route::get('/api/products', function (Request $request) {
     $products = $query->get();
 
     return view('partials.product-card', compact('products'));
-});
+};
+
+Route::get('/products-fragment', $productsFragment)->name('products.fragment');
+Route::get('/api/products', $productsFragment);
 
 Route::get('/downloads', function () {
     $downloads = collect(config('links.downloads', []))

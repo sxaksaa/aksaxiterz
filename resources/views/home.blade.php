@@ -101,6 +101,7 @@
 
             let timeout;
             let currentCategory = @json(request('category', ''));
+            const productEndpoint = @json(route('products.fragment', [], false));
 
             const searchInput = document.getElementById('searchInput');
             const container = document.getElementById('productContainer');
@@ -120,21 +121,25 @@
             window.filterCategory = function(cat, el) {
 
                 currentCategory = cat;
-                const categoryName = el?.textContent?.trim() || 'All';
+                const categoryName = el && el.textContent ? el.textContent.trim() : 'All';
 
                 document.querySelectorAll('.category-chip')
                     .forEach(e => e.classList.remove('active'));
 
-                el.classList.add('active');
+                if (el) {
+                    el.classList.add('active');
+                }
 
                 fetchProducts(searchInput.value, cat);
 
-                window.showAppToast?.(
-                    'Category selected',
-                    categoryName === 'All' ? 'Showing all products.' : `Showing ${categoryName}.`, {
+                if (window.showAppToast) {
+                    window.showAppToast(
+                        'Category selected',
+                        categoryName === 'All' ? 'Showing all products.' : `Showing ${categoryName}.`, {
                         variant: 'success'
-                    }
-                );
+                        }
+                    );
+                }
             }
 
             function fetchProducts(search, category) {
@@ -144,11 +149,42 @@
                     category,
                 });
 
-                fetch(`/api/products?${params.toString()}`)
-                    .then(res => res.text())
+                container.style.opacity = '0.45';
+
+                fetch(`${productEndpoint}?${params.toString()}`, {
+                        headers: {
+                            'Accept': 'text/html',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    })
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error(`Product filter failed with status ${res.status}`);
+                        }
+
+                        return res.text();
+                    })
                     .then(html => {
-                        container.innerHTML = html;
+                        container.innerHTML = html.trim() || emptyProductsHtml();
+                    })
+                    .catch(error => {
+                        container.innerHTML = emptyProductsHtml(
+                            'Products could not be loaded. Please refresh the page and try again.'
+                        );
+
+                        if (window.showAppToast) {
+                            window.showAppToast('Products not loaded', error.message, {
+                                variant: 'error'
+                            });
+                        }
+                    })
+                    .finally(() => {
+                        container.style.opacity = '1';
                     });
+            }
+
+            function emptyProductsHtml(message = 'No products match this filter yet.') {
+                return `<div class="empty-state sm:col-span-2 lg:col-span-3">${message}</div>`;
             }
 
         });
