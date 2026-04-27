@@ -408,7 +408,8 @@
                             refreshOrders();
                         }
                     }
-                });
+                })
+                .catch(() => {});
         }, 5000);
 
         function updateCountdowns() {

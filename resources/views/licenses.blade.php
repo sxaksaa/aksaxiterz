@@ -113,7 +113,7 @@
                             {{ $license->license_key }}
                         </span>
 
-                        <button onclick="copyKey(event, '{{ $license->id }}')"
+                        <button type="button" data-copy-license="{{ $license->id }}"
                             class="order-action btn-press self-end sm:self-auto">
                             Copy
                         </button>
@@ -131,22 +131,4 @@
         </div>
 
     </div>
-
-    <script>
-        function copyKey(event, id) {
-
-            const text = document.getElementById('key-' + id).innerText;
-
-            navigator.clipboard.writeText(text);
-
-            const btn = event.target;
-            btn.innerText = "Copied!";
-            btn.classList.add("text-green-400");
-
-            setTimeout(() => {
-                btn.innerText = "Copy";
-                btn.classList.remove("text-green-400");
-            }, 1200);
-        }
-    </script>
 @endsection

@@ -217,7 +217,7 @@ Route::middleware('auth')->group(function () {
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay()),
         ]);
-    });
+    })->middleware('throttle:30,1');
 
     // License
     Route::get('/licenses', function () {
@@ -270,15 +270,7 @@ Route::middleware('auth')->group(function () {
             ->withPath('/orders');
 
         return view('partials.orders-list', compact('orders'));
-    });
-
-    Route::get('/orders-data', function () {
-        return Order::with(['product', 'package'])
-            ->where('user_id', auth()->id())
-            ->latest()
-            ->take(10)
-            ->get();
-    });
+    })->middleware('throttle:30,1');
 });
 
 /*

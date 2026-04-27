@@ -568,10 +568,16 @@ class PaymentController extends Controller
 
     private function validMidtransOrderPayload(Order $order, array $payload): bool
     {
+        $payloadOrderId = $payload['order_id'] ?? null;
         $grossAmount = $payload['gross_amount'] ?? null;
         $originalAmount = $payload['extra_info']['gross_amount_info']['original_amount'] ?? null;
 
-        if ($order->payment_method !== 'midtrans' || ! is_numeric($grossAmount)) {
+        if (
+            $order->payment_method !== 'midtrans' ||
+            ! is_scalar($payloadOrderId) ||
+            ! hash_equals($order->order_id, (string) $payloadOrderId) ||
+            ! is_numeric($grossAmount)
+        ) {
             return false;
         }
 
