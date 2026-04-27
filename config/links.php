@@ -13,7 +13,7 @@ return [
 
     'show_test_products' => env('AKSA_SHOW_TEST_PRODUCTS', env('APP_ENV') === 'local'),
 
-    'discord_url' => env('AKSA_DISCORD_URL'),
+    'discord_url' => env('AKSA_DISCORD_URL', 'https://discord.gg/RuYM6qWArC'),
 
     'downloads' => [
         [
