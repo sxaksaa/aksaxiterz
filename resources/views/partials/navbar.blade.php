@@ -31,6 +31,11 @@ border-b border-[#27272A] transition-transform duration-300">
                 <a href="/licenses" class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
                     Licenses
                 </a>
+                @if (auth()->user()?->isAdmin())
+                    <a href="/admin/license-stocks" class="nav-item {{ request()->is('admin*') ? 'active' : '' }}">
+                        Admin
+                    </a>
+                @endif
             @endauth
 
             <span id="navIndicator" class="nav-indicator"></span>
@@ -125,6 +130,9 @@ transition-all duration-300 ease-out">
         @auth
             <a href="/orders" onclick="toggleMobileMenu(event)" class="nav-item">Orders</a>
             <a href="/licenses" onclick="toggleMobileMenu(event)" class="nav-item">Licenses</a>
+            @if (auth()->user()?->isAdmin())
+                <a href="/admin/license-stocks" onclick="toggleMobileMenu(event)" class="nav-item">Admin</a>
+            @endif
 
             @php $discordUrl = config('links.discord_url'); @endphp
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\PaymentController;
 use App\Models\Category;
 use App\Models\License;
@@ -273,6 +274,17 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:30,1');
 });
 
+Route::middleware(['auth', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/', fn () => redirect()->route('admin.license-stocks.index'))->name('dashboard');
+        Route::get('/license-stocks', [LicenseStockController::class, 'index'])->name('license-stocks.index');
+        Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
+        Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');
+        Route::delete('/license-stocks/{licenseStock}', [LicenseStockController::class, 'destroy'])->name('license-stocks.destroy');
+    });
+
 /*
 |--------------------------------------------------------------------------
 | AUTH
@@ -321,6 +333,12 @@ Route::get('/auth/google/callback', function (Request $request) use ($isSafeLogi
         ]);
 
         $googleUser = Socialite::driver('google')->stateless()->user();
+    }
+
+    $googlePayload = $googleUser->user ?? [];
+
+    if (array_key_exists('verified_email', $googlePayload) && ! $googlePayload['verified_email']) {
+        abort(403, 'Google email is not verified.');
     }
 
     $user = User::updateOrCreate(
