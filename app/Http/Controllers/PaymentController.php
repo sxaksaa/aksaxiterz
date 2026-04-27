@@ -237,7 +237,7 @@ class PaymentController extends Controller
         $paymentId = $this->nowpaymentsPaymentId($order);
 
         if (! $paymentId) {
-            return response()->json([
+            return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
                 'message' => 'Crypto payment is still being verified.',
@@ -248,7 +248,7 @@ class PaymentController extends Controller
             $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
 
             if (! $this->validNowpaymentsOrderPayload($order, $payload)) {
-                return response()->json(['error' => 'Invalid crypto status'], 403);
+                return $this->syncCryptoResponse($request, ['error' => 'Invalid crypto status'], 403);
             }
 
             $providerStatus = strtolower((string) ($payload['payment_status'] ?? ''));
@@ -261,7 +261,7 @@ class PaymentController extends Controller
             }
 
             if (! $paymentVerified) {
-                return response()->json([
+                return $this->syncCryptoResponse($request, [
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
                     'provider_status' => $providerStatus,
@@ -278,7 +278,7 @@ class PaymentController extends Controller
             if (! $this->validNowpaymentsOrderPayload($lockedOrder, $payload)) {
                 DB::rollBack();
 
-                return response()->json(['error' => 'Invalid crypto status'], 403);
+                return $this->syncCryptoResponse($request, ['error' => 'Invalid crypto status'], 403);
             }
 
             if ($lockedOrder->status !== 'paid') {
@@ -294,7 +294,7 @@ class PaymentController extends Controller
                 ]);
             }
 
-            return response()->json([
+            return $this->syncCryptoResponse($request, [
                 'order_id' => $lockedOrder->order_id,
                 'status' => $lockedOrder->fresh()->status,
                 'provider_status' => $providerStatus,
@@ -309,7 +309,7 @@ class PaymentController extends Controller
                 'order_id' => $order->order_id,
             ]);
 
-            return response()->json([
+            return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->fresh()->status,
                 'message' => 'Crypto payment is still being verified.',
@@ -516,6 +516,22 @@ class PaymentController extends Controller
         }
 
         return $this->sameAmount($grossAmount, $order->price);
+    }
+
+    private function syncCryptoResponse(Request $request, array $payload, int $status = 200)
+    {
+        if ($this->wantsPaymentJson($request)) {
+            return response()->json($payload, $status);
+        }
+
+        if (($payload['status'] ?? null) === 'paid') {
+            return redirect('/licenses');
+        }
+
+        return redirect('/orders')->with(
+            'info',
+            $payload['message'] ?? $payload['error'] ?? 'Crypto payment is still being verified.'
+        );
     }
 
     private function validNowpaymentsOrderPayload(Order $order, array $payload): bool

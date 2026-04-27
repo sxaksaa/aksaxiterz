@@ -137,7 +137,15 @@
                 },
             });
 
-            return response.json().catch(() => null);
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok && response.status !== 202) {
+                const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+                error.status = response.status;
+                throw error;
+            }
+
+            return data;
         }
 
         async function finishMidtransPayment(orderId, redirectUrl) {
@@ -246,11 +254,14 @@
             }
         });
 
-        document.addEventListener('click', async function(e) {
-            const button = e.target.closest('.sync-crypto-button');
-            if (!button) return;
+        document.addEventListener('submit', async function(e) {
+            const form = e.target.closest('.sync-crypto-form');
+            if (!form) return;
 
-            const orderId = button.dataset.orderId;
+            e.preventDefault();
+
+            const button = form.querySelector('.sync-crypto-button');
+            const orderId = button?.dataset.orderId;
             const originalText = button.innerText;
 
             button.disabled = true;
@@ -273,7 +284,7 @@
                 });
                 await refreshOrders();
             } catch (error) {
-                window.showAppToast?.('Payment check failed', 'Please try again in a moment.', {
+                window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
                     variant: 'error',
                 });
             } finally {

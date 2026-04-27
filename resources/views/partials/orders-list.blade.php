@@ -65,9 +65,12 @@
 
             <div class="mt-4">
                 @if ($canSyncCrypto)
-                    <button type="button" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
-                        Verify Payment
-                    </button>
+                    <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
+                        @csrf
+                        <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
+                            Verify Payment
+                        </button>
+                    </form>
                 @elseif ($canContinueCrypto)
                     <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
                         Continue Payment
@@ -167,9 +170,12 @@
                         </td>
                         <td class="p-4 text-right">
                             @if ($canSyncCrypto)
-                                <button type="button" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
-                                    Verify
-                                </button>
+                                <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
+                                    @csrf
+                                    <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
+                                        Verify
+                                    </button>
+                                </form>
                             @elseif ($canContinueCrypto)
                                 <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
                                     Continue
