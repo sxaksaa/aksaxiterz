@@ -10,7 +10,7 @@
             $isCrypto = $order->payment_method === 'crypto';
             $canSyncCrypto = $isCrypto &&
                 $order->payment_url &&
-                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $order->status === 'pending' &&
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay());
             $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
@@ -22,6 +22,7 @@
             $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
+            $canCancel = $order->status === 'pending';
         @endphp
 
         <article class="order-mobile-card motion-card">
@@ -63,11 +64,14 @@
                 </div>
             </div>
 
-            <div class="mt-4">
+            <div class="mt-4 flex flex-col gap-2">
                 @if ($canSyncCrypto)
-                    <a href="/sync-crypto-order/{{ $order->order_id }}" class="order-action w-full">
-                        Verify Payment
-                    </a>
+                    <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
+                        @csrf
+                        <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
+                            Verify Payment
+                        </button>
+                    </form>
                 @elseif ($canContinueCrypto)
                     <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
                         Continue Payment
@@ -79,9 +83,18 @@
                             Pay Again
                         </button>
                     </form>
+                @endif
+
+                @if ($canCancel)
+                    <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form">
+                        @csrf
+                        <button type="submit" class="order-action order-action-danger cancel-order-button w-full">
+                            Cancel Order
+                        </button>
+                    </form>
                 @elseif ($isPaid)
                     <a href="/licenses" class="order-action w-full">View License</a>
-                @else
+                @elseif (! $canSyncCrypto && ! $canContinueCrypto && ! $canPayMidtrans)
                     <span class="inline-flex w-full items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-500">
                         No action needed
                     </span>
@@ -126,7 +139,7 @@
                         $isCrypto = $order->payment_method === 'crypto';
                         $canSyncCrypto = $isCrypto &&
                             $order->payment_url &&
-                            in_array($order->status, ['pending', 'cancelled'], true) &&
+                            $order->status === 'pending' &&
                             $order->created_at &&
                             $order->created_at->gt(now()->subDay());
                         $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
@@ -138,6 +151,7 @@
                         $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
+                        $canCancel = $order->status === 'pending';
                     @endphp
 
                     <tr class="orders-table-row">
@@ -166,26 +180,40 @@
                             @endif
                         </td>
                         <td class="p-4 text-right">
-                            @if ($canSyncCrypto)
-                                <a href="/sync-crypto-order/{{ $order->order_id }}" class="order-action">
-                                    Verify
-                                </a>
-                            @elseif ($canContinueCrypto)
-                                <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
-                                    Continue
-                                </a>
-                            @elseif ($canPayMidtrans)
-                                <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
-                                    @csrf
-                                    <button type="submit" class="order-action pay-btn">
-                                        Pay Again
-                                    </button>
-                                </form>
-                            @elseif ($isPaid)
-                                <a href="/licenses" class="order-action">License</a>
-                            @else
-                                <span class="text-xs text-gray-500">No action</span>
-                            @endif
+                            <div class="inline-flex flex-wrap justify-end gap-2">
+                                @if ($canSyncCrypto)
+                                    <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
+                                        @csrf
+                                        <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
+                                            Verify
+                                        </button>
+                                    </form>
+                                @elseif ($canContinueCrypto)
+                                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
+                                        Continue
+                                    </a>
+                                @elseif ($canPayMidtrans)
+                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
+                                        @csrf
+                                        <button type="submit" class="order-action pay-btn">
+                                            Pay Again
+                                        </button>
+                                    </form>
+                                @endif
+
+                                @if ($canCancel)
+                                    <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form inline">
+                                        @csrf
+                                        <button type="submit" class="order-action order-action-danger cancel-order-button">
+                                            Cancel
+                                        </button>
+                                    </form>
+                                @elseif ($isPaid)
+                                    <a href="/licenses" class="order-action">License</a>
+                                @elseif (! $canSyncCrypto && ! $canContinueCrypto && ! $canPayMidtrans)
+                                    <span class="text-xs text-gray-500">No action</span>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty

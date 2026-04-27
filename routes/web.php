@@ -146,6 +146,7 @@ Route::middleware('auth')->group(function () {
 
     // Pay again
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain']);
+    Route::post('/cancel-order/{id}', [PaymentController::class, 'cancelOrder']);
 
     // Midtrans pay page
     Route::get('/midtrans-pay', function () {
@@ -159,7 +160,7 @@ Route::middleware('auth')->group(function () {
 
     // Midtrans
     Route::post('/process-order/{id}', [PaymentController::class, 'payMidtrans'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:20,1');
     Route::post('/sync-midtrans-order/{orderId}', [PaymentController::class, 'syncMidtransOrder'])
         ->middleware('throttle:10,1');
     Route::match(['get', 'post'], '/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
@@ -167,7 +168,7 @@ Route::middleware('auth')->group(function () {
 
     // Crypto
     Route::post('/pay-crypto/{id}', [PaymentController::class, 'payCrypto'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:20,1');
 
     // Check latest order for polling.
     Route::get('/check-order', function () {
@@ -189,7 +190,7 @@ Route::middleware('auth')->group(function () {
                 'payment_method' => $order->payment_method,
                 'can_sync_crypto' => $order->payment_method === 'crypto' &&
                     (bool) $order->payment_url &&
-                    in_array($order->status, ['pending', 'cancelled'], true) &&
+                    $order->status === 'pending' &&
                     $order->created_at &&
                     $order->created_at->gt(now()->subDay()),
             ]);
@@ -212,7 +213,7 @@ Route::middleware('auth')->group(function () {
             'payment_method' => $order->payment_method,
             'can_sync_crypto' => $order->payment_method === 'crypto' &&
                 (bool) $order->payment_url &&
-                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $order->status === 'pending' &&
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay()),
         ]);

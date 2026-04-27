@@ -252,8 +252,8 @@
         let selectedUsd = 0;
         let selectedPackageStock = 0;
         let dropdownOpen = false;
-        const cryptoBuyerFeeRate = 0.04;
-        const cryptoBuyerFeeMinimum = 0.25;
+        const cryptoBuyerFeeRate = @json((float) config('payment.crypto_buyer_fee_rate', 0.02));
+        const cryptoBuyerFeeMinimum = @json((float) config('payment.crypto_buyer_fee_minimum', 0.10));
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
@@ -494,12 +494,15 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
+                const isTooManyAttempts = response.status === 429;
                 const message = response.status === 401 ?
                     'Please login with Google before checkout.' :
-                    (data.message || 'Payment failed');
+                    (isTooManyAttempts ?
+                        (data.message || 'Too many payment attempts. Cancel unfinished payments from Orders first.') :
+                        (data.message || 'Payment failed'));
                 const error = new Error(message);
                 error.status = response.status;
-                error.redirectUrl = data.redirect_url;
+                error.redirectUrl = data.redirect_url || (isTooManyAttempts ? '/orders?payment_notice=too-many-attempts' : null);
                 throw error;
             }
 
@@ -689,7 +692,7 @@
 
                 let min = networkMinimum(selectedCoin);
 
-                if (selectedUsd < min) {
+                if (cryptoCustomerTotal(selectedUsd) < min) {
                     showToast('Minimum payment', `Minimum payment for ${selectedCoin} is $${min}.`, null, 'warning');
 
                     this.disabled = false

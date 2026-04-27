@@ -6,6 +6,7 @@ use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -25,8 +26,6 @@ class PaymentService
 
     private const MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES = [
         'gopay',
-        'qris',
-        'other_qris',
         'shopeepay',
         'dana',
         'bca_va',
@@ -34,12 +33,11 @@ class PaymentService
         'bri_va',
         'permata_va',
         'echannel',
-        'other_va',
     ];
 
-    private const CRYPTO_BUYER_FEE_RATE = 0.04;
+    private const DEFAULT_CRYPTO_BUYER_FEE_RATE = 0.02;
 
-    private const CRYPTO_BUYER_FEE_MINIMUM = 0.25;
+    private const DEFAULT_CRYPTO_BUYER_FEE_MINIMUM = 0.10;
 
     public function createMidtrans($user, $productId, $packageId, ?Order $order = null)
     {
@@ -89,12 +87,17 @@ class PaymentService
                 'order_id' => $order->order_id,
                 'gross_amount' => (int) round((float) $order->price),
             ],
-            'customer_imposed_payment_fee' => $this->midtransCustomerFeeConfig(),
             'customer_details' => [
                 'first_name' => $user->name,
                 'email' => $user->email,
             ],
         ];
+
+        $customerFeeConfig = $this->midtransCustomerFeeConfig();
+
+        if ($customerFeeConfig) {
+            $params['customer_imposed_payment_fee'] = $customerFeeConfig;
+        }
 
         try {
             $snapToken = Snap::getSnapToken($params);
@@ -373,7 +376,7 @@ class PaymentService
 
     private function cryptoCustomerTotal(float $baseAmount): float
     {
-        $fee = max($baseAmount * self::CRYPTO_BUYER_FEE_RATE, self::CRYPTO_BUYER_FEE_MINIMUM);
+        $fee = max($baseAmount * $this->cryptoBuyerFeeRate(), $this->cryptoBuyerFeeMinimum());
 
         return round($baseAmount + $fee, 2);
     }
@@ -405,18 +408,39 @@ class PaymentService
         }
     }
 
-    private function midtransCustomerFeeConfig(): array
+    private function midtransCustomerFeeConfig(): ?array
     {
+        $customerPercentage = $this->midtransCustomerFeePercentage();
+
+        if ($customerPercentage <= 0) {
+            return null;
+        }
+
         return [
             'enable' => true,
             'payment_fee_configs' => array_map(
                 fn (string $paymentType) => [
                     'payment_type' => $paymentType,
-                    'customer_percentage' => 100,
+                    'customer_percentage' => $customerPercentage,
                 ],
                 self::MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES
             ),
         ];
+    }
+
+    private function cryptoBuyerFeeRate(): float
+    {
+        return max(0.0, (float) config('payment.crypto_buyer_fee_rate', self::DEFAULT_CRYPTO_BUYER_FEE_RATE));
+    }
+
+    private function cryptoBuyerFeeMinimum(): float
+    {
+        return max(0.0, (float) config('payment.crypto_buyer_fee_minimum', self::DEFAULT_CRYPTO_BUYER_FEE_MINIMUM));
+    }
+
+    private function midtransCustomerFeePercentage(): int
+    {
+        return max(0, min(100, (int) config('payment.midtrans_customer_fee_percentage', 50)));
     }
 
     private function bscRpc(string $method, array $params)
@@ -463,7 +487,7 @@ class PaymentService
         }
 
         try {
-            return \Carbon\Carbon::parse($createdAt)->timestamp;
+            return Carbon::parse($createdAt)->timestamp;
         } catch (\Exception $e) {
             return null;
         }

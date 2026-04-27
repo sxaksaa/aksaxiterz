@@ -585,6 +585,18 @@
         transform: translateY(-1px);
     }
 
+    .order-action-danger {
+        background: rgba(239, 68, 68, 0.09);
+        border-color: rgba(239, 68, 68, 0.34);
+        color: #fecaca;
+    }
+
+    .order-action-danger:hover {
+        background: rgba(239, 68, 68, 0.16);
+        border-color: rgba(252, 165, 165, 0.55);
+        color: #ffffff;
+    }
+
     .empty-state {
         @apply rounded-xl border p-8 text-center text-sm text-gray-400;
         background: rgba(21, 21, 27, 0.76);

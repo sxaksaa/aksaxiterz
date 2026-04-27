@@ -78,8 +78,13 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                const error = new Error(data.message || 'Payment failed');
-                error.redirectUrl = data.redirect_url;
+                const isTooManyAttempts = response.status === 429;
+                const error = new Error(
+                    isTooManyAttempts ?
+                        (data.message || 'Too many payment attempts. Cancel unfinished payments from Orders first.') :
+                        (data.message || 'Payment failed')
+                );
+                error.redirectUrl = data.redirect_url || (isTooManyAttempts ? '/orders?payment_notice=too-many-attempts' : null);
                 throw error;
             }
 
@@ -214,6 +219,37 @@
             }
         }
 
+        function showPaymentNoticeFromQuery() {
+            const url = new URL(window.location.href);
+            const notice = url.searchParams.get('payment_notice');
+
+            if (!notice) return;
+
+            const messages = {
+                'pending-order': [
+                    'Unfinished payment',
+                    'Cancel or continue your unfinished order before starting a new checkout.',
+                    'warning',
+                ],
+                'too-many-attempts': [
+                    'Too many attempts',
+                    'Cancel unfinished payments here, then start checkout again.',
+                    'warning',
+                ],
+            };
+
+            const message = messages[notice];
+
+            if (message) {
+                window.showAppToast?.(message[0], message[1], {
+                    variant: message[2],
+                });
+            }
+
+            url.searchParams.delete('payment_notice');
+            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        }
+
         document.addEventListener('submit', async function(e) {
             const form = e.target.closest('.pay-again-form');
             if (!form) return;
@@ -294,6 +330,43 @@
             }
         });
 
+        document.addEventListener('submit', async function(e) {
+            const form = e.target.closest('.cancel-order-form');
+            if (!form) return;
+
+            e.preventDefault();
+
+            const button = form.querySelector('.cancel-order-button');
+            const originalText = button?.innerText;
+
+            if (button) {
+                button.disabled = true;
+                button.innerText = 'Cancelling...';
+                button.classList.add('opacity-60', 'pointer-events-none');
+            }
+
+            window.showAppToast?.('Cancelling order', 'Closing this unfinished checkout.');
+
+            try {
+                const data = await fetchPaymentJson(form.action, new FormData(form));
+
+                window.showAppToast?.('Order cancelled', data.message || 'You can start a new checkout now.', {
+                    variant: 'success',
+                });
+                await refreshOrders();
+            } catch (error) {
+                window.showAppToast?.('Cancel failed', error.message || 'Please try again in a moment.', {
+                    variant: 'error',
+                });
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerText = originalText || 'Cancel';
+                    button.classList.remove('opacity-60', 'pointer-events-none');
+                }
+            }
+        });
+
         setInterval(() => {
             fetch('/check-order')
                 .then(res => res.json())
@@ -359,6 +432,11 @@
         }
 
         setInterval(updateCountdowns, 1000);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            showPaymentNoticeFromQuery();
+            updateCountdowns();
+        });
 
         window.addEventListener('pageshow', function() {
             refreshOrders();

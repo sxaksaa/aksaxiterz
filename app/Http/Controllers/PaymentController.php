@@ -116,6 +116,10 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
+        if ($pendingOrder = $this->activePendingOrder($user->id)) {
+            return $this->pendingPaymentResponse($request, $pendingOrder);
+        }
+
         if ($this->hasTooManyRecentOrders($user->id)) {
             return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
         }
@@ -251,7 +255,7 @@ class PaymentController extends Controller
                 return $this->syncCryptoResponse($request, [
                     'order_id' => $order->order_id,
                     'status' => $order->status,
-                    'message' => 'Payment ID is not attached yet. Open Verify with ?paymentId=YOUR_NOWPAYMENTS_PAYMENT_ID.',
+                    'message' => 'Payment is not visible from NOWPayments yet. Please click Verify again after the invoice updates.',
                 ], 202);
             }
 
@@ -418,6 +422,10 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
+        if ($pendingOrder = $this->activePendingOrder($user->id)) {
+            return $this->pendingPaymentResponse($request, $pendingOrder);
+        }
+
         if ($this->hasTooManyRecentOrders($user->id)) {
             return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
         }
@@ -452,6 +460,32 @@ class PaymentController extends Controller
 
             return $this->paymentErrorResponse($request, $e);
         }
+    }
+
+    public function cancelOrder(Request $request, $orderId)
+    {
+        $order = Order::whereKey($orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($order->status === 'paid') {
+            return $this->orderActionResponse($request, [
+                'message' => 'Paid orders cannot be cancelled.',
+            ], 422);
+        }
+
+        if ($order->status !== 'cancelled') {
+            $order->update([
+                'status' => 'cancelled',
+                'expired_at' => now(),
+            ]);
+        }
+
+        return $this->orderActionResponse($request, [
+            'order_id' => $order->order_id,
+            'status' => 'cancelled',
+            'message' => 'Order cancelled. You can start a new checkout now.',
+        ]);
     }
 
     /*
@@ -649,6 +683,7 @@ class PaymentController extends Controller
     private function hasTooManyRecentOrders(int $userId): bool
     {
         return Order::where('user_id', $userId)
+            ->where('status', 'pending')
             ->where('created_at', '>', now()->subMinute())
             ->count() >= 5;
     }
@@ -658,6 +693,22 @@ class PaymentController extends Controller
         Order::where('user_id', $userId)
             ->where('status', 'pending')
             ->update(['status' => 'cancelled']);
+    }
+
+    private function activePendingOrder(int $userId): ?Order
+    {
+        return Order::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->where(function ($query) {
+                $query->whereNull('expired_at')
+                    ->orWhere('expired_at', '>', now())
+                    ->orWhere(function ($cryptoQuery) {
+                        $cryptoQuery->where('payment_method', 'crypto')
+                            ->where('created_at', '>', now()->subDay());
+                    });
+            })
+            ->latest()
+            ->first();
     }
 
     private function sameAmount($first, $second): bool
@@ -776,6 +827,31 @@ class PaymentController extends Controller
         return $request->expectsJson() || $request->ajax();
     }
 
+    private function pendingPaymentResponse(Request $request, Order $order)
+    {
+        $message = 'You already have an unfinished payment. Continue, verify, or cancel it from Orders first.';
+        $redirectUrl = url('/orders?payment_notice=pending-order');
+
+        if ($this->wantsPaymentJson($request)) {
+            return response()->json([
+                'message' => $message,
+                'redirect_url' => $redirectUrl,
+                'order_id' => $order->order_id,
+            ], 409);
+        }
+
+        return redirect($redirectUrl)->with('info', $message);
+    }
+
+    private function orderActionResponse(Request $request, array $payload, int $status = 200)
+    {
+        if ($this->wantsPaymentJson($request)) {
+            return response()->json($payload, $status);
+        }
+
+        return redirect('/orders')->with('info', $payload['message'] ?? 'Order updated.');
+    }
+
     private function paymentErrorResponse(Request $request, \Exception|string $error, int $status = 422)
     {
         $message = $error instanceof \Exception ? $error->getMessage() : $error;
@@ -785,9 +861,21 @@ class PaymentController extends Controller
         }
 
         if ($this->wantsPaymentJson($request)) {
-            return response()->json([
+            $payload = [
                 'message' => $message,
-            ], $status);
+            ];
+
+            if ($status === 429) {
+                $payload['message'] = 'Too many payment attempts. Open Orders and cancel unfinished payments before trying again.';
+                $payload['redirect_url'] = url('/orders?payment_notice=too-many-attempts');
+            }
+
+            return response()->json($payload, $status);
+        }
+
+        if ($status === 429) {
+            return redirect('/orders?payment_notice=too-many-attempts')
+                ->with('info', 'Too many payment attempts. Open Orders and cancel unfinished payments before trying again.');
         }
 
         return back()->withErrors([
