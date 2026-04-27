@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PaymentController extends Controller
 {
@@ -36,7 +37,7 @@ class PaymentController extends Controller
         }
 
         $newOrder = Order::create([
-            'order_id' => 'ORD-'.strtoupper(\Str::random(10)),
+            'order_id' => 'ORD-'.strtoupper(Str::random(10)),
             'user_id' => $user->id,
             'product_id' => $oldOrder->product_id,
             'package_id' => $oldOrder->package_id,
