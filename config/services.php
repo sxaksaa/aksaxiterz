@@ -46,6 +46,8 @@ return [
         'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
         'url' => env('NOWPAYMENTS_URL'),
         'ipn' => env('NOWPAYMENTS_IPN'),
+        'email' => env('NOWPAYMENTS_EMAIL'),
+        'password' => env('NOWPAYMENTS_PASSWORD'),
     ],
 
     'bsc' => [

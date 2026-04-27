@@ -138,6 +138,69 @@ class PaymentService
         return $response->json() ?: [];
     }
 
+    public function findNowpaymentsPaymentByInvoice(string $invoiceId, string $orderId): ?array
+    {
+        $email = config('services.nowpayments.email');
+        $password = config('services.nowpayments.password');
+
+        if (! $email || ! $password) {
+            return null;
+        }
+
+        $baseUrl = rtrim(config('services.nowpayments.url') ?: 'https://api.nowpayments.io/v1', '/');
+        $tokenResponse = Http::withOptions($this->gatewayHttpOptions())
+            ->post($baseUrl.'/auth', [
+                'email' => $email,
+                'password' => $password,
+            ]);
+
+        if (! $tokenResponse->successful()) {
+            throw new \Exception('Unable to authenticate NOWPayments');
+        }
+
+        $token = $tokenResponse->json('token');
+
+        if (! $token) {
+            throw new \Exception('Unable to authenticate NOWPayments');
+        }
+
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->withToken($token)
+            ->withHeaders([
+                'x-api-key' => config('services.nowpayments.key'),
+            ])
+            ->get($baseUrl.'/payment/', [
+                'limit' => 50,
+                'page' => 0,
+                'sortBy' => 'created_at',
+                'orderBy' => 'desc',
+                'invoiceid' => $invoiceId,
+            ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('Unable to search NOWPayments invoice payments');
+        }
+
+        $payload = $response->json() ?: [];
+        $payments = $payload['data'] ?? $payload['payments'] ?? $payload;
+
+        if (! is_array($payments)) {
+            return null;
+        }
+
+        foreach ($payments as $payment) {
+            if (! is_array($payment)) {
+                continue;
+            }
+
+            if (hash_equals($orderId, (string) ($payment['order_id'] ?? ''))) {
+                return $payment;
+            }
+        }
+
+        return null;
+    }
+
     public function findUsdtBscInvoiceTransfer(array $payment): ?array
     {
         if (strtolower((string) ($payment['pay_currency'] ?? '')) !== 'usdtbsc') {

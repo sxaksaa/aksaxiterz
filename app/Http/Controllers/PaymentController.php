@@ -228,24 +228,38 @@ class PaymentController extends Controller
         }
 
         if ($order->status === 'paid') {
-            return response()->json([
+            return $this->syncCryptoResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
             ]);
         }
 
-        $paymentId = $this->nowpaymentsPaymentId($order);
-
-        if (! $paymentId) {
-            return $this->syncCryptoResponse($request, [
-                'order_id' => $order->order_id,
-                'status' => $order->status,
-                'message' => 'Crypto payment link is missing its payment ID.',
-            ], 202);
-        }
+        $paymentId = $this->nowpaymentsPaymentIdFromRequest($request) ?? $this->nowpaymentsPaymentId($order);
+        $payload = null;
 
         try {
-            $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
+            if (! $paymentId) {
+                $invoiceId = $this->nowpaymentsInvoiceId($order);
+
+                if ($invoiceId) {
+                    $payload = $this->paymentService->findNowpaymentsPaymentByInvoice($invoiceId, $order->order_id);
+                    $paymentId = $payload['payment_id'] ?? null;
+                }
+            }
+
+            if (! $paymentId) {
+                return $this->syncCryptoResponse($request, [
+                    'order_id' => $order->order_id,
+                    'status' => $order->status,
+                    'message' => 'Payment ID is not attached yet. Open Verify with ?paymentId=YOUR_NOWPAYMENTS_PAYMENT_ID.',
+                ], 202);
+            }
+
+            if (! $payload) {
+                $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
+            }
+
+            $this->rememberNowpaymentsPaymentId($order, (string) $paymentId);
 
             if (! $this->validNowpaymentsOrderPayload($order, $payload)) {
                 Log::warning('CRYPTO SYNC INVALID PAYLOAD', [
@@ -672,6 +686,68 @@ class PaymentController extends Controller
         }
 
         return (string) $paymentId;
+    }
+
+    private function nowpaymentsPaymentIdFromRequest(Request $request): ?string
+    {
+        $paymentId = $request->query('paymentId') ?? $request->query('payment_id');
+
+        if (! is_scalar($paymentId) || ! ctype_digit((string) $paymentId)) {
+            return null;
+        }
+
+        return (string) $paymentId;
+    }
+
+    private function nowpaymentsInvoiceId(Order $order): ?string
+    {
+        if (! $order->payment_url) {
+            return null;
+        }
+
+        $query = parse_url($order->payment_url, PHP_URL_QUERY);
+
+        if (! $query) {
+            return null;
+        }
+
+        parse_str($query, $params);
+
+        $invoiceId = $params['iid'] ?? $params['invoice_id'] ?? $params['invoiceId'] ?? null;
+
+        if (! is_scalar($invoiceId) || ! ctype_digit((string) $invoiceId)) {
+            return null;
+        }
+
+        return (string) $invoiceId;
+    }
+
+    private function rememberNowpaymentsPaymentId(Order $order, string $paymentId): void
+    {
+        if (! $order->payment_url || $this->nowpaymentsPaymentId($order)) {
+            return;
+        }
+
+        $parts = parse_url($order->payment_url);
+        $query = [];
+
+        if (! empty($parts['query'])) {
+            parse_str($parts['query'], $query);
+        }
+
+        $query['paymentId'] = $paymentId;
+
+        $url = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? 'nowpayments.io');
+
+        if (! empty($parts['path'])) {
+            $url .= $parts['path'];
+        }
+
+        $url .= '?'.http_build_query($query);
+
+        $order->update([
+            'payment_url' => $url,
+        ]);
     }
 
     private function nowpaymentsSignature(array $payload, string $secret): string
