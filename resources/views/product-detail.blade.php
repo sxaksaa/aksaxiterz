@@ -10,18 +10,26 @@
 @section('content')
     @php
         $stock = $product->available_license_stocks_count ?? 0;
+        $discordUrl = config('links.discord_url');
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10">
 
-        <div class="grid gap-5 md:grid-cols-[1fr_320px] md:items-start mb-8">
+        <div class="product-hero mb-6 fade-up">
+            <div class="grid gap-5 md:grid-cols-[1fr_320px] md:items-end">
             <div>
                 <a href="/" class="text-sm text-[#C084FC] hover:text-white transition">Back to products</a>
                 <h1 class="text-3xl md:text-5xl font-bold mt-3 mb-3">{{ $product->name }}</h1>
                 <p class="text-gray-400 max-w-2xl">{{ $product->description }}</p>
+
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="support-pill">Instant delivery</span>
+                    <span class="support-pill">Secure checkout</span>
+                    <span class="support-pill">Support ready</span>
+                </div>
             </div>
 
-            <div class="panel-card p-4">
+            <div class="product-stat">
                 <div class="text-xs uppercase text-gray-500 mb-2">Availability</div>
                 <div class="flex items-end justify-between">
                     <div>
@@ -33,10 +41,14 @@
                     <div class="text-xs text-gray-500">Auto delivery after paid</div>
                 </div>
             </div>
+            </div>
         </div>
 
-        <div class="panel-card p-5 mb-8">
-            <h3 class="mb-3 font-semibold">Features</h3>
+        <div class="product-section mb-6 fade-up">
+            <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Included</p>
+                <h3 class="mt-1 text-xl font-semibold text-white">Features</h3>
+            </div>
             <ul class="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
                 @foreach ($product->features as $f)
                     <li class="rounded-lg bg-white/5 px-3 py-2">{{ $f->name }}</li>
@@ -44,12 +56,40 @@
             </ul>
         </div>
 
-        <h2 class="mb-4 font-semibold">Payment Method</h2>
+        <div class="discord-mini-panel mb-8 fade-up">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-white">Need help before checkout?</h2>
+                    <p class="mt-1 text-sm text-gray-400">
+                        Contact support for product questions, setup guidance, license resets, and checkout help.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="/downloads"
+                        class="inline-flex items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white">
+                        Downloads
+                    </a>
+                    <a href="{{ $discordUrl ?: '#' }}"
+                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                        class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                        Contact Support
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="product-section mb-6 fade-up">
+            <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Checkout</p>
+                <h2 class="mt-1 text-xl font-semibold text-white">Payment Method</h2>
+                <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
+            </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
 
             <div onclick="selectPayment('midtrans')" id="btnMid"
-                class="panel-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+                class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">Transfer / E-Wallet</div>
                 <span class="text-xs text-gray-400">QRIS All Payment (Bank, Dana, GoPay, etc)</span>
@@ -57,7 +97,7 @@
             </div>
 
             <div onclick="selectPayment('crypto')" id="btnCrypto"
-                class="panel-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+                class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">Crypto</div>
                 <span class="text-xs text-gray-400">USDT Address</span>
@@ -115,10 +155,16 @@
             </div>
 
         </div>
+        </div>
 
-        <h2 class="mb-4 font-semibold">Select Package</h2>
+        <div class="product-section mb-6 fade-up">
+            <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Packages</p>
+                <h2 class="mt-1 text-xl font-semibold text-white">Select Package</h2>
+                <p class="mt-1 text-sm text-gray-400">Pick the duration that matches what you need.</p>
+            </div>
 
-        <div class="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($product->packages as $p)
                 @php
                     $packageStock = $p->available_license_stocks_count ?? 0;
@@ -133,7 +179,7 @@
                 @endphp
 
                 <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }}, {{ $packageStock }})"
-                    class="panel-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+                    class="package-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
@@ -155,17 +201,21 @@
                 </div>
             @endforeach
         </div>
+        </div>
 
-        <div id="summaryBox" class="hidden panel-card p-4 sm:p-6 fade-up transition-all duration-300">
+        <div id="summaryBox" class="hidden product-summary-card fade-up">
 
-            <h3 class="mb-4 font-semibold">Order Summary</h3>
+            <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Ready to pay</p>
+                <h3 class="mt-1 text-xl font-semibold text-white">Order Summary</h3>
+            </div>
 
-            <div class="flex justify-between mb-2">
+            <div class="summary-row mb-2">
                 <span>Package</span>
                 <span id="selectedPackage">-</span>
             </div>
 
-            <div class="flex justify-between mb-2">
+            <div class="summary-row">
                 <span>Total</span>
                 <span id="totalPrice" class="text-[#C084FC]">-</span>
             </div>

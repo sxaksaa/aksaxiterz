@@ -14,17 +14,18 @@ class FeatureSeeder extends Seeder
         $aurora = Product::where('name', 'Aurora-VN')->firstOrFail();
 
         $this->syncFeatures($aurora, [
-            'Holo',
-            'Pull',
-            'Etc',
+            'Duration-based license access',
+            'Setup guide included',
+            'Customer support available',
         ]);
 
         // XG-Team
         $xg = Product::where('name', 'XG-Team')->firstOrFail();
 
         $this->syncFeatures($xg, [
-            'Remove Logo PC',
-            '120 FPS Unlocked On Free Fire Setting',
+            'Desktop access utility',
+            'Setup tutorial included',
+            'Customer support available',
         ]);
 
         // Testing Payment

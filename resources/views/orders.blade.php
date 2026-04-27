@@ -8,17 +8,52 @@
 @endpush
 
 @section('content')
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-12 py-6 md:py-10">
+    @php
+        $totalOrders = $orderStats['total'] ?? $orders->count();
+        $paidOrders = $orderStats['paid'] ?? $orders->where('status', 'paid')->count();
+        $pendingOrders = $orderStats['pending'] ?? $orders->where('status', 'pending')->count();
+    @endphp
 
-        <h1 class="text-xl sm:text-2xl font-semibold mb-6">Order History</h1>
+    <div class="page-shell py-6 md:py-10">
+        <section class="orders-hero fade-up mb-6">
+            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Order Center</p>
+                    <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Order History</h1>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+                        Track payments, continue pending invoices, and jump back into your licenses after checkout.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="/" class="btn-footer-secondary">Browse Products</a>
+                    <a href="/licenses" class="btn-footer">My Licenses</a>
+                </div>
+            </div>
+
+            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $totalOrders }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Total orders</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $paidOrders }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Paid orders</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $pendingOrders }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Waiting payment</div>
+                </div>
+            </div>
+        </section>
 
         @if (session('info'))
-            <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
+            <div class="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
                 {{ session('info') }}
             </div>
         @endif
 
-        <div id="ordersContent">
+        <div id="ordersContent" class="fade-up">
             @include('partials.orders-list', ['orders' => $orders])
         </div>
 
@@ -57,7 +92,10 @@
             ordersRefreshing = true;
 
             try {
-                const response = await fetch('/orders-fragment', {
+                const fragmentUrl = new URL('/orders-fragment', window.location.origin);
+                fragmentUrl.search = window.location.search;
+
+                const response = await fetch(fragmentUrl.toString(), {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                     },

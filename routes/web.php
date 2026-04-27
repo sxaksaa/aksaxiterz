@@ -23,14 +23,26 @@ use Laravel\Socialite\Two\InvalidStateException;
 */
 
 Route::get('/', function (Request $request) {
-    $categories = Category::all();
+    $showTestProducts = (bool) config('links.show_test_products');
+
+    $categories = Category::query()
+        ->when(! $showTestProducts, fn ($query) => $query->where('slug', '!=', 'testing-payment'))
+        ->get();
+
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])->withCount('availableLicenseStocks');
 
+    if (! $showTestProducts) {
+        $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'));
+    }
+
     if ($request->category) {
-        $category = Category::where('slug', $request->category)->first();
+        $category = Category::where('slug', $request->category)
+            ->when(! $showTestProducts, fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'))
+            ->first();
+
         if ($category) {
             $query->where('category_id', $category->id);
         }
@@ -46,17 +58,26 @@ Route::get('/', function (Request $request) {
 });
 
 Route::get('/api/products', function (Request $request) {
+    $showTestProducts = (bool) config('links.show_test_products');
+
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])->withCount('availableLicenseStocks');
+
+    if (! $showTestProducts) {
+        $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'));
+    }
 
     if ($request->search) {
         $query->where('name', 'like', '%'.$request->search.'%');
     }
 
     if ($request->category) {
-        $category = Category::where('slug', $request->category)->first();
+        $category = Category::where('slug', $request->category)
+            ->when(! $showTestProducts, fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'))
+            ->first();
+
         if ($category) {
             $query->where('category_id', $category->id);
         }
@@ -67,6 +88,31 @@ Route::get('/api/products', function (Request $request) {
     return view('partials.product-card', compact('products'));
 });
 
+Route::get('/downloads', function () {
+    $downloads = collect(config('links.downloads', []))
+        ->filter(fn ($download) => filled($download['name'] ?? null))
+        ->values();
+    $discordUrl = config('links.discord_url');
+
+    return view('downloads', compact('downloads', 'discordUrl'));
+});
+
+$legalPage = function (string $slug) {
+    $page = config("legal.pages.{$slug}");
+
+    abort_if(! $page, 404);
+
+    return view('legal', array_merge($page, [
+        'slug' => $slug,
+        'updatedAt' => config('legal.updated_at'),
+    ]));
+};
+
+Route::get('/terms', fn () => $legalPage('terms'))->name('terms');
+Route::get('/privacy', fn () => $legalPage('privacy'))->name('privacy');
+Route::get('/refund-policy', fn () => $legalPage('refund-policy'))->name('refund-policy');
+Route::get('/contact', fn () => $legalPage('contact'))->name('contact');
+
 /*
 |--------------------------------------------------------------------------
 | PRODUCT DETAIL
@@ -74,11 +120,16 @@ Route::get('/api/products', function (Request $request) {
 */
 Route::get('/product/{id}', function ($id) {
     $product = Product::with([
+        'category',
         'features',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
         ->withCount('availableLicenseStocks')
         ->findOrFail($id);
+
+    if (! config('links.show_test_products') && $product->category?->slug === 'testing-payment') {
+        abort(404);
+    }
 
     return view('product-detail', compact('product'));
 });
@@ -163,12 +214,19 @@ Route::middleware('auth')->group(function () {
             ->where('expired_at', '<', now())
             ->update(['status' => 'cancelled']);
 
+        $orderStats = [
+            'total' => Order::where('user_id', auth()->id())->count(),
+            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
+            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
+        ];
+
         $orders = Order::with(['product', 'package'])
             ->where('user_id', auth()->id())
             ->latest()
-            ->get();
+            ->paginate(8)
+            ->withPath('/orders');
 
-        return view('orders', compact('orders'));
+        return view('orders', compact('orders', 'orderStats'));
     });
 
     Route::get('/orders-fragment', function () {
@@ -180,7 +238,8 @@ Route::middleware('auth')->group(function () {
         $orders = Order::with(['product', 'package'])
             ->where('user_id', auth()->id())
             ->latest()
-            ->get();
+            ->paginate(8)
+            ->withPath('/orders');
 
         return view('partials.orders-list', compact('orders'));
     });

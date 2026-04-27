@@ -10,8 +10,8 @@ class CategorySeeder extends Seeder
     public function run(): void
     {
         Category::updateOrCreate(
-            ['slug' => 'free-fire'],
-            ['name' => 'Free Fire']
+            ['slug' => 'digital-tools'],
+            ['name' => 'Digital Tools']
         );
 
         Category::updateOrCreate(

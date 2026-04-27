@@ -9,6 +9,7 @@
 
     body {
         min-height: 100vh;
+        overflow-x: hidden;
         user-select: none;
         -webkit-user-select: none;
         background:
@@ -28,7 +29,7 @@
 
 @layer components {
     .page-shell {
-        @apply max-w-6xl mx-auto px-4 sm:px-6 md:px-12;
+        @apply w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12;
     }
 
     .surface {
@@ -106,9 +107,19 @@
     }
 
     .btn-main {
-        @apply rounded-xl px-4 py-3 font-semibold text-white transition;
+        @apply relative overflow-hidden rounded-xl px-4 py-3 font-semibold text-white transition;
         background: linear-gradient(135deg, #9333ea, #7c3aed);
         box-shadow: 0 18px 35px rgba(147, 51, 234, 0.18);
+    }
+
+    .btn-main::after,
+    .discord-cta::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-120%);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+        transition: transform 0.7s ease;
     }
 
     .btn-main:hover {
@@ -116,6 +127,509 @@
         box-shadow:
             0 18px 35px rgba(147, 51, 234, 0.22),
             0 10px 28px rgba(124, 58, 237, 0.18);
+    }
+
+    .btn-main:hover::after,
+    .discord-cta:hover::after {
+        transform: translateX(120%);
+    }
+
+    .discord-cta {
+        @apply relative inline-flex items-center justify-center overflow-hidden rounded-xl px-4 py-3 text-sm font-bold text-white transition;
+        background:
+            linear-gradient(135deg, rgba(192, 132, 252, 0.98), rgba(147, 51, 234, 0.98) 48%, rgba(109, 40, 217, 0.98));
+        box-shadow:
+            0 18px 38px rgba(147, 51, 234, 0.32),
+            0 0 0 1px rgba(216, 180, 254, 0.28);
+        animation: ctaPulse 2.8s ease-in-out infinite;
+    }
+
+    .discord-cta:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            0 22px 46px rgba(147, 51, 234, 0.42),
+            0 0 0 1px rgba(216, 180, 254, 0.42);
+    }
+
+    .discord-nav-cta {
+        @apply hidden md:inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-white transition;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.95), rgba(109, 40, 217, 0.95));
+        box-shadow: 0 12px 28px rgba(147, 51, 234, 0.28);
+    }
+
+    .discord-nav-cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 34px rgba(147, 51, 234, 0.38);
+    }
+
+    .discord-panel {
+        @apply surface relative overflow-hidden rounded-xl p-5;
+        border-color: rgba(147, 51, 234, 0.62);
+        box-shadow:
+            0 22px 58px rgba(0, 0, 0, 0.32),
+            0 18px 44px rgba(147, 51, 234, 0.18);
+    }
+
+    .discord-panel::before,
+    .discord-mini-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(115deg, rgba(147, 51, 234, 0.18), transparent 46%, rgba(192, 132, 252, 0.11));
+        opacity: 0.8;
+        pointer-events: none;
+    }
+
+    .discord-mini-panel {
+        @apply relative overflow-hidden rounded-xl border p-4;
+        background: rgba(147, 51, 234, 0.1);
+        border-color: rgba(147, 51, 234, 0.34);
+        box-shadow: 0 16px 34px rgba(147, 51, 234, 0.08);
+    }
+
+    .discord-panel > *,
+    .discord-mini-panel > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .support-pill {
+        @apply rounded-lg border px-3 py-2 text-xs font-semibold text-[#D8B4FE];
+        background: rgba(147, 51, 234, 0.12);
+        border-color: rgba(147, 51, 234, 0.28);
+    }
+
+    .home-hero {
+        @apply relative overflow-hidden rounded-xl border p-5 md:p-7;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(21, 21, 27, 0.9) 48%, rgba(9, 9, 12, 0.95)),
+            rgba(21, 21, 27, 0.86);
+        border-color: rgba(147, 51, 234, 0.34);
+        box-shadow:
+            0 24px 68px rgba(0, 0, 0, 0.32),
+            0 18px 42px rgba(147, 51, 234, 0.11);
+    }
+
+    .home-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.17), transparent 24rem),
+            radial-gradient(circle at 92% 4%, rgba(147, 51, 234, 0.18), transparent 22rem);
+        pointer-events: none;
+    }
+
+    .home-hero > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .home-panel {
+        @apply rounded-xl border p-4 transition md:p-5;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(147, 51, 234, 0.26);
+    }
+
+    .home-panel:hover {
+        border-color: rgba(147, 51, 234, 0.5);
+        background: rgba(147, 51, 234, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .home-stat {
+        @apply rounded-xl border px-4 py-3 transition;
+        background: rgba(21, 21, 27, 0.72);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .home-stat:hover {
+        border-color: rgba(147, 51, 234, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .home-toolbar {
+        @apply rounded-xl border p-4 md:p-5;
+        background: rgba(21, 21, 27, 0.78);
+        border-color: rgba(63, 63, 70, 0.9);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    }
+
+    .product-hero,
+    .license-hero {
+        @apply relative overflow-hidden rounded-xl border p-5 md:p-7;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(21, 21, 27, 0.9) 52%, rgba(9, 9, 12, 0.95)),
+            rgba(21, 21, 27, 0.86);
+        border-color: rgba(147, 51, 234, 0.32);
+        box-shadow:
+            0 24px 68px rgba(0, 0, 0, 0.3),
+            0 18px 42px rgba(147, 51, 234, 0.1);
+    }
+
+    .product-hero::before,
+    .license-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.16), transparent 24rem),
+            radial-gradient(circle at 92% 10%, rgba(147, 51, 234, 0.14), transparent 22rem);
+        pointer-events: none;
+    }
+
+    .product-hero > *,
+    .license-hero > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .product-stat,
+    .license-stat {
+        @apply rounded-xl border p-4 transition;
+        background: rgba(9, 9, 12, 0.36);
+        border-color: rgba(147, 51, 234, 0.26);
+    }
+
+    .product-stat:hover,
+    .license-stat:hover {
+        border-color: rgba(147, 51, 234, 0.54);
+        background: rgba(147, 51, 234, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .product-section {
+        @apply rounded-xl border p-5 md:p-6;
+        background: rgba(21, 21, 27, 0.82);
+        border-color: rgba(63, 63, 70, 0.9);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    }
+
+    .checkout-card,
+    .package-card,
+    .license-card {
+        @apply relative overflow-hidden rounded-xl border transition duration-300;
+        background: rgba(21, 21, 27, 0.86);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .checkout-card:hover,
+    .package-card:hover,
+    .license-card:hover {
+        border-color: rgba(147, 51, 234, 0.62);
+        box-shadow:
+            0 0 0 1px rgba(147, 51, 234, 0.12),
+            0 18px 42px rgba(147, 51, 234, 0.12);
+        transform: translateY(-3px);
+    }
+
+    .product-summary-card {
+        @apply rounded-xl border p-4 transition-all duration-300 sm:p-6;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.12), rgba(21, 21, 27, 0.88)),
+            rgba(21, 21, 27, 0.86);
+        border-color: rgba(147, 51, 234, 0.36);
+        box-shadow: 0 20px 46px rgba(147, 51, 234, 0.12);
+    }
+
+    .summary-row {
+        @apply flex items-center justify-between rounded-lg border px-3 py-3 text-sm;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(63, 63, 70, 0.8);
+    }
+
+    .license-key-box {
+        @apply rounded-xl border px-3 py-3 sm:px-4;
+        background: rgba(9, 9, 12, 0.38);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .mobile-discord-link {
+        @apply inline-flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-semibold text-gray-300 transition hover:text-white;
+        background: rgba(147, 51, 234, 0.08);
+        border-color: rgba(147, 51, 234, 0.22);
+    }
+
+    .mobile-discord-link:hover {
+        border-color: rgba(147, 51, 234, 0.5);
+        background: rgba(147, 51, 234, 0.14);
+    }
+
+    .download-card {
+        @apply surface relative overflow-hidden rounded-xl p-5 transition duration-300 md:p-6;
+    }
+
+    .download-hero {
+        @apply relative overflow-hidden rounded-xl border px-5 py-7 md:px-8 md:py-9;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(21, 21, 27, 0.92) 48%, rgba(9, 9, 12, 0.95)),
+            rgba(21, 21, 27, 0.86);
+        border-color: rgba(147, 51, 234, 0.34);
+        box-shadow:
+            0 24px 68px rgba(0, 0, 0, 0.32),
+            0 18px 42px rgba(147, 51, 234, 0.1);
+    }
+
+    .download-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 50% 0%, rgba(216, 180, 254, 0.16), transparent 24rem),
+            linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.08), transparent);
+        pointer-events: none;
+    }
+
+    .download-hero > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .download-feature {
+        @apply rounded-xl border px-4 py-3 transition;
+        background: rgba(9, 9, 12, 0.38);
+        border-color: rgba(147, 51, 234, 0.26);
+    }
+
+    .download-feature:hover {
+        border-color: rgba(147, 51, 234, 0.54);
+        background: rgba(147, 51, 234, 0.11);
+        transform: translateY(-2px);
+    }
+
+    .download-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.13), transparent 42%),
+            radial-gradient(circle at 50% 0%, rgba(216, 180, 254, 0.12), transparent 24rem);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+
+    .download-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .download-card:hover {
+        border-color: rgba(147, 51, 234, 0.72);
+        box-shadow:
+            0 0 0 1px rgba(147, 51, 234, 0.18),
+            0 22px 50px rgba(147, 51, 234, 0.16),
+            0 18px 42px rgba(0, 0, 0, 0.28);
+        transform: translateY(-6px) scale(1.01);
+    }
+
+    .download-card:hover::before {
+        opacity: 1;
+    }
+
+    .download-meta {
+        transition:
+            border-color 0.25s ease,
+            background-color 0.25s ease;
+    }
+
+    .download-card:hover .download-meta {
+        border-color: rgba(147, 51, 234, 0.42);
+        background: rgba(147, 51, 234, 0.08);
+    }
+
+    .footer-link {
+        @apply inline-flex w-fit text-gray-400 transition hover:text-white;
+    }
+
+    .footer-link:hover {
+        transform: translateX(3px);
+    }
+
+    .footer-brand {
+        @apply inline-flex items-center gap-2 transition;
+    }
+
+    .footer-brand:hover {
+        transform: translateY(-1px);
+    }
+
+    .footer-discord-link {
+        @apply mt-4 inline-flex w-fit items-center gap-2 text-sm font-semibold text-gray-300 transition hover:text-white;
+    }
+
+    .footer-discord-link:hover {
+        transform: translateY(-2px);
+    }
+
+    .footer-discord-icon {
+        @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border text-[#C084FC] transition;
+        background: rgba(21, 21, 27, 0.82);
+        border-color: #27272a;
+    }
+
+    .footer-discord-link:hover .footer-discord-icon {
+        border-color: rgba(147, 51, 234, 0.62);
+        background: rgba(147, 51, 234, 0.12);
+    }
+
+    .orders-hero {
+        @apply relative overflow-hidden rounded-xl border p-5 md:p-6;
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.14), rgba(21, 21, 27, 0.9) 52%, rgba(9, 9, 12, 0.95)),
+            rgba(21, 21, 27, 0.86);
+        border-color: rgba(147, 51, 234, 0.32);
+        box-shadow: 0 24px 62px rgba(0, 0, 0, 0.3);
+    }
+
+    .orders-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.16), transparent 23rem);
+        pointer-events: none;
+    }
+
+    .orders-hero > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .order-stat {
+        @apply rounded-xl border px-4 py-3 transition;
+        background: rgba(9, 9, 12, 0.36);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .order-stat:hover {
+        border-color: rgba(147, 51, 234, 0.5);
+        background: rgba(147, 51, 234, 0.09);
+        transform: translateY(-2px);
+    }
+
+    .order-mobile-card {
+        @apply relative overflow-hidden rounded-xl border p-4 transition duration-300;
+        background: rgba(21, 21, 27, 0.88);
+        border-color: rgba(63, 63, 70, 0.9);
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+    }
+
+    .order-mobile-card:hover {
+        border-color: rgba(147, 51, 234, 0.62);
+        box-shadow:
+            0 0 0 1px rgba(147, 51, 234, 0.12),
+            0 18px 42px rgba(147, 51, 234, 0.12);
+        transform: translateY(-4px);
+    }
+
+    .orders-table-wrap {
+        @apply surface overflow-hidden rounded-xl;
+    }
+
+    .orders-table-row {
+        @apply border-t border-[#27272A] transition;
+    }
+
+    .orders-table-row:hover {
+        background: rgba(147, 51, 234, 0.07);
+    }
+
+    .status-pill {
+        @apply inline-flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-semibold;
+    }
+
+    .status-pill-paid {
+        @apply text-green-300;
+        background: rgba(34, 197, 94, 0.12);
+        border-color: rgba(34, 197, 94, 0.28);
+    }
+
+    .status-pill-pending {
+        @apply text-yellow-300;
+        background: rgba(234, 179, 8, 0.12);
+        border-color: rgba(234, 179, 8, 0.28);
+    }
+
+    .status-pill-expired,
+    .status-pill-cancelled {
+        @apply text-red-300;
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.28);
+    }
+
+    .method-pill {
+        @apply inline-flex items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-semibold;
+        background: rgba(147, 51, 234, 0.1);
+        border-color: rgba(147, 51, 234, 0.26);
+        color: #d8b4fe;
+    }
+
+    .method-pill-midtrans {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.24);
+        color: #93c5fd;
+    }
+
+    .order-action {
+        @apply inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition;
+        background: rgba(147, 51, 234, 0.1);
+        border-color: rgba(147, 51, 234, 0.34);
+        color: #d8b4fe;
+    }
+
+    .order-action:hover {
+        background: rgba(147, 51, 234, 0.18);
+        border-color: rgba(216, 180, 254, 0.5);
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .empty-state {
+        @apply rounded-xl border p-8 text-center text-sm text-gray-400;
+        background: rgba(21, 21, 27, 0.76);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .order-pagination {
+        @apply flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between;
+        background: rgba(21, 21, 27, 0.72);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .order-pagination-link {
+        @apply inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold text-gray-300 transition;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .order-pagination-link:hover {
+        border-color: rgba(147, 51, 234, 0.58);
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .order-pagination-link.is-active {
+        background: rgba(147, 51, 234, 0.22);
+        border-color: rgba(147, 51, 234, 0.62);
+        color: #ffffff;
+    }
+
+    .btn-footer {
+        @apply inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition;
+        border-color: rgba(147, 51, 234, 0.55);
+        color: #c084fc;
+    }
+
+    .btn-footer:hover {
+        border-color: #c084fc;
+        color: #ffffff;
+    }
+
+    .btn-footer-secondary {
+        @apply inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white;
+        border-color: #27272a;
+        background: rgba(21, 21, 27, 0.58);
     }
 
     .badge {
@@ -233,6 +747,31 @@
         animation: fadeUp 0.45s ease both;
         will-change: transform;
     }
+
+    .motion-card {
+        animation: fadeUp 0.5s ease both;
+        will-change: transform;
+    }
+
+    .motion-card:nth-child(2) {
+        animation-delay: 0.05s;
+    }
+
+    .motion-card:nth-child(3) {
+        animation-delay: 0.1s;
+    }
+
+    .motion-card:nth-child(4) {
+        animation-delay: 0.15s;
+    }
+
+    .motion-card:nth-child(5) {
+        animation-delay: 0.2s;
+    }
+
+    .motion-card:nth-child(n + 6) {
+        animation-delay: 0.25s;
+    }
 }
 
 @keyframes fadeUp {
@@ -244,5 +783,31 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes ctaPulse {
+    0%,
+    100% {
+        box-shadow:
+            0 18px 38px rgba(147, 51, 234, 0.32),
+            0 0 0 1px rgba(216, 180, 254, 0.28);
+    }
+
+    50% {
+        box-shadow:
+            0 20px 44px rgba(147, 51, 234, 0.44),
+            0 0 0 1px rgba(216, 180, 254, 0.42);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
     }
 }

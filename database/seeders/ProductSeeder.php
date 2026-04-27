@@ -10,13 +10,13 @@ class ProductSeeder extends Seeder
 {
     public function run(): void
     {
-        $category = Category::where('slug', 'free-fire')->firstOrFail();
+        $category = Category::where('slug', 'digital-tools')->firstOrFail();
         $testingCategory = Category::where('slug', 'testing-payment')->firstOrFail();
 
         Product::updateOrCreate(
             ['name' => 'Aurora-VN'],
             [
-                'description' => 'Aurora ',
+                'description' => 'Licensed desktop utility package with setup support and duration-based access.',
                 'category_id' => $category->id,
             ]
         );
@@ -24,7 +24,7 @@ class ProductSeeder extends Seeder
         Product::updateOrCreate(
             ['name' => 'XG-Team'],
             [
-                'description' => 'XG access',
+                'description' => 'Desktop utility license with setup guidance and access support.',
                 'category_id' => $category->id,
             ]
         );

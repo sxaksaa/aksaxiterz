@@ -1,213 +1,213 @@
-<!-- ================= MOBILE (CARD) ================= -->
-<div class="space-y-4 md:hidden">
+@php
+    $now = now();
+@endphp
 
+<div class="space-y-4 md:hidden">
     @forelse ($orders as $order)
         @php
             $orderDate = $order->created_at?->timezone(config('app.timezone'));
+            $isExpired = $order->status === 'pending' && $order->expired_at && $now->gt($order->expired_at);
+            $isPending = $order->status === 'pending' && ! $isExpired;
+            $isPaid = $order->status === 'paid';
+            $statusLabel = $isPaid ? 'Paid' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'));
+            $statusClass = $isPaid ? 'status-pill-paid' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'));
+            $isCrypto = $order->payment_method === 'crypto';
+            $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
+            $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
+            $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
+            $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+            $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
         @endphp
-        <div class="bg-[#15151B] border border-[#27272A] rounded-xl p-4 space-y-2">
 
-            <div class="flex justify-between text-xs text-gray-400">
-                <span>{{ $order->order_id }}</span>
-                <span>
-                    @if ($order->status == 'paid')
-                        <span class="text-green-400">Paid</span>
-                    @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                        <span class="text-red-400">Expired</span>
-                    @elseif($order->status == 'pending')
-                        <span class="text-yellow-400">Pending</span>
-
-                        @if ($order->expired_at && now()->lt($order->expired_at))
-                            <div class="text-xs text-gray-400 mt-1">
-                                <span class="countdown text-yellow-400 animate-pulse"
-                                    data-expire="{{ $order->expired_at }}">
-                                </span>
-                            </div>
-                        @endif
-                    @else
-                        <span class="text-red-400">Cancelled</span>
+        <article class="order-mobile-card motion-card">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
+                    <div class="mt-1 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                </div>
+                <div class="text-right">
+                    <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
+                    @if ($isPending && $order->expired_at)
+                        <div class="mt-1 text-xs text-gray-400">
+                            <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
+                        </div>
                     @endif
-                </span>
-            </div>
-
-            <div class="text-sm font-semibold">
-                {{ $order->product->name ?? '-' }}
-            </div>
-
-            <div class="text-xs text-gray-400">
-                {{ $order->package->name ?? '-' }}
-            </div>
-
-            <div class="rounded-lg bg-white/5 px-3 py-2 text-xs text-gray-400">
-                <div class="text-[10px] uppercase tracking-wide text-gray-500">Order Date</div>
-                <div class="mt-1 text-gray-200">
-                    {{ $orderDate?->format('l, d F Y') ?? '-' }}
-                </div>
-                <div>
-                    {{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}
                 </div>
             </div>
 
-            <div class="text-xs">
-                @if ($order->payment_method == 'crypto')
-                    <span class="text-green-400">Crypto (USDT)</span>
-                @else
-                    <span class="text-blue-400">Midtrans</span>
-                @endif
+            <div class="mt-4">
+                <h2 class="text-base font-semibold text-white">{{ $order->product->name ?? '-' }}</h2>
+                <p class="mt-1 text-sm text-gray-400">{{ $order->package->name ?? '-' }}</p>
             </div>
 
-            <div class="text-[#C084FC] text-sm">
-                @if ($order->payment_method == 'crypto')
-                    ${{ $order->price }}
-                @else
-                    Rp {{ number_format($order->price) }}
-                @endif
+            <div class="mt-4 grid gap-3 rounded-xl border border-[#27272A] bg-black/20 p-4 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="text-xs text-gray-500">Method</span>
+                    <span class="method-pill {{ $methodClass }}">{{ $methodLabel }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <span class="text-xs text-gray-500">Price</span>
+                    <span class="font-semibold text-[#D8B4FE]">{{ $priceLabel }}</span>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                    <span class="text-xs text-gray-500">Date</span>
+                    <span class="text-right text-xs text-gray-300">
+                        {{ $orderDate?->format('d M Y') ?? '-' }}
+                        <span class="block text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</span>
+                    </span>
+                </div>
             </div>
 
-            <div class="pt-2">
-                @if (
-                    $order->status === 'pending' &&
-                        $order->payment_method === 'crypto' &&
-                        $order->payment_url &&
-                        $order->expired_at &&
-                        now()->lt($order->expired_at))
-                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="text-purple-400 text-xs underline">
-                        Continue
+            <div class="mt-4">
+                @if ($canContinueCrypto)
+                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
+                        Continue Payment
                     </a>
-                @elseif (
-                    $order->status === 'pending' &&
-                        $order->payment_method === 'midtrans' &&
-                        $order->expired_at &&
-                        now()->lt($order->expired_at))
+                @elseif ($canPayMidtrans)
                     <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
                         @csrf
-                        <button type="submit" class="pay-btn text-blue-400 text-xs underline">
+                        <button type="submit" class="order-action pay-btn w-full">
                             Pay Again
                         </button>
                     </form>
-                @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                    <span class="text-red-400 text-xs">Expired</span>
+                @elseif ($isPaid)
+                    <a href="/licenses" class="order-action w-full">View License</a>
                 @else
-                    <span class="text-gray-500 text-xs">-</span>
+                    <span class="inline-flex w-full items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-500">
+                        No action needed
+                    </span>
                 @endif
             </div>
-
-        </div>
+        </article>
     @empty
-        <p class="text-gray-400 text-sm">No orders yet</p>
+        <div class="empty-state">No orders yet</div>
     @endforelse
-
 </div>
 
-<!-- ================= DESKTOP (TABLE) ================= -->
-<div class="hidden md:block bg-[#15151B] border border-[#27272A] rounded-xl overflow-hidden">
+<div class="orders-table-wrap hidden md:block">
+    <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Recent Orders</h2>
+            <p class="mt-1 text-xs text-gray-500">Auto-refreshes after checkout and payment retry.</p>
+        </div>
+        <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+            {{ method_exists($orders, 'total') ? $orders->total() : $orders->count() }} records
+        </span>
+    </div>
 
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[920px] text-sm">
+            <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
+                <tr>
+                    <th class="p-4 text-left">Order</th>
+                    <th class="p-4 text-left">Product</th>
+                    <th class="p-4 text-left">Method</th>
+                    <th class="p-4 text-left">Price</th>
+                    <th class="p-4 text-left">Date</th>
+                    <th class="p-4 text-left">Status</th>
+                    <th class="p-4 text-right">Action</th>
+                </tr>
+            </thead>
 
-        <thead class="bg-[#1f1f25] text-gray-400">
-            <tr>
-                <th class="p-3 text-left">Order ID</th>
-                <th class="p-3 text-left">Product</th>
-                <th class="p-3 text-left">Package</th>
-                <th class="p-3 text-left">Method</th>
-                <th class="p-3 text-left">Price</th>
-                <th class="p-3 text-left">Order Date</th>
-                <th class="p-3 text-left">Status</th>
-                <th class="p-3 text-left">Action</th>
-            </tr>
-        </thead>
+            <tbody id="ordersTable">
+                @forelse ($orders as $order)
+                    @php
+                        $orderDate = $order->created_at?->timezone(config('app.timezone'));
+                        $isExpired = $order->status === 'pending' && $order->expired_at && $now->gt($order->expired_at);
+                        $isPending = $order->status === 'pending' && ! $isExpired;
+                        $isPaid = $order->status === 'paid';
+                        $statusLabel = $isPaid ? 'Paid' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'));
+                        $statusClass = $isPaid ? 'status-pill-paid' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'));
+                        $isCrypto = $order->payment_method === 'crypto';
+                        $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
+                        $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
+                        $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
+                        $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+                        $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
+                    @endphp
 
-        <tbody id="ordersTable">
-            @forelse ($orders as $order)
-                @php
-                    $orderDate = $order->created_at?->timezone(config('app.timezone'));
-                @endphp
-                <tr class="border-t border-[#27272A]">
-
-                    <td class="p-3 text-xs text-gray-400">{{ $order->order_id }}</td>
-                    <td class="p-3">{{ $order->product->name ?? '-' }}</td>
-                    <td class="p-3">{{ $order->package->name ?? '-' }}</td>
-
-                    <td class="p-3">
-                        @if ($order->payment_method == 'crypto')
-                            <span class="text-purple-400">Crypto (USDT)</span>
-                        @else
-                            <span class="text-blue-400">Midtrans</span>
-                        @endif
-                    </td>
-
-                    <td class="p-3 text-[#C084FC]">
-                        @if ($order->payment_method == 'crypto')
-                            ${{ $order->price }}
-                        @else
-                            Rp {{ number_format($order->price) }}
-                        @endif
-                    </td>
-
-                    <td class="p-3 text-xs text-gray-300 whitespace-nowrap">
-                        <div>{{ $orderDate?->format('l, d F Y') ?? '-' }}</div>
-                        <div class="text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</div>
-                    </td>
-
-                    <td class="p-3">
-                        @if ($order->status == 'paid')
-                            <span class="text-green-400">Paid</span>
-                        @elseif ($order->status == 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                            <span class="text-red-400">Expired</span>
-                        @elseif($order->status == 'pending')
-                            <span class="text-yellow-400">Pending</span>
-
-                            @if ($order->expired_at && now()->lt($order->expired_at))
-                                <div class="text-xs text-gray-400">
-                                    <span class="countdown text-yellow-400 animate-pulse"
-                                        data-expire="{{ $order->expired_at }}">
-                                    </span>
+                    <tr class="orders-table-row">
+                        <td class="p-4">
+                            <div class="max-w-[150px] truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                            <div class="mt-1 text-[10px] uppercase tracking-normal text-gray-500">Invoice</div>
+                        </td>
+                        <td class="p-4">
+                            <div class="font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
+                            <div class="mt-1 text-xs text-gray-500">{{ $order->package->name ?? '-' }}</div>
+                        </td>
+                        <td class="p-4">
+                            <span class="method-pill {{ $methodClass }}">{{ $methodLabel }}</span>
+                        </td>
+                        <td class="p-4 font-semibold text-[#D8B4FE]">{{ $priceLabel }}</td>
+                        <td class="p-4 whitespace-nowrap text-xs text-gray-300">
+                            <div>{{ $orderDate?->format('d M Y') ?? '-' }}</div>
+                            <div class="mt-1 text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</div>
+                        </td>
+                        <td class="p-4">
+                            <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
+                            @if ($isPending && $order->expired_at)
+                                <div class="mt-1 text-xs text-gray-400">
+                                    <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
                                 </div>
                             @endif
-                        @else
-                            <span class="text-red-400">Cancelled</span>
-                        @endif
-                    </td>
-
-                    <td class="p-3">
-                        @if (
-                            $order->status === 'pending' &&
-                                $order->payment_method === 'crypto' &&
-                                $order->payment_url &&
-                                $order->expired_at &&
-                                now()->lt($order->expired_at))
-                            <a href="{{ $order->payment_url }}" target="_blank" rel="noopener"
-                                class="text-purple-400 text-xs underline">
-                                Continue
-                            </a>
-                        @elseif (
-                            $order->status === 'pending' &&
-                                $order->payment_method === 'midtrans' &&
-                                $order->expired_at &&
-                                now()->lt($order->expired_at))
-                            <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
-                                @csrf
-                                <button type="submit" class="pay-btn text-blue-400 text-xs underline">
-                                    Pay Again
-                                </button>
-                            </form>
-                        @elseif ($order->status === 'pending' && $order->expired_at && now()->gt($order->expired_at))
-                            <span class="text-red-400 text-xs">Expired</span>
-                        @else
-                            -
-                        @endif
-                    </td>
-
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="8" class="p-6 text-center text-gray-400">
-                        No orders yet
-                    </td>
-                </tr>
-            @endforelse
-        </tbody>
-
-    </table>
-
+                        </td>
+                        <td class="p-4 text-right">
+                            @if ($canContinueCrypto)
+                                <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
+                                    Continue
+                                </a>
+                            @elseif ($canPayMidtrans)
+                                <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
+                                    @csrf
+                                    <button type="submit" class="order-action pay-btn">
+                                        Pay Again
+                                    </button>
+                                </form>
+                            @elseif ($isPaid)
+                                <a href="/licenses" class="order-action">License</a>
+                            @else
+                                <span class="text-xs text-gray-500">No action</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="p-8">
+                            <div class="empty-state">No orders yet</div>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 </div>
+
+@if (method_exists($orders, 'hasPages') && $orders->hasPages())
+    <nav class="order-pagination mt-5" aria-label="Order pagination">
+        <div class="text-xs text-gray-500">
+            Showing {{ $orders->firstItem() }}-{{ $orders->lastItem() }} of {{ $orders->total() }} orders
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+            @if ($orders->onFirstPage())
+                <span class="order-pagination-link opacity-45">Previous</span>
+            @else
+                <a href="{{ $orders->previousPageUrl() }}" class="order-pagination-link">Previous</a>
+            @endif
+
+            @foreach ($orders->getUrlRange(max(1, $orders->currentPage() - 2), min($orders->lastPage(), $orders->currentPage() + 2)) as $page => $url)
+                @if ($page === $orders->currentPage())
+                    <span class="order-pagination-link is-active">{{ $page }}</span>
+                @else
+                    <a href="{{ $url }}" class="order-pagination-link">{{ $page }}</a>
+                @endif
+            @endforeach
+
+            @if ($orders->hasMorePages())
+                <a href="{{ $orders->nextPageUrl() }}" class="order-pagination-link">Next</a>
+            @else
+                <span class="order-pagination-link opacity-45">Next</span>
+            @endif
+        </div>
+    </nav>
+@endif

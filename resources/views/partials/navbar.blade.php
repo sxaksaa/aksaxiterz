@@ -7,9 +7,10 @@ border-b border-[#27272A] transition-transform duration-300">
     <div class="w-full px-4 md:px-12 py-4 flex items-center justify-between relative">
 
         <!-- LOGO -->
-        <a href="/" class="flex items-center gap-2">
-            <span class="text-xl font-bold text-[#9333EA]">Aksa</span>
-            <span class="text-xl font-semibold text-white">Xiterz</span>
+        <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
+            <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
+                class="block h-8 w-auto max-w-[136px] drop-shadow-[0_0_18px_rgba(147,51,234,0.35)] sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
+                width="612" height="195" draggable="false">
         </a>
 
         <!-- MENU DESKTOP -->
@@ -17,6 +18,10 @@ border-b border-[#27272A] transition-transform duration-300">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
                 Products
+            </a>
+
+            <a href="/downloads" class="nav-item {{ request()->is('downloads*') ? 'active' : '' }}">
+                Downloads
             </a>
 
             @auth
@@ -34,6 +39,15 @@ border-b border-[#27272A] transition-transform duration-300">
 
         <!-- RIGHT -->
         <div class="flex items-center gap-3">
+            @php $discordUrl = config('links.discord_url'); @endphp
+
+            <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                class="discord-nav-cta {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                <span>Discord</span>
+                <span class="hidden rounded-md bg-white/[0.12] px-2 py-1 text-[10px] font-semibold text-white/90 lg:inline">
+                    Support
+                </span>
+            </a>
 
             <!-- MOBILE MENU BUTTON -->
             <button id="menuBtn" onclick="toggleMobileMenu(event)" class="md:hidden text-white text-sm p-2">
@@ -106,10 +120,18 @@ transition-all duration-300 ease-out">
     <div class="flex flex-col gap-4 text-sm">
 
         <a href="/" onclick="toggleMobileMenu(event)" class="nav-item">Products</a>
+        <a href="/downloads" onclick="toggleMobileMenu(event)" class="nav-item">Downloads</a>
 
         @auth
             <a href="/orders" onclick="toggleMobileMenu(event)" class="nav-item">Orders</a>
             <a href="/licenses" onclick="toggleMobileMenu(event)" class="nav-item">Licenses</a>
+
+            @php $discordUrl = config('links.discord_url'); @endphp
+            <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                class="mobile-discord-link {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                <span>Discord</span>
+                <span class="text-xs text-[#C084FC]">Support</span>
+            </a>
 
             <div class="border-t border-[#27272A] pt-3 text-xs text-gray-400 flex items-center gap-2">
                 @if (auth()->user()->avatar)
@@ -135,6 +157,13 @@ transition-all duration-300 ease-out">
         @guest
             <a href="/auth/google" class="text-gray-400">
                 Login
+            </a>
+
+            @php $discordUrl = config('links.discord_url'); @endphp
+            <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                class="mobile-discord-link {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                <span>Discord</span>
+                <span class="text-xs text-[#C084FC]">Support</span>
             </a>
         @endguest
 
