@@ -217,6 +217,106 @@ class PaymentController extends Controller
         }
     }
 
+    public function syncCryptoOrder(Request $request, string $orderId)
+    {
+        $order = Order::where('order_id', $orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($order->payment_method !== 'crypto') {
+            abort(404);
+        }
+
+        if ($order->status === 'paid') {
+            return response()->json([
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+            ]);
+        }
+
+        $paymentId = $this->nowpaymentsPaymentId($order);
+
+        if (! $paymentId) {
+            return response()->json([
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'Crypto payment is still being verified.',
+            ], 202);
+        }
+
+        try {
+            $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
+
+            if (! $this->validNowpaymentsOrderPayload($order, $payload)) {
+                return response()->json(['error' => 'Invalid crypto status'], 403);
+            }
+
+            $providerStatus = strtolower((string) ($payload['payment_status'] ?? ''));
+            $chainTransfer = null;
+            $paymentVerified = $providerStatus === 'finished';
+
+            if (! $paymentVerified) {
+                $chainTransfer = $this->paymentService->findUsdtBscInvoiceTransfer($payload);
+                $paymentVerified = $chainTransfer !== null;
+            }
+
+            if (! $paymentVerified) {
+                return response()->json([
+                    'order_id' => $order->order_id,
+                    'status' => $order->fresh()->status,
+                    'provider_status' => $providerStatus,
+                    'message' => 'Crypto payment is still being verified.',
+                ], 202);
+            }
+
+            DB::beginTransaction();
+
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $this->validNowpaymentsOrderPayload($lockedOrder, $payload)) {
+                DB::rollBack();
+
+                return response()->json(['error' => 'Invalid crypto status'], 403);
+            }
+
+            if ($lockedOrder->status !== 'paid') {
+                $this->generateLicense($lockedOrder);
+            }
+
+            DB::commit();
+
+            if ($chainTransfer) {
+                Log::info('CRYPTO ON-CHAIN FALLBACK VERIFIED', [
+                    'order_id' => $lockedOrder->order_id,
+                    'tx_hash' => $chainTransfer['tx_hash'] ?? null,
+                ]);
+            }
+
+            return response()->json([
+                'order_id' => $lockedOrder->order_id,
+                'status' => $lockedOrder->fresh()->status,
+                'provider_status' => $providerStatus,
+                'tx_hash' => $chainTransfer['tx_hash'] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            Log::warning('CRYPTO SYNC ERROR: '.$e->getMessage(), [
+                'order_id' => $order->order_id,
+            ]);
+
+            return response()->json([
+                'order_id' => $order->order_id,
+                'status' => $order->fresh()->status,
+                'message' => 'Crypto payment is still being verified.',
+            ], 202);
+        }
+    }
+
     /*
     |--------------------------------------------------------------------------
     | MIDTRANS CALLBACK
@@ -418,6 +518,14 @@ class PaymentController extends Controller
         return $this->sameAmount($grossAmount, $order->price);
     }
 
+    private function validNowpaymentsOrderPayload(Order $order, array $payload): bool
+    {
+        return $order->payment_method === 'crypto' &&
+            hash_equals($order->order_id, (string) ($payload['order_id'] ?? '')) &&
+            strtolower((string) ($payload['price_currency'] ?? '')) === 'usd' &&
+            $this->sameAmount($payload['price_amount'] ?? null, $order->price);
+    }
+
     private function applyMidtransStatus(Order $order, array $payload): void
     {
         $transactionStatus = $payload['transaction_status'] ?? null;
@@ -439,7 +547,15 @@ class PaymentController extends Controller
 
     private function generateLicense($order)
     {
-        if ($order->status === 'paid' || License::where('order_id', $order->order_id)->exists()) {
+        if ($order->status === 'paid') {
+            return;
+        }
+
+        if (License::where('order_id', $order->order_id)->exists()) {
+            $order->update([
+                'status' => 'paid',
+            ]);
+
             return;
         }
 
@@ -489,6 +605,29 @@ class PaymentController extends Controller
     private function sameAmount($first, $second): bool
     {
         return round((float) $first, 4) === round((float) $second, 4);
+    }
+
+    private function nowpaymentsPaymentId(Order $order): ?string
+    {
+        if (! $order->payment_url) {
+            return null;
+        }
+
+        $query = parse_url($order->payment_url, PHP_URL_QUERY);
+
+        if (! $query) {
+            return null;
+        }
+
+        parse_str($query, $params);
+
+        $paymentId = $params['paymentId'] ?? $params['payment_id'] ?? null;
+
+        if (! is_scalar($paymentId) || ! ctype_digit((string) $paymentId)) {
+            return null;
+        }
+
+        return (string) $paymentId;
     }
 
     private function nowpaymentsSignature(array $payload, string $secret): string

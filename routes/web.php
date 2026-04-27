@@ -162,6 +162,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1');
     Route::post('/sync-midtrans-order/{orderId}', [PaymentController::class, 'syncMidtransOrder'])
         ->middleware('throttle:10,1');
+    Route::post('/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
+        ->middleware('throttle:20,1');
 
     // Crypto
     Route::post('/pay-crypto/{id}', [PaymentController::class, 'payCrypto'])
@@ -185,12 +187,21 @@ Route::middleware('auth')->group(function () {
                 'remaining' => 0,
                 'order_id' => $order->order_id,
                 'payment_method' => $order->payment_method,
+                'can_sync_crypto' => $order->payment_method === 'crypto' &&
+                    (bool) $order->payment_url &&
+                    in_array($order->status, ['pending', 'cancelled'], true) &&
+                    $order->created_at &&
+                    $order->created_at->gt(now()->subDay()),
             ]);
         }
 
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
 
-        if ($remaining <= 0 && $order->status === 'pending') {
+        $canStillVerifyCrypto = $order->payment_method === 'crypto' &&
+            $order->created_at &&
+            $order->created_at->gt(now()->subDay());
+
+        if ($remaining <= 0 && $order->status === 'pending' && ! $canStillVerifyCrypto) {
             $order->update(['status' => 'cancelled']);
         }
 
@@ -199,6 +210,11 @@ Route::middleware('auth')->group(function () {
             'remaining' => max(0, (int) $remaining),
             'order_id' => $order->order_id,
             'payment_method' => $order->payment_method,
+            'can_sync_crypto' => $order->payment_method === 'crypto' &&
+                (bool) $order->payment_url &&
+                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $order->created_at &&
+                $order->created_at->gt(now()->subDay()),
         ]);
     });
 
@@ -215,6 +231,10 @@ Route::middleware('auth')->group(function () {
         Order::where('status', 'pending')
             ->whereNotNull('expired_at')
             ->where('expired_at', '<', now())
+            ->where(function ($query) {
+                $query->where('payment_method', '!=', 'crypto')
+                    ->orWhere('created_at', '<', now()->subDay());
+            })
             ->update(['status' => 'cancelled']);
 
         $orderStats = [
@@ -236,6 +256,10 @@ Route::middleware('auth')->group(function () {
         Order::where('status', 'pending')
             ->whereNotNull('expired_at')
             ->where('expired_at', '<', now())
+            ->where(function ($query) {
+                $query->where('payment_method', '!=', 'crypto')
+                    ->orWhere('created_at', '<', now()->subDay());
+            })
             ->update(['status' => 'cancelled']);
 
         $orders = Order::with(['product', 'package'])

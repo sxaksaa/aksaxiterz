@@ -48,4 +48,10 @@ return [
         'ipn' => env('NOWPAYMENTS_IPN'),
     ],
 
+    'bsc' => [
+        'rpc_url' => env('BSC_RPC_URL', 'https://bsc-rpc.publicnode.com'),
+        'usdt_contract' => env('BSC_USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'),
+        'log_blocks' => (int) env('BSC_LOG_BLOCKS', 50000),
+    ],
+
 ];

@@ -125,6 +125,21 @@
             return response.json().catch(() => null);
         }
 
+        async function syncCryptoOrder(orderId) {
+            if (!orderId) return null;
+
+            const response = await fetch(`/sync-crypto-order/${encodeURIComponent(orderId)}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            });
+
+            return response.json().catch(() => null);
+        }
+
         async function finishMidtransPayment(orderId, redirectUrl) {
             let syncResult = null;
 
@@ -231,6 +246,43 @@
             }
         });
 
+        document.addEventListener('click', async function(e) {
+            const button = e.target.closest('.sync-crypto-button');
+            if (!button) return;
+
+            const orderId = button.dataset.orderId;
+            const originalText = button.innerText;
+
+            button.disabled = true;
+            button.innerText = 'Verifying...';
+            button.classList.add('opacity-60', 'pointer-events-none');
+
+            window.showAppToast?.('Payment check', 'Checking your crypto payment.');
+
+            try {
+                const result = await syncCryptoOrder(orderId);
+
+                if (result?.status === 'paid') {
+                    window.showAppToast?.('Payment verified', 'Your license is ready.');
+                    window.location.href = '/licenses';
+                    return;
+                }
+
+                window.showAppToast?.('Still verifying', result?.message || 'Payment is still being verified.', {
+                    variant: 'warning',
+                });
+                await refreshOrders();
+            } catch (error) {
+                window.showAppToast?.('Payment check failed', 'Please try again in a moment.', {
+                    variant: 'error',
+                });
+            } finally {
+                button.disabled = false;
+                button.innerText = originalText || 'Verify';
+                button.classList.remove('opacity-60', 'pointer-events-none');
+            }
+        });
+
         setInterval(() => {
             fetch('/check-order')
                 .then(res => res.json())
@@ -239,6 +291,20 @@
 
                     if (data.status === 'pending' && data.payment_method === 'midtrans' && data.order_id) {
                         syncMidtransOrder(data.order_id).then(result => {
+                            if (result?.status === 'paid') {
+                                window.location.href = '/licenses';
+                                return;
+                            }
+
+                            if (result?.status && result.status !== lastPolledStatus) {
+                                lastPolledStatus = result.status;
+                                refreshOrders();
+                            }
+                        });
+                    }
+
+                    if (data.can_sync_crypto && data.payment_method === 'crypto' && data.order_id) {
+                        syncCryptoOrder(data.order_id).then(result => {
                             if (result?.status === 'paid') {
                                 window.location.href = '/licenses';
                                 return;

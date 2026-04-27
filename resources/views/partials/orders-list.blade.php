@@ -6,12 +6,17 @@
     @forelse ($orders as $order)
         @php
             $orderDate = $order->created_at?->timezone(config('app.timezone'));
-            $isExpired = $order->status === 'pending' && $order->expired_at && $now->gt($order->expired_at);
-            $isPending = $order->status === 'pending' && ! $isExpired;
             $isPaid = $order->status === 'paid';
-            $statusLabel = $isPaid ? 'Paid' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'));
-            $statusClass = $isPaid ? 'status-pill-paid' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'));
             $isCrypto = $order->payment_method === 'crypto';
+            $canSyncCrypto = $isCrypto &&
+                $order->payment_url &&
+                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $order->created_at &&
+                $order->created_at->gt(now()->subDay());
+            $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
+            $isPending = $order->status === 'pending' && ! $isExpired;
+            $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
+            $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
             $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
             $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
             $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
@@ -27,7 +32,7 @@
                 </div>
                 <div class="text-right">
                     <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
-                    @if ($isPending && $order->expired_at)
+                    @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
                             <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
                         </div>
@@ -59,7 +64,11 @@
             </div>
 
             <div class="mt-4">
-                @if ($canContinueCrypto)
+                @if ($canSyncCrypto)
+                    <button type="button" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
+                        Verify Payment
+                    </button>
+                @elseif ($canContinueCrypto)
                     <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
                         Continue Payment
                     </a>
@@ -113,12 +122,17 @@
                 @forelse ($orders as $order)
                     @php
                         $orderDate = $order->created_at?->timezone(config('app.timezone'));
-                        $isExpired = $order->status === 'pending' && $order->expired_at && $now->gt($order->expired_at);
-                        $isPending = $order->status === 'pending' && ! $isExpired;
                         $isPaid = $order->status === 'paid';
-                        $statusLabel = $isPaid ? 'Paid' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'));
-                        $statusClass = $isPaid ? 'status-pill-paid' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'));
                         $isCrypto = $order->payment_method === 'crypto';
+                        $canSyncCrypto = $isCrypto &&
+                            $order->payment_url &&
+                            in_array($order->status, ['pending', 'cancelled'], true) &&
+                            $order->created_at &&
+                            $order->created_at->gt(now()->subDay());
+                        $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
+                        $isPending = $order->status === 'pending' && ! $isExpired;
+                        $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
+                        $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
                         $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
                         $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
                         $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
@@ -145,14 +159,18 @@
                         </td>
                         <td class="p-4">
                             <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
-                            @if ($isPending && $order->expired_at)
+                            @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
                                     <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
                                 </div>
                             @endif
                         </td>
                         <td class="p-4 text-right">
-                            @if ($canContinueCrypto)
+                            @if ($canSyncCrypto)
+                                <button type="button" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
+                                    Verify
+                                </button>
+                            @elseif ($canContinueCrypto)
                                 <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
                                     Continue
                                 </a>
