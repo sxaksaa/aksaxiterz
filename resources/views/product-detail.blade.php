@@ -252,6 +252,8 @@
         let selectedUsd = 0;
         let selectedPackageStock = 0;
         let dropdownOpen = false;
+        const cryptoBuyerFeeRate = 0.04;
+        const cryptoBuyerFeeMinimum = 0.25;
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
@@ -336,7 +338,7 @@
             showSummary();
 
             const priceText = selectedPayment === 'crypto' ?
-                `$${Number(usd).toLocaleString()}` :
+                `${formatUsd(cryptoCustomerTotal(usd))} fee incl.` :
                 `Rp ${Number(price).toLocaleString()}`;
 
             showToast(
@@ -365,9 +367,28 @@
                 text = "Rp " + selectedPrice.toLocaleString();
 
             if (selectedPayment === 'crypto')
-                text = "$" + selectedUsd;
+                text = `${formatUsd(cryptoCustomerTotal(selectedUsd))} fee incl.`;
 
             document.getElementById('totalPrice').innerText = text;
+        }
+
+        function cryptoCustomerTotal(baseAmount) {
+            const amount = Number(baseAmount) || 0;
+
+            if (amount <= 0) {
+                return 0;
+            }
+
+            const fee = Math.max(amount * cryptoBuyerFeeRate, cryptoBuyerFeeMinimum);
+
+            return Math.round((amount + fee) * 100) / 100;
+        }
+
+        function formatUsd(amount) {
+            return `$${Number(amount).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            })}`;
         }
 
         function networkMinimum(coin) {
@@ -375,7 +396,9 @@
         }
 
         function isNetworkDisabled(coin) {
-            return selectedUsd > 0 && selectedUsd < networkMinimum(coin);
+            const cryptoTotal = cryptoCustomerTotal(selectedUsd);
+
+            return cryptoTotal > 0 && cryptoTotal < networkMinimum(coin);
         }
 
         function refreshNetworkAvailability() {

@@ -405,10 +405,17 @@ class PaymentController extends Controller
     private function validMidtransOrderPayload(Order $order, array $payload): bool
     {
         $grossAmount = $payload['gross_amount'] ?? null;
+        $originalAmount = $payload['extra_info']['gross_amount_info']['original_amount'] ?? null;
 
-        return $order->payment_method === 'midtrans'
-            && is_numeric($grossAmount)
-            && $this->sameAmount($grossAmount, $order->price);
+        if ($order->payment_method !== 'midtrans' || ! is_numeric($grossAmount)) {
+            return false;
+        }
+
+        if (is_numeric($originalAmount)) {
+            return $this->sameAmount($originalAmount, $order->price);
+        }
+
+        return $this->sameAmount($grossAmount, $order->price);
     }
 
     private function applyMidtransStatus(Order $order, array $payload): void

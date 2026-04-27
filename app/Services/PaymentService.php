@@ -23,6 +23,24 @@ class PaymentService
         'usdtton',
     ];
 
+    private const MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES = [
+        'gopay',
+        'qris',
+        'other_qris',
+        'shopeepay',
+        'dana',
+        'bca_va',
+        'bni_va',
+        'bri_va',
+        'permata_va',
+        'echannel',
+        'other_va',
+    ];
+
+    private const CRYPTO_BUYER_FEE_RATE = 0.04;
+
+    private const CRYPTO_BUYER_FEE_MINIMUM = 0.25;
+
     public function createMidtrans($user, $productId, $packageId, ?Order $order = null)
     {
         return $this->createMidtransPayment($user, $productId, $packageId, $order)['snap_token'];
@@ -71,6 +89,7 @@ class PaymentService
                 'order_id' => $order->order_id,
                 'gross_amount' => (int) round((float) $order->price),
             ],
+            'customer_imposed_payment_fee' => $this->midtransCustomerFeeConfig(),
             'customer_details' => [
                 'first_name' => $user->name,
                 'email' => $user->email,
@@ -134,7 +153,10 @@ class PaymentService
             throw new \Exception('Out of stock');
         }
 
-        $amount = (float) ($order?->price ?? $package->price_usdt);
+        $baseAmount = (float) ($package->price_usdt ?? 0);
+        $amount = $order
+            ? (float) $order->price
+            : $this->cryptoCustomerTotal($baseAmount);
         $customMin = [
             'usdttrc20' => 10,
             'usdtbsc' => 1,
@@ -169,8 +191,9 @@ class PaymentService
                     'price_currency' => 'usd',
                     'pay_currency' => $coin,
                     'is_fixed_rate' => false,
+                    'is_fee_paid_by_user' => false,
                     'order_id' => $order->order_id,
-                    'order_description' => $product->name.' - '.$package->name,
+                    'order_description' => $this->cryptoOrderDescription($product->name, $package->name, $baseAmount, $amount),
                     'ipn_callback_url' => config('services.nowpayments.ipn'),
                     'success_url' => url('/licenses'),
                     'cancel_url' => url('/'),
@@ -206,54 +229,25 @@ class PaymentService
         }
     }
 
-    private function ensureNowpaymentsMinimum(string $coin, float $amount): void
+    private function cryptoCustomerTotal(float $baseAmount): float
     {
-        $apiKey = config('services.nowpayments.key');
-        $baseUrl = config('services.nowpayments.url');
+        $fee = max($baseAmount * self::CRYPTO_BUYER_FEE_RATE, self::CRYPTO_BUYER_FEE_MINIMUM);
 
-        if (! $apiKey || ! $baseUrl) {
-            return;
-        }
-
-        try {
-            $response = Http::withOptions($this->gatewayHttpOptions())
-                ->withHeaders([
-                    'x-api-key' => $apiKey,
-                ])->get(rtrim($baseUrl, '/').'/min-amount', [
-                    'currency_from' => 'usd',
-                    'currency_to' => $coin,
-                    'fiat_equivalent' => 'usd',
-                    'is_fixed_rate' => false,
-                ]);
-
-            if (! $response->successful()) {
-                return;
-            }
-
-            $data = $response->json();
-            $minimum = $this->extractMinimumUsd($data);
-
-            if ($minimum !== null && $amount < $minimum) {
-                throw new \Exception("Minimum crypto payment for {$coin} is about \${$minimum}");
-            }
-        } catch (\Exception $e) {
-            if (str_starts_with($e->getMessage(), 'Minimum crypto payment')) {
-                throw $e;
-            }
-
-            Log::warning('NOWPayments minimum check failed: '.$e->getMessage());
-        }
+        return round($baseAmount + $fee, 2);
     }
 
-    private function extractMinimumUsd(array $data): ?float
+    private function cryptoOrderDescription(string $productName, string $packageName, float $baseAmount, float $amount): string
     {
-        foreach (['fiat_equivalent', 'min_amount', 'min_amount_fiat'] as $key) {
-            if (isset($data[$key]) && is_numeric($data[$key])) {
-                return (float) $data[$key];
-            }
+        if ($amount <= $baseAmount) {
+            return $productName.' - '.$packageName;
         }
 
-        return null;
+        return sprintf(
+            '%s - %s (includes $%s crypto fee)',
+            $productName,
+            $packageName,
+            number_format($amount - $baseAmount, 2, '.', '')
+        );
     }
 
     private function ensurePayableOrder(Order $order, $user, int $productId, int $packageId, string $method): void
@@ -267,6 +261,20 @@ class PaymentService
         ) {
             throw new \Exception('Invalid order');
         }
+    }
+
+    private function midtransCustomerFeeConfig(): array
+    {
+        return [
+            'enable' => true,
+            'payment_fee_configs' => array_map(
+                fn (string $paymentType) => [
+                    'payment_type' => $paymentType,
+                    'customer_percentage' => 100,
+                ],
+                self::MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES
+            ),
+        ];
     }
 
     private function gatewayCurlOptions(): array
