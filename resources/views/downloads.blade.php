@@ -29,11 +29,6 @@
                 </div>
             </div>
 
-            <div class="mt-5 flex flex-wrap gap-2">
-                <span class="support-pill">Customer support</span>
-                <span class="support-pill">License reset</span>
-                <span class="support-pill">Setup guidance</span>
-            </div>
         </div>
     </section>
 

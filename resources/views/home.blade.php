@@ -22,7 +22,6 @@
 
                     <div class="mt-5 flex flex-wrap gap-3">
                         <a href="#products" class="btn-main">Browse Products</a>
-                        <a href="/downloads" class="btn-footer-secondary">Download Tools</a>
                         <a href="{{ $discordUrl ?: '#' }}"
                             @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                             class="btn-footer {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
@@ -61,7 +60,7 @@
                 </div>
 
                 <div class="w-full lg:max-w-md">
-                    <input type="text" id="searchInput" placeholder="Search tools, products..."
+                    <input type="text" id="searchInput" placeholder="Search Products..."
                         class="search-bar w-full text-sm md:text-base" value="{{ request('search') }}">
                 </div>
             </div>
