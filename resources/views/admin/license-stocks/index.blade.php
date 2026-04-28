@@ -124,7 +124,7 @@
         @endif
 
         <section class="product-section mb-6 fade-up">
-            <form method="GET" action="{{ route('admin.license-stocks.index') }}" class="grid gap-3 md:grid-cols-4 md:items-end">
+            <form id="stockFilterForm" method="GET" action="{{ route('admin.license-stocks.index') }}" class="grid gap-3 md:grid-cols-4 md:items-end">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
                     <input name="search" value="{{ request('search') }}" class="search-bar w-full"
@@ -153,7 +153,7 @@
                 </label>
 
                 <div class="flex gap-2">
-                    <button class="btn-footer h-12">Filter</button>
+                    <button class="btn-footer h-12 md:hidden">Filter</button>
                     <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">Reset</a>
                 </div>
             </form>
@@ -264,34 +264,38 @@
             @endforelse
         </div>
 
-        @if ($stocks->hasPages())
-            <nav class="order-pagination mt-5" aria-label="License stock pagination">
-                <div class="text-xs text-gray-500">
-                    Showing {{ $stocks->firstItem() }}-{{ $stocks->lastItem() }} of {{ $stocks->total() }} keys
-                </div>
-
-                <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
-                    @if ($stocks->onFirstPage())
-                        <span class="order-pagination-link opacity-45">Previous</span>
-                    @else
-                        <a href="{{ $stocks->previousPageUrl() }}" class="order-pagination-link">Previous</a>
-                    @endif
-
-                    @foreach ($stocks->getUrlRange(max(1, $stocks->currentPage() - 2), min($stocks->lastPage(), $stocks->currentPage() + 2)) as $page => $url)
-                        @if ($page === $stocks->currentPage())
-                            <span class="order-pagination-link is-active">{{ $page }}</span>
-                        @else
-                            <a href="{{ $url }}" class="order-pagination-link">{{ $page }}</a>
-                        @endif
-                    @endforeach
-
-                    @if ($stocks->hasMorePages())
-                        <a href="{{ $stocks->nextPageUrl() }}" class="order-pagination-link">Next</a>
-                    @else
-                        <span class="order-pagination-link opacity-45">Next</span>
-                    @endif
-                </div>
-            </nav>
-        @endif
+        @include('partials.pagination', [
+            'paginator' => $stocks,
+            'label' => 'License stock pagination',
+            'itemLabel' => 'keys',
+        ])
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('stockFilterForm');
+
+            if (!form) return;
+
+            let searchTimeout;
+            const submitFilters = () => {
+                const pageInput = form.querySelector('input[name="page"]');
+
+                if (pageInput) {
+                    pageInput.remove();
+                }
+
+                form.requestSubmit();
+            };
+
+            form.querySelectorAll('select[name="product_id"], select[name="status"]').forEach((select) => {
+                select.addEventListener('change', submitFilters);
+            });
+
+            form.querySelector('input[name="search"]')?.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(submitFilters, 450);
+            });
+        });
+    </script>
 @endsection

@@ -228,32 +228,8 @@
     </div>
 </div>
 
-@if (method_exists($orders, 'hasPages') && $orders->hasPages())
-    <nav class="order-pagination mt-5" aria-label="Order pagination">
-        <div class="text-xs text-gray-500">
-            Showing {{ $orders->firstItem() }}-{{ $orders->lastItem() }} of {{ $orders->total() }} orders
-        </div>
-
-        <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
-            @if ($orders->onFirstPage())
-                <span class="order-pagination-link opacity-45">Previous</span>
-            @else
-                <a href="{{ $orders->previousPageUrl() }}" class="order-pagination-link">Previous</a>
-            @endif
-
-            @foreach ($orders->getUrlRange(max(1, $orders->currentPage() - 2), min($orders->lastPage(), $orders->currentPage() + 2)) as $page => $url)
-                @if ($page === $orders->currentPage())
-                    <span class="order-pagination-link is-active">{{ $page }}</span>
-                @else
-                    <a href="{{ $url }}" class="order-pagination-link">{{ $page }}</a>
-                @endif
-            @endforeach
-
-            @if ($orders->hasMorePages())
-                <a href="{{ $orders->nextPageUrl() }}" class="order-pagination-link">Next</a>
-            @else
-                <span class="order-pagination-link opacity-45">Next</span>
-            @endif
-        </div>
-    </nav>
-@endif
+@include('partials.pagination', [
+    'paginator' => $orders,
+    'label' => 'Order pagination',
+    'itemLabel' => 'orders',
+])
