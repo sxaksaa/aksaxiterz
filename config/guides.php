@@ -59,29 +59,45 @@ return [
             'slug' => 'clean-windows-temp-files',
             'title' => 'Clean Windows Temporary Files',
             'category' => 'Maintenance',
-            'read_time' => '3 min read',
-            'summary' => 'Clear common temporary folders to free space and reduce setup errors caused by stale files.',
+            'read_time' => '5 min read',
+            'summary' => 'Clear temporary folders, Prefetch, Recent shortcuts, and cleanup tools to reduce setup errors caused by stale files.',
             'visual' => 'cleanup',
             'requirements' => [
                 'Windows 10 or Windows 11',
                 'Close active apps before cleaning',
                 'Skip files Windows says are in use',
+                'Do not delete personal files from Downloads unless you are sure',
             ],
             'steps' => [
                 [
-                    'title' => 'Open the temp folder',
-                    'body' => 'Press Win + R, type temp, then press Enter. Select the files inside the folder and delete what Windows allows.',
-                    'visual' => 'folder',
-                ],
-                [
-                    'title' => 'Open the user temp folder',
-                    'body' => 'Press Win + R again, type %temp%, then press Enter. Delete the files inside this folder too.',
+                    'title' => 'Clean the user temp folder',
+                    'body' => 'Press Win + R, type %temp%, then press Enter. Select the files inside the folder and delete what Windows allows. Skip anything that says it is in use.',
                     'visual' => 'user-temp',
                 ],
                 [
+                    'title' => 'Clean the Windows temp folder',
+                    'body' => 'Press Win + R again, type temp, then press Enter. Delete the temporary files that Windows allows, then skip locked files.',
+                    'visual' => 'folder',
+                ],
+                [
+                    'title' => 'Clear Prefetch cache',
+                    'body' => 'Press Win + R, type prefetch, then press Enter. Approve the administrator prompt if it appears, select the contents, and delete what Windows allows. Windows will rebuild this cache automatically.',
+                    'visual' => 'prefetch',
+                ],
+                [
+                    'title' => 'Clear Recent shortcuts',
+                    'body' => 'Press Win + R, type recent, then press Enter. Delete the shortcuts in this folder. This clears recent file history shortcuts, not the original files.',
+                    'visual' => 'recent',
+                ],
+                [
                     'title' => 'Use Disk Cleanup',
-                    'body' => 'Search Disk Cleanup from Start, select your Windows drive, then clean temporary files, thumbnails, and recycle bin items if needed.',
+                    'body' => 'Search Disk Cleanup from Start, select your Windows drive, then clean temporary files, thumbnails, DirectX shader cache, and recycle bin items if needed.',
                     'visual' => 'cleanup-tool',
+                ],
+                [
+                    'title' => 'Empty Recycle Bin',
+                    'body' => 'Right-click Recycle Bin and choose Empty Recycle Bin after checking that you do not need anything inside it.',
+                    'visual' => 'recycle-bin',
                 ],
                 [
                     'title' => 'Restart before reinstalling',

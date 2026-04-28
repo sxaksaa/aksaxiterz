@@ -16,7 +16,10 @@
         'cleanup' => ['Temporary Files', '12,481 files scanned', 'Ready to clean'],
         'folder' => ['C:\\Windows\\Temp', 'cache.tmp', 'setup.log', 'old-package.tmp'],
         'user-temp' => ['%temp%', 'browser-cache', 'installer-cache', 'session.tmp'],
+        'prefetch' => ['C:\\Windows\\Prefetch', 'APP-9F2A.pf', 'SETUP-41D0.pf', 'Rebuilds automatically'],
+        'recent' => ['Recent Items', 'setup.lnk', 'downloads.lnk', 'Shortcuts only'],
         'cleanup-tool' => ['Disk Cleanup', 'Temporary files', 'Thumbnails', 'Recycle Bin'],
+        'recycle-bin' => ['Recycle Bin', 'Review first', 'Empty selected items', 'Space recovered'],
         'restart' => ['Restart required', 'Save your work', 'Apply changes after reboot'],
         default => ['Aksa Xiterz Guide', 'Step-by-step setup', 'Public support notes'],
     };
