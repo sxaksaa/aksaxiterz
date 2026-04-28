@@ -168,6 +168,7 @@
             @foreach ($product->packages as $p)
                 @php
                     $packageStock = $p->available_license_stocks_count ?? 0;
+                    $packageName = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name);
                     $badge = null;
                     if (str_contains($p->name, 'Testing')) {
                         $badge = 'Test Flow';
@@ -186,7 +187,7 @@
                     @endif
 
                     <p class="text-sm mb-1">
-                        {{ str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name) }}
+                        {{ $packageName }}
                     </p>
 
                     <p class="text-[#C084FC] font-semibold price-text" data-idr="Rp {{ number_format($p->price) }}"
@@ -197,6 +198,14 @@
                     <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-red-300' }}">
                         {{ $packageStock > 0 ? $packageStock . ' left' : 'Out of stock' }}
                     </p>
+
+                    @if ($packageStock <= 0)
+                        <button type="button"
+                            onclick="requestManualOrder(event, {{ Illuminate\Support\Js::from($product->name) }}, {{ Illuminate\Support\Js::from($packageName) }})"
+                            class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
+                            Request Manual Order
+                        </button>
+                    @endif
 
                 </div>
             @endforeach
@@ -257,6 +266,7 @@
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
+        const discordUrl = @json($discordUrl);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         @if ($paymentError)
@@ -274,6 +284,26 @@
 
         function requireLogin() {
             showToast('Login required', 'Please login with Google before checkout.', loginUrl, 'warning');
+        }
+
+        async function requestManualOrder(event, productName, packageName) {
+            event.stopPropagation();
+
+            const message = `I want to buy ${productName} - ${packageName}. Is manual order available?`;
+            const copyRequest = navigator.clipboard
+                ? navigator.clipboard.writeText(message)
+                : Promise.reject(new Error('Clipboard unavailable'));
+
+            if (discordUrl) {
+                window.open(discordUrl, '_blank', 'noopener');
+            }
+
+            try {
+                await copyRequest;
+                showToast('Message copied', 'Paste it in Discord support to request a manual order.', null, 'success');
+            } catch (error) {
+                showToast('Manual order request', 'Open Discord and send the product plus package name to support.', null, 'warning');
+            }
         }
 
         /* =========================
