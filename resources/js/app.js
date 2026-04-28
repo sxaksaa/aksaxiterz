@@ -61,3 +61,36 @@ document.addEventListener('click', async (event) => {
         }, 1200);
     }
 });
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-value]');
+
+    if (!button) return;
+
+    const text = button.dataset.copyValue?.trim();
+
+    if (!text) return;
+
+    const originalText = button.innerText;
+
+    try {
+        await navigator.clipboard.writeText(text);
+        button.innerText = 'Copied!';
+        button.classList.add('text-green-400');
+        window.showAppToast?.(
+            button.dataset.copyTitle || 'Copied',
+            button.dataset.copyMessage || 'The text is ready to paste.', {
+                variant: 'success',
+            }
+        );
+    } catch (error) {
+        window.showAppToast?.('Copy failed', 'Select the text and copy it manually.', {
+            variant: 'error',
+        });
+    } finally {
+        setTimeout(() => {
+            button.innerText = originalText || 'Copy';
+            button.classList.remove('text-green-400');
+        }, 1200);
+    }
+});

@@ -29,7 +29,15 @@
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
-                    <div class="mt-1 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                    <div class="mt-1 flex min-w-0 items-center gap-2">
+                        <div class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                        <button type="button" data-copy-value="{{ $order->order_id }}"
+                            data-copy-title="Order ID copied"
+                            data-copy-message="The order ID is ready to paste."
+                            class="shrink-0 rounded-md border border-[#9333EA]/30 px-2 py-1 text-[10px] font-semibold text-[#C084FC] transition hover:border-[#C084FC] hover:text-white">
+                            Copy
+                        </button>
+                    </div>
                 </div>
                 <div class="text-right">
                     <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
@@ -156,7 +164,15 @@
 
                     <tr class="orders-table-row">
                         <td class="p-4">
-                            <div class="max-w-[150px] truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                            <div class="flex max-w-[190px] items-center gap-2">
+                                <div class="min-w-0 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                                <button type="button" data-copy-value="{{ $order->order_id }}"
+                                    data-copy-title="Order ID copied"
+                                    data-copy-message="The order ID is ready to paste."
+                                    class="shrink-0 rounded-md border border-[#9333EA]/30 px-2 py-1 text-[10px] font-semibold text-[#C084FC] transition hover:border-[#C084FC] hover:text-white">
+                                    Copy
+                                </button>
+                            </div>
                             <div class="mt-1 text-[10px] uppercase tracking-normal text-gray-500">Invoice</div>
                         </td>
                         <td class="p-4">

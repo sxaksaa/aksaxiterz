@@ -13,11 +13,11 @@
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Digital License Platform</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                        Premium tools, instant licenses, and public setup files.
+                        Premium tools and instant digital licenses.
                     </h1>
                     <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Browse trusted digital tools, pay securely, and get quick access to licenses, downloads,
-                        setup resources, and customer support.
+                        Browse trusted digital tools, pay securely, and get quick access to license keys, setup
+                        guides, and customer support.
                     </p>
 
                     <div class="mt-5 flex flex-wrap gap-3">

@@ -14,7 +14,7 @@
                     </p>
                 </div>
 
-                @include('guides._visual', ['variant' => 'hyperv', 'title' => 'Guide preview'])
+                @include('guides._visual', ['variant' => 'overview', 'title' => 'Guide preview'])
             </div>
 
             <div class="mt-5 flex flex-wrap gap-2">

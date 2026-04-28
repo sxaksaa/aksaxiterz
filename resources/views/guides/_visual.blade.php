@@ -6,6 +6,7 @@
         ? $image
         : ($image ? asset($image) : null);
     $lines = match ($variant) {
+        'overview' => ['Step-by-step fixes', 'Windows setup', 'Cleanup checklist', 'Troubleshooting notes'],
         'hyperv' => ['Windows Features', '[ ] Hyper-V', '[ ] Virtual Machine Platform', '[ ] Windows Hypervisor Platform'],
         'features' => ['Run', 'optionalfeatures', 'Open Windows Features'],
         'checkboxes' => ['Hyper-V', 'Virtual Machine Platform', 'Windows Hypervisor Platform'],

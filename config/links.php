@@ -19,6 +19,7 @@ return [
         [
             'name' => 'Aurora-VN',
             'version' => 'Setup Files',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'PC and laptop',
             'description' => 'Licensed for PC & Laptop',
             'links' => [
@@ -31,6 +32,7 @@ return [
         [
             'name' => 'XG-Team',
             'version' => 'Setup Files',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'PC and laptop',
             'description' => 'Licensed for PC & Laptop',
             'links' => [
@@ -43,6 +45,7 @@ return [
         [
             'name' => 'Fluorite',
             'version' => 'Setup Files',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'iPhone',
             'description' => 'Licensed for iPhone',
             'links' => [
@@ -55,6 +58,7 @@ return [
         [
             'name' => 'Drip Client',
             'version' => 'Setup Files',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Android',
             'description' => 'Licensed for Android',
             'links' => [
@@ -67,6 +71,7 @@ return [
         [
             'name' => 'BR',
             'version' => 'Setup Files',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Android, PC, and laptop',
             'description' => 'Licensed for Android, PC & Laptop',
             'links' => [
@@ -79,6 +84,7 @@ return [
         [
             'name' => 'FF',
             'version' => '32-bit + 64-bit',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Android V7A and V8A',
             'description' => 'FF 32-bit (V7A), FF 64-bit (V8A)',
             'links' => [
@@ -91,6 +97,7 @@ return [
         [
             'name' => 'Emulator',
             'version' => 'Emulator Pack',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Windows emulator tools',
             'description' => 'Bluestacks, MSI, Debloater Package',
             'links' => [
@@ -103,6 +110,7 @@ return [
         [
             'name' => 'Requirements',
             'version' => 'Runtime Pack',
+            'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Windows requirements',
             'description' => 'Common Runtime Requirements For PC & Laptop Utilities',
             'links' => [

@@ -71,6 +71,10 @@
                                 {{ $links->count() }} download {{ $links->count() === 1 ? 'link' : 'links' }}
                             </dd>
                         </div>
+                        <div class="sm:col-span-2">
+                            <dt class="text-xs uppercase tracking-normal text-gray-500">Last updated</dt>
+                            <dd class="mt-1 text-gray-300">{{ $download['updated_at'] ?? 'Not set' }}</dd>
+                        </div>
                     </dl>
 
                     <div class="mt-auto grid gap-3 pt-5">
