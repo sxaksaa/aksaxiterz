@@ -14,7 +14,7 @@ class LicenseStockController extends Controller
 {
     public function index(Request $request)
     {
-        $stocks = LicenseStock::with(['product', 'package'])
+        $stocks = LicenseStock::with(['product', 'package', 'soldLicense.user'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $query->where('license_key', 'like', '%'.$request->search.'%');
             })
@@ -31,16 +31,33 @@ class LicenseStockController extends Controller
             ->withQueryString();
 
         $products = Product::orderBy('name')->get();
-        $packages = Package::with('product')->orderBy('product_id')->orderBy('price')->get();
+        $packages = Package::with('product')
+            ->withCount('availableLicenseStocks')
+            ->orderBy('product_id')
+            ->orderBy('price')
+            ->get();
         $editStock = $this->editableStock($request);
+        $lowStockThreshold = (int) config('admin.low_stock_threshold', 3);
+        $lowStockPackages = $packages
+            ->filter(fn ($package) => (int) $package->available_license_stocks_count <= $lowStockThreshold)
+            ->values();
 
         $stats = [
             'total' => LicenseStock::count(),
             'available' => LicenseStock::where('is_sold', false)->count(),
             'sold' => LicenseStock::where('is_sold', true)->count(),
+            'low_stock' => $lowStockPackages->count(),
         ];
 
-        return view('admin.license-stocks.index', compact('stocks', 'products', 'packages', 'editStock', 'stats'));
+        return view('admin.license-stocks.index', compact(
+            'stocks',
+            'products',
+            'packages',
+            'editStock',
+            'stats',
+            'lowStockPackages',
+            'lowStockThreshold'
+        ));
     }
 
     public function store(Request $request)

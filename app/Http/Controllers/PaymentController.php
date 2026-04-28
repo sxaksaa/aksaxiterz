@@ -672,6 +672,7 @@ class PaymentController extends Controller
 
         $stock->update([
             'is_sold' => true,
+            'sold_at' => now(),
         ]);
 
         $order->update([

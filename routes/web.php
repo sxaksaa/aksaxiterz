@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\LicenseStockController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PaymentController;
 use App\Models\Category;
 use App\Models\License;
@@ -283,6 +284,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');
         Route::delete('/license-stocks/{licenseStock}', [LicenseStockController::class, 'destroy'])->name('license-stocks.destroy');
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
 
 /*

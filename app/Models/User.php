@@ -54,4 +54,14 @@ class User extends Authenticatable
 
         return $email !== '' && in_array($email, config('admin.emails', []), true);
     }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function licenses()
+    {
+        return $this->hasMany(License::class);
+    }
 }
