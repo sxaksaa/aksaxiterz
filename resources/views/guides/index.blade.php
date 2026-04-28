@@ -7,7 +7,7 @@
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Public Guides</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                        Setup notes and Windows fixes for smoother installs.
+                        Some Guides to Fix Windows Problems.
                     </h1>
                     <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Practical tutorials for preparation, troubleshooting, cleanup, and common setup issues.
@@ -30,7 +30,7 @@
             <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Knowledge Base</p>
             <h2 class="text-2xl font-semibold text-white">Choose a guide</h2>
             <p class="max-w-2xl text-sm leading-6 text-gray-400">
-                Open a guide and follow each step in order. Screenshots can be added later per step.
+                Open a guide and follow each step in order.
             </p>
         </div>
 
