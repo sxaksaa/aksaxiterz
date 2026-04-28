@@ -102,6 +102,33 @@ Route::get('/downloads', function () {
     return view('downloads', compact('downloads', 'discordUrl'));
 });
 
+Route::get('/guides', function () {
+    $guides = collect(config('guides.items', []))
+        ->filter(fn ($guide) => filled($guide['slug'] ?? null) && filled($guide['title'] ?? null))
+        ->values();
+
+    return view('guides.index', [
+        'guides' => $guides,
+        'updatedAt' => config('guides.updated_at'),
+    ]);
+})->name('guides.index');
+
+Route::get('/guides/{slug}', function (string $slug) {
+    $guide = collect(config('guides.items', []))
+        ->firstWhere('slug', $slug);
+
+    abort_if(! $guide, 404);
+
+    return view('guides.show', [
+        'guide' => $guide,
+        'relatedGuides' => collect(config('guides.items', []))
+            ->where('slug', '!=', $slug)
+            ->take(3)
+            ->values(),
+        'updatedAt' => config('guides.updated_at'),
+    ]);
+})->name('guides.show');
+
 $legalPage = function (string $slug) {
     $page = config("legal.pages.{$slug}");
 

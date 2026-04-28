@@ -4,7 +4,7 @@ bg-[#111115]/80 backdrop-blur-md
 border-b border-[#27272A] transition-transform duration-300">
 
 
-    <div class="w-full px-4 md:px-12 py-4 flex items-center justify-between relative">
+    <div class="grid w-full grid-cols-[auto_1fr_auto] items-center px-4 py-4 md:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)] md:px-12">
 
         <!-- LOGO -->
         <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
@@ -14,10 +14,14 @@ border-b border-[#27272A] transition-transform duration-300">
         </a>
 
         <!-- MENU DESKTOP -->
-        <div id="navMenu" class="hidden md:flex absolute left-1/2 -translate-x-1/2 gap-10 text-sm">
+        <div id="navMenu" class="relative hidden justify-self-center md:flex gap-8 lg:gap-10 text-sm">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
                 Products
+            </a>
+
+            <a href="{{ route('guides.index') }}" class="nav-item {{ request()->is('guides*') ? 'active' : '' }}">
+                Guides
             </a>
 
             <a href="/downloads" class="nav-item {{ request()->is('downloads*') ? 'active' : '' }}">
@@ -31,14 +35,6 @@ border-b border-[#27272A] transition-transform duration-300">
                 <a href="/licenses" class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
                     Licenses
                 </a>
-                @if (auth()->user()?->isAdmin())
-                    <a href="/admin/license-stocks" class="nav-item {{ request()->is('admin/license-stocks*') ? 'active' : '' }}">
-                        Admin
-                    </a>
-                    <a href="{{ route('admin.users.index') }}" class="nav-item {{ request()->is('admin/users*') ? 'active' : '' }}">
-                        Users
-                    </a>
-                @endif
             @endauth
 
             <span id="navIndicator" class="nav-indicator"></span>
@@ -46,7 +42,7 @@ border-b border-[#27272A] transition-transform duration-300">
         </div>
 
         <!-- RIGHT -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center justify-end gap-3">
             @php $discordUrl = config('links.discord_url'); @endphp
 
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
@@ -91,6 +87,19 @@ border-b border-[#27272A] transition-transform duration-300">
                             {{ $user->name }}
                         </div>
 
+                        @if ($user->isAdmin())
+                            <div class="border-b border-[#27272A]">
+                                <a href="{{ route('admin.license-stocks.index') }}"
+                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    Admin Stock
+                                </a>
+                                <a href="{{ route('admin.users.index') }}"
+                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    Users
+                                </a>
+                            </div>
+                        @endif
+
                         <form action="/logout" method="POST">
                             @csrf
                             <button
@@ -128,6 +137,7 @@ transition-all duration-300 ease-out">
     <div class="flex flex-col gap-4 text-sm">
 
         <a href="/" onclick="toggleMobileMenu(event)" class="nav-item">Products</a>
+        <a href="{{ route('guides.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Guides</a>
         <a href="/downloads" onclick="toggleMobileMenu(event)" class="nav-item">Downloads</a>
 
         @auth
@@ -217,7 +227,7 @@ transition-all duration-300 ease-out">
     /* MOBILE MENU */
     function toggleMobileMenu(e) {
         const menu = document.getElementById('mobileMenu');
-        const btn = e.currentTarget;
+        const btn = document.getElementById('menuBtn');
 
         mobileOpen = !mobileOpen;
 

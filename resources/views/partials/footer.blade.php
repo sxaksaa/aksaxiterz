@@ -21,6 +21,7 @@
                 <h2 class="text-sm font-semibold text-white">Quick Links</h2>
                 <div class="mt-3 grid gap-2 text-sm">
                     <a href="/" class="footer-link">Products</a>
+                    <a href="{{ route('guides.index') }}" class="footer-link">Guides</a>
                     <a href="/downloads" class="footer-link">Downloads</a>
                     @auth
                         <a href="/orders" class="footer-link">Orders</a>
