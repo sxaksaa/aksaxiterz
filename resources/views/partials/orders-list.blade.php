@@ -12,14 +12,15 @@
             $isPakasir = ! $isCrypto;
             $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
             $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
+            $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
             $canSyncCrypto = $isCrypto &&
                 $order->status === 'pending' &&
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay());
             $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
-            $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
-            $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
+            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
             $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
             $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
@@ -72,6 +73,9 @@
                 </div>
                 <div class="text-right">
                     <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
+                    @if ($hasCryptoMismatch)
+                        <div class="mt-1 text-xs text-red-300">Contact support</div>
+                    @endif
                     @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
                             <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
@@ -199,14 +203,15 @@
                         $isPakasir = ! $isCrypto;
                         $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
                         $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
+                        $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
                         $canSyncCrypto = $isCrypto &&
                             $order->status === 'pending' &&
                             $order->created_at &&
                             $order->created_at->gt(now()->subDay());
                         $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
-                        $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
-                        $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
+                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
                         $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
                         $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
@@ -275,6 +280,9 @@
                         </td>
                         <td class="p-4">
                             <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
+                            @if ($hasCryptoMismatch)
+                                <div class="mt-1 text-xs text-red-300">Contact support</div>
+                            @endif
                             @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
                                     <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>

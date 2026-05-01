@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\LicenseStock;
+use App\Services\DirectCryptoOrderVerifier;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
@@ -63,3 +64,16 @@ Artisan::command('license-stocks:purge-unsold {--execute : Delete the matching u
 
     return self::SUCCESS;
 })->purpose('Safely purge unsold placeholder license stocks without touching sold licenses');
+
+Artisan::command('orders:scan-crypto {--limit=50 : Maximum pending crypto orders to scan}', function () {
+    $limit = max(1, (int) $this->option('limit'));
+    $summary = app(DirectCryptoOrderVerifier::class)->scanPending($limit);
+
+    $this->info('Direct crypto scan complete.');
+    $this->line("Checked: {$summary['checked']}");
+    $this->line("Paid: {$summary['paid']}");
+    $this->line("Amount mismatch: {$summary['mismatch']}");
+    $this->line("Still pending: {$summary['pending']}");
+
+    return self::SUCCESS;
+})->purpose('Scan pending direct USDT orders and fulfill exact on-chain matches');

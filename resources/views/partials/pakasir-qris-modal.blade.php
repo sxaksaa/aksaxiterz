@@ -37,13 +37,10 @@
             </div>
         </div>
 
-        <div class="mt-5 grid gap-2 sm:grid-cols-2">
+        <div class="mt-5">
             <button type="button" id="aksaQrisCheck" data-qris-check class="order-action w-full">
                 Check Payment
             </button>
-            <a id="aksaQrisFallback" href="#" target="_blank" rel="noopener" class="order-action w-full">
-                Open QRIS Page
-            </a>
         </div>
     </section>
 </div>

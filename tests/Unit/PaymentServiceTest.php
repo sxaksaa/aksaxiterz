@@ -96,4 +96,50 @@ class PaymentServiceTest extends TestCase
         $this->assertSame('0xabc', $transfer['tx_hash'] ?? null);
         $this->assertSame('usdtbsc', $transfer['network'] ?? null);
     }
+
+    public function test_direct_bep20_scanner_reports_amount_mismatch(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.api_url' => 'https://api.etherscan.io/v2/api',
+            'services.crypto_direct.networks.usdtbsc.api_key' => 'test-key',
+            'services.crypto_direct.networks.usdtbsc.chain_id' => 56,
+        ]);
+
+        Http::fake([
+            'https://api.etherscan.io/v2/api*' => Http::response([
+                'status' => '1',
+                'message' => 'OK',
+                'result' => [
+                    [
+                        'hash' => '0xunderpaid',
+                        'timeStamp' => (string) now()->timestamp,
+                        'contractAddress' => '0x55d398326f99059ff775485246999027b3197955',
+                        'to' => '0x1111111111111111111111111111111111111111',
+                        'value' => '1000000000000000000',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-CHAIN',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtbsc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '1.100123',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $inspection = (new PaymentService)->inspectDirectCryptoPayment($order);
+
+        $this->assertNull($inspection['transfer']);
+        $this->assertSame('0xunderpaid', $inspection['mismatches'][0]['tx_hash'] ?? null);
+        $this->assertSame('1.100123', $inspection['mismatches'][0]['expected_amount'] ?? null);
+        $this->assertSame('1', $inspection['mismatches'][0]['received_amount'] ?? null);
+    }
 }

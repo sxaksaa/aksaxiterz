@@ -8,6 +8,7 @@
         $isDirectCrypto = $order->payment_method === 'crypto' && ($payload['type'] ?? null) === 'direct_crypto';
         $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
         $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
+        $amountMismatch = is_array($payload['amount_mismatch'] ?? null) ? $payload['amount_mismatch'] : null;
         $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
         $createdAt = $order->created_at?->timezone(config('app.timezone'));
         $expiresAt = $order->expired_at?->timezone(config('app.timezone'));
@@ -117,7 +118,7 @@
                         <form action="{{ route('admin.orders.mark-paid', $order) }}" method="POST">
                             @csrf
                             <button class="order-action" onclick="return confirm('Mark this order as paid and deliver a license?')">
-                                Mark Paid
+                                {{ $isDirectCrypto ? 'Mark Paid Manually' : 'Mark Paid' }}
                             </button>
                         </form>
                     @endif
@@ -135,6 +136,15 @@
                         </a>
                     @endif
                 </div>
+
+                @if ($isDirectCrypto && ! $isPaid)
+                    <div class="crypto-payment-warning mt-5">
+                        <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Manual Override</p>
+                        <p class="mt-1 text-xs leading-5 text-gray-300">
+                            Use Mark Paid Manually only after checking the Binance deposit record yourself. This will deliver the license even if the scanner has not matched the exact on-chain amount.
+                        </p>
+                    </div>
+                @endif
             </section>
 
             <div class="grid gap-6">
@@ -162,25 +172,69 @@
 
                 <section class="product-section fade-up">
                     <div class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Provider</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ $isDirectCrypto ? 'Crypto Scanner' : 'Provider' }}</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Payment Data</h2>
                     </div>
 
                     <div class="grid gap-3 text-sm">
-                        <div class="qris-detail-row">
-                            <span>Payment URL</span>
-                            <span class="max-w-[260px] truncate text-right text-gray-200">{{ $order->payment_url ?: '-' }}</span>
-                        </div>
-                        <div class="qris-detail-row">
-                            <span>Provider method</span>
-                            <span class="text-right text-gray-200">{{ $payload['payment_method'] ?? $order->payment_method ?? '-' }}</span>
-                        </div>
-                        <div class="qris-detail-row">
-                            <span>Provider total</span>
-                            <span class="text-right text-gray-200">
-                                {{ isset($payload['total_payment']) ? 'Rp ' . number_format((int) $payload['total_payment']) : '-' }}
-                            </span>
-                        </div>
+                        @if ($isDirectCrypto)
+                            <div class="qris-detail-row">
+                                <span>Scanner status</span>
+                                <span class="text-right font-semibold {{ ($payload['scanner_status'] ?? null) === 'amount_mismatch' ? 'text-red-300' : 'text-gray-200' }}">
+                                    {{ str_replace('_', ' ', ucfirst($payload['scanner_status'] ?? 'waiting')) }}
+                                </span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Network</span>
+                                <span class="text-right text-gray-200">{{ $payload['network_label'] ?? $payload['network'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row qris-total-row">
+                                <span>Expected amount</span>
+                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} USDT</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Receive address</span>
+                                <span class="max-w-[260px] truncate text-right font-mono text-xs text-gray-200">{{ $payload['address'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Contract</span>
+                                <span class="max-w-[260px] truncate text-right font-mono text-xs text-gray-500">{{ $payload['contract'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Matched tx</span>
+                                <span class="max-w-[260px] truncate text-right font-mono text-xs text-gray-200">{{ $payload['tx_hash'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Last checked</span>
+                                <span class="text-right text-gray-200">{{ ! empty($payload['last_checked_at']) ? \Carbon\Carbon::parse($payload['last_checked_at'])->timezone(config('app.timezone'))->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
+                            </div>
+                            @if ($amountMismatch)
+                                <div class="crypto-payment-warning">
+                                    <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Amount Mismatch</p>
+                                    <p class="mt-1 text-xs leading-5 text-gray-300">
+                                        Expected {{ $amountMismatch['expected_amount'] ?? '-' }} USDT, received {{ $amountMismatch['received_amount'] ?? '-' }} USDT.
+                                    </p>
+                                    <p class="mt-1 break-all font-mono text-[11px] text-[#F5D0FE]">
+                                        {{ $amountMismatch['tx_hash'] ?? '-' }}
+                                    </p>
+                                </div>
+                            @endif
+                        @else
+                            <div class="qris-detail-row">
+                                <span>Payment URL</span>
+                                <span class="max-w-[260px] truncate text-right text-gray-200">{{ $order->payment_url ?: '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Provider method</span>
+                                <span class="text-right text-gray-200">{{ $payload['payment_method'] ?? $order->payment_method ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Provider total</span>
+                                <span class="text-right text-gray-200">
+                                    {{ isset($payload['total_payment']) ? 'Rp ' . number_format((int) $payload['total_payment']) : '-' }}
+                                </span>
+                            </div>
+                        @endif
                     </div>
                 </section>
             </div>

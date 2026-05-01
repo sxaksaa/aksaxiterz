@@ -34,8 +34,20 @@
                 </div>
             </div>
             <div class="qris-detail-row crypto-address-row">
-                <span>Contract</span>
+                <span>Token contract</span>
                 <span id="aksaCryptoContract" class="min-w-0 truncate text-right font-mono text-[11px] text-gray-500">-</span>
+            </div>
+            <div class="crypto-payment-warning">
+                <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
+                <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
+                    Send exactly the amount shown above. Network/exchange fee is not included.
+                </p>
+                <p class="mt-1 text-xs leading-5 text-gray-300">
+                    The received USDT amount must match this invoice amount, or the order will stay pending.
+                </p>
+                <p class="mt-2 text-xs font-semibold leading-5 text-white">
+                    Do not use Binance Pay or internal exchange transfer. Send through the selected network only.
+                </p>
             </div>
             <div class="qris-detail-row">
                 <span>Order ID</span>
@@ -43,12 +55,17 @@
             </div>
             <div class="qris-detail-row">
                 <span>Expires</span>
-                <span id="aksaCryptoExpires" class="text-right text-gray-300">-</span>
+                <span id="aksaCryptoExpires" class="text-right font-mono text-xs text-[#D8B4FE]" data-expire="">-</span>
             </div>
         </div>
 
-        <div class="mt-5 grid gap-2 sm:grid-cols-2">
-            <button type="button" id="aksaCryptoCheck" data-crypto-check class="order-action w-full">
+        <label class="crypto-confirm-row mt-5">
+            <input type="checkbox" id="aksaCryptoAcknowledge" data-crypto-ack>
+            <span>I sent the exact amount through the selected network.</span>
+        </label>
+
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <button type="button" id="aksaCryptoCheck" data-crypto-check class="order-action w-full opacity-60 pointer-events-none" disabled>
                 Check Payment
             </button>
             <a href="/orders" class="order-action w-full">

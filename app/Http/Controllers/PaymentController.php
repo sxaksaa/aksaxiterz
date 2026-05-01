@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\License;
 use App\Models\Order;
+use App\Services\DirectCryptoOrderVerifier;
 use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class PaymentController extends Controller
 
     public function __construct(
         PaymentService $paymentService,
+        private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
         private readonly OrderFulfillmentService $orderFulfillmentService
     )
     {
@@ -234,82 +236,10 @@ class PaymentController extends Controller
             ], $order));
         }
 
-        if ($this->isDirectCryptoOrder($order)) {
-            return $this->syncDirectCryptoOrder($request, $order);
-        }
+        $result = $this->directCryptoOrderVerifier->verify($order);
+        $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
 
-        return $this->syncPaymentResponse($request, [
-            'order_id' => $order->order_id,
-            'status' => $order->status,
-            'message' => 'This crypto order uses the old checkout flow. Please cancel it and start a new USDT address checkout.',
-        ], 202);
-    }
-
-    private function syncDirectCryptoOrder(Request $request, Order $order)
-    {
-        try {
-            $transfer = $this->paymentService->findDirectCryptoTransfer($order);
-
-            if (! $transfer) {
-                return $this->syncPaymentResponse($request, [
-                    'order_id' => $order->order_id,
-                    'status' => $order->fresh()->status,
-                    'message' => 'Crypto payment is still being verified.',
-                ], 202);
-            }
-
-            DB::beginTransaction();
-
-            $lockedOrder = Order::whereKey($order->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (! $this->isDirectCryptoOrder($lockedOrder)) {
-                DB::rollBack();
-
-                return $this->syncPaymentResponse($request, [
-                    'error' => 'Crypto order data does not match this checkout.',
-                ], 403);
-            }
-
-            if ($lockedOrder->status !== 'paid') {
-                $paymentPayload = $lockedOrder->payment_payload;
-                $paymentPayload['tx_hash'] = $transfer['tx_hash'] ?? null;
-                $paymentPayload['paid_at'] = now()->toIso8601String();
-
-                if (! empty($transfer['confirmed_at']) && $transfer['confirmed_at'] instanceof \DateTimeInterface) {
-                    $paymentPayload['confirmed_at'] = $transfer['confirmed_at']->format(DATE_ATOM);
-                }
-
-                $lockedOrder->update([
-                    'payment_payload' => $paymentPayload,
-                ]);
-
-                $this->orderFulfillmentService->fulfill($lockedOrder);
-            }
-
-            DB::commit();
-
-            return $this->syncPaymentResponse($request, $this->withLicensePayload([
-                'order_id' => $lockedOrder->order_id,
-                'status' => $lockedOrder->fresh()->status,
-                'tx_hash' => $transfer['tx_hash'] ?? null,
-            ], $lockedOrder));
-        } catch (\Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
-            Log::warning('DIRECT CRYPTO SYNC ERROR: '.$e->getMessage(), [
-                'order_id' => $order->order_id,
-            ]);
-
-            return $this->syncPaymentResponse($request, [
-                'order_id' => $order->order_id,
-                'status' => $order->fresh()->status,
-                'message' => $this->publicCryptoSyncError($e),
-            ], 202);
-        }
+        return $this->syncPaymentResponse($request, $result, $status);
     }
 
     /*
@@ -573,32 +503,6 @@ class PaymentController extends Controller
         $payload['license_key'] = $license->license_key;
 
         return $payload;
-    }
-
-    private function publicCryptoSyncError(\Exception $error): string
-    {
-        if ($error->getMessage() === 'No license stock available for this package') {
-            return 'Payment is verified, but no license stock is available for this package.';
-        }
-
-        if ($error->getMessage() === 'Unable to verify crypto payment') {
-            return 'Crypto network API could not be reached. Please try Verify again.';
-        }
-
-        if ($error->getMessage() === 'Direct crypto checkout is not configured') {
-            return 'Crypto checkout is not configured yet.';
-        }
-
-        return 'Crypto payment is still being verified.';
-    }
-
-    private function isDirectCryptoOrder(Order $order): bool
-    {
-        $payload = $order->payment_payload;
-
-        return $order->payment_method === 'crypto' &&
-            is_array($payload) &&
-            ($payload['type'] ?? null) === 'direct_crypto';
     }
 
     private function applyPakasirStatus(Order $order, array $payload): void

@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 let appToastTimer = null;
 let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
+let cryptoExpiryCountdownTimer = null;
 
 window.renderAksaQrCode = async function(target, value, options = {}) {
     const canvas = typeof target === 'string' ? document.querySelector(target) : target;
@@ -58,6 +59,33 @@ function formatQrisExpiry(value) {
         hour: '2-digit',
         minute: '2-digit',
     });
+}
+
+function formatCountdown(value) {
+    if (!value) return '-';
+
+    const expireTime = new Date(value).getTime();
+
+    if (Number.isNaN(expireTime)) {
+        return '-';
+    }
+
+    const diff = expireTime - Date.now();
+
+    if (diff <= 0) {
+        return 'Expired';
+    }
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${seconds}s`;
+    }
+
+    return `${minutes}m ${seconds}s`;
 }
 
 function formatCryptoAmount(amount, token = 'USDT') {
@@ -178,6 +206,30 @@ function startCryptoPolling(orderId) {
     }, 8000);
 }
 
+function stopCryptoExpiryCountdown() {
+    if (cryptoExpiryCountdownTimer) {
+        clearInterval(cryptoExpiryCountdownTimer);
+        cryptoExpiryCountdownTimer = null;
+    }
+}
+
+function startCryptoExpiryCountdown(value) {
+    const element = document.getElementById('aksaCryptoExpires');
+
+    if (!element) return;
+
+    stopCryptoExpiryCountdown();
+    element.dataset.expire = value || '';
+
+    const update = () => {
+        element.innerText = formatCountdown(value);
+        element.classList.toggle('text-red-300', element.innerText === 'Expired');
+    };
+
+    update();
+    cryptoExpiryCountdownTimer = setInterval(update, 1000);
+}
+
 window.openAksaQrisModal = async function(checkout, options = {}) {
     const modal = document.getElementById('aksaQrisModal');
     const payment = checkout?.pakasir_payment;
@@ -193,13 +245,6 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
     document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
     document.getElementById('aksaQrisExpires').innerText = formatQrisExpiry(payment.expired_at);
-
-    const fallback = document.getElementById('aksaQrisFallback');
-
-    if (fallback) {
-        fallback.href = checkout.payment_url || '#';
-        fallback.classList.toggle('hidden', !checkout.payment_url);
-    }
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -242,10 +287,12 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
     document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, payment.token || 'USDT');
     document.getElementById('aksaCryptoAddress').innerText = payment.address || '-';
     document.getElementById('aksaCryptoContract').innerText = payment.contract || '-';
-    document.getElementById('aksaCryptoExpires').innerText = formatQrisExpiry(payment.expired_at);
+    startCryptoExpiryCountdown(payment.expired_at);
 
     const copyAddress = document.getElementById('aksaCryptoCopyAddress');
     const copyAmount = document.getElementById('aksaCryptoCopyAmount');
+    const acknowledgement = document.getElementById('aksaCryptoAcknowledge');
+    const checkButton = document.getElementById('aksaCryptoCheck');
 
     if (copyAddress) {
         copyAddress.dataset.copyValue = payment.address || '';
@@ -259,11 +306,20 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
         copyAmount.dataset.copyMessage = 'Paste the exact USDT amount in your wallet.';
     }
 
+    if (acknowledgement) {
+        acknowledgement.checked = false;
+    }
+
+    if (checkButton) {
+        checkButton.disabled = true;
+        checkButton.classList.add('opacity-60', 'pointer-events-none');
+    }
+
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
 
-    if (options.startPolling !== false && cryptoState.orderId) {
+    if (options.startPolling === true && cryptoState.orderId) {
         startCryptoPolling(cryptoState.orderId);
     }
 
@@ -276,6 +332,7 @@ window.closeAksaCryptoModal = function() {
     if (!modal) return;
 
     stopCryptoPolling();
+    stopCryptoExpiryCountdown();
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('overflow-hidden');
@@ -500,6 +557,15 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !cryptoState.orderId) return;
 
+    const acknowledgement = document.getElementById('aksaCryptoAcknowledge');
+
+    if (acknowledgement && !acknowledgement.checked) {
+        window.showAppToast?.('Confirm first', 'Confirm that you sent the exact amount through the selected network.', {
+            variant: 'warning',
+        });
+        return;
+    }
+
     const originalText = button.innerText;
 
     button.disabled = true;
@@ -531,6 +597,20 @@ document.addEventListener('click', async (event) => {
         button.innerText = originalText || 'Check Payment';
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
+});
+
+document.addEventListener('change', (event) => {
+    const acknowledgement = event.target.closest('[data-crypto-ack]');
+
+    if (!acknowledgement) return;
+
+    const checkButton = document.getElementById('aksaCryptoCheck');
+
+    if (!checkButton) return;
+
+    checkButton.disabled = !acknowledgement.checked;
+    checkButton.classList.toggle('opacity-60', !acknowledgement.checked);
+    checkButton.classList.toggle('pointer-events-none', !acknowledgement.checked);
 });
 
 document.addEventListener('click', async (event) => {

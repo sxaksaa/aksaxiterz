@@ -111,14 +111,15 @@
             <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
 
                 <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtbsc">
+                    class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdtbsc">
                     <span class="font-bold text-white">BSC</span>
+                    <span class="crypto-network-badge">Recommended</span>
                     <span class="text-xs text-gray-500 ml-auto">BEP20</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
                 </div>
 
                 <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdttrc20">
+                    class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdttrc20">
                     <span class="font-bold text-white">TRX</span>
                     <span class="text-xs text-gray-500 ml-auto">TRC20</span>
                     <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>

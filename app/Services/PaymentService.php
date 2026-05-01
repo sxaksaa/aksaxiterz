@@ -183,29 +183,44 @@ class PaymentService
 
     public function findDirectCryptoTransfer(Order $order): ?array
     {
+        return $this->inspectDirectCryptoPayment($order)['transfer'] ?? null;
+    }
+
+    public function inspectDirectCryptoPayment(Order $order): array
+    {
         $payload = $order->payment_payload;
 
         if (! is_array($payload) || ($payload['type'] ?? null) !== 'direct_crypto') {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+            ];
         }
 
         $network = strtolower((string) ($payload['network'] ?? ''));
 
         return match ($network) {
-            'usdttrc20' => $this->findDirectTrc20Transfer($order, $payload),
-            'usdtbsc' => $this->findDirectBep20Transfer($order, $payload),
-            default => null,
+            'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
+            'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload),
+            default => [
+                'transfer' => null,
+                'mismatches' => [],
+            ],
         };
     }
 
-    private function findDirectTrc20Transfer(Order $order, array $payload): ?array
+    private function inspectDirectTrc20Transfers(Order $order, array $payload): array
     {
         $address = trim((string) ($payload['address'] ?? ''));
         $contract = trim((string) ($payload['contract'] ?? ''));
-        $requiredUnits = $this->decimalToTokenUnits($payload['amount'] ?? null, (int) ($payload['decimals'] ?? 6));
+        $decimals = (int) ($payload['decimals'] ?? 6);
+        $requiredUnits = $this->decimalToTokenUnits($payload['amount'] ?? null, $decimals);
 
         if ($address === '' || $contract === '' || $requiredUnits === null) {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+            ];
         }
 
         $network = $this->directCryptoNetwork('usdttrc20');
@@ -232,6 +247,7 @@ class PaymentService
 
         $transactions = $response->json('data') ?: [];
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
+        $mismatches = [];
 
         foreach ($transactions as $transaction) {
             if (! is_array($transaction)) {
@@ -252,34 +268,49 @@ class PaymentService
                 continue;
             }
 
-            if ($this->decimalStringCompare($value, $requiredUnits) !== 0) {
-                continue;
-            }
-
             if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
                 continue;
             }
 
-            return [
+            $transfer = [
                 'tx_hash' => (string) ($transaction['transaction_id'] ?? ''),
                 'network' => 'usdttrc20',
                 'amount_units' => $value,
+                'amount' => $this->tokenUnitsToDecimal($value, $decimals),
                 'to' => $actualTo,
                 'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
             ];
+
+            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+                return [
+                    'transfer' => $transfer,
+                    'mismatches' => $mismatches,
+                ];
+            }
+
+            if (count($mismatches) < 5) {
+                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
+            }
         }
 
-        return null;
+        return [
+            'transfer' => null,
+            'mismatches' => $mismatches,
+        ];
     }
 
-    private function findDirectBep20Transfer(Order $order, array $payload): ?array
+    private function inspectDirectBep20Transfers(Order $order, array $payload): array
     {
         $address = strtolower(trim((string) ($payload['address'] ?? '')));
         $contract = strtolower(trim((string) ($payload['contract'] ?? '')));
-        $requiredUnits = $this->decimalToTokenUnits($payload['amount'] ?? null, (int) ($payload['decimals'] ?? 18));
+        $decimals = (int) ($payload['decimals'] ?? 18);
+        $requiredUnits = $this->decimalToTokenUnits($payload['amount'] ?? null, $decimals);
 
         if (! $this->looksLikeEvmAddress($address) || ! $this->looksLikeEvmAddress($contract) || $requiredUnits === null) {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+            ];
         }
 
         $network = $this->directCryptoNetwork('usdtbsc');
@@ -305,10 +336,14 @@ class PaymentService
         $transactions = $data['result'] ?? [];
 
         if (! is_array($transactions)) {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+            ];
         }
 
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
+        $mismatches = [];
 
         foreach ($transactions as $transaction) {
             if (! is_array($transaction)) {
@@ -324,24 +359,35 @@ class PaymentService
                 continue;
             }
 
-            if ($this->decimalStringCompare($value, $requiredUnits) !== 0) {
-                continue;
-            }
-
             if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
                 continue;
             }
 
-            return [
+            $transfer = [
                 'tx_hash' => (string) ($transaction['hash'] ?? ''),
                 'network' => 'usdtbsc',
                 'amount_units' => $value,
+                'amount' => $this->tokenUnitsToDecimal($value, $decimals),
                 'to' => $actualTo,
                 'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
             ];
+
+            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+                return [
+                    'transfer' => $transfer,
+                    'mismatches' => $mismatches,
+                ];
+            }
+
+            if (count($mismatches) < 5) {
+                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
+            }
         }
 
-        return null;
+        return [
+            'transfer' => null,
+            'mismatches' => $mismatches,
+        ];
     }
 
     private function directCryptoNetwork(string $coin): array
@@ -385,6 +431,24 @@ class PaymentService
             'decimals' => (int) ($network['decimals'] ?? 6),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
+        ];
+    }
+
+    private function directCryptoMismatchPayload(array $transfer, array $payload): array
+    {
+        $actualAmount = (string) ($transfer['amount'] ?? '0');
+        $expectedAmount = (string) ($payload['amount'] ?? '0');
+
+        return [
+            'tx_hash' => (string) ($transfer['tx_hash'] ?? ''),
+            'network' => (string) ($payload['network'] ?? $transfer['network'] ?? ''),
+            'expected_amount' => $expectedAmount,
+            'received_amount' => $actualAmount,
+            'difference' => number_format(((float) $actualAmount) - ((float) $expectedAmount), 6, '.', ''),
+            'checked_at' => now()->toIso8601String(),
+            'confirmed_at' => ! empty($transfer['confirmed_at']) && $transfer['confirmed_at'] instanceof \DateTimeInterface
+                ? $transfer['confirmed_at']->format(DATE_ATOM)
+                : null,
         ];
     }
 
@@ -563,6 +627,22 @@ class PaymentService
         $number = ltrim($number, '0');
 
         return $number === '' ? '0' : $number;
+    }
+
+    private function tokenUnitsToDecimal(string $units, int $decimals): string
+    {
+        $units = $this->normalizeDecimalString($units);
+
+        if ($decimals <= 0) {
+            return $units;
+        }
+
+        $units = str_pad($units, $decimals + 1, '0', STR_PAD_LEFT);
+        $whole = substr($units, 0, -$decimals);
+        $fraction = substr($units, -$decimals);
+        $decimal = $whole.'.'.$fraction;
+
+        return rtrim(rtrim($decimal, '0'), '.') ?: '0';
     }
 
     private function gatewayCurlOptions(): array
