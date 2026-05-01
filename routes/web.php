@@ -187,7 +187,6 @@ Route::middleware('auth')->group(function () {
                 'order_id' => $order->order_id,
                 'payment_method' => $order->payment_method,
                 'can_sync_crypto' => $order->payment_method === 'crypto' &&
-                    (bool) $order->payment_url &&
                     $order->status === 'pending' &&
                     $order->created_at &&
                     $order->created_at->gt(now()->subDay()),
@@ -210,7 +209,6 @@ Route::middleware('auth')->group(function () {
             'order_id' => $order->order_id,
             'payment_method' => $order->payment_method,
             'can_sync_crypto' => $order->payment_method === 'crypto' &&
-                (bool) $order->payment_url &&
                 $order->status === 'pending' &&
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay()),
@@ -380,7 +378,6 @@ Route::get('/login', function () {
 */
 
 Route::post('/pakasir-callback', [PaymentController::class, 'pakasirCallback']);
-Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);
 
 Route::get('/success', function () {
     return redirect('/licenses');

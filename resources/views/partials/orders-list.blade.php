@@ -10,8 +10,9 @@
             $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
             $isCrypto = $order->payment_method === 'crypto';
             $isPakasir = ! $isCrypto;
+            $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+            $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
             $canSyncCrypto = $isCrypto &&
-                $order->payment_url &&
                 $order->status === 'pending' &&
                 $order->created_at &&
                 $order->created_at->gt(now()->subDay());
@@ -19,10 +20,12 @@
             $isPending = $order->status === 'pending' && ! $isExpired;
             $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
             $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
-            $methodLabel = $isCrypto ? 'Crypto (NOWPayments)' : 'QRIS';
+            $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
             $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
-            $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
-            $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+            $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
+            $priceLabel = $isCrypto ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price);
+            $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+            $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
             $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
             $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
@@ -39,9 +42,26 @@
                     'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
                 ],
             ];
+            $cryptoCheckout = [
+                'method' => 'crypto',
+                'order_id' => $order->order_id,
+                'payment_url' => $order->payment_url,
+                'crypto_payment' => [
+                    'token' => (string) ($cryptoPayload['token'] ?? 'USDT'),
+                    'network' => (string) ($cryptoPayload['network'] ?? ''),
+                    'network_label' => (string) ($cryptoPayload['network_label'] ?? 'USDT'),
+                    'network_short_label' => (string) ($cryptoPayload['network_short_label'] ?? ''),
+                    'address' => (string) ($cryptoPayload['address'] ?? ''),
+                    'contract' => (string) ($cryptoPayload['contract'] ?? ''),
+                    'amount' => (string) ($cryptoPayload['amount'] ?? $order->price),
+                    'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
+                    'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
+                    'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                ],
+            ];
             $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
             $canCancel = $order->status === 'pending';
-            $hasPaymentAction = $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
+            $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
         @endphp
 
         <article class="order-mobile-card motion-card">
@@ -94,6 +114,12 @@
 
             @if ($hasPaymentAction)
                 <div class="mt-4 flex flex-col gap-2">
+                    @if ($canOpenCryptoAddress)
+                        <button type="button" class="order-action open-crypto-address-button w-full" data-crypto-checkout='@json($cryptoCheckout)'>
+                            View Address
+                        </button>
+                    @endif
+
                     @if ($canSyncCrypto)
                         <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
                             @csrf
@@ -143,7 +169,6 @@
     <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
         <div>
             <h2 class="text-sm font-semibold text-white">Recent Orders</h2>
-            <p class="mt-1 text-xs text-gray-500">Auto-refreshes after checkout and payment retry.</p>
         </div>
         <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
             {{ method_exists($orders, 'total') ? $orders->total() : $orders->count() }} records
@@ -172,8 +197,9 @@
                         $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
                         $isCrypto = $order->payment_method === 'crypto';
                         $isPakasir = ! $isCrypto;
+                        $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+                        $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
                         $canSyncCrypto = $isCrypto &&
-                            $order->payment_url &&
                             $order->status === 'pending' &&
                             $order->created_at &&
                             $order->created_at->gt(now()->subDay());
@@ -181,10 +207,12 @@
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
                         $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
-                        $methodLabel = $isCrypto ? 'Crypto (NOWPayments)' : 'QRIS';
+                        $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
                         $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
-                        $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
-                        $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+                        $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
+                        $priceLabel = $isCrypto ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price);
+                        $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+                        $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
                         $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
                         $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
@@ -201,9 +229,26 @@
                                 'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
                             ],
                         ];
+                        $cryptoCheckout = [
+                            'method' => 'crypto',
+                            'order_id' => $order->order_id,
+                            'payment_url' => $order->payment_url,
+                            'crypto_payment' => [
+                                'token' => (string) ($cryptoPayload['token'] ?? 'USDT'),
+                                'network' => (string) ($cryptoPayload['network'] ?? ''),
+                                'network_label' => (string) ($cryptoPayload['network_label'] ?? 'USDT'),
+                                'network_short_label' => (string) ($cryptoPayload['network_short_label'] ?? ''),
+                                'address' => (string) ($cryptoPayload['address'] ?? ''),
+                                'contract' => (string) ($cryptoPayload['contract'] ?? ''),
+                                'amount' => (string) ($cryptoPayload['amount'] ?? $order->price),
+                                'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
+                                'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
+                                'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                            ],
+                        ];
                         $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
                         $canCancel = $order->status === 'pending';
-                        $hasPaymentAction = $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
+                        $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
                     @endphp
 
                     <tr class="orders-table-row">
@@ -241,6 +286,11 @@
                                 @if (! $hasPaymentAction)
                                     <span class="text-xs text-gray-600">-</span>
                                 @elseif ($canSyncCrypto)
+                                    @if ($canOpenCryptoAddress)
+                                        <button type="button" class="order-action open-crypto-address-button" data-crypto-checkout='@json($cryptoCheckout)'>
+                                            Address
+                                        </button>
+                                    @endif
                                     <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">

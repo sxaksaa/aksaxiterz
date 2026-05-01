@@ -87,14 +87,10 @@ class PaymentController extends Controller
             );
 
             if ($this->wantsPaymentJson($request)) {
-                return response()->json([
-                    'method' => 'crypto',
-                    'payment_url' => $payment['payment_url'],
-                    'order_id' => $payment['order']->order_id,
-                ]);
+                return response()->json($this->cryptoCheckoutPayload($payment['order']));
             }
 
-            return redirect($payment['payment_url']);
+            return redirect('/orders');
         } catch (\Exception $e) {
             $newOrder->update(['status' => 'cancelled']);
 
@@ -238,63 +234,26 @@ class PaymentController extends Controller
             ], $order));
         }
 
-        $paymentId = $this->nowpaymentsPaymentIdFromRequest($request) ?? $this->nowpaymentsPaymentId($order);
-        $payload = null;
+        if ($this->isDirectCryptoOrder($order)) {
+            return $this->syncDirectCryptoOrder($request, $order);
+        }
 
+        return $this->syncPaymentResponse($request, [
+            'order_id' => $order->order_id,
+            'status' => $order->status,
+            'message' => 'This crypto order uses the old checkout flow. Please cancel it and start a new USDT address checkout.',
+        ], 202);
+    }
+
+    private function syncDirectCryptoOrder(Request $request, Order $order)
+    {
         try {
-            if (! $paymentId) {
-                $invoiceId = $this->nowpaymentsInvoiceId($order);
+            $transfer = $this->paymentService->findDirectCryptoTransfer($order);
 
-                if ($invoiceId) {
-                    $payload = $this->paymentService->findNowpaymentsPaymentByInvoice($invoiceId, $order->order_id);
-                    $paymentId = $payload['payment_id'] ?? null;
-                }
-            }
-
-            if (! $paymentId) {
-                return $this->syncPaymentResponse($request, [
-                    'order_id' => $order->order_id,
-                    'status' => $order->status,
-                    'message' => 'Payment is not visible from NOWPayments yet. Please click Verify again after the invoice updates.',
-                ], 202);
-            }
-
-            if (! $payload) {
-                $payload = $this->paymentService->getNowpaymentsPayment($paymentId);
-            }
-
-            $this->rememberNowpaymentsPaymentId($order, (string) $paymentId);
-
-            if (! $this->validNowpaymentsOrderPayload($order, $payload)) {
-                Log::warning('CRYPTO SYNC INVALID PAYLOAD', [
-                    'order_id' => $order->order_id,
-                    'payment_id' => $paymentId,
-                    'order_price' => (string) $order->price,
-                    'provider_order_id' => $payload['order_id'] ?? null,
-                    'provider_price_amount' => $payload['price_amount'] ?? null,
-                    'provider_price_currency' => $payload['price_currency'] ?? null,
-                    'provider_status' => $payload['payment_status'] ?? null,
-                ]);
-
-                return $this->syncPaymentResponse($request, [
-                    'error' => 'NOWPayments data does not match this order.',
-                ], 403);
-            }
-
-            $providerStatus = strtolower((string) ($payload['payment_status'] ?? ''));
-            $chainTransfer = null;
-            $paymentVerified = $providerStatus === 'finished';
-
-            if (! $paymentVerified) {
-                $chainTransfer = $this->paymentService->findUsdtBscInvoiceTransfer($payload);
-                $paymentVerified = $chainTransfer !== null;
-            }
-
-            if (! $paymentVerified) {
+            if (! $transfer) {
                 return $this->syncPaymentResponse($request, [
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
-                    'provider_status' => $providerStatus,
                     'message' => 'Crypto payment is still being verified.',
                 ], 202);
             }
@@ -305,41 +264,44 @@ class PaymentController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $this->validNowpaymentsOrderPayload($lockedOrder, $payload)) {
+            if (! $this->isDirectCryptoOrder($lockedOrder)) {
                 DB::rollBack();
 
                 return $this->syncPaymentResponse($request, [
-                    'error' => 'NOWPayments data does not match this order.',
+                    'error' => 'Crypto order data does not match this checkout.',
                 ], 403);
             }
 
             if ($lockedOrder->status !== 'paid') {
+                $paymentPayload = $lockedOrder->payment_payload;
+                $paymentPayload['tx_hash'] = $transfer['tx_hash'] ?? null;
+                $paymentPayload['paid_at'] = now()->toIso8601String();
+
+                if (! empty($transfer['confirmed_at']) && $transfer['confirmed_at'] instanceof \DateTimeInterface) {
+                    $paymentPayload['confirmed_at'] = $transfer['confirmed_at']->format(DATE_ATOM);
+                }
+
+                $lockedOrder->update([
+                    'payment_payload' => $paymentPayload,
+                ]);
+
                 $this->orderFulfillmentService->fulfill($lockedOrder);
             }
 
             DB::commit();
 
-            if ($chainTransfer) {
-                Log::info('CRYPTO ON-CHAIN FALLBACK VERIFIED', [
-                    'order_id' => $lockedOrder->order_id,
-                    'tx_hash' => $chainTransfer['tx_hash'] ?? null,
-                ]);
-            }
-
             return $this->syncPaymentResponse($request, $this->withLicensePayload([
                 'order_id' => $lockedOrder->order_id,
                 'status' => $lockedOrder->fresh()->status,
-                'provider_status' => $providerStatus,
-                'tx_hash' => $chainTransfer['tx_hash'] ?? null,
+                'tx_hash' => $transfer['tx_hash'] ?? null,
             ], $lockedOrder));
         } catch (\Exception $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
 
-            Log::warning('CRYPTO SYNC ERROR: '.$e->getMessage(), [
+            Log::warning('DIRECT CRYPTO SYNC ERROR: '.$e->getMessage(), [
                 'order_id' => $order->order_id,
-                'payment_id' => $paymentId,
             ]);
 
             return $this->syncPaymentResponse($request, [
@@ -439,14 +401,10 @@ class PaymentController extends Controller
             );
 
             if ($this->wantsPaymentJson($request)) {
-                return response()->json([
-                    'method' => 'crypto',
-                    'payment_url' => $payment['payment_url'],
-                    'order_id' => $payment['order']->order_id,
-                ]);
+                return response()->json($this->cryptoCheckoutPayload($payment['order']));
             }
 
-            return redirect($payment['payment_url']);
+            return redirect('/orders');
         } catch (\Exception $e) {
 
             Log::error('CRYPTO ERROR: '.$e->getMessage());
@@ -479,77 +437,6 @@ class PaymentController extends Controller
             'status' => 'cancelled',
             'message' => 'Order cancelled. You can start a new checkout now.',
         ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CRYPTO CALLBACK
-    |--------------------------------------------------------------------------
-    */
-
-    public function cryptoCallback(Request $request)
-    {
-        $signature = $request->header('x-nowpayments-sig');
-        $ipnSecret = config('services.nowpayments.ipn_secret');
-
-        if (! $ipnSecret) {
-            Log::error('NOWPayments CALLBACK ERROR: missing IPN secret');
-
-            return response()->json(['error' => 'server not configured'], 500);
-        }
-
-        $data = json_decode($request->getContent(), true);
-
-        if (! is_array($data)) {
-            return response()->json(['error' => 'invalid payload'], 400);
-        }
-
-        $expected = $this->nowpaymentsSignature($data, $ipnSecret);
-
-        if (! $signature || ! hash_equals($expected, $signature)) {
-            return response()->json(['error' => 'invalid signature'], 403);
-        }
-
-        if (($data['payment_status'] ?? '') !== 'finished') {
-            return response()->json(['status' => 'not finished']);
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $order = Order::where('order_id', $data['order_id'] ?? null)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (
-                $order->payment_method !== 'crypto' ||
-                strtolower((string) ($data['price_currency'] ?? '')) !== 'usd' ||
-                ! $this->sameAmount($data['price_amount'] ?? null, $order->price)
-            ) {
-                DB::rollBack();
-
-                return response()->json(['error' => 'invalid amount'], 403);
-            }
-
-            if ($order->status === 'paid') {
-                DB::commit();
-
-                return response()->json(['status' => 'already']);
-            }
-
-            $this->orderFulfillmentService->fulfill($order);
-
-            DB::commit();
-
-            return response()->json(['status' => 'success']);
-        } catch (\Exception $e) {
-
-            DB::rollBack();
-
-            Log::error('CRYPTO CALLBACK ERROR: '.$e->getMessage());
-
-            return response()->json(['error' => 'failed'], 500);
-        }
     }
 
     /*
@@ -600,6 +487,16 @@ class PaymentController extends Controller
         ];
     }
 
+    private function cryptoCheckoutPayload(Order $order): array
+    {
+        return [
+            'method' => 'crypto',
+            'payment_url' => $order->payment_url,
+            'order_id' => $order->order_id,
+            'crypto_payment' => $this->publicDirectCryptoPaymentPayload($order),
+        ];
+    }
+
     private function publicPakasirPaymentPayload(Order $order): ?array
     {
         $payload = $order->payment_payload;
@@ -615,6 +512,28 @@ class PaymentController extends Controller
             'payment_method' => (string) ($payload['payment_method'] ?? 'qris'),
             'payment_number' => (string) $payload['payment_number'],
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
+        ];
+    }
+
+    private function publicDirectCryptoPaymentPayload(Order $order): ?array
+    {
+        $payload = $order->payment_payload;
+
+        if (! is_array($payload) || ($payload['type'] ?? null) !== 'direct_crypto') {
+            return null;
+        }
+
+        return [
+            'token' => (string) ($payload['token'] ?? 'USDT'),
+            'network' => (string) ($payload['network'] ?? ''),
+            'network_label' => (string) ($payload['network_label'] ?? 'USDT'),
+            'network_short_label' => (string) ($payload['network_short_label'] ?? ''),
+            'address' => (string) ($payload['address'] ?? ''),
+            'contract' => (string) ($payload['contract'] ?? ''),
+            'amount' => (string) ($payload['amount'] ?? number_format((float) $order->price, 6, '.', '')),
+            'base_amount' => (string) ($payload['base_amount'] ?? ''),
+            'unique_amount' => (string) ($payload['unique_amount'] ?? ''),
+            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
         ];
     }
 
@@ -663,22 +582,23 @@ class PaymentController extends Controller
         }
 
         if ($error->getMessage() === 'Unable to verify crypto payment') {
-            return 'NOWPayments could not be reached. Please try Verify again.';
+            return 'Crypto network API could not be reached. Please try Verify again.';
         }
 
-        if ($error->getMessage() === 'NOWPayments is not configured') {
+        if ($error->getMessage() === 'Direct crypto checkout is not configured') {
             return 'Crypto checkout is not configured yet.';
         }
 
         return 'Crypto payment is still being verified.';
     }
 
-    private function validNowpaymentsOrderPayload(Order $order, array $payload): bool
+    private function isDirectCryptoOrder(Order $order): bool
     {
+        $payload = $order->payment_payload;
+
         return $order->payment_method === 'crypto' &&
-            hash_equals($order->order_id, (string) ($payload['order_id'] ?? '')) &&
-            strtolower((string) ($payload['price_currency'] ?? '')) === 'usd' &&
-            $this->sameAmount($payload['price_amount'] ?? null, $order->price);
+            is_array($payload) &&
+            ($payload['type'] ?? null) === 'direct_crypto';
     }
 
     private function applyPakasirStatus(Order $order, array $payload): void
@@ -730,113 +650,7 @@ class PaymentController extends Controller
 
     private function sameAmount($first, $second): bool
     {
-        return round((float) $first, 4) === round((float) $second, 4);
-    }
-
-    private function nowpaymentsPaymentId(Order $order): ?string
-    {
-        if (! $order->payment_url) {
-            return null;
-        }
-
-        $query = parse_url($order->payment_url, PHP_URL_QUERY);
-
-        if (! $query) {
-            return null;
-        }
-
-        parse_str($query, $params);
-
-        $paymentId = $params['paymentId'] ?? $params['payment_id'] ?? null;
-
-        if (! is_scalar($paymentId) || ! ctype_digit((string) $paymentId)) {
-            return null;
-        }
-
-        return (string) $paymentId;
-    }
-
-    private function nowpaymentsPaymentIdFromRequest(Request $request): ?string
-    {
-        $paymentId = $request->query('paymentId') ?? $request->query('payment_id');
-
-        if (! is_scalar($paymentId) || ! ctype_digit((string) $paymentId)) {
-            return null;
-        }
-
-        return (string) $paymentId;
-    }
-
-    private function nowpaymentsInvoiceId(Order $order): ?string
-    {
-        if (! $order->payment_url) {
-            return null;
-        }
-
-        $query = parse_url($order->payment_url, PHP_URL_QUERY);
-
-        if (! $query) {
-            return null;
-        }
-
-        parse_str($query, $params);
-
-        $invoiceId = $params['iid'] ?? $params['invoice_id'] ?? $params['invoiceId'] ?? null;
-
-        if (! is_scalar($invoiceId) || ! ctype_digit((string) $invoiceId)) {
-            return null;
-        }
-
-        return (string) $invoiceId;
-    }
-
-    private function rememberNowpaymentsPaymentId(Order $order, string $paymentId): void
-    {
-        if (! $order->payment_url || $this->nowpaymentsPaymentId($order)) {
-            return;
-        }
-
-        $parts = parse_url($order->payment_url);
-        $query = [];
-
-        if (! empty($parts['query'])) {
-            parse_str($parts['query'], $query);
-        }
-
-        $query['paymentId'] = $paymentId;
-
-        $url = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? 'nowpayments.io');
-
-        if (! empty($parts['path'])) {
-            $url .= $parts['path'];
-        }
-
-        $url .= '?'.http_build_query($query);
-
-        $order->update([
-            'payment_url' => $url,
-        ]);
-    }
-
-    private function nowpaymentsSignature(array $payload, string $secret): string
-    {
-        $sortedPayload = $this->sortPayload($payload);
-        $json = json_encode($sortedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        return hash_hmac('sha512', $json, $secret);
-    }
-
-    private function sortPayload(array $payload): array
-    {
-        ksort($payload);
-
-        foreach ($payload as $key => $value) {
-            if (is_array($value)) {
-                $payload[$key] = $this->sortPayload($value);
-            }
-        }
-
-        return $payload;
+        return round((float) $first, 6) === round((float) $second, 6);
     }
 
     private function wantsPaymentJson(Request $request): bool
@@ -873,7 +687,14 @@ class PaymentController extends Controller
     {
         $message = $error instanceof \Exception ? $error->getMessage() : $error;
 
-        if (! str_starts_with($message, 'Minimum crypto payment') && $error instanceof \Exception) {
+        if ($message === 'Direct crypto checkout is not configured') {
+            $message = 'Crypto checkout is not configured yet.';
+        }
+
+        if (
+            ! in_array($message, ['Crypto checkout is not configured yet.', 'Invalid crypto amount'], true) &&
+            $error instanceof \Exception
+        ) {
             $message = 'Payment failed';
         }
 

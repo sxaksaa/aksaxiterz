@@ -111,38 +111,17 @@
             <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
 
                 <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtbsc" data-min="1">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtbsc">
                     <span class="font-bold text-white">BSC</span>
-                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
+                    <span class="text-xs text-gray-500 ml-auto">BEP20</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
                 </div>
 
                 <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdttrc20" data-min="10">
+                    class="dropdown-item flex items-baseline gap-2" data-coin="usdttrc20">
                     <span class="font-bold text-white">TRX</span>
-                    <span class="text-xs text-gray-500 ml-auto">Min $10</span>
+                    <span class="text-xs text-gray-500 ml-auto">TRC20</span>
                     <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
-                </div>
-
-                <div onclick="selectNetwork('usdterc20','ETH Ethereum (ERC20)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdterc20" data-min="1">
-                    <span class="font-bold text-white">ETH</span>
-                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
-                    <span class="font-normal text-gray-400 text-sm">Ethereum (ERC20)</span>
-                </div>
-
-                <div onclick="selectNetwork('usdtmatic','POL Polygon POS', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtmatic" data-min="1">
-                    <span class="font-bold text-white">POL</span>
-                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
-                    <span class="font-normal text-gray-400 text-sm">Polygon POS</span>
-                </div>
-
-                <div onclick="selectNetwork('usdtton','TON The Open Network (TON)', event)"
-                    class="dropdown-item flex items-baseline gap-2" data-coin="usdtton" data-min="1">
-                    <span class="font-bold text-white">TON</span>
-                    <span class="text-xs text-gray-500 ml-auto">Min $1</span>
-                    <span class="font-normal text-gray-400 text-sm">The Open Network (TON)</span>
                 </div>
 
             </div>
@@ -244,6 +223,7 @@
     </div>
 
     @include('partials.pakasir-qris-modal')
+    @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
 
     @php $paymentError = $errors->first('payment'); @endphp
@@ -255,8 +235,6 @@
         let selectedUsd = 0;
         let selectedPackageStock = 0;
         let dropdownOpen = false;
-        const cryptoBuyerFeeRate = @json((float) config('payment.crypto_buyer_fee_rate', 0.02));
-        const cryptoBuyerFeeMinimum = @json((float) config('payment.crypto_buyer_fee_minimum', 0.10));
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
@@ -329,7 +307,7 @@
 
             showToast(
                 'Payment selected',
-                type === 'crypto' ? 'Crypto via NOWPayments is active. Choose a network next.' :
+                type === 'crypto' ? 'Direct USDT address is active. Choose a network next.' :
                 'QRIS via Pakasir is active.',
                 null,
                 'success'
@@ -362,7 +340,7 @@
             showSummary();
 
             const priceText = selectedPayment === 'crypto' ?
-                `${formatUsd(cryptoCustomerTotal(usd))} fee incl.` :
+                `${formatUsd(usd)} + unique amount` :
                 `Rp ${Number(price).toLocaleString()}`;
 
             showToast(
@@ -391,21 +369,9 @@
                 text = "Rp " + selectedPrice.toLocaleString();
 
             if (selectedPayment === 'crypto')
-                text = `${formatUsd(cryptoCustomerTotal(selectedUsd))} fee incl.`;
+                text = `${formatUsd(selectedUsd)} + unique amount`;
 
             document.getElementById('totalPrice').innerText = text;
-        }
-
-        function cryptoCustomerTotal(baseAmount) {
-            const amount = Number(baseAmount) || 0;
-
-            if (amount <= 0) {
-                return 0;
-            }
-
-            const fee = Math.max(amount * cryptoBuyerFeeRate, cryptoBuyerFeeMinimum);
-
-            return Math.round((amount + fee) * 100) / 100;
         }
 
         function formatUsd(amount) {
@@ -415,31 +381,11 @@
             })}`;
         }
 
-        function networkMinimum(coin) {
-            return coin === 'usdttrc20' ? 10 : 1;
-        }
-
-        function isNetworkDisabled(coin) {
-            const cryptoTotal = cryptoCustomerTotal(selectedUsd);
-
-            return cryptoTotal > 0 && cryptoTotal < networkMinimum(coin);
-        }
-
         function refreshNetworkAvailability() {
             document.querySelectorAll('.dropdown-item').forEach(item => {
-                const coin = item.dataset.coin;
-                const disabled = isNetworkDisabled(coin);
-
-                item.classList.toggle('disabled', disabled);
-                item.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                item.classList.remove('disabled');
+                item.setAttribute('aria-disabled', 'false');
             });
-
-            if (selectedCoin && isNetworkDisabled(selectedCoin)) {
-                const min = networkMinimum(selectedCoin);
-                selectedCoin = null;
-                document.getElementById('selectedText').innerText = 'Select Network';
-                showToast('Network reset', `Selected package is below the $${min} minimum.`, null, 'warning');
-            }
         }
 
         function formatPackageName(name) {
@@ -467,12 +413,6 @@
         }
 
         function selectNetwork(value, text, e) {
-            if (e?.currentTarget?.classList.contains('disabled')) {
-                const min = networkMinimum(value);
-                showToast('Network unavailable', `This network needs at least $${min}.`, null, 'warning');
-                return;
-            }
-
             selectedCoin = value;
 
             document.getElementById('selectedText').innerText = text;
@@ -531,54 +471,6 @@
             }
 
             return data;
-        }
-
-        function preparePaymentTab() {
-            const tab = window.open('about:blank', '_blank');
-
-            if (!tab) {
-                return null;
-            }
-
-            try {
-                tab.opener = null;
-                tab.document.title = 'Opening payment...';
-                tab.document.body.innerHTML =
-                    '<p style="font-family: system-ui, sans-serif; padding: 24px;">Opening payment...</p>';
-            } catch (error) {
-                // Some browsers restrict access quickly after opening a tab.
-            }
-
-            return tab;
-        }
-
-        function openPaymentUrl(tab, paymentUrl) {
-            if (!paymentUrl) {
-                throw new Error('Payment URL is not available');
-            }
-
-            if (tab && !tab.closed) {
-                tab.location.replace(paymentUrl);
-                return true;
-            }
-
-            const newTab = window.open(paymentUrl, '_blank');
-
-            if (newTab) {
-                try {
-                    newTab.opener = null;
-                } catch (error) {}
-
-                return true;
-            }
-
-            return false;
-        }
-
-        function closePaymentTab(tab) {
-            if (tab && !tab.closed) {
-                tab.close();
-            }
         }
 
         function resetPayButton() {
@@ -666,21 +558,6 @@
             }
 
             if (selectedPayment === 'crypto') {
-
-                let min = networkMinimum(selectedCoin);
-
-                if (cryptoCustomerTotal(selectedUsd) < min) {
-                    showToast('Minimum payment', `Minimum payment for ${selectedCoin} is $${min}.`, null, 'warning');
-
-                    this.disabled = false
-                    this.innerText = isAuthenticated ? "Pay Now" : "Login to Pay"
-                    this.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
-
-                    return;
-                }
-
-                const invoiceTab = preparePaymentTab();
-
                 document.getElementById('crypto_package').value = selectedPackageId;
                 document.getElementById('crypto_coin').value = selectedCoin;
 
@@ -688,15 +565,16 @@
 
                 try {
                     const data = await fetchPaymentJson(form);
+                    const opened = await window.openAksaCryptoModal?.(data);
 
-                    if (openPaymentUrl(invoiceTab, data.payment_url)) {
+                    if (!opened) {
                         window.location.href = '/orders';
-                    } else {
-                        window.location.href = data.payment_url;
+                        return;
                     }
-                } catch (error) {
-                    closePaymentTab(invoiceTab);
 
+                    this.innerText = 'Payment Pending';
+                    showToast('USDT address ready', 'Send the exact amount shown in the modal.', null, 'success');
+                } catch (error) {
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;
                         return;

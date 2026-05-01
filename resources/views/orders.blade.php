@@ -48,6 +48,7 @@
     </div>
 
     @include('partials.pakasir-qris-modal')
+    @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
 
     <script>
@@ -183,6 +184,16 @@
                 return;
             }
 
+            if (data.method === 'crypto' && data.crypto_payment) {
+                const opened = await window.openAksaCryptoModal?.(data);
+
+                if (!opened) {
+                    await refreshOrders();
+                }
+
+                return;
+            }
+
             if (data.method === 'crypto' && data.payment_url) {
                 openHostedPayment(data.payment_url);
             }
@@ -280,6 +291,27 @@
             }
         });
 
+        document.addEventListener('click', async function(e) {
+            const button = e.target.closest('.open-crypto-address-button');
+            if (!button) return;
+
+            e.preventDefault();
+
+            let checkout = null;
+
+            try {
+                checkout = JSON.parse(button.dataset.cryptoCheckout || '{}');
+            } catch (error) {
+                checkout = null;
+            }
+
+            const opened = await window.openAksaCryptoModal?.(checkout);
+
+            if (!opened && checkout?.payment_url) {
+                openHostedPayment(checkout.payment_url);
+            }
+        });
+
         document.addEventListener('submit', async function(e) {
             const form = e.target.closest('.sync-pakasir-form');
             if (!form) return;
@@ -340,14 +372,14 @@
             button.innerText = 'Verifying...';
             button.classList.add('opacity-60', 'pointer-events-none');
 
-            window.showAppToast?.('Payment check', 'Checking your crypto payment via NOWPayments.');
+            window.showAppToast?.('Payment check', 'Scanning the selected USDT network.');
 
             try {
                 const result = await syncCryptoOrder(orderId);
 
                 if (result?.status === 'paid') {
                     window.showAksaPaymentSuccess?.({
-                        message: 'Your crypto payment has been verified and your license is ready.',
+                        message: 'Your USDT payment has been verified and your license is ready.',
                         licenseKey: result.license_key,
                         orderId: result.order_id || orderId,
                     }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
@@ -440,7 +472,7 @@
                         syncCryptoOrder(data.order_id).then(result => {
                             if (result?.status === 'paid') {
                                 window.showAksaPaymentSuccess?.({
-                                    message: 'Your crypto payment has been verified and your license is ready.',
+                    message: 'Your USDT payment has been verified and your license is ready.',
                                     licenseKey: result.license_key,
                                     orderId: result.order_id || data.order_id,
                                 }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {

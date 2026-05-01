@@ -24,7 +24,7 @@ class Order extends Model
     protected $casts = [
         'expired_at' => 'datetime',
         'paid_at' => 'datetime',
-        'price' => 'decimal:4',
+        'price' => 'decimal:6',
         'payment_payload' => 'array',
     ];
 

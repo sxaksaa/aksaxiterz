@@ -30,6 +30,11 @@ const qrisState = {
     pollTimer: null,
 };
 
+const cryptoState = {
+    orderId: null,
+    pollTimer: null,
+};
+
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
@@ -55,10 +60,46 @@ function formatQrisExpiry(value) {
     });
 }
 
+function formatCryptoAmount(amount, token = 'USDT') {
+    const numericAmount = Number(amount);
+
+    if (Number.isNaN(numericAmount)) {
+        return `${amount || '-'} ${token}`;
+    }
+
+    return `${numericAmount.toLocaleString(undefined, {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6,
+    })} ${token}`;
+}
+
 async function syncPakasirOrder(orderId) {
     if (!orderId) return null;
 
     const response = await fetch(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && response.status !== 202) {
+        const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return data;
+}
+
+async function syncCryptoOrder(orderId) {
+    if (!orderId) return null;
+
+    const response = await fetch(`/sync-crypto-order/${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -107,6 +148,35 @@ function startQrisPolling(orderId) {
 }
 
 window.syncAksaPakasirOrder = syncPakasirOrder;
+window.syncAksaCryptoOrder = syncCryptoOrder;
+
+function stopCryptoPolling() {
+    if (cryptoState.pollTimer) {
+        clearInterval(cryptoState.pollTimer);
+        cryptoState.pollTimer = null;
+    }
+}
+
+function startCryptoPolling(orderId) {
+    stopCryptoPolling();
+
+    cryptoState.pollTimer = setInterval(async () => {
+        try {
+            const result = await syncCryptoOrder(orderId);
+
+            if (result?.status === 'paid') {
+                stopCryptoPolling();
+                showPaymentSuccess({
+                    message: 'Your USDT payment has been verified and your license is ready.',
+                    licenseKey: result.license_key,
+                    orderId: result.order_id || orderId,
+                });
+            }
+        } catch (error) {
+            stopCryptoPolling();
+        }
+    }, 8000);
+}
 
 window.openAksaQrisModal = async function(checkout, options = {}) {
     const modal = document.getElementById('aksaQrisModal');
@@ -157,6 +227,60 @@ window.closeAksaQrisModal = function() {
     document.body.classList.remove('overflow-hidden');
 };
 
+window.openAksaCryptoModal = async function(checkout, options = {}) {
+    const modal = document.getElementById('aksaCryptoModal');
+    const payment = checkout?.crypto_payment;
+
+    if (!modal || !payment?.address || !payment?.amount) {
+        return false;
+    }
+
+    cryptoState.orderId = checkout.order_id || null;
+
+    document.getElementById('aksaCryptoOrderId').innerText = checkout.order_id || '-';
+    document.getElementById('aksaCryptoNetwork').innerText = payment.network_label || payment.network || '-';
+    document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, payment.token || 'USDT');
+    document.getElementById('aksaCryptoAddress').innerText = payment.address || '-';
+    document.getElementById('aksaCryptoContract').innerText = payment.contract || '-';
+    document.getElementById('aksaCryptoExpires').innerText = formatQrisExpiry(payment.expired_at);
+
+    const copyAddress = document.getElementById('aksaCryptoCopyAddress');
+    const copyAmount = document.getElementById('aksaCryptoCopyAmount');
+
+    if (copyAddress) {
+        copyAddress.dataset.copyValue = payment.address || '';
+        copyAddress.dataset.copyTitle = 'Address copied';
+        copyAddress.dataset.copyMessage = 'Paste the address in your wallet.';
+    }
+
+    if (copyAmount) {
+        copyAmount.dataset.copyValue = payment.amount || '';
+        copyAmount.dataset.copyTitle = 'Amount copied';
+        copyAmount.dataset.copyMessage = 'Paste the exact USDT amount in your wallet.';
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+
+    if (options.startPolling !== false && cryptoState.orderId) {
+        startCryptoPolling(cryptoState.orderId);
+    }
+
+    return true;
+};
+
+window.closeAksaCryptoModal = function() {
+    const modal = document.getElementById('aksaCryptoModal');
+
+    if (!modal) return;
+
+    stopCryptoPolling();
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+};
+
 function licenseUrlForOrder(orderId) {
     if (!orderId) {
         return '/licenses';
@@ -182,6 +306,7 @@ function showPaymentSuccess(options = {}) {
     }
 
     window.closeAksaQrisModal?.();
+    window.closeAksaCryptoModal?.();
     clearTimeout(paymentSuccessRedirectTimer);
     clearInterval(paymentSuccessCountdownTimer);
 
@@ -321,6 +446,12 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-crypto-close]')) return;
+
+    window.closeAksaCryptoModal?.();
+});
+
+document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-payment-success-close]')) return;
 
     window.closeAksaPaymentSuccessModal?.();
@@ -346,6 +477,44 @@ document.addEventListener('click', async (event) => {
                 message: 'Your QRIS payment has been verified and your license is ready.',
                 licenseKey: result.license_key,
                 orderId: result.order_id || qrisState.orderId,
+            });
+            return;
+        }
+
+        window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
+            variant: 'warning',
+        });
+    } catch (error) {
+        window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+            variant: 'error',
+        });
+    } finally {
+        button.disabled = false;
+        button.innerText = originalText || 'Check Payment';
+        button.classList.remove('opacity-60', 'pointer-events-none');
+    }
+});
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-crypto-check]');
+
+    if (!button || !cryptoState.orderId) return;
+
+    const originalText = button.innerText;
+
+    button.disabled = true;
+    button.innerText = 'Checking...';
+    button.classList.add('opacity-60', 'pointer-events-none');
+
+    try {
+        const result = await syncCryptoOrder(cryptoState.orderId);
+
+        if (result?.status === 'paid') {
+            stopCryptoPolling();
+            showPaymentSuccess({
+                message: 'Your USDT payment has been verified and your license is ready.',
+                licenseKey: result.license_key,
+                orderId: result.order_id || cryptoState.orderId,
             });
             return;
         }

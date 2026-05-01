@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 class PaymentPresentationTest extends TestCase
 {
-    public function test_crypto_orders_render_verify_as_clickable_form(): void
+    public function test_direct_crypto_orders_render_address_and_verify_actions(): void
     {
         $order = $this->fakeOrder([
             'order_id' => 'ORDER-VERIFYTEST',
@@ -19,7 +19,9 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Crypto (NOWPayments)', $html);
+        $this->assertStringContainsString('USDT Address', $html);
+        $this->assertStringContainsString('View Address', $html);
+        $this->assertStringContainsString('data-crypto-checkout=', $html);
         $this->assertStringContainsString('class="sync-crypto-form"', $html);
         $this->assertStringContainsString('data-order-id="ORDER-VERIFYTEST"', $html);
         $this->assertStringContainsString('action="/cancel-order/1"', $html);
@@ -131,9 +133,23 @@ class PaymentPresentationTest extends TestCase
             'user_id' => 1,
             'status' => 'pending',
             'payment_method' => 'crypto',
-            'price' => 1.10,
+            'price' => 1.100123,
             'package_id' => 1,
-            'payment_url' => 'https://nowpayments.io/payment/?iid=123',
+            'payment_url' => null,
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDT',
+                'network' => 'usdtbsc',
+                'network_label' => 'BSC BNB Smart Chain (BEP20)',
+                'network_short_label' => 'BEP20',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '1.100123',
+                'base_amount' => '1.100000',
+                'unique_amount' => '0.000123',
+                'decimals' => 18,
+                'expires_at' => now()->addHour()->toIso8601String(),
+            ],
             'expired_at' => now()->subMinute(),
         ], $attributes));
         $order->id = 1;

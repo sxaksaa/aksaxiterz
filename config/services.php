@@ -41,15 +41,6 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'nowpayments' => [
-        'key' => env('NOWPAYMENTS_API_KEY'),
-        'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
-        'url' => env('NOWPAYMENTS_URL'),
-        'ipn' => env('NOWPAYMENTS_IPN'),
-        'email' => env('NOWPAYMENTS_EMAIL'),
-        'password' => env('NOWPAYMENTS_PASSWORD'),
-    ],
-
     'pakasir' => [
         'slug' => env('PAKASIR_SLUG'),
         'api_key' => env('PAKASIR_API_KEY'),
@@ -58,10 +49,30 @@ return [
         'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
     ],
 
-    'bsc' => [
-        'rpc_url' => env('BSC_RPC_URL', 'https://bsc-rpc.publicnode.com'),
-        'usdt_contract' => env('BSC_USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'),
-        'log_blocks' => (int) env('BSC_LOG_BLOCKS', 50000),
+    'crypto_direct' => [
+        'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 1440),
+        'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
+        'networks' => [
+            'usdttrc20' => [
+                'label' => 'TRX Tron (TRC20)',
+                'short_label' => 'TRC20',
+                'address' => env('CRYPTO_TRC20_ADDRESS'),
+                'contract' => env('TRON_USDT_CONTRACT', 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'),
+                'api_url' => env('TRONGRID_URL', 'https://api.trongrid.io'),
+                'api_key' => env('TRONGRID_API_KEY'),
+                'decimals' => 6,
+            ],
+            'usdtbsc' => [
+                'label' => 'BSC BNB Smart Chain (BEP20)',
+                'short_label' => 'BEP20',
+                'address' => env('CRYPTO_BEP20_ADDRESS'),
+                'contract' => env('BSC_USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'),
+                'api_url' => env('ETHERSCAN_API_URL', 'https://api.etherscan.io/v2/api'),
+                'api_key' => env('ETHERSCAN_API_KEY'),
+                'chain_id' => (int) env('BSC_CHAIN_ID', 56),
+                'decimals' => 18,
+            ],
+        ],
     ],
 
 ];

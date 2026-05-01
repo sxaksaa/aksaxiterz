@@ -10,7 +10,7 @@
                         Some Guides to Fix Windows Problems.
                     </h1>
                     <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Practical tutorials for preparation, troubleshooting, cleanup, and common setup issues.
+                        Practical tutorials for common setup issues.
                     </p>
                 </div>
 

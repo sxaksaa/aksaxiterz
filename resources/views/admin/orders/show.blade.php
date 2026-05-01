@@ -4,11 +4,13 @@
     @php
         $isPaid = $order->status === 'paid';
         $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
-        $methodLabel = $order->payment_method === 'crypto' ? 'Crypto (NOWPayments)' : 'QRIS';
+        $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
+        $isDirectCrypto = $order->payment_method === 'crypto' && ($payload['type'] ?? null) === 'direct_crypto';
+        $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
+        $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
         $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
         $createdAt = $order->created_at?->timezone(config('app.timezone'));
         $expiresAt = $order->expired_at?->timezone(config('app.timezone'));
-        $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -93,7 +95,7 @@
                     <div class="qris-detail-row">
                         <span>Amount</span>
                         <span class="font-semibold text-[#D8B4FE]">
-                            {{ $order->payment_method === 'crypto' ? '$' . $order->price : 'Rp ' . number_format($order->price) }}
+                            {{ $order->payment_method === 'crypto' ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price) }}
                         </span>
                     </div>
                     <div class="qris-detail-row">
