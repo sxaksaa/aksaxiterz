@@ -14,7 +14,7 @@
 
                 <div class="flex flex-wrap gap-3">
                     <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary">Stock</a>
-                    <a href="/orders" class="btn-footer-secondary">Orders</a>
+                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary">Orders</a>
                     <a href="/licenses" class="btn-footer">Licenses</a>
                 </div>
             </div>

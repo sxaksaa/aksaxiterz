@@ -1,12 +1,5 @@
 @extends('layouts.app')
 
-@push('head')
-    <script
-        src="{{ config('midtrans.isProduction') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
-        data-client-key="{{ config('midtrans.clientKey') }}">
-    </script>
-@endpush
-
 @section('content')
     @php
         $stock = $product->available_license_stocks_count ?? 0;
@@ -88,11 +81,11 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
 
-            <div onclick="selectPayment('midtrans')" id="btnMid"
+            <div onclick="selectPayment('pakasir')" id="btnPakasir"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                <div class="font-semibold">Transfer / E-Wallet</div>
-                <span class="text-xs text-gray-400">QRIS All Payment (Bank, Dana, GoPay, etc)</span>
+                <div class="font-semibold">QRIS</div>
+                <span class="text-xs text-gray-400">QRIS for Indonesia & Malaysia-supported wallets</span>
 
             </div>
 
@@ -170,9 +163,7 @@
                     $packageStock = $p->available_license_stocks_count ?? 0;
                     $packageName = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name);
                     $badge = null;
-                    if (str_contains($p->name, 'Testing')) {
-                        $badge = 'Test Flow';
-                    } elseif (str_contains($p->name, '30')) {
+                    if (str_contains($p->name, '30')) {
                         $badge = 'Best Deal';
                     } elseif (str_contains($p->name, '90')) {
                         $badge = 'Premium';
@@ -237,10 +228,10 @@
                 {{ $stock <= 0 ? 'Out of Stock' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
 
             </button>
-            <!-- MIDTRANS FORM -->
-            <form id="midForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
+            <!-- PAKASIR FORM -->
+            <form id="pakasirForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
                 @csrf
-                <input type="hidden" name="package_id" id="mid_package">
+                <input type="hidden" name="package_id" id="pakasir_package">
             </form>
 
             <!-- CRYPTO FORM -->
@@ -251,6 +242,9 @@
             </form>
         </div>
     </div>
+
+    @include('partials.pakasir-qris-modal')
+    @include('partials.payment-success-modal')
 
     @php $paymentError = $errors->first('payment'); @endphp
     <script>
@@ -317,7 +311,7 @@
                 el.classList.remove('active');
             });
 
-            const target = type === 'crypto' ? 'btnCrypto' : 'btnMid';
+            const target = type === 'crypto' ? 'btnCrypto' : 'btnPakasir';
             const el = document.getElementById(target);
 
             el.classList.add('active');
@@ -335,8 +329,8 @@
 
             showToast(
                 'Payment selected',
-                type === 'crypto' ? 'Crypto payment is active. Choose a network next.' :
-                'Transfer and e-wallet payment is active.',
+                type === 'crypto' ? 'Crypto via NOWPayments is active. Choose a network next.' :
+                'QRIS via Pakasir is active.',
                 null,
                 'success'
             );
@@ -393,7 +387,7 @@
         function updatePrice() {
             let text = '-';
 
-            if (selectedPayment === 'midtrans')
+            if (selectedPayment === 'pakasir')
                 text = "Rp " + selectedPrice.toLocaleString();
 
             if (selectedPayment === 'crypto')
@@ -539,7 +533,7 @@
             return data;
         }
 
-        function prepareCryptoTab() {
+        function preparePaymentTab() {
             const tab = window.open('about:blank', '_blank');
 
             if (!tab) {
@@ -558,9 +552,9 @@
             return tab;
         }
 
-        function openCryptoInvoice(tab, paymentUrl) {
+        function openPaymentUrl(tab, paymentUrl) {
             if (!paymentUrl) {
-                throw new Error('Crypto invoice URL is not available');
+                throw new Error('Payment URL is not available');
             }
 
             if (tab && !tab.closed) {
@@ -581,65 +575,10 @@
             return false;
         }
 
-        function closeCryptoTab(tab) {
+        function closePaymentTab(tab) {
             if (tab && !tab.closed) {
                 tab.close();
             }
-        }
-
-        async function syncMidtransOrder(orderId) {
-            if (!orderId) return null;
-
-            const response = await fetch(`/sync-midtrans-order/${encodeURIComponent(orderId)}`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-            });
-
-            return response.json().catch(() => null);
-        }
-
-        async function finishMidtransPayment(orderId, redirectUrl) {
-            let syncResult = null;
-
-            try {
-                syncResult = await syncMidtransOrder(orderId);
-            } finally {
-                const target = redirectUrl === '/licenses' && syncResult?.status !== 'paid' ? '/orders' : redirectUrl;
-                window.location.href = target;
-            }
-        }
-
-        function openMidtransPayment(token, orderId) {
-            if (!window.snap) {
-                const target = new URL('/midtrans-pay', window.location.origin);
-                target.searchParams.set('token', token);
-
-                if (orderId) {
-                    target.searchParams.set('order_id', orderId);
-                }
-
-                window.location.href = target.toString();
-                return;
-            }
-
-            window.snap.pay(token, {
-                onSuccess: function(result) {
-                    finishMidtransPayment(orderId || result?.order_id, '/licenses');
-                },
-                onPending: function(result) {
-                    finishMidtransPayment(orderId || result?.order_id, '/orders');
-                },
-                onError: function() {
-                    window.location.href = '/orders';
-                },
-                onClose: function() {
-                    window.location.href = '/orders';
-                },
-            });
         }
 
         function resetPayButton() {
@@ -683,7 +622,7 @@
                 return;
             }
 
-            showToast('Checkout started', 'Preparing your payment link.');
+            showToast('Checkout started', 'Preparing your payment.');
 
             this.innerText = "Processing...";
             this.classList.add('opacity-60')
@@ -692,16 +631,24 @@
 
             const productId = {{ $product->id }};
 
-            if (selectedPayment === 'midtrans') {
+            if (selectedPayment === 'pakasir') {
 
-                document.getElementById('mid_package').value = selectedPackageId;
+                document.getElementById('pakasir_package').value = selectedPackageId;
 
-                const form = document.getElementById('midForm');
+                const form = document.getElementById('pakasirForm');
                 sessionStorage.setItem('last_product', window.location.href);
 
                 try {
                     const data = await fetchPaymentJson(form);
-                    openMidtransPayment(data.snap_token, data.order_id);
+                    const opened = await window.openAksaQrisModal?.(data);
+
+                    if (!opened && data.payment_url) {
+                        window.location.href = data.payment_url;
+                        return;
+                    }
+
+                    this.innerText = 'Payment Pending';
+                    showToast('QRIS ready', 'Scan the QRIS code to complete your payment.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;
@@ -732,7 +679,7 @@
                     return;
                 }
 
-                const invoiceTab = prepareCryptoTab();
+                const invoiceTab = preparePaymentTab();
 
                 document.getElementById('crypto_package').value = selectedPackageId;
                 document.getElementById('crypto_coin').value = selectedCoin;
@@ -742,13 +689,13 @@
                 try {
                     const data = await fetchPaymentJson(form);
 
-                    if (openCryptoInvoice(invoiceTab, data.payment_url)) {
+                    if (openPaymentUrl(invoiceTab, data.payment_url)) {
                         window.location.href = '/orders';
                     } else {
                         window.location.href = data.payment_url;
                     }
                 } catch (error) {
-                    closeCryptoTab(invoiceTab);
+                    closePaymentTab(invoiceTab);
 
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;

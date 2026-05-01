@@ -93,6 +93,10 @@ border-b border-[#27272A] transition-transform duration-300">
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Admin Stock
                                 </a>
+                                <a href="{{ route('admin.orders.index') }}"
+                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    Admin Orders
+                                </a>
                                 <a href="{{ route('admin.users.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Users
@@ -145,6 +149,7 @@ transition-all duration-300 ease-out">
             <a href="/licenses" onclick="toggleMobileMenu(event)" class="nav-item">Licenses</a>
             @if (auth()->user()?->isAdmin())
                 <a href="/admin/license-stocks" onclick="toggleMobileMenu(event)" class="nav-item">Admin</a>
+                <a href="{{ route('admin.orders.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Admin Orders</a>
                 <a href="{{ route('admin.users.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Users</a>
             @endif
 

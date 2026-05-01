@@ -7,7 +7,9 @@
         @php
             $orderDate = $order->created_at?->timezone(config('app.timezone'));
             $isPaid = $order->status === 'paid';
+            $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
             $isCrypto = $order->payment_method === 'crypto';
+            $isPakasir = ! $isCrypto;
             $canSyncCrypto = $isCrypto &&
                 $order->payment_url &&
                 $order->status === 'pending' &&
@@ -17,27 +19,36 @@
             $isPending = $order->status === 'pending' && ! $isExpired;
             $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
             $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
-            $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
-            $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
+            $methodLabel = $isCrypto ? 'Crypto (NOWPayments)' : 'QRIS';
+            $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
             $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-            $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
+            $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
+            $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+            $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+            $pakasirCheckout = [
+                'method' => 'pakasir',
+                'order_id' => $order->order_id,
+                'payment_url' => $order->payment_url,
+                'pakasir_payment' => [
+                    'amount' => (int) ($pakasirPayload['amount'] ?? $order->price),
+                    'fee' => (int) ($pakasirPayload['fee'] ?? 0),
+                    'total_payment' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
+                    'payment_method' => (string) ($pakasirPayload['payment_method'] ?? 'qris'),
+                    'payment_number' => (string) ($pakasirPayload['payment_number'] ?? ''),
+                    'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
+                ],
+            ];
+            $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
             $canCancel = $order->status === 'pending';
+            $hasPaymentAction = $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
         @endphp
 
         <article class="order-mobile-card motion-card">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
-                    <div class="mt-1 flex min-w-0 items-center gap-2">
-                        <div class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
-                        <button type="button" data-copy-value="{{ $order->order_id }}"
-                            data-copy-title="Order ID copied"
-                            data-copy-message="The order ID is ready to paste."
-                            class="shrink-0 rounded-md border border-[#9333EA]/30 px-2 py-1 text-[10px] font-semibold text-[#C084FC] transition hover:border-[#C084FC] hover:text-white">
-                            Copy
-                        </button>
-                    </div>
+                    <div class="mt-1 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
                 </div>
                 <div class="text-right">
                     <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
@@ -64,50 +75,64 @@
                     <span class="font-semibold text-[#D8B4FE]">{{ $priceLabel }}</span>
                 </div>
                 <div class="flex items-start justify-between gap-3">
-                    <span class="text-xs text-gray-500">Date</span>
+                    <span class="text-xs text-gray-500">Created at</span>
                     <span class="text-right text-xs text-gray-300">
                         {{ $orderDate?->format('d M Y') ?? '-' }}
                         <span class="block text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</span>
                     </span>
                 </div>
-            </div>
-
-            <div class="mt-4 flex flex-col gap-2">
-                @if ($canSyncCrypto)
-                    <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
-                        @csrf
-                        <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
-                            Verify Payment
-                        </button>
-                    </form>
-                @elseif ($canContinueCrypto)
-                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
-                        Continue Payment
-                    </a>
-                @elseif ($canPayMidtrans)
-                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
-                        @csrf
-                        <button type="submit" class="order-action pay-btn w-full">
-                            Pay Again
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canCancel)
-                    <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form">
-                        @csrf
-                        <button type="submit" class="order-action order-action-danger cancel-order-button w-full">
-                            Cancel Order
-                        </button>
-                    </form>
-                @elseif ($isPaid)
-                    <a href="/licenses" class="order-action w-full">View License</a>
-                @elseif (! $canSyncCrypto && ! $canContinueCrypto && ! $canPayMidtrans)
-                    <span class="inline-flex w-full items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-500">
-                        No action needed
-                    </span>
+                @if ($isPaid)
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="text-xs text-gray-500">Paid at</span>
+                        <span class="text-right text-xs text-gray-300">
+                            {{ $paidDate?->format('d M Y') ?? '-' }}
+                            <span class="block text-gray-500">{{ $paidDate ? $paidDate->format('H:i:s') . ' WIB' : '-' }}</span>
+                        </span>
+                    </div>
                 @endif
             </div>
+
+            @if ($hasPaymentAction)
+                <div class="mt-4 flex flex-col gap-2">
+                    @if ($canSyncCrypto)
+                        <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
+                            @csrf
+                            <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
+                                Verify Payment
+                            </button>
+                        </form>
+                    @elseif ($canContinueCrypto)
+                        <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
+                            Continue Payment
+                        </a>
+                    @elseif ($canSyncPakasir)
+                        @if ($canOpenPakasirQris)
+                            <button type="button" class="order-action open-pakasir-qris-button w-full" data-pakasir-checkout='@json($pakasirCheckout)'>
+                                View QRIS
+                            </button>
+                        @elseif ($canContinuePakasir)
+                            <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
+                                Open QRIS Page
+                            </a>
+                        @endif
+                        <form action="/sync-pakasir-order/{{ $order->order_id }}" method="POST" class="sync-pakasir-form">
+                            @csrf
+                            <button type="submit" class="order-action sync-pakasir-button w-full" data-order-id="{{ $order->order_id }}">
+                                Check Payment
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canCancel)
+                        <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form">
+                            @csrf
+                            <button type="submit" class="order-action order-action-danger cancel-order-button w-full">
+                                Cancel Order
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            @endif
         </article>
     @empty
         <div class="empty-state">No orders yet</div>
@@ -133,9 +158,9 @@
                     <th class="p-4 text-left">Product</th>
                     <th class="p-4 text-left">Method</th>
                     <th class="p-4 text-left">Price</th>
-                    <th class="p-4 text-left">Date</th>
+                    <th class="p-4 text-left">Created at</th>
                     <th class="p-4 text-left">Status</th>
-                    <th class="p-4 text-right">Action</th>
+                    <th class="p-4 text-right">Payment</th>
                 </tr>
             </thead>
 
@@ -144,7 +169,9 @@
                     @php
                         $orderDate = $order->created_at?->timezone(config('app.timezone'));
                         $isPaid = $order->status === 'paid';
+                        $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
                         $isCrypto = $order->payment_method === 'crypto';
+                        $isPakasir = ! $isCrypto;
                         $canSyncCrypto = $isCrypto &&
                             $order->payment_url &&
                             $order->status === 'pending' &&
@@ -154,25 +181,34 @@
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $statusLabel = $isPaid ? 'Paid' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled')));
                         $statusClass = $isPaid ? 'status-pill-paid' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled')));
-                        $methodLabel = $isCrypto ? 'Crypto (USDT)' : 'Midtrans';
-                        $methodClass = $isCrypto ? '' : 'method-pill-midtrans';
+                        $methodLabel = $isCrypto ? 'Crypto (NOWPayments)' : 'QRIS';
+                        $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
                         $priceLabel = $isCrypto ? '$' . $order->price : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-                        $canPayMidtrans = $isPending && ! $isCrypto && $order->expired_at && $now->lt($order->expired_at);
+                        $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
+                        $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
+                        $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+                        $pakasirCheckout = [
+                            'method' => 'pakasir',
+                            'order_id' => $order->order_id,
+                            'payment_url' => $order->payment_url,
+                            'pakasir_payment' => [
+                                'amount' => (int) ($pakasirPayload['amount'] ?? $order->price),
+                                'fee' => (int) ($pakasirPayload['fee'] ?? 0),
+                                'total_payment' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
+                                'payment_method' => (string) ($pakasirPayload['payment_method'] ?? 'qris'),
+                                'payment_number' => (string) ($pakasirPayload['payment_number'] ?? ''),
+                                'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
+                            ],
+                        ];
+                        $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
                         $canCancel = $order->status === 'pending';
+                        $hasPaymentAction = $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
                     @endphp
 
                     <tr class="orders-table-row">
                         <td class="p-4">
-                            <div class="flex max-w-[190px] items-center gap-2">
-                                <div class="min-w-0 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
-                                <button type="button" data-copy-value="{{ $order->order_id }}"
-                                    data-copy-title="Order ID copied"
-                                    data-copy-message="The order ID is ready to paste."
-                                    class="shrink-0 rounded-md border border-[#9333EA]/30 px-2 py-1 text-[10px] font-semibold text-[#C084FC] transition hover:border-[#C084FC] hover:text-white">
-                                    Copy
-                                </button>
-                            </div>
+                            <div class="max-w-[190px] truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
                             <div class="mt-1 text-[10px] uppercase tracking-normal text-gray-500">Invoice</div>
                         </td>
                         <td class="p-4">
@@ -186,6 +222,11 @@
                         <td class="p-4 whitespace-nowrap text-xs text-gray-300">
                             <div>{{ $orderDate?->format('d M Y') ?? '-' }}</div>
                             <div class="mt-1 text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</div>
+                            @if ($isPaid)
+                                <div class="mt-2 text-[10px] uppercase tracking-normal text-[#C084FC]">Paid at</div>
+                                <div class="mt-1">{{ $paidDate?->format('d M Y') ?? '-' }}</div>
+                                <div class="mt-1 text-gray-500">{{ $paidDate ? $paidDate->format('H:i:s') . ' WIB' : '-' }}</div>
+                            @endif
                         </td>
                         <td class="p-4">
                             <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
@@ -197,7 +238,9 @@
                         </td>
                         <td class="p-4 text-right">
                             <div class="inline-flex flex-wrap justify-end gap-2">
-                                @if ($canSyncCrypto)
+                                @if (! $hasPaymentAction)
+                                    <span class="text-xs text-gray-600">-</span>
+                                @elseif ($canSyncCrypto)
                                     <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
@@ -208,11 +251,20 @@
                                     <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
                                         Continue
                                     </a>
-                                @elseif ($canPayMidtrans)
-                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
+                                @elseif ($canSyncPakasir)
+                                    @if ($canOpenPakasirQris)
+                                        <button type="button" class="order-action open-pakasir-qris-button" data-pakasir-checkout='@json($pakasirCheckout)'>
+                                            QRIS
+                                        </button>
+                                    @elseif ($canContinuePakasir)
+                                        <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
+                                            QRIS
+                                        </a>
+                                    @endif
+                                    <form action="/sync-pakasir-order/{{ $order->order_id }}" method="POST" class="sync-pakasir-form inline">
                                         @csrf
-                                        <button type="submit" class="order-action pay-btn">
-                                            Pay Again
+                                        <button type="submit" class="order-action sync-pakasir-button" data-order-id="{{ $order->order_id }}">
+                                            Check
                                         </button>
                                     </form>
                                 @endif
@@ -224,10 +276,6 @@
                                             Cancel
                                         </button>
                                     </form>
-                                @elseif ($isPaid)
-                                    <a href="/licenses" class="order-action">License</a>
-                                @elseif (! $canSyncCrypto && ! $canContinueCrypto && ! $canPayMidtrans)
-                                    <span class="text-xs text-gray-500">No action</span>
                                 @endif
                             </div>
                         </td>

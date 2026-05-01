@@ -50,6 +50,14 @@ return [
         'password' => env('NOWPAYMENTS_PASSWORD'),
     ],
 
+    'pakasir' => [
+        'slug' => env('PAKASIR_SLUG'),
+        'api_key' => env('PAKASIR_API_KEY'),
+        'url' => env('PAKASIR_URL', 'https://app.pakasir.com'),
+        'return_url' => env('PAKASIR_RETURN_URL'),
+        'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
+    ],
+
     'bsc' => [
         'rpc_url' => env('BSC_RPC_URL', 'https://bsc-rpc.publicnode.com'),
         'usdt_contract' => env('BSC_USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'),

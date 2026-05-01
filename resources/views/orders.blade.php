@@ -1,12 +1,5 @@
 @extends('layouts.app')
 
-@push('head')
-    <script
-        src="{{ config('midtrans.isProduction') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
-        data-client-key="{{ config('midtrans.clientKey') }}">
-    </script>
-@endpush
-
 @section('content')
     @php
         $totalOrders = $orderStats['total'] ?? $orders->count();
@@ -23,11 +16,6 @@
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Track payments, continue pending invoices, and jump back into your licenses after checkout.
                     </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="/" class="btn-footer-secondary">Browse Products</a>
-                    <a href="/licenses" class="btn-footer">My Licenses</a>
                 </div>
             </div>
 
@@ -58,6 +46,9 @@
         </div>
 
     </div>
+
+    @include('partials.pakasir-qris-modal')
+    @include('partials.payment-success-modal')
 
     <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -115,10 +106,10 @@
             }
         }
 
-        async function syncMidtransOrder(orderId) {
+        async function syncPakasirOrder(orderId) {
             if (!orderId) return null;
 
-            const response = await fetch(`/sync-midtrans-order/${encodeURIComponent(orderId)}`, {
+            const response = await fetch(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -127,7 +118,15 @@
                 },
             });
 
-            return response.json().catch(() => null);
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok && response.status !== 202) {
+                const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+                error.status = response.status;
+                throw error;
+            }
+
+            return data;
         }
 
         async function syncCryptoOrder(orderId) {
@@ -153,69 +152,39 @@
             return data;
         }
 
-        async function finishMidtransPayment(orderId, redirectUrl) {
-            let syncResult = null;
+        function openHostedPayment(paymentUrl) {
+            const paymentTab = window.open(paymentUrl, '_blank');
 
-            try {
-                syncResult = await syncMidtransOrder(orderId);
-            } finally {
-                const target = redirectUrl === '/licenses' && syncResult?.status !== 'paid' ? '/orders' : redirectUrl;
-                window.location.href = target;
-            }
-        }
+            if (paymentTab) {
+                try {
+                    paymentTab.opener = null;
+                } catch (error) {}
 
-        function openMidtransPayment(token, orderId) {
-            if (!window.snap) {
-                const target = new URL('/midtrans-pay', window.location.origin);
-                target.searchParams.set('token', token);
-
-                if (orderId) {
-                    target.searchParams.set('order_id', orderId);
-                }
-
-                window.location.href = target.toString();
+                refreshOrders();
                 return;
             }
 
-            window.snap.pay(token, {
-                onSuccess: function(result) {
-                    finishMidtransPayment(orderId || result?.order_id, '/licenses');
-                },
-                onPending: function(result) {
-                    finishMidtransPayment(orderId || result?.order_id, '/orders');
-                },
-                onError: function() {
-                    window.location.href = '/orders';
-                },
-                onClose: function() {
-                    refreshOrders();
-                },
-            });
+            window.location.href = paymentUrl;
         }
 
-        function handlePaymentResponse(data) {
+        async function handlePaymentResponse(data) {
             if (data.redirect_url) {
                 window.location.href = data.redirect_url;
                 return;
             }
 
-            if (data.method === 'midtrans' && data.snap_token) {
-                openMidtransPayment(data.snap_token, data.order_id);
+            if (data.method === 'pakasir' && data.payment_url) {
+                const opened = await window.openAksaQrisModal?.(data);
+
+                if (!opened) {
+                    openHostedPayment(data.payment_url);
+                }
+
                 return;
             }
 
             if (data.method === 'crypto' && data.payment_url) {
-                const invoiceTab = window.open(data.payment_url, '_blank');
-
-                if (invoiceTab) {
-                    try {
-                        invoiceTab.opener = null;
-                    } catch (error) {}
-
-                    refreshOrders();
-                } else {
-                    window.location.href = data.payment_url;
-                }
+                openHostedPayment(data.payment_url);
             }
         }
 
@@ -270,7 +239,7 @@
             try {
                 const data = await fetchPaymentJson(form.action, new FormData(form));
                 await refreshOrders();
-                handlePaymentResponse(data);
+                await handlePaymentResponse(data);
             } catch (error) {
                 if (error.redirectUrl) {
                     window.location.href = error.redirectUrl;
@@ -290,6 +259,73 @@
             }
         });
 
+        document.addEventListener('click', async function(e) {
+            const button = e.target.closest('.open-pakasir-qris-button');
+            if (!button) return;
+
+            e.preventDefault();
+
+            let checkout = null;
+
+            try {
+                checkout = JSON.parse(button.dataset.pakasirCheckout || '{}');
+            } catch (error) {
+                checkout = null;
+            }
+
+            const opened = await window.openAksaQrisModal?.(checkout);
+
+            if (!opened && checkout?.payment_url) {
+                openHostedPayment(checkout.payment_url);
+            }
+        });
+
+        document.addEventListener('submit', async function(e) {
+            const form = e.target.closest('.sync-pakasir-form');
+            if (!form) return;
+
+            e.preventDefault();
+
+            const button = form.querySelector('.sync-pakasir-button');
+            const orderId = button?.dataset.orderId;
+            const originalText = button.innerText;
+
+            button.disabled = true;
+            button.innerText = 'Checking...';
+            button.classList.add('opacity-60', 'pointer-events-none');
+
+            window.showAppToast?.('Payment check', 'Checking your QRIS payment via Pakasir.');
+
+            try {
+                const result = await syncPakasirOrder(orderId);
+
+                if (result?.status === 'paid') {
+                    window.showAksaPaymentSuccess?.({
+                        message: 'Your QRIS payment has been verified and your license is ready.',
+                        licenseKey: result.license_key,
+                        orderId: result.order_id || orderId,
+                    }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                        variant: 'success',
+                    });
+                    await refreshOrders();
+                    return;
+                }
+
+                window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
+                    variant: 'warning',
+                });
+                await refreshOrders();
+            } catch (error) {
+                window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+                    variant: 'error',
+                });
+            } finally {
+                button.disabled = false;
+                button.innerText = originalText || 'Check Payment';
+                button.classList.remove('opacity-60', 'pointer-events-none');
+            }
+        });
+
         document.addEventListener('submit', async function(e) {
             const form = e.target.closest('.sync-crypto-form');
             if (!form) return;
@@ -304,14 +340,20 @@
             button.innerText = 'Verifying...';
             button.classList.add('opacity-60', 'pointer-events-none');
 
-            window.showAppToast?.('Payment check', 'Checking your crypto payment.');
+            window.showAppToast?.('Payment check', 'Checking your crypto payment via NOWPayments.');
 
             try {
                 const result = await syncCryptoOrder(orderId);
 
                 if (result?.status === 'paid') {
-                    window.showAppToast?.('Payment verified', 'Your license is ready.');
-                    window.location.href = '/licenses';
+                    window.showAksaPaymentSuccess?.({
+                        message: 'Your crypto payment has been verified and your license is ready.',
+                        licenseKey: result.license_key,
+                        orderId: result.order_id || orderId,
+                    }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                        variant: 'success',
+                    });
+                    await refreshOrders();
                     return;
                 }
 
@@ -373,10 +415,17 @@
                 .then(data => {
                     if (!data.status) return;
 
-                    if (data.status === 'pending' && data.payment_method === 'midtrans' && data.order_id) {
-                        syncMidtransOrder(data.order_id).then(result => {
+                    if (data.status === 'pending' && data.payment_method === 'pakasir' && data.order_id) {
+                        syncPakasirOrder(data.order_id).then(result => {
                             if (result?.status === 'paid') {
-                                window.location.href = '/licenses';
+                                window.showAksaPaymentSuccess?.({
+                                    message: 'Your QRIS payment has been verified and your license is ready.',
+                                    licenseKey: result.license_key,
+                                    orderId: result.order_id || data.order_id,
+                                }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                                    variant: 'success',
+                                });
+                                refreshOrders();
                                 return;
                             }
 
@@ -384,13 +433,20 @@
                                 lastPolledStatus = result.status;
                                 refreshOrders();
                             }
-                        });
+                        }).catch(() => {});
                     }
 
                     if (data.can_sync_crypto && data.payment_method === 'crypto' && data.order_id) {
                         syncCryptoOrder(data.order_id).then(result => {
                             if (result?.status === 'paid') {
-                                window.location.href = '/licenses';
+                                window.showAksaPaymentSuccess?.({
+                                    message: 'Your crypto payment has been verified and your license is ready.',
+                                    licenseKey: result.license_key,
+                                    orderId: result.order_id || data.order_id,
+                                }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                                    variant: 'success',
+                                });
+                                refreshOrders();
                                 return;
                             }
 

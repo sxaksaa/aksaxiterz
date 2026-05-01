@@ -1,6 +1,289 @@
 import './bootstrap';
+import QRCode from 'qrcode';
 
 let appToastTimer = null;
+let paymentSuccessRedirectTimer = null;
+let paymentSuccessCountdownTimer = null;
+
+window.renderAksaQrCode = async function(target, value, options = {}) {
+    const canvas = typeof target === 'string' ? document.querySelector(target) : target;
+
+    if (!canvas || !value) {
+        return false;
+    }
+
+    await QRCode.toCanvas(canvas, value, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: options.width || 256,
+        color: {
+            dark: '#09090c',
+            light: '#ffffff',
+        },
+    });
+
+    return true;
+};
+
+const qrisState = {
+    orderId: null,
+    pollTimer: null,
+};
+
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+function formatIdr(amount) {
+    return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
+}
+
+function formatQrisExpiry(value) {
+    if (!value) return '-';
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return '-';
+    }
+
+    return date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+async function syncPakasirOrder(orderId) {
+    if (!orderId) return null;
+
+    const response = await fetch(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && response.status !== 202) {
+        const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return data;
+}
+
+function stopQrisPolling() {
+    if (qrisState.pollTimer) {
+        clearInterval(qrisState.pollTimer);
+        qrisState.pollTimer = null;
+    }
+}
+
+function startQrisPolling(orderId) {
+    stopQrisPolling();
+
+    qrisState.pollTimer = setInterval(async () => {
+        try {
+            const result = await syncPakasirOrder(orderId);
+
+            if (result?.status === 'paid') {
+                stopQrisPolling();
+                showPaymentSuccess({
+                    message: 'Your QRIS payment has been verified and your license is ready.',
+                    licenseKey: result.license_key,
+                    orderId: result.order_id || orderId,
+                });
+            }
+        } catch (error) {
+            stopQrisPolling();
+        }
+    }, 5000);
+}
+
+window.syncAksaPakasirOrder = syncPakasirOrder;
+
+window.openAksaQrisModal = async function(checkout, options = {}) {
+    const modal = document.getElementById('aksaQrisModal');
+    const payment = checkout?.pakasir_payment;
+
+    if (!modal || !payment?.payment_number) {
+        return false;
+    }
+
+    qrisState.orderId = checkout.order_id || null;
+
+    document.getElementById('aksaQrisOrderId').innerText = checkout.order_id || '-';
+    document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.amount);
+    document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
+    document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
+    document.getElementById('aksaQrisExpires').innerText = formatQrisExpiry(payment.expired_at);
+
+    const fallback = document.getElementById('aksaQrisFallback');
+
+    if (fallback) {
+        fallback.href = checkout.payment_url || '#';
+        fallback.classList.toggle('hidden', !checkout.payment_url);
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+
+    await window.renderAksaQrCode('#aksaQrisCanvas', payment.payment_number, {
+        width: 280,
+    });
+
+    if (options.startPolling !== false && qrisState.orderId) {
+        startQrisPolling(qrisState.orderId);
+    }
+
+    return true;
+};
+
+window.closeAksaQrisModal = function() {
+    const modal = document.getElementById('aksaQrisModal');
+
+    if (!modal) return;
+
+    stopQrisPolling();
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+};
+
+function licenseUrlForOrder(orderId) {
+    if (!orderId) {
+        return '/licenses';
+    }
+
+    const encodedOrderId = encodeURIComponent(orderId);
+
+    return `/licenses?order=${encodedOrderId}#license-${encodedOrderId}`;
+}
+
+function showPaymentSuccess(options = {}) {
+    const modal = document.getElementById('aksaPaymentSuccessModal');
+    const redirectUrl = options.primaryUrl || licenseUrlForOrder(options.orderId);
+
+    if (!modal) {
+        window.showAppToast?.('Payment successful', options.message || 'Your payment has been verified.', {
+            variant: 'success',
+        });
+        setTimeout(() => {
+            window.location.href = redirectUrl;
+        }, options.redirectDelay || 5000);
+        return false;
+    }
+
+    window.closeAksaQrisModal?.();
+    clearTimeout(paymentSuccessRedirectTimer);
+    clearInterval(paymentSuccessCountdownTimer);
+
+    const message = document.getElementById('aksaPaymentSuccessMessage');
+    const primary = document.getElementById('aksaPaymentSuccessPrimary');
+    const copyStatus = document.getElementById('aksaPaymentSuccessCopyStatus');
+    const countdown = document.getElementById('aksaPaymentSuccessCountdown');
+    const redirectDelay = Number(options.redirectDelay || 5000);
+
+    if (message) {
+        message.innerText = options.message || 'Your payment has been verified and your license is ready.';
+    }
+
+    if (primary) {
+        primary.href = redirectUrl;
+        primary.innerText = options.primaryText || 'View License';
+    }
+
+    if (copyStatus) {
+        copyStatus.innerText = options.licenseKey ? 'Copying license key...' : 'License key is ready on My Licenses.';
+    }
+
+    if (countdown) {
+        countdown.innerText = `Redirecting to My Licenses in ${Math.ceil(redirectDelay / 1000)}s.`;
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+
+    copyLicenseKey(options.licenseKey, copyStatus);
+    startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown);
+
+    return true;
+}
+
+window.showAksaPaymentSuccess = showPaymentSuccess;
+
+window.closeAksaPaymentSuccessModal = function() {
+    const modal = document.getElementById('aksaPaymentSuccessModal');
+
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+};
+
+async function copyLicenseKey(licenseKey, statusElement) {
+    if (!licenseKey) return false;
+
+    if (!navigator.clipboard || !window.isSecureContext) {
+        if (statusElement) {
+            statusElement.innerText = 'License key is ready on My Licenses.';
+        }
+
+        return false;
+    }
+
+    try {
+        await navigator.clipboard.writeText(licenseKey);
+
+        if (statusElement) {
+            statusElement.innerText = 'License key copied automatically.';
+        }
+
+        return true;
+    } catch (error) {
+        if (statusElement) {
+            statusElement.innerText = 'License key is ready on My Licenses.';
+        }
+
+        return false;
+    }
+}
+
+function startPaymentSuccessRedirect(url, delay, countdownElement) {
+    let remaining = Math.max(1, Math.ceil(delay / 1000));
+
+    clearTimeout(paymentSuccessRedirectTimer);
+    clearInterval(paymentSuccessCountdownTimer);
+
+    if (countdownElement) {
+        countdownElement.innerText = `Redirecting to My Licenses in ${remaining}s.`;
+    }
+
+    paymentSuccessCountdownTimer = setInterval(() => {
+        remaining -= 1;
+
+        if (countdownElement) {
+            countdownElement.innerText = `Redirecting to My Licenses in ${Math.max(0, remaining)}s.`;
+        }
+
+        if (remaining <= 0) {
+            clearInterval(paymentSuccessCountdownTimer);
+        }
+    }, 1000);
+
+    paymentSuccessRedirectTimer = setTimeout(() => {
+        window.location.href = url;
+    }, delay);
+}
 
 window.showAppToast = function(title, message = '', options = {}) {
     const toast = document.getElementById('appToast');
@@ -30,6 +313,56 @@ window.showAppToast = function(title, message = '', options = {}) {
         toast.classList.remove('is-visible');
     }, duration);
 };
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-qris-close]')) return;
+
+    window.closeAksaQrisModal?.();
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-payment-success-close]')) return;
+
+    window.closeAksaPaymentSuccessModal?.();
+});
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-qris-check]');
+
+    if (!button || !qrisState.orderId) return;
+
+    const originalText = button.innerText;
+
+    button.disabled = true;
+    button.innerText = 'Checking...';
+    button.classList.add('opacity-60', 'pointer-events-none');
+
+    try {
+        const result = await syncPakasirOrder(qrisState.orderId);
+
+        if (result?.status === 'paid') {
+            stopQrisPolling();
+            showPaymentSuccess({
+                message: 'Your QRIS payment has been verified and your license is ready.',
+                licenseKey: result.license_key,
+                orderId: result.order_id || qrisState.orderId,
+            });
+            return;
+        }
+
+        window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
+            variant: 'warning',
+        });
+    } catch (error) {
+        window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+            variant: 'error',
+        });
+    } finally {
+        button.disabled = false;
+        button.innerText = originalText || 'Check Payment';
+        button.classList.remove('opacity-60', 'pointer-events-none');
+    }
+});
 
 document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-copy-license]');

@@ -11,8 +11,6 @@ return [
         'hours' => env('AKSA_SUPPORT_HOURS', 'Daily, 09:00-22:00 WIB'),
     ],
 
-    'show_test_products' => env('AKSA_SHOW_TEST_PRODUCTS', env('APP_ENV') === 'local'),
-
     'discord_url' => env('AKSA_DISCORD_URL', 'https://discord.gg/RuYM6qWArC'),
 
     'downloads' => [

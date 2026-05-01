@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\LicenseStockController;
+use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PaymentController;
 use App\Models\Category;
@@ -25,25 +26,15 @@ use Laravel\Socialite\Two\InvalidStateException;
 */
 
 Route::get('/', function (Request $request) {
-    $showTestProducts = (bool) config('links.show_test_products');
-
-    $categories = Category::query()
-        ->when(! $showTestProducts, fn ($query) => $query->where('slug', '!=', 'testing-payment'))
-        ->get();
+    $categories = Category::all();
 
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])->withCount('availableLicenseStocks');
 
-    if (! $showTestProducts) {
-        $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'));
-    }
-
     if ($request->category) {
-        $category = Category::where('slug', $request->category)
-            ->when(! $showTestProducts, fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'))
-            ->first();
+        $category = Category::where('slug', $request->category)->first();
 
         if ($category) {
             $query->where('category_id', $category->id);
@@ -60,25 +51,17 @@ Route::get('/', function (Request $request) {
 });
 
 $productsFragment = function (Request $request) {
-    $showTestProducts = (bool) config('links.show_test_products');
-
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])->withCount('availableLicenseStocks');
-
-    if (! $showTestProducts) {
-        $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'));
-    }
 
     if ($request->search) {
         $query->where('name', 'like', '%'.$request->search.'%');
     }
 
     if ($request->category) {
-        $category = Category::where('slug', $request->category)
-            ->when(! $showTestProducts, fn ($categoryQuery) => $categoryQuery->where('slug', '!=', 'testing-payment'))
-            ->first();
+        $category = Category::where('slug', $request->category)->first();
 
         if ($category) {
             $query->where('category_id', $category->id);
@@ -159,10 +142,6 @@ Route::get('/product/{id}', function ($id) {
         ->withCount('availableLicenseStocks')
         ->findOrFail($id);
 
-    if (! config('links.show_test_products') && $product->category?->slug === 'testing-payment') {
-        abort(404);
-    }
-
     return view('product-detail', compact('product'));
 });
 
@@ -177,20 +156,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain']);
     Route::post('/cancel-order/{id}', [PaymentController::class, 'cancelOrder']);
 
-    // Midtrans pay page
-    Route::get('/midtrans-pay', function () {
-        $token = request('token');
-        $orderId = request('order_id');
-
-        abort_if(blank($token), 404);
-
-        return view('midtrans-pay', compact('token', 'orderId'));
-    })->name('midtrans.pay.page');
-
-    // Midtrans
-    Route::post('/process-order/{id}', [PaymentController::class, 'payMidtrans'])
+    // Pakasir
+    Route::post('/process-order/{id}', [PaymentController::class, 'payPakasir'])
         ->middleware('throttle:20,1');
-    Route::post('/sync-midtrans-order/{orderId}', [PaymentController::class, 'syncMidtransOrder'])
+    Route::post('/sync-pakasir-order/{orderId}', [PaymentController::class, 'syncPakasirOrder'])
         ->middleware('throttle:10,1');
     Route::match(['get', 'post'], '/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
         ->middleware('throttle:20,1');
@@ -311,6 +280,10 @@ Route::middleware(['auth', 'admin'])
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');
         Route::delete('/license-stocks/{licenseStock}', [LicenseStockController::class, 'destroy'])->name('license-stocks.destroy');
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{order}/mark-paid', [OrderController::class, 'markPaid'])->name('orders.mark-paid');
+        Route::post('/orders/{order}/resync-license', [OrderController::class, 'resyncLicense'])->name('orders.resync-license');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
 
@@ -406,7 +379,7 @@ Route::get('/login', function () {
 |--------------------------------------------------------------------------
 */
 
-Route::post('/midtrans-callback', [PaymentController::class, 'midtransCallback']);
+Route::post('/pakasir-callback', [PaymentController::class, 'pakasirCallback']);
 Route::post('/crypto-callback', [PaymentController::class, 'cryptoCallback']);
 
 Route::get('/success', function () {

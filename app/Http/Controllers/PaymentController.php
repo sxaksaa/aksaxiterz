@@ -3,9 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\License;
-use App\Models\LicenseStock;
 use App\Models\Order;
-use App\Models\Package;
+use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +16,10 @@ class PaymentController extends Controller
 {
     protected PaymentService $paymentService;
 
-    public function __construct(PaymentService $paymentService)
+    public function __construct(
+        PaymentService $paymentService,
+        private readonly OrderFulfillmentService $orderFulfillmentService
+    )
     {
         $this->paymentService = $paymentService;
     }
@@ -36,13 +38,15 @@ class PaymentController extends Controller
             return back()->withErrors(['msg' => 'Already paid']);
         }
 
+        $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
+
         $newOrder = Order::create([
-            'order_id' => 'ORD-'.strtoupper(Str::random(10)),
+            'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
             'user_id' => $user->id,
             'product_id' => $oldOrder->product_id,
             'package_id' => $oldOrder->package_id,
             'status' => 'pending',
-            'payment_method' => $oldOrder->payment_method,
+            'payment_method' => $paymentMethod,
             'price' => $oldOrder->price,
             'expired_at' => now()->addMinutes(10),
         ]);
@@ -58,9 +62,9 @@ class PaymentController extends Controller
             ->update(['status' => 'cancelled']);
 
         try {
-            if ($newOrder->payment_method === 'midtrans') {
+            if ($newOrder->payment_method === 'pakasir') {
 
-                $payment = $this->paymentService->createMidtransPayment(
+                $payment = $this->paymentService->createPakasirPayment(
                     $user,
                     $newOrder->product_id,
                     $newOrder->package_id,
@@ -68,17 +72,10 @@ class PaymentController extends Controller
                 );
 
                 if ($this->wantsPaymentJson($request)) {
-                    return response()->json([
-                        'method' => 'midtrans',
-                        'snap_token' => $payment['snap_token'],
-                        'order_id' => $payment['order']->order_id,
-                    ]);
+                    return response()->json($this->pakasirCheckoutPayload($payment['order']));
                 }
 
-                return redirect()->route('midtrans.pay.page', [
-                    'token' => $payment['snap_token'],
-                    'order_id' => $payment['order']->order_id,
-                ]);
+                return redirect($payment['payment_url']);
             }
 
             $payment = $this->paymentService->createCryptoPayment(
@@ -109,11 +106,11 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | MIDTRANS (PAY)
+    | PAKASIR (PAY)
     |--------------------------------------------------------------------------
     */
 
-    public function payMidtrans(Request $request, $id)
+    public function payPakasir(Request $request, $id)
     {
         $user = Auth::user();
 
@@ -132,26 +129,19 @@ class PaymentController extends Controller
         $this->cancelPendingOrders($user->id);
 
         try {
-            $payment = $this->paymentService->createMidtransPayment(
+            $payment = $this->paymentService->createPakasirPayment(
                 $user,
                 $id,
                 $request->package_id
             );
 
             if ($this->wantsPaymentJson($request)) {
-                return response()->json([
-                    'method' => 'midtrans',
-                    'snap_token' => $payment['snap_token'],
-                    'order_id' => $payment['order']->order_id,
-                ]);
+                return response()->json($this->pakasirCheckoutPayload($payment['order']));
             }
 
-            return redirect()->route('midtrans.pay.page', [
-                'token' => $payment['snap_token'],
-                'order_id' => $payment['order']->order_id,
-            ]);
+            return redirect($payment['payment_url']);
         } catch (\Exception $e) {
-            Log::error('MIDTRANS ERROR: '.$e->getMessage());
+            Log::error('PAKASIR ERROR: '.$e->getMessage());
 
             return $this->paymentErrorResponse($request, $e);
         }
@@ -159,29 +149,29 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | MIDTRANS STATUS SYNC
+    | PAKASIR STATUS SYNC
     |--------------------------------------------------------------------------
     */
 
-    public function syncMidtransOrder(Request $request, string $orderId)
+    public function syncPakasirOrder(Request $request, string $orderId)
     {
         $order = Order::where('order_id', $orderId)
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
 
-        if ($order->payment_method !== 'midtrans') {
+        if ($order->payment_method !== 'pakasir') {
             abort(404);
         }
 
         if ($order->status === 'paid') {
-            return $this->syncCryptoResponse($request, [
+            return $this->syncPaymentResponse($request, $this->withLicensePayload([
                 'order_id' => $order->order_id,
                 'status' => $order->status,
-            ]);
+            ], $order));
         }
 
         try {
-            $payload = $this->paymentService->getMidtransStatus($order->order_id);
+            $payload = $this->paymentService->getPakasirStatus($order);
 
             DB::beginTransaction();
 
@@ -189,32 +179,41 @@ class PaymentController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $this->validMidtransOrderPayload($lockedOrder, $payload)) {
+            if (! $this->validPakasirOrderPayload($lockedOrder, $payload)) {
                 DB::rollBack();
 
-                return response()->json(['error' => 'Invalid Midtrans status'], 403);
+                return response()->json(['error' => 'Invalid Pakasir status'], 403);
             }
 
             if ($lockedOrder->status !== 'paid') {
-                $this->applyMidtransStatus($lockedOrder, $payload);
+                $this->applyPakasirStatus($lockedOrder, $payload);
             }
 
             DB::commit();
 
-            return response()->json([
+            $freshStatus = $lockedOrder->fresh()->status;
+            $responsePayload = [
                 'order_id' => $lockedOrder->order_id,
-                'status' => $lockedOrder->fresh()->status,
-            ]);
+                'status' => $freshStatus,
+            ];
+
+            if ($freshStatus !== 'paid') {
+                $responsePayload['message'] = 'Payment is still being verified.';
+            } else {
+                $responsePayload = $this->withLicensePayload($responsePayload, $lockedOrder);
+            }
+
+            return $this->syncPaymentResponse($request, $responsePayload, $freshStatus === 'paid' ? 200 : 202);
         } catch (\Exception $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
 
-            Log::warning('MIDTRANS SYNC ERROR: '.$e->getMessage(), [
+            Log::warning('PAKASIR SYNC ERROR: '.$e->getMessage(), [
                 'order_id' => $order->order_id,
             ]);
 
-            return response()->json([
+            return $this->syncPaymentResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->fresh()->status,
                 'message' => 'Payment is still being verified.',
@@ -233,10 +232,10 @@ class PaymentController extends Controller
         }
 
         if ($order->status === 'paid') {
-            return $this->syncCryptoResponse($request, [
+            return $this->syncPaymentResponse($request, $this->withLicensePayload([
                 'order_id' => $order->order_id,
                 'status' => $order->status,
-            ]);
+            ], $order));
         }
 
         $paymentId = $this->nowpaymentsPaymentIdFromRequest($request) ?? $this->nowpaymentsPaymentId($order);
@@ -253,7 +252,7 @@ class PaymentController extends Controller
             }
 
             if (! $paymentId) {
-                return $this->syncCryptoResponse($request, [
+                return $this->syncPaymentResponse($request, [
                     'order_id' => $order->order_id,
                     'status' => $order->status,
                     'message' => 'Payment is not visible from NOWPayments yet. Please click Verify again after the invoice updates.',
@@ -277,7 +276,7 @@ class PaymentController extends Controller
                     'provider_status' => $payload['payment_status'] ?? null,
                 ]);
 
-                return $this->syncCryptoResponse($request, [
+                return $this->syncPaymentResponse($request, [
                     'error' => 'NOWPayments data does not match this order.',
                 ], 403);
             }
@@ -292,7 +291,7 @@ class PaymentController extends Controller
             }
 
             if (! $paymentVerified) {
-                return $this->syncCryptoResponse($request, [
+                return $this->syncPaymentResponse($request, [
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
                     'provider_status' => $providerStatus,
@@ -309,13 +308,13 @@ class PaymentController extends Controller
             if (! $this->validNowpaymentsOrderPayload($lockedOrder, $payload)) {
                 DB::rollBack();
 
-                return $this->syncCryptoResponse($request, [
+                return $this->syncPaymentResponse($request, [
                     'error' => 'NOWPayments data does not match this order.',
                 ], 403);
             }
 
             if ($lockedOrder->status !== 'paid') {
-                $this->generateLicense($lockedOrder);
+                $this->orderFulfillmentService->fulfill($lockedOrder);
             }
 
             DB::commit();
@@ -327,12 +326,12 @@ class PaymentController extends Controller
                 ]);
             }
 
-            return $this->syncCryptoResponse($request, [
+            return $this->syncPaymentResponse($request, $this->withLicensePayload([
                 'order_id' => $lockedOrder->order_id,
                 'status' => $lockedOrder->fresh()->status,
                 'provider_status' => $providerStatus,
                 'tx_hash' => $chainTransfer['tx_hash'] ?? null,
-            ]);
+            ], $lockedOrder));
         } catch (\Exception $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
@@ -343,7 +342,7 @@ class PaymentController extends Controller
                 'payment_id' => $paymentId,
             ]);
 
-            return $this->syncCryptoResponse($request, [
+            return $this->syncPaymentResponse($request, [
                 'order_id' => $order->order_id,
                 'status' => $order->fresh()->status,
                 'message' => $this->publicCryptoSyncError($e),
@@ -353,61 +352,54 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | MIDTRANS CALLBACK
+    | PAKASIR CALLBACK
     |--------------------------------------------------------------------------
     */
 
-    public function midtransCallback(Request $request)
+    public function pakasirCallback(Request $request)
     {
-        $serverKey = config('midtrans.serverKey');
-
-        if (! $serverKey) {
-            Log::error('MIDTRANS CALLBACK ERROR: missing server key');
-
-            return response()->json(['error' => 'server not configured'], 500);
-        }
-
-        $hashed = hash(
-            'sha512',
-            $request->order_id.
-                $request->status_code.
-                $request->gross_amount.
-                $serverKey
-        );
-
-        if (! hash_equals($hashed, (string) $request->signature_key)) {
-            return response()->json(['error' => 'Invalid signature'], 403);
-        }
-
-        DB::beginTransaction();
-
         try {
             $order = Order::where('order_id', $request->order_id)
+                ->firstOrFail();
+
+            if (! $this->validPakasirOrderPayload($order, $request->all())) {
+                return response()->json(['error' => 'Invalid amount'], 403);
+            }
+
+            $payload = $this->paymentService->getPakasirStatus($order);
+
+            DB::beginTransaction();
+
+            $lockedOrder = Order::whereKey($order->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $this->validMidtransOrderPayload($order, $request->all())) {
+            if (! $this->validPakasirOrderPayload($lockedOrder, $payload)) {
                 DB::rollBack();
 
                 return response()->json(['error' => 'Invalid amount'], 403);
             }
 
-            if ($order->status === 'paid') {
+            if ($lockedOrder->status === 'paid') {
                 DB::commit();
 
-                return response()->json(['msg' => 'already']);
+                return response()->json(['status' => 'already']);
             }
 
-            $this->applyMidtransStatus($order, $request->all());
+            $this->applyPakasirStatus($lockedOrder, $payload);
 
             DB::commit();
 
-            return response()->json(['msg' => 'ok']);
+            return response()->json([
+                'order_id' => $lockedOrder->order_id,
+                'status' => $lockedOrder->fresh()->status,
+            ]);
         } catch (\Exception $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
 
-            DB::rollBack();
-
-            Log::error('MIDTRANS CALLBACK ERROR: '.$e->getMessage());
+            Log::error('PAKASIR CALLBACK ERROR: '.$e->getMessage());
 
             return response()->json(['error' => 'failed'], 500);
         }
@@ -545,7 +537,7 @@ class PaymentController extends Controller
                 return response()->json(['status' => 'already']);
             }
 
-            $this->generateLicense($order);
+            $this->orderFulfillmentService->fulfill($order);
 
             DB::commit();
 
@@ -566,42 +558,102 @@ class PaymentController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function validMidtransOrderPayload(Order $order, array $payload): bool
+    private function validPakasirOrderPayload(Order $order, array $payload): bool
     {
-        $payloadOrderId = $payload['order_id'] ?? null;
-        $grossAmount = $payload['gross_amount'] ?? null;
-        $originalAmount = $payload['extra_info']['gross_amount_info']['original_amount'] ?? null;
+        $transaction = $this->pakasirPayloadTransaction($payload);
+        $payloadOrderId = $transaction['order_id'] ?? null;
+        $amount = $transaction['amount'] ?? null;
+        $project = $transaction['project'] ?? null;
 
         if (
-            $order->payment_method !== 'midtrans' ||
+            $order->payment_method !== 'pakasir' ||
             ! is_scalar($payloadOrderId) ||
             ! hash_equals($order->order_id, (string) $payloadOrderId) ||
-            ! is_numeric($grossAmount)
+            ! is_numeric($amount)
         ) {
             return false;
         }
 
-        if (is_numeric($originalAmount)) {
-            return $this->sameAmount($originalAmount, $order->price);
+        if ($project && ! hash_equals((string) config('services.pakasir.slug'), (string) $project)) {
+            return false;
         }
 
-        return $this->sameAmount($grossAmount, $order->price);
+        return $this->sameAmount($amount, $order->price);
     }
 
-    private function syncCryptoResponse(Request $request, array $payload, int $status = 200)
+    private function pakasirPayloadTransaction(array $payload): array
+    {
+        if (isset($payload['transaction']) && is_array($payload['transaction'])) {
+            return $payload['transaction'];
+        }
+
+        return $payload;
+    }
+
+    private function pakasirCheckoutPayload(Order $order): array
+    {
+        return [
+            'method' => 'pakasir',
+            'payment_url' => $order->payment_url,
+            'order_id' => $order->order_id,
+            'pakasir_payment' => $this->publicPakasirPaymentPayload($order),
+        ];
+    }
+
+    private function publicPakasirPaymentPayload(Order $order): ?array
+    {
+        $payload = $order->payment_payload;
+
+        if (! is_array($payload) || blank($payload['payment_number'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'amount' => (int) ($payload['amount'] ?? $order->price),
+            'fee' => (int) ($payload['fee'] ?? 0),
+            'total_payment' => (int) ($payload['total_payment'] ?? $payload['amount'] ?? $order->price),
+            'payment_method' => (string) ($payload['payment_method'] ?? 'qris'),
+            'payment_number' => (string) $payload['payment_number'],
+            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
+        ];
+    }
+
+    private function syncPaymentResponse(Request $request, array $payload, int $status = 200)
     {
         if ($this->wantsPaymentJson($request)) {
             return response()->json($payload, $status);
         }
 
         if (($payload['status'] ?? null) === 'paid') {
-            return redirect('/licenses');
+            $orderId = (string) ($payload['order_id'] ?? '');
+            $target = $orderId !== ''
+                ? '/licenses?order=' . rawurlencode($orderId) . '#license-' . $orderId
+                : '/licenses';
+
+            return redirect($target);
         }
 
         return redirect('/orders')->with(
             'info',
-            $payload['message'] ?? $payload['error'] ?? 'Crypto payment is still being verified.'
+            $payload['message'] ?? $payload['error'] ?? 'Payment is still being verified.'
         );
+    }
+
+    private function withLicensePayload(array $payload, Order $order): array
+    {
+        if (($payload['status'] ?? null) !== 'paid') {
+            return $payload;
+        }
+
+        $license = License::where('order_id', $order->order_id)->first();
+
+        if (! $license) {
+            return $payload;
+        }
+
+        $payload['license_key'] = $license->license_key;
+
+        return $payload;
     }
 
     private function publicCryptoSyncError(\Exception $error): string
@@ -612,6 +664,10 @@ class PaymentController extends Controller
 
         if ($error->getMessage() === 'Unable to verify crypto payment') {
             return 'NOWPayments could not be reached. Please try Verify again.';
+        }
+
+        if ($error->getMessage() === 'NOWPayments is not configured') {
+            return 'Crypto checkout is not configured yet.';
         }
 
         return 'Crypto payment is still being verified.';
@@ -625,67 +681,20 @@ class PaymentController extends Controller
             $this->sameAmount($payload['price_amount'] ?? null, $order->price);
     }
 
-    private function applyMidtransStatus(Order $order, array $payload): void
+    private function applyPakasirStatus(Order $order, array $payload): void
     {
-        $transactionStatus = $payload['transaction_status'] ?? null;
-        $fraudStatus = $payload['fraud_status'] ?? null;
+        $transaction = $this->pakasirPayloadTransaction($payload);
+        $status = strtolower((string) ($transaction['status'] ?? ''));
 
-        if (
-            ($transactionStatus === 'capture' && $fraudStatus === 'accept') ||
-            $transactionStatus === 'settlement'
-        ) {
-            $this->generateLicense($order);
+        if ($status === 'completed') {
+            $this->orderFulfillmentService->fulfill($order);
 
             return;
         }
 
-        if (in_array($transactionStatus, ['cancel', 'deny', 'expire'], true) && $order->status !== 'paid') {
+        if (in_array($status, ['cancelled', 'canceled', 'expired', 'failed'], true) && $order->status !== 'paid') {
             $order->update(['status' => 'cancelled']);
         }
-    }
-
-    private function generateLicense($order)
-    {
-        if ($order->status === 'paid') {
-            return;
-        }
-
-        if (License::where('order_id', $order->order_id)->exists()) {
-            $order->update([
-                'status' => 'paid',
-            ]);
-
-            return;
-        }
-
-        $package = Package::findOrFail($order->package_id);
-
-        $stock = LicenseStock::where('product_id', $order->product_id)
-            ->where('package_id', $package->id)
-            ->where('is_sold', false)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $stock || $stock->is_sold) {
-            throw new \Exception('No license stock available for this package');
-        }
-
-        $stock->update([
-            'is_sold' => true,
-            'sold_at' => now(),
-        ]);
-
-        $order->update([
-            'status' => 'paid',
-        ]);
-
-        License::create([
-            'user_id' => $order->user_id,
-            'product_id' => $order->product_id,
-            'license_key' => $stock->license_key,
-            'duration' => $package->name,
-            'order_id' => $order->order_id,
-        ]);
     }
 
     private function hasTooManyRecentOrders(int $userId): bool

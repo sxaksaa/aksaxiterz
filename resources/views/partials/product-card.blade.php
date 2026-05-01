@@ -10,9 +10,6 @@
         if ($minPackage && $minPackage->price >= 100000) {
             $badge = 'Premium';
         }
-        if ($product->category?->slug === 'testing-payment') {
-            $badge = 'Testing';
-        }
     @endphp
 
     <a href="/product/{{ $product->id }}" class="product-card fade-up p-5 flex min-h-56 flex-col">

@@ -37,7 +37,7 @@
                     </div>
                     <div class="home-panel">
                         <div class="text-xl font-semibold text-white">{{ $downloadGroups }}</div>
-                        <div class="mt-1 text-xs text-gray-400">Public download groups ready.</div>
+                        <div class="mt-1 text-xs text-gray-400">File Downloads.</div>
                     </div>
                     <div class="home-panel">
                         <div class="text-xl font-semibold text-white">{{ $totalStock }}</div>

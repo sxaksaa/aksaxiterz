@@ -5,6 +5,8 @@
         $discordUrl = config('links.discord_url');
         $licenseCount = $licenses->count();
         $latestLicense = $licenses->first();
+        $selectedOrderId = request()->query('order');
+        $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -74,7 +76,13 @@
         <div class="grid gap-4 md:gap-6">
 
             @forelse($licenses as $license)
-                <div class="license-card motion-card p-4 md:p-6">
+                @php
+                    $licenseOrderId = (string) $license->order_id;
+                    $licenseAnchor = $licenseOrderId !== '' ? 'license-' . $licenseOrderId : 'license-' . $license->id;
+                    $isSelectedLicense = $selectedOrderId !== '' && $licenseOrderId !== '' && hash_equals($selectedOrderId, $licenseOrderId);
+                @endphp
+
+                <div id="{{ $licenseAnchor }}" class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedLicense ? 'license-card-selected' : '' }}">
 
                     <!-- TOP -->
                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
@@ -88,11 +96,23 @@
                                         NEW
                                     </span>
                                 @endif
+
+                                @if ($isSelectedLicense)
+                                    <span class="text-[10px] sm:text-xs bg-[#9333EA]/25 text-[#E9D5FF] px-2 py-1 rounded">
+                                        SELECTED ORDER
+                                    </span>
+                                @endif
                             </h2>
 
                             <p class="text-xs sm:text-sm text-gray-400">
                                 {{ str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $license->duration) }}
                             </p>
+
+                            @if ($licenseOrderId !== '')
+                                <p class="mt-1 font-mono text-[10px] sm:text-xs text-gray-500">
+                                    Order: {{ $licenseOrderId }}
+                                </p>
+                            @endif
 
                             <p class="text-[10px] sm:text-xs text-gray-500 mt-1">
                                 Purchased: {{ $license->created_at->format('d M Y, H:i') }}

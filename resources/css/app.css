@@ -376,6 +376,16 @@
         transform: translateY(-3px);
     }
 
+    .license-card-selected {
+        border-color: rgba(216, 180, 254, 0.8);
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.18), rgba(21, 21, 27, 0.9)),
+            rgba(21, 21, 27, 0.92);
+        box-shadow:
+            0 0 0 1px rgba(216, 180, 254, 0.16),
+            0 18px 48px rgba(147, 51, 234, 0.16);
+    }
+
     .product-summary-card {
         @apply rounded-xl border p-4 transition-all duration-300 sm:p-6;
         background:
@@ -617,7 +627,7 @@
         color: #d8b4fe;
     }
 
-    .method-pill-midtrans {
+    .method-pill-pakasir {
         background: rgba(59, 130, 246, 0.1);
         border-color: rgba(59, 130, 246, 0.24);
         color: #93c5fd;
@@ -653,6 +663,76 @@
         @apply rounded-xl border p-8 text-center text-sm text-gray-400;
         background: rgba(21, 21, 27, 0.76);
         border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .qris-modal {
+        @apply fixed inset-0 z-[70] flex items-center justify-center px-4 py-6;
+    }
+
+    .qris-modal-backdrop {
+        @apply absolute inset-0;
+        background: rgba(3, 3, 8, 0.78);
+        backdrop-filter: blur(16px);
+    }
+
+    .qris-dialog {
+        @apply relative w-full max-w-md rounded-xl border p-5 shadow-2xl;
+        background:
+            radial-gradient(circle at top left, rgba(147, 51, 234, 0.18), transparent 32%),
+            rgba(14, 14, 18, 0.98);
+        border-color: rgba(147, 51, 234, 0.34);
+        box-shadow:
+            0 24px 72px rgba(0, 0, 0, 0.5),
+            0 0 0 1px rgba(216, 180, 254, 0.08);
+    }
+
+    .qris-close-button {
+        @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-semibold text-gray-400 transition hover:text-white;
+        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(9, 9, 12, 0.68);
+    }
+
+    .qris-canvas-wrap {
+        @apply mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center rounded-xl border bg-white p-3;
+        border-color: rgba(216, 180, 254, 0.32);
+    }
+
+    .qris-canvas-wrap canvas {
+        @apply h-full w-full;
+    }
+
+    .qris-detail-row {
+        @apply flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs text-gray-400;
+        background: rgba(9, 9, 12, 0.42);
+        border-color: rgba(63, 63, 70, 0.72);
+    }
+
+    .qris-total-row {
+        border-color: rgba(147, 51, 234, 0.42);
+        background: rgba(147, 51, 234, 0.11);
+    }
+
+    .payment-success-dialog {
+        @apply max-w-sm;
+    }
+
+    .payment-success-mark {
+        @apply flex h-20 w-20 items-center justify-center rounded-full border;
+        color: #ffffff;
+        border-color: rgba(216, 180, 254, 0.44);
+        background:
+            radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.22), transparent 24%),
+            linear-gradient(135deg, #581c87, #9333ea 52%, #c084fc);
+        box-shadow:
+            0 18px 42px rgba(147, 51, 234, 0.2),
+            0 0 0 8px rgba(147, 51, 234, 0.1);
+    }
+
+    .payment-success-check {
+        @apply block h-7 w-4;
+        border-bottom: 4px solid #ffffff;
+        border-right: 4px solid #ffffff;
+        transform: translateY(-2px) rotate(45deg);
     }
 
     .order-pagination {

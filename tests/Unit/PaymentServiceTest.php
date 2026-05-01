@@ -23,24 +23,29 @@ class PaymentServiceTest extends TestCase
         $this->assertEqualsWithDelta(0.60, $method->invoke($service, 0.50), 0.0001);
     }
 
-    public function test_midtrans_customer_fee_percentage_is_configurable(): void
+    public function test_pakasir_payment_url_uses_order_amount_redirect_and_qris_flag(): void
     {
-        config(['payment.midtrans_customer_fee_percentage' => 50]);
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.url' => 'https://app.pakasir.com',
+            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
+            'services.pakasir.qris_only' => true,
+        ]);
 
         $service = new PaymentService;
-        $method = new ReflectionMethod($service, 'midtransCustomerFeeConfig');
+        $method = new ReflectionMethod($service, 'pakasirPaymentUrl');
         $method->setAccessible(true);
 
-        $config = $method->invoke($service);
+        $url = $method->invoke($service, 'ORDER-ABC123', 22000);
+        $parts = parse_url($url);
 
-        $this->assertNotNull($config);
-        $this->assertSame(50, $config['payment_fee_configs'][0]['customer_percentage']);
-        $this->assertNotContains('qris', array_column($config['payment_fee_configs'], 'payment_type'));
-        $this->assertNotContains('other_qris', array_column($config['payment_fee_configs'], 'payment_type'));
-        $this->assertNotContains('other_va', array_column($config['payment_fee_configs'], 'payment_type'));
+        parse_str($parts['query'] ?? '', $query);
 
-        config(['payment.midtrans_customer_fee_percentage' => 0]);
-
-        $this->assertNull($method->invoke($service));
+        $this->assertSame('https', $parts['scheme']);
+        $this->assertSame('app.pakasir.com', $parts['host']);
+        $this->assertSame('/pay/aksaxiterz/22000', $parts['path']);
+        $this->assertSame('ORDER-ABC123', $query['order_id'] ?? null);
+        $this->assertSame('https://aksaxiterz.test/orders', $query['redirect'] ?? null);
+        $this->assertSame('1', (string) ($query['qris_only'] ?? null));
     }
 }

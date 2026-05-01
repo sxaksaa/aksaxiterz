@@ -10,9 +10,6 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Midtrans\Config;
-use Midtrans\Snap;
-use Midtrans\Transaction;
 
 class PaymentService
 {
@@ -24,28 +21,19 @@ class PaymentService
         'usdtton',
     ];
 
-    private const MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES = [
-        'gopay',
-        'shopeepay',
-        'dana',
-        'bca_va',
-        'bni_va',
-        'bri_va',
-        'permata_va',
-        'echannel',
-    ];
-
     private const DEFAULT_CRYPTO_BUYER_FEE_RATE = 0.02;
 
     private const DEFAULT_CRYPTO_BUYER_FEE_MINIMUM = 0.10;
 
-    public function createMidtrans($user, $productId, $packageId, ?Order $order = null)
+    public function createPakasir($user, $productId, $packageId, ?Order $order = null)
     {
-        return $this->createMidtransPayment($user, $productId, $packageId, $order)['snap_token'];
+        return $this->createPakasirPayment($user, $productId, $packageId, $order)['payment_url'];
     }
 
-    public function createMidtransPayment($user, $productId, $packageId, ?Order $order = null): array
+    public function createPakasirPayment($user, $productId, $packageId, ?Order $order = null): array
     {
+        $this->ensurePakasirConfigured();
+
         $product = Product::findOrFail($productId);
 
         $package = Package::where('id', $packageId)
@@ -53,7 +41,7 @@ class PaymentService
             ->firstOrFail();
 
         if ($order) {
-            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'midtrans');
+            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'pakasir');
         }
 
         $stock = LicenseStock::where('product_id', $product->id)
@@ -67,40 +55,27 @@ class PaymentService
 
         if (! $order) {
             $order = Order::create([
-                'order_id' => 'ORD-'.strtoupper(Str::random(10)),
+                'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
                 'product_id' => $product->id,
                 'user_id' => $user->id,
                 'status' => 'pending',
-                'payment_method' => 'midtrans',
+                'payment_method' => 'pakasir',
                 'price' => $package->price,
                 'package_id' => $package->id,
                 'expired_at' => now()->addMinutes(10),
             ]);
         }
 
-        Config::$serverKey = config('midtrans.serverKey');
-        Config::$isProduction = config('midtrans.isProduction', false);
-        Config::$curlOptions = $this->midtransCurlOptions();
-
-        $params = [
-            'transaction_details' => [
-                'order_id' => $order->order_id,
-                'gross_amount' => (int) round((float) $order->price),
-            ],
-            'customer_details' => [
-                'first_name' => $user->name,
-                'email' => $user->email,
-            ],
-        ];
-
-        $customerFeeConfig = $this->midtransCustomerFeeConfig();
-
-        if ($customerFeeConfig) {
-            $params['customer_imposed_payment_fee'] = $customerFeeConfig;
-        }
+        $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
 
         try {
-            $snapToken = Snap::getSnapToken($params);
+            $payment = $this->createPakasirQrisTransaction($order);
+
+            $order->update([
+                'payment_url' => $paymentUrl,
+                'payment_payload' => $this->normalizePakasirPayment($payment),
+                'expired_at' => $this->pakasirExpiredAt($payment['expired_at'] ?? null) ?? $order->expired_at,
+            ]);
         } catch (\Exception $e) {
             $order->update(['status' => 'cancelled']);
 
@@ -108,24 +83,37 @@ class PaymentService
         }
 
         return [
-            'snap_token' => $snapToken,
+            'payment_url' => $paymentUrl,
+            'pakasir_payment' => $order->fresh()->payment_payload,
             'order' => $order->fresh(),
         ];
     }
 
-    public function getMidtransStatus(string $orderId): array
+    public function getPakasirStatus(Order $order): array
     {
-        Config::$serverKey = config('midtrans.serverKey');
-        Config::$isProduction = config('midtrans.isProduction', false);
-        Config::$curlOptions = $this->midtransCurlOptions();
+        $this->ensurePakasirConfigured();
 
-        $status = Transaction::status($orderId);
+        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
 
-        return json_decode(json_encode($status), true) ?: [];
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->get($baseUrl.'/api/transactiondetail', [
+                'project' => config('services.pakasir.slug'),
+                'amount' => $this->idrAmount($order->price),
+                'order_id' => $order->order_id,
+                'api_key' => config('services.pakasir.api_key'),
+            ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('Unable to verify Pakasir payment');
+        }
+
+        return $response->json() ?: [];
     }
 
     public function getNowpaymentsPayment(string $paymentId): array
     {
+        $this->ensureNowpaymentsConfigured();
+
         $baseUrl = rtrim(config('services.nowpayments.url') ?: 'https://api.nowpayments.io/v1', '/');
 
         $response = Http::withOptions($this->gatewayHttpOptions())
@@ -149,6 +137,8 @@ class PaymentService
         if (! $email || ! $password) {
             return null;
         }
+
+        $this->ensureNowpaymentsConfigured();
 
         $baseUrl = rtrim(config('services.nowpayments.url') ?: 'https://api.nowpayments.io/v1', '/');
         $tokenResponse = Http::withOptions($this->gatewayHttpOptions())
@@ -279,6 +269,8 @@ class PaymentService
             throw new \Exception('Invalid payment method');
         }
 
+        $this->ensureNowpaymentsConfigured();
+
         $product = Product::findOrFail($productId);
 
         $package = Package::where('id', $packageId)
@@ -316,7 +308,7 @@ class PaymentService
 
         if (! $order) {
             $order = Order::create([
-                'order_id' => 'ORD-'.strtoupper(Str::random(10)),
+                'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
                 'product_id' => $product->id,
                 'user_id' => $user->id,
                 'status' => 'pending',
@@ -328,10 +320,12 @@ class PaymentService
         }
 
         try {
+            $baseUrl = rtrim(config('services.nowpayments.url') ?: 'https://api.nowpayments.io/v1', '/');
+
             $response = Http::withOptions($this->gatewayHttpOptions())
                 ->withHeaders([
                     'x-api-key' => config('services.nowpayments.key'),
-                ])->post(config('services.nowpayments.url').'/invoice', [
+                ])->post($baseUrl.'/invoice', [
                     'price_amount' => $amount,
                     'price_currency' => 'usd',
                     'pay_currency' => $coin,
@@ -340,7 +334,7 @@ class PaymentService
                     'order_id' => $order->order_id,
                     'order_description' => $this->cryptoOrderDescription($product->name, $package->name, $baseAmount, $amount),
                     'ipn_callback_url' => config('services.nowpayments.ipn'),
-                    'success_url' => url('/licenses'),
+                    'success_url' => url('/licenses') . '?order=' . rawurlencode($order->order_id) . '#license-' . $order->order_id,
                     'cancel_url' => url('/'),
                 ]);
 
@@ -408,26 +402,6 @@ class PaymentService
         }
     }
 
-    private function midtransCustomerFeeConfig(): ?array
-    {
-        $customerPercentage = $this->midtransCustomerFeePercentage();
-
-        if ($customerPercentage <= 0) {
-            return null;
-        }
-
-        return [
-            'enable' => true,
-            'payment_fee_configs' => array_map(
-                fn (string $paymentType) => [
-                    'payment_type' => $paymentType,
-                    'customer_percentage' => $customerPercentage,
-                ],
-                self::MIDTRANS_CUSTOMER_FEE_PAYMENT_TYPES
-            ),
-        ];
-    }
-
     private function cryptoBuyerFeeRate(): float
     {
         return max(0.0, (float) config('payment.crypto_buyer_fee_rate', self::DEFAULT_CRYPTO_BUYER_FEE_RATE));
@@ -438,9 +412,108 @@ class PaymentService
         return max(0.0, (float) config('payment.crypto_buyer_fee_minimum', self::DEFAULT_CRYPTO_BUYER_FEE_MINIMUM));
     }
 
-    private function midtransCustomerFeePercentage(): int
+    private function pakasirPaymentUrl(string $orderId, $amount): string
     {
-        return max(0, min(100, (int) config('payment.midtrans_customer_fee_percentage', 50)));
+        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
+        $slug = trim((string) config('services.pakasir.slug'));
+        $query = [
+            'order_id' => $orderId,
+            'redirect' => config('services.pakasir.return_url') ?: url('/orders'),
+        ];
+
+        if ((bool) config('services.pakasir.qris_only', false)) {
+            $query['qris_only'] = 1;
+        }
+
+        return sprintf(
+            '%s/pay/%s/%d?%s',
+            $baseUrl,
+            rawurlencode($slug),
+            $this->idrAmount($amount),
+            http_build_query($query)
+        );
+    }
+
+    private function createPakasirQrisTransaction(Order $order): array
+    {
+        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
+
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->asJson()
+            ->post($baseUrl.'/api/transactioncreate/qris', [
+                'project' => config('services.pakasir.slug'),
+                'order_id' => $order->order_id,
+                'amount' => $this->idrAmount($order->price),
+                'api_key' => config('services.pakasir.api_key'),
+            ]);
+
+        $payload = $response->json() ?: [];
+        $payment = $payload['payment'] ?? null;
+
+        if (! $response->successful() || ! is_array($payment) || blank($payment['payment_number'] ?? null)) {
+            Log::warning('Pakasir QRIS response missing payment number', [
+                'order_id' => $order->order_id,
+                'status' => $response->status(),
+                'body' => $payload ?: $response->body(),
+            ]);
+
+            throw new \Exception('Unable to create Pakasir QRIS payment');
+        }
+
+        return $payment;
+    }
+
+    private function normalizePakasirPayment(array $payment): array
+    {
+        return [
+            'project' => (string) ($payment['project'] ?? config('services.pakasir.slug')),
+            'order_id' => (string) ($payment['order_id'] ?? ''),
+            'amount' => $this->idrAmount($payment['amount'] ?? 0),
+            'fee' => $this->idrAmount($payment['fee'] ?? 0),
+            'total_payment' => $this->idrAmount($payment['total_payment'] ?? ($payment['amount'] ?? 0)),
+            'payment_method' => (string) ($payment['payment_method'] ?? 'qris'),
+            'payment_number' => (string) ($payment['payment_number'] ?? ''),
+            'expired_at' => (string) ($payment['expired_at'] ?? ''),
+        ];
+    }
+
+    private function pakasirExpiredAt(?string $expiredAt): ?Carbon
+    {
+        if (! $expiredAt) {
+            return null;
+        }
+
+        $normalized = preg_replace('/\.(\d{6})\d+(Z|[+-]\d{2}:\d{2})$/', '.$1$2', $expiredAt);
+
+        try {
+            return Carbon::parse($normalized);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function ensurePakasirConfigured(): void
+    {
+        if (! config('services.pakasir.slug') || ! config('services.pakasir.api_key')) {
+            throw new \Exception('Pakasir is not configured');
+        }
+    }
+
+    private function ensureNowpaymentsConfigured(): void
+    {
+        if (
+            ! config('services.nowpayments.key') ||
+            ! config('services.nowpayments.url') ||
+            ! config('services.nowpayments.ipn') ||
+            ! config('services.nowpayments.ipn_secret')
+        ) {
+            throw new \Exception('NOWPayments is not configured');
+        }
+    }
+
+    private function idrAmount($amount): int
+    {
+        return max(0, (int) round((float) $amount));
     }
 
     private function bscRpc(string $method, array $params)
@@ -613,13 +686,6 @@ class PaymentService
         return [
             'proxy' => '',
             'curl' => $this->gatewayCurlOptions(),
-        ];
-    }
-
-    private function midtransCurlOptions(): array
-    {
-        return $this->gatewayCurlOptions() + [
-            CURLOPT_HTTPHEADER => [],
         ];
     }
 }

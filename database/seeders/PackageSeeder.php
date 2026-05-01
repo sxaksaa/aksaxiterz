@@ -12,7 +12,6 @@ class PackageSeeder extends Seeder
     {
         $aurora = Product::where('name', 'Aurora-VN')->firstOrFail();
         $xg = Product::where('name', 'XG-Team')->firstOrFail();
-        $testing = Product::where('name', 'Testing Payment')->firstOrFail();
 
         // AuroraVN
         $this->upsertPackage($aurora, '1 Hari', '1 Day', 20000, 1.25);
@@ -21,10 +20,6 @@ class PackageSeeder extends Seeder
 
         // XG
         $this->upsertPackage($xg, '7 Hari', '7 Days', 80000, 5);
-
-        // Testing Payment
-        $this->upsertPackage($testing, 'Testing', 'Testing', 1, 0.1);
-        $this->upsertPackage($testing, 'Testing Rp 1,000', 'Testing Rp 1,000', 1000, 1);
     }
 
     private function upsertPackage(Product $product, string $oldName, string $name, int $price, float $priceUsdt): void

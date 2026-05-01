@@ -11,7 +11,6 @@ class ProductSeeder extends Seeder
     public function run(): void
     {
         $category = Category::where('slug', 'digital-tools')->firstOrFail();
-        $testingCategory = Category::where('slug', 'testing-payment')->firstOrFail();
 
         Product::updateOrCreate(
             ['name' => 'Aurora-VN'],
@@ -26,14 +25,6 @@ class ProductSeeder extends Seeder
             [
                 'description' => 'Desktop utility license with setup guidance and access support.',
                 'category_id' => $category->id,
-            ]
-        );
-
-        Product::updateOrCreate(
-            ['name' => 'Testing Payment'],
-            [
-                'description' => 'Low-cost product for testing the real payment flow.',
-                'category_id' => $testingCategory->id,
             ]
         );
     }

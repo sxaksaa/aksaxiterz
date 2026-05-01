@@ -15,8 +15,6 @@ class LicenseStockSeeder extends Seeder
         $this->seedPackageStock('Aurora-VN', '7 Days', 'AURORA-7D', 20);
         $this->seedPackageStock('Aurora-VN', '30 Days', 'AURORA-30D', 20);
         $this->seedPackageStock('XG-Team', '7 Days', 'XG-7D', 20);
-        $this->seedPackageStock('Testing Payment', 'Testing', 'TEST-PAYMENT', 25);
-        $this->seedPackageStock('Testing Payment', 'Testing Rp 1,000', 'TEST-PAYMENT-1K', 25);
     }
 
     private function seedPackageStock(string $productName, string $packageName, string $prefix, int $count): void

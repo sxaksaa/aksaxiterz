@@ -13,23 +13,25 @@ class PaymentPresentationTest extends TestCase
     public function test_crypto_orders_render_verify_as_clickable_form(): void
     {
         $order = $this->fakeOrder([
-            'order_id' => 'ORD-VERIFYTEST',
+            'order_id' => 'ORDER-VERIFYTEST',
             'status' => 'pending',
         ]);
 
         $html = $this->renderOrders([$order]);
 
+        $this->assertStringContainsString('Crypto (NOWPayments)', $html);
         $this->assertStringContainsString('class="sync-crypto-form"', $html);
-        $this->assertStringContainsString('data-order-id="ORD-VERIFYTEST"', $html);
+        $this->assertStringContainsString('data-order-id="ORDER-VERIFYTEST"', $html);
         $this->assertStringContainsString('action="/cancel-order/1"', $html);
         $this->assertStringContainsString('Cancel Order', $html);
-        $this->assertStringNotContainsString('href="/sync-crypto-order/ORD-VERIFYTEST"', $html);
+        $this->assertStringNotContainsString('Order ID copied', $html);
+        $this->assertStringNotContainsString('href="/sync-crypto-order/ORDER-VERIFYTEST"', $html);
     }
 
     public function test_cancelled_crypto_orders_do_not_render_as_verifying(): void
     {
         $order = $this->fakeOrder([
-            'order_id' => 'ORD-CANCELLED',
+            'order_id' => 'ORDER-CANCELLED',
             'status' => 'cancelled',
         ]);
 
@@ -37,8 +39,75 @@ class PaymentPresentationTest extends TestCase
 
         $this->assertStringContainsString('Cancelled', $html);
         $this->assertStringNotContainsString('Verifying', $html);
-        $this->assertStringNotContainsString('data-order-id="ORD-CANCELLED"', $html);
+        $this->assertStringNotContainsString('data-order-id="ORDER-CANCELLED"', $html);
         $this->assertStringNotContainsString('action="/cancel-order/1"', $html);
+    }
+
+    public function test_pakasir_orders_render_check_and_continue_actions(): void
+    {
+        $order = $this->fakeOrder([
+            'order_id' => 'ORDER-PAKASIR',
+            'payment_method' => 'pakasir',
+            'price' => 10000,
+            'payment_url' => 'https://app.pakasir.com/pay/aksaxiterz/10000?order_id=ORDER-PAKASIR',
+            'payment_payload' => [
+                'amount' => 10000,
+                'fee' => 380,
+                'total_payment' => 10380,
+                'payment_method' => 'qris',
+                'payment_number' => '00020101021226570011ID.DUMMY.QRIS',
+                'expired_at' => now()->addMinutes(5)->toIso8601String(),
+            ],
+            'expired_at' => now()->addMinutes(5),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('QRIS', $html);
+        $this->assertStringNotContainsString('QRIS (Pakasir)', $html);
+        $this->assertStringContainsString('class="sync-pakasir-form"', $html);
+        $this->assertStringContainsString('data-order-id="ORDER-PAKASIR"', $html);
+        $this->assertStringContainsString('View QRIS', $html);
+        $this->assertStringContainsString('data-pakasir-checkout=', $html);
+        $this->assertStringNotContainsString('Waiting for QRIS payment', $html);
+        $this->assertStringNotContainsString('Need Help?', $html);
+        $this->assertStringNotContainsString('Support message copied', $html);
+        $this->assertStringNotContainsString('Pay Again', $html);
+    }
+
+    public function test_cancelled_orders_do_not_render_extra_payment_actions(): void
+    {
+        $order = $this->fakeOrder([
+            'status' => 'cancelled',
+            'payment_method' => 'pakasir',
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringNotContainsString('Start New Checkout', $html);
+        $this->assertStringNotContainsString('/product/1', $html);
+        $this->assertStringNotContainsString('No action', $html);
+    }
+
+    public function test_paid_orders_render_paid_timestamp(): void
+    {
+        $paidAt = now()->setTime(13, 14, 15);
+        $order = $this->fakeOrder([
+            'status' => 'paid',
+            'payment_method' => 'pakasir',
+            'paid_at' => $paidAt,
+            'expired_at' => now()->subMinute(),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+        $expectedTime = $paidAt->timezone(config('app.timezone'))->format('H:i:s').' WIB';
+
+        $this->assertStringContainsString('Created at', $html);
+        $this->assertStringContainsString('Paid at', $html);
+        $this->assertStringContainsString($expectedTime, $html);
+        $this->assertStringNotContainsString('View License', $html);
+        $this->assertStringNotContainsString('/licenses?order=ORDER-TEST#license-ORDER-TEST', $html);
     }
 
     private function fakeOrder(array $attributes = []): Order
@@ -57,7 +126,7 @@ class PaymentPresentationTest extends TestCase
         $package->id = 1;
 
         $order = new Order(array_merge([
-            'order_id' => 'ORD-TEST',
+            'order_id' => 'ORDER-TEST',
             'product_id' => 1,
             'user_id' => 1,
             'status' => 'pending',

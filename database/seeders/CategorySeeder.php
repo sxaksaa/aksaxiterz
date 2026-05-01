@@ -13,10 +13,5 @@ class CategorySeeder extends Seeder
             ['slug' => 'digital-tools'],
             ['name' => 'Digital Tools']
         );
-
-        Category::updateOrCreate(
-            ['slug' => 'testing-payment'],
-            ['name' => 'Testing Payment']
-        );
     }
 }

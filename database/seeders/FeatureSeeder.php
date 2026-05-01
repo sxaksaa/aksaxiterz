@@ -27,15 +27,6 @@ class FeatureSeeder extends Seeder
             'Setup tutorial included',
             'Customer support available',
         ]);
-
-        // Testing Payment
-        $testing = Product::where('name', 'Testing Payment')->firstOrFail();
-
-        $this->syncFeatures($testing, [
-            'Midtrans real payment flow test',
-            'Crypto invoice flow test',
-            'Dummy license delivery',
-        ]);
     }
 
     private function syncFeatures(Product $product, array $features): void
