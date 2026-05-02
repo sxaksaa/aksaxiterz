@@ -161,7 +161,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1');
     Route::post('/sync-pakasir-order/{orderId}', [PaymentController::class, 'syncPakasirOrder'])
         ->middleware('throttle:10,1');
-    Route::match(['get', 'post'], '/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
+    Route::post('/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
         ->middleware('throttle:20,1');
 
     // Crypto
@@ -320,7 +320,7 @@ Route::get('/auth/google', function (Request $request) use ($isSafeLoginRedirect
     }
 
     return Socialite::driver('google')->redirect();
-});
+})->middleware('throttle:60,1');
 
 Route::get('/auth/google/callback', function (Request $request) use ($isSafeLoginRedirect) {
 
@@ -359,7 +359,7 @@ Route::get('/auth/google/callback', function (Request $request) use ($isSafeLogi
     Cookie::queue(Cookie::forget('login_redirect'));
 
     return redirect($isSafeLoginRedirect($request, $redirect) ? $redirect : '/');
-});
+})->middleware('throttle:120,1');
 
 Route::post('/logout', function () {
     Auth::logout();
@@ -377,7 +377,8 @@ Route::get('/login', function () {
 |--------------------------------------------------------------------------
 */
 
-Route::post('/pakasir-callback', [PaymentController::class, 'pakasirCallback']);
+Route::post('/pakasir-callback', [PaymentController::class, 'pakasirCallback'])
+    ->middleware('throttle:120,1');
 
 Route::get('/success', function () {
     return redirect('/licenses');

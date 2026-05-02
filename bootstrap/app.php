@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnforceCanonicalUrl;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Request as HttpRequest;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,7 +16,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->append(SecurityHeaders::class);
+        $trustedProxies = env('TRUSTED_PROXIES');
+
+        if ($trustedProxies === null || $trustedProxies === '') {
+            $trustedProxies = env('APP_ENV', 'production') === 'production' ? '*' : null;
+        }
+
+        $middleware->trustProxies(
+            at: $trustedProxies,
+            headers: HttpRequest::HEADER_X_FORWARDED_FOR |
+                HttpRequest::HEADER_X_FORWARDED_HOST |
+                HttpRequest::HEADER_X_FORWARDED_PORT |
+                HttpRequest::HEADER_X_FORWARDED_PROTO |
+                HttpRequest::HEADER_X_FORWARDED_PREFIX
+        );
+
+        $middleware->append([
+            SecurityHeaders::class,
+            EnforceCanonicalUrl::class,
+        ]);
         $middleware->alias([
             'admin' => EnsureAdmin::class,
         ]);
