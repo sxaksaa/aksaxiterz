@@ -15,6 +15,7 @@ class PackageSeeder extends Seeder
 
         // AuroraVN
         $this->upsertPackage($aurora, '1 Hari', '1 Day', 20000, 1.25);
+        $this->upsertPackage($aurora, '3 Hari', '3 Days', 45000, 3);
         $this->upsertPackage($aurora, '7 Hari', '7 Days', 100000, 6);
         $this->upsertPackage($aurora, '30 Hari', '30 Days', 250000, 15);
 

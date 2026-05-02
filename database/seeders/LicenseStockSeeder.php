@@ -12,6 +12,7 @@ class LicenseStockSeeder extends Seeder
     public function run(): void
     {
         $this->seedPackageStock('Aurora-VN', '1 Day', 'AURORA-1D', 20);
+        $this->seedPackageStock('Aurora-VN', '3 Days', 'AURORA-3D', 20);
         $this->seedPackageStock('Aurora-VN', '7 Days', 'AURORA-7D', 20);
         $this->seedPackageStock('Aurora-VN', '30 Days', 'AURORA-30D', 20);
         $this->seedPackageStock('XG-Team', '7 Days', 'XG-7D', 20);
