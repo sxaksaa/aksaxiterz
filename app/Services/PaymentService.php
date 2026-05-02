@@ -301,6 +301,8 @@ class PaymentService
 
     private function inspectDirectBep20Transfers(Order $order, array $payload): array
     {
+        $network = $this->directCryptoNetwork('usdtbsc');
+
         $address = strtolower(trim((string) ($payload['address'] ?? '')));
         $contract = strtolower(trim((string) ($payload['contract'] ?? '')));
         $decimals = (int) ($payload['decimals'] ?? 18);
@@ -313,74 +315,66 @@ class PaymentService
             ];
         }
 
-        $network = $this->directCryptoNetwork('usdtbsc');
-        $response = Http::withOptions($this->gatewayHttpOptions())
-            ->timeout(20)
-            ->get((string) ($network['api_url'] ?? 'https://api.etherscan.io/v2/api'), [
-                'chainid' => (string) ($network['chain_id'] ?? 56),
-                'module' => 'account',
-                'action' => 'tokentx',
-                'contractaddress' => $contract,
-                'address' => $address,
-                'page' => 1,
-                'offset' => 100,
-                'sort' => 'desc',
-                'apikey' => (string) ($network['api_key'] ?? ''),
-            ]);
+        $rpcUrl = rtrim((string) ($network['rpc_url'] ?? ''), '/');
 
-        if (! $response->successful()) {
+        if ($rpcUrl === '') {
             throw new \Exception('Unable to verify crypto payment');
         }
 
-        $data = $response->json() ?: [];
-        $transactions = $data['result'] ?? [];
-
-        if (! is_array($transactions)) {
-            return [
-                'transfer' => null,
-                'mismatches' => [],
-            ];
-        }
-
+        $latestBlock = $this->bscRpcBlockNumber($rpcUrl);
+        $scanBlocks = max(1, min(120000, (int) ($network['rpc_scan_blocks'] ?? 40000)));
+        $chunkBlocks = max(100, min(5000, (int) ($network['rpc_chunk_blocks'] ?? 3000)));
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
+        $toTopic = '0x'.str_pad(substr($address, 2), 64, '0', STR_PAD_LEFT);
+        $eventTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
         $mismatches = [];
+        $oldestBlock = max(0, $latestBlock - $scanBlocks);
 
-        foreach ($transactions as $transaction) {
-            if (! is_array($transaction)) {
-                continue;
-            }
+        for ($toBlock = $latestBlock; $toBlock >= $oldestBlock; $toBlock -= ($chunkBlocks + 1)) {
+            $fromBlock = max($oldestBlock, $toBlock - $chunkBlocks);
+            $logs = $this->bscRpcGetLogs($rpcUrl, [
+                'fromBlock' => $this->hexQuantity($fromBlock),
+                'toBlock' => $this->hexQuantity($toBlock),
+                'address' => $contract,
+                'topics' => [
+                    $eventTopic,
+                    null,
+                    $toTopic,
+                ],
+            ]);
 
-            $actualTo = strtolower((string) ($transaction['to'] ?? ''));
-            $actualContract = strtolower((string) ($transaction['contractAddress'] ?? ''));
-            $value = $this->normalizeDecimalString((string) ($transaction['value'] ?? ''));
-            $timestamp = (int) ($transaction['timeStamp'] ?? 0);
+            foreach (array_reverse($logs) as $log) {
+                if (! is_array($log)) {
+                    continue;
+                }
 
-            if ($actualTo !== $address || $actualContract !== $contract) {
-                continue;
-            }
+                $value = $this->hexToDecimalString((string) ($log['data'] ?? '0x0'));
+                $blockNumber = hexdec((string) ($log['blockNumber'] ?? '0x0'));
+                $confirmedAt = $this->bscRpcBlockTimestamp($rpcUrl, $blockNumber);
 
-            if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
-                continue;
-            }
+                if ($createdAtTimestamp && $confirmedAt && $confirmedAt->timestamp < ($createdAtTimestamp - 300)) {
+                    continue;
+                }
 
-            $transfer = [
-                'tx_hash' => (string) ($transaction['hash'] ?? ''),
-                'network' => 'usdtbsc',
-                'amount_units' => $value,
-                'amount' => $this->tokenUnitsToDecimal($value, $decimals),
-                'to' => $actualTo,
-                'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
-            ];
-
-            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
-                return [
-                    'transfer' => $transfer,
-                    'mismatches' => $mismatches,
+                $transfer = [
+                    'tx_hash' => (string) ($log['transactionHash'] ?? ''),
+                    'network' => 'usdtbsc',
+                    'amount_units' => $value,
+                    'amount' => $this->tokenUnitsToDecimal($value, $decimals),
+                    'to' => $address,
+                    'confirmed_at' => $confirmedAt,
                 ];
-            }
 
-            if (count($mismatches) < 5) {
-                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
+                if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+                    return [
+                        'transfer' => $transfer,
+                        'mismatches' => $mismatches,
+                    ];
+                }
+
+                if (count($mismatches) < 5) {
+                    $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
+                }
             }
         }
 
@@ -560,7 +554,7 @@ class PaymentService
             throw new \Exception('Direct crypto checkout is not configured');
         }
 
-        if ($coin === 'usdtbsc' && blank($network['api_key'] ?? null)) {
+        if ($coin === 'usdtbsc' && blank($network['rpc_url'] ?? null)) {
             throw new \Exception('Direct crypto checkout is not configured');
         }
     }
@@ -643,6 +637,129 @@ class PaymentService
         $decimal = $whole.'.'.$fraction;
 
         return rtrim(rtrim($decimal, '0'), '.') ?: '0';
+    }
+
+    private function bscRpcBlockNumber(string $rpcUrl): int
+    {
+        $result = $this->bscRpc($rpcUrl, 'eth_blockNumber');
+
+        if (! is_string($result)) {
+            throw new \Exception('Unable to verify crypto payment');
+        }
+
+        return hexdec($result);
+    }
+
+    private function bscRpcGetLogs(string $rpcUrl, array $filter): array
+    {
+        $result = $this->bscRpc($rpcUrl, 'eth_getLogs', [$filter]);
+
+        if (! is_array($result)) {
+            throw new \Exception('Unable to verify crypto payment');
+        }
+
+        return $result;
+    }
+
+    private function bscRpcBlockTimestamp(string $rpcUrl, int $blockNumber): ?Carbon
+    {
+        $result = $this->bscRpc($rpcUrl, 'eth_getBlockByNumber', [$this->hexQuantity($blockNumber), false]);
+
+        if (! is_array($result) || ! is_string($result['timestamp'] ?? null)) {
+            return null;
+        }
+
+        return Carbon::createFromTimestamp(hexdec($result['timestamp']));
+    }
+
+    private function bscRpc(string $rpcUrl, string $method, array $params = []): mixed
+    {
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->timeout(20)
+            ->asJson()
+            ->post($rpcUrl, [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => $method,
+                'params' => $params,
+            ]);
+
+        $payload = $response->json() ?: [];
+
+        if (! $response->successful() || isset($payload['error'])) {
+            Log::warning('BSC RPC verification request failed', [
+                'method' => $method,
+                'status' => $response->status(),
+                'error' => $payload['error']['message'] ?? null,
+            ]);
+
+            throw new \Exception('Unable to verify crypto payment');
+        }
+
+        return $payload['result'] ?? null;
+    }
+
+    private function hexQuantity(int $value): string
+    {
+        return '0x'.dechex(max(0, $value));
+    }
+
+    private function hexToDecimalString(string $hex): string
+    {
+        $hex = strtolower(trim($hex));
+        $hex = str_starts_with($hex, '0x') ? substr($hex, 2) : $hex;
+        $hex = ltrim($hex, '0');
+
+        if ($hex === '') {
+            return '0';
+        }
+
+        $decimal = '0';
+
+        foreach (str_split($hex) as $digit) {
+            $decimal = $this->decimalStringMultiplySmall($decimal, 16);
+            $decimal = $this->decimalStringAddSmall($decimal, hexdec($digit));
+        }
+
+        return $this->normalizeDecimalString($decimal);
+    }
+
+    private function decimalStringMultiplySmall(string $number, int $multiplier): string
+    {
+        $carry = 0;
+        $result = '';
+
+        for ($i = strlen($number) - 1; $i >= 0; $i--) {
+            $product = ((int) $number[$i] * $multiplier) + $carry;
+            $result = ($product % 10).$result;
+            $carry = intdiv($product, 10);
+        }
+
+        while ($carry > 0) {
+            $result = ($carry % 10).$result;
+            $carry = intdiv($carry, 10);
+        }
+
+        return $this->normalizeDecimalString($result);
+    }
+
+    private function decimalStringAddSmall(string $number, int $addend): string
+    {
+        $carry = $addend;
+        $result = '';
+
+        for ($i = strlen($number) - 1; $i >= 0; $i--) {
+            $sum = ((int) $number[$i]) + ($carry % 10);
+            $carry = intdiv($carry, 10) + intdiv($sum, 10);
+            $result = ($sum % 10).$result;
+        }
+
+        while ($carry > 0) {
+            $result = ($carry % 10).$result;
+            $carry = intdiv($carry, 10);
+        }
+
+        return $this->normalizeDecimalString($result);
     }
 
     private function gatewayCurlOptions(): array
