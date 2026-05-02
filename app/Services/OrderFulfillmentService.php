@@ -22,6 +22,8 @@ class OrderFulfillmentService
         $stock = LicenseStock::where('product_id', $order->product_id)
             ->where('package_id', $package->id)
             ->where('is_sold', false)
+            ->oldest('created_at')
+            ->oldest('id')
             ->lockForUpdate()
             ->first();
 

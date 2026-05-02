@@ -62,6 +62,38 @@ class AdminOrderOperationsTest extends TestCase
         $response->assertSee('Resync License');
     }
 
+    public function test_fulfillment_delivers_oldest_available_license_stock_first(): void
+    {
+        [$admin, $order] = $this->makePendingOrder();
+
+        LicenseStock::create([
+            'product_id' => $order->product_id,
+            'package_id' => $order->package_id,
+            'license_key' => 'OLDER-LICENSE-KEY',
+            'is_sold' => false,
+            'created_at' => now()->subMonths(2),
+            'updated_at' => now()->subMonths(2),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.orders.mark-paid', $order));
+
+        $response->assertRedirect(route('admin.orders.show', $order));
+
+        $this->assertDatabaseHas('licenses', [
+            'order_id' => $order->order_id,
+            'license_key' => 'OLDER-LICENSE-KEY',
+        ]);
+        $this->assertDatabaseHas('license_stocks', [
+            'license_key' => 'OLDER-LICENSE-KEY',
+            'is_sold' => true,
+        ]);
+        $this->assertDatabaseHas('license_stocks', [
+            'license_key' => 'TEST-LICENSE-KEY',
+            'is_sold' => false,
+        ]);
+    }
+
     private function makePendingOrder(): array
     {
         config(['admin.emails' => ['admin@example.com']]);
