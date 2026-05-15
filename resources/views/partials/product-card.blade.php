@@ -12,7 +12,7 @@
         }
     @endphp
 
-    <a href="/product/{{ $product->id }}" class="product-card fade-up p-5 flex min-h-56 flex-col">
+    <a href="{{ route('products.show', $product) }}" class="product-card fade-up p-5 flex min-h-56 flex-col">
 
         @if ($badge)
             <div class="badge">{{ $badge }}</div>

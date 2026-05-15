@@ -26,14 +26,25 @@ use Laravel\Socialite\Two\InvalidStateException;
 */
 
 Route::get('/', function (Request $request) {
-    $categories = Category::all();
+    $categoryOrder = "CASE slug WHEN 'pc' THEN 1 WHEN 'mobile' THEN 2 WHEN 'android' THEN 3 WHEN 'ios' THEN 4 ELSE 99 END";
+    $productOrder = "CASE name WHEN 'Aurora-VN' THEN 1 WHEN 'XG-Team' THEN 2 WHEN 'Drip Client Root' THEN 3 WHEN 'Drip Client Non Root' THEN 4 WHEN 'Fluorite FF' THEN 5 WHEN 'Fluorite ML' THEN 6 ELSE 99 END";
+
+    $categories = Category::whereIn('slug', ['pc', 'mobile', 'android', 'ios'])
+        ->orderByRaw($categoryOrder)
+        ->orderBy('name')
+        ->get();
 
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
-    ])->withCount('availableLicenseStocks');
+    ])
+        ->withCount('availableLicenseStocks')
+        ->orderByRaw($productOrder)
+        ->orderBy('name');
 
-    if ($request->category) {
+    if ($request->category === 'mobile') {
+        $query->whereHas('category', fn ($query) => $query->whereIn('slug', ['android', 'ios']));
+    } elseif ($request->category) {
         $category = Category::where('slug', $request->category)->first();
 
         if ($category) {
@@ -51,16 +62,23 @@ Route::get('/', function (Request $request) {
 });
 
 $productsFragment = function (Request $request) {
+    $productOrder = "CASE name WHEN 'Aurora-VN' THEN 1 WHEN 'XG-Team' THEN 2 WHEN 'Drip Client Root' THEN 3 WHEN 'Drip Client Non Root' THEN 4 WHEN 'Fluorite FF' THEN 5 WHEN 'Fluorite ML' THEN 6 ELSE 99 END";
+
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
-    ])->withCount('availableLicenseStocks');
+    ])
+        ->withCount('availableLicenseStocks')
+        ->orderByRaw($productOrder)
+        ->orderBy('name');
 
     if ($request->search) {
         $query->where('name', 'like', '%'.$request->search.'%');
     }
 
-    if ($request->category) {
+    if ($request->category === 'mobile') {
+        $query->whereHas('category', fn ($query) => $query->whereIn('slug', ['android', 'ios']));
+    } elseif ($request->category) {
         $category = Category::where('slug', $request->category)->first();
 
         if ($category) {
@@ -133,17 +151,18 @@ Route::get('/contact', fn () => $legalPage('contact'))->name('contact');
 | PRODUCT DETAIL
 |--------------------------------------------------------------------------
 */
-Route::get('/product/{id}', function ($id) {
+Route::get('/product/{product}', function (string $product) {
     $product = Product::with([
         'category',
         'features',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
         ->withCount('availableLicenseStocks')
-        ->findOrFail($id);
+        ->where('slug', $product)
+        ->firstOrFail();
 
     return view('product-detail', compact('product'));
-});
+})->where('product', '[A-Za-z0-9-]+')->name('products.show');
 
 /*
 |--------------------------------------------------------------------------

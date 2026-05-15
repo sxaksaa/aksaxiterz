@@ -9,9 +9,20 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
-        Category::updateOrCreate(
-            ['slug' => 'digital-tools'],
-            ['name' => 'Digital Tools']
-        );
+        Category::where('slug', 'digital-tools')
+            ->whereDoesntHave('products')
+            ->delete();
+
+        foreach ([
+            'pc' => 'PC',
+            'mobile' => 'Mobile',
+            'android' => 'Android',
+            'ios' => 'iOS',
+        ] as $slug => $name) {
+            Category::updateOrCreate(
+                ['slug' => $slug],
+                ['name' => $name]
+            );
+        }
     }
 }

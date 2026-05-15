@@ -143,7 +143,7 @@
                     $packageStock = $p->available_license_stocks_count ?? 0;
                     $packageName = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name);
                     $badge = null;
-                    if (str_contains($p->name, '30')) {
+                    if (str_contains($p->name, '30') || str_contains($p->name, 'Month')) {
                         $badge = 'Best Deal';
                     } elseif (str_contains($p->name, '90')) {
                         $badge = 'Premium';

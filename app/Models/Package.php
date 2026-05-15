@@ -22,6 +22,11 @@ class Package extends Model
         return $this->hasMany(LicenseStock::class);
     }
 
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
     public function availableLicenseStocks()
     {
         return $this->hasMany(LicenseStock::class)->where('is_sold', false);

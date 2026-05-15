@@ -27,6 +27,30 @@ class FeatureSeeder extends Seeder
             'Setup tutorial included',
             'Customer support available',
         ]);
+
+        $this->syncFeatures(Product::where('name', 'Drip Client Root')->firstOrFail(), [
+            'Android root client access',
+            'Duration-based license delivery',
+            'Setup support available',
+        ]);
+
+        $this->syncFeatures(Product::where('name', 'Drip Client Non Root')->firstOrFail(), [
+            'Android non-root client access',
+            'Duration-based license delivery',
+            'Setup support available',
+        ]);
+
+        $this->syncFeatures(Product::where('name', 'Fluorite FF')->firstOrFail(), [
+            'iOS Fluorite FF access',
+            'Duration-based license delivery',
+            'Setup support available',
+        ]);
+
+        $this->syncFeatures(Product::where('name', 'Fluorite ML')->firstOrFail(), [
+            'iOS Fluorite ML access',
+            'Duration-based license delivery',
+            'Setup support available',
+        ]);
     }
 
     private function syncFeatures(Product $product, array $features): void

@@ -3,7 +3,6 @@
 @section('content')
     @php
         $discordUrl = config('links.discord_url');
-        $downloadGroups = collect(config('links.downloads', []))->filter(fn ($download) => filled($download['name'] ?? null))->count();
         $totalStock = $products->sum('available_license_stocks_count');
     @endphp
 
@@ -32,16 +31,16 @@
 
                 <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                     <div class="home-panel">
+                        <div class="text-xl font-semibold text-white">5000+ Licenses</div>
+                        <div class="mt-1 text-xs text-gray-400">Delivered to customers with support.</div>
+                    </div>
+                    <div class="home-panel">
+                        <div class="text-xl font-semibold text-white">2000+ Members</div>
+                        <div class="mt-1 text-xs text-gray-400">Active community on Discord.</div>
+                    </div>
+                    <div class="home-panel">
                         <div class="text-xl font-semibold text-white">Since 2024</div>
-                        <div class="mt-1 text-xs text-gray-400">Serving customers with digital support.</div>
-                    </div>
-                    <div class="home-panel">
-                        <div class="text-xl font-semibold text-white">{{ $downloadGroups }}</div>
-                        <div class="mt-1 text-xs text-gray-400">File Downloads.</div>
-                    </div>
-                    <div class="home-panel">
-                        <div class="text-xl font-semibold text-white">{{ $totalStock }}</div>
-                        <div class="mt-1 text-xs text-gray-400">Available license stock.</div>
+                        <div class="mt-1 text-xs text-gray-400">{{ $totalStock }} licenses ready in stock.</div>
                     </div>
                 </div>
             </div>
