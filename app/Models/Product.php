@@ -6,12 +6,37 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    public const STATUS_READY = 'ready';
+
+    public const STATUS_UPDATING = 'updating';
+
     protected $fillable = [
         'category_id',
         'name',
         'slug',
+        'status',
         'description',
     ];
+
+    public static function statusOptions(): array
+    {
+        return [
+            self::STATUS_READY => 'Ready',
+            self::STATUS_UPDATING => 'Updating',
+        ];
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::statusOptions()[$this->status] ?? self::statusOptions()[self::STATUS_READY];
+    }
+
+    public function getStatusBadgeClassAttribute(): string
+    {
+        return $this->status === self::STATUS_UPDATING
+            ? 'product-status-badge-updating'
+            : 'product-status-badge-ready';
+    }
 
     public function getRouteKeyName(): string
     {

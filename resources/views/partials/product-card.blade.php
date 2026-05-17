@@ -1,28 +1,15 @@
-@php
-    $starterProductId = $products
-        ->filter(fn ($product) => ($product->available_license_stocks_count ?? 0) > 0 && $product->packages->isNotEmpty())
-        ->sortBy(fn ($product) => sprintf('%012d|%s', (int) $product->packages->min('price'), strtolower($product->name)))
-        ->first()?->id;
-@endphp
-
 @forelse ($products as $product)
     @php
         $minPackage = $product->packages->sortBy('price')->first();
         $stock = $product->available_license_stocks_count ?? 0;
-        $badge = null;
-
-        if ($product->id === $starterProductId) {
-            $badge = 'Starter Deal';
-        } elseif ($minPackage && $minPackage->price >= 100000) {
-            $badge = 'Premium';
-        }
+        $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
+            ? 'product-status-badge-updating'
+            : 'product-status-badge-ready';
     @endphp
 
     <a href="{{ route('products.show', $product) }}" class="product-card fade-up p-5 flex min-h-56 flex-col">
 
-        @if ($badge)
-            <div class="badge">{{ $badge }}</div>
-        @endif
+        <div class="product-status-badge {{ $statusBadgeClass }}">{{ $product->status_label }}</div>
 
         <div class="text-xs text-gray-500 mb-4">{{ $product->category->name ?? 'Product' }}</div>
 

@@ -90,6 +90,17 @@
                         maxlength="160">
                 </label>
 
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
+                    <select name="status" class="search-bar w-full" required>
+                        @foreach ($statusOptions as $statusValue => $statusLabel)
+                            <option value="{{ $statusValue }}" @selected(old('status', $product->status) === $statusValue)>
+                                {{ $statusLabel }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
                 <label class="block lg:row-span-2">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Description</span>
                     <textarea name="description" rows="4" class="search-bar min-h-28 w-full resize-y"

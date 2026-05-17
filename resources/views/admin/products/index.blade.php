@@ -34,12 +34,12 @@
                     <div class="mt-1 text-xs text-gray-400">Packages</div>
                 </div>
                 <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $stats['available'] }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Available keys</div>
+                    <div class="text-xl font-semibold text-white">{{ $stats['ready_products'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Ready products</div>
                 </div>
                 <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $stats['stocked_products'] }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Stocked products</div>
+                    <div class="text-xl font-semibold text-white">{{ $stats['updating_products'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Updating products</div>
                 </div>
             </div>
         </section>
@@ -87,6 +87,17 @@
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
                     <input name="slug" value="{{ old('slug') }}" class="search-bar w-full"
                         placeholder="auto from product name" maxlength="160">
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
+                    <select name="status" class="search-bar w-full" required>
+                        @foreach ($statusOptions as $statusValue => $statusLabel)
+                            <option value="{{ $statusValue }}" @selected(old('status', 'ready') === $statusValue)>
+                                {{ $statusLabel }}
+                            </option>
+                        @endforeach
+                    </select>
                 </label>
 
                 <label class="block lg:row-span-2">
@@ -146,6 +157,7 @@
                         <tr>
                             <th class="p-4 text-left">Product</th>
                             <th class="p-4 text-left">Category</th>
+                            <th class="p-4 text-left">Status</th>
                             <th class="p-4 text-left">Packages</th>
                             <th class="p-4 text-left">Stock</th>
                             <th class="p-4 text-right">Action</th>
@@ -153,6 +165,11 @@
                     </thead>
                     <tbody>
                         @forelse ($products as $product)
+                            @php
+                                $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
+                                    ? 'product-status-badge-updating'
+                                    : 'product-status-badge-ready';
+                            @endphp
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $product->name }}</div>
@@ -162,6 +179,11 @@
                                     </div>
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $product->category->name ?? '-' }}</td>
+                                <td class="p-4">
+                                    <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                                        {{ $product->status_label }}
+                                    </span>
+                                </td>
                                 <td class="p-4">
                                     <div class="grid gap-2">
                                         @forelse ($product->packages as $package)
@@ -191,7 +213,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="p-8">
+                                <td colspan="6" class="p-8">
                                     <div class="empty-state">No products found</div>
                                 </td>
                             </tr>
@@ -203,6 +225,11 @@
 
         <div class="space-y-4 md:hidden">
             @forelse ($products as $product)
+                @php
+                    $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
+                        ? 'product-status-badge-updating'
+                        : 'product-status-badge-ready';
+                @endphp
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -210,7 +237,9 @@
                             <div class="mt-1 font-mono text-xs text-gray-500">/{{ $product->slug }}</div>
                             <div class="mt-1 text-xs text-gray-400">{{ $product->category->name ?? '-' }}</div>
                         </div>
-                        <span class="status-pill status-pill-paid">{{ $product->available_license_stocks_count }} keys</span>
+                        <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                            {{ $product->status_label }}
+                        </span>
                     </div>
 
                     <div class="mt-4 grid gap-2 text-sm">

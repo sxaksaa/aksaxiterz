@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
-use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
@@ -45,11 +44,12 @@ class ProductController extends Controller
         $stats = [
             'products' => Product::count(),
             'packages' => Package::count(),
-            'available' => LicenseStock::where('is_sold', false)->count(),
-            'stocked_products' => Product::has('availableLicenseStocks')->count(),
+            'ready_products' => Product::where('status', Product::STATUS_READY)->count(),
+            'updating_products' => Product::where('status', Product::STATUS_UPDATING)->count(),
         ];
+        $statusOptions = Product::statusOptions();
 
-        return view('admin.products.index', compact('products', 'categories', 'stats'));
+        return view('admin.products.index', compact('products', 'categories', 'stats', 'statusOptions'));
     }
 
     public function store(Request $request)
@@ -61,6 +61,7 @@ class ProductController extends Controller
             'category_id' => $validated['category_id'],
             'name' => $validated['name'],
             'slug' => $slug,
+            'status' => $validated['status'] ?? Product::STATUS_READY,
             'description' => $validated['description'],
         ]);
 
@@ -81,8 +82,9 @@ class ProductController extends Controller
 
         $categories = Category::orderBy('name')->get();
         $orderCount = Order::where('product_id', $product->id)->count();
+        $statusOptions = Product::statusOptions();
 
-        return view('admin.products.edit', compact('product', 'categories', 'orderCount'));
+        return view('admin.products.edit', compact('product', 'categories', 'orderCount', 'statusOptions'));
     }
 
     public function update(Request $request, Product $product)
@@ -94,6 +96,7 @@ class ProductController extends Controller
             'category_id' => $validated['category_id'],
             'name' => $validated['name'],
             'slug' => $slug,
+            'status' => $validated['status'],
             'description' => $validated['description'],
         ]);
 
@@ -176,6 +179,7 @@ class ProductController extends Controller
                 Rule::unique('products', 'slug')->ignore($product?->id),
             ],
             'description' => ['required', 'string', 'max:1000'],
+            'status' => ['required', 'string', Rule::in(array_keys(Product::statusOptions()))],
         ]);
     }
 

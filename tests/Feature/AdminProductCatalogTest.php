@@ -34,6 +34,7 @@ class AdminProductCatalogTest extends TestCase
             'name' => 'Updated Product',
             'slug' => 'updated-product',
             'description' => 'Updated public description.',
+            'status' => Product::STATUS_UPDATING,
         ]);
 
         $product->refresh();
@@ -41,6 +42,7 @@ class AdminProductCatalogTest extends TestCase
         $response->assertRedirect(route('admin.products.edit', $product));
         $this->assertSame('Updated Product', $product->name);
         $this->assertSame('updated-product', $product->slug);
+        $this->assertSame(Product::STATUS_UPDATING, $product->status);
 
         $response = $this->actingAs($admin)->patch(route('admin.packages.update', $package), [
             'package_name' => '30 Days',
