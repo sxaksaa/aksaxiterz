@@ -243,6 +243,12 @@ class ProductController extends Controller
 
     private function validatePackage(Request $request, Product $product, ?Package $package = null): array
     {
+        if ($request->filled('package_name')) {
+            $request->merge([
+                'package_name' => $this->canonicalPackageName((string) $request->input('package_name')),
+            ]);
+        }
+
         $validated = $request->validate([
             'package_name' => [
                 'required',
@@ -269,11 +275,11 @@ class ProductController extends Controller
         $names = collect(self::PACKAGE_NAME_OPTIONS);
 
         if ($product) {
-            $names = $names->merge($product->packages()->pluck('name'));
+            $names = $names->merge($product->packages()->pluck('name')->map(fn ($name) => $this->canonicalPackageName((string) $name)));
         }
 
         if ($currentName) {
-            $names = $names->push($currentName);
+            $names = $names->push($this->canonicalPackageName($currentName));
         }
 
         return $names
@@ -295,6 +301,39 @@ class ProductController extends Controller
         }
 
         return 9999;
+    }
+
+    private function canonicalPackageName(string $name): string
+    {
+        $normalized = Str::lower(trim($name));
+        $compact = preg_replace('/[\s_\-]+/', '', $normalized) ?: $normalized;
+
+        return [
+            '1day' => '1 Day',
+            '1days' => '1 Day',
+            '1hari' => '1 Day',
+            '3day' => '3 Days',
+            '3days' => '3 Days',
+            '3hari' => '3 Days',
+            '7day' => '7 Days',
+            '7days' => '7 Days',
+            '7hari' => '7 Days',
+            '10day' => '10 Days',
+            '10days' => '10 Days',
+            '10hari' => '10 Days',
+            '15day' => '15 Days',
+            '15days' => '15 Days',
+            '15hari' => '15 Days',
+            '30day' => '30 Days',
+            '30days' => '30 Days',
+            '30hari' => '30 Days',
+            '1month' => '30 Days',
+            '1months' => '30 Days',
+            'onemonth' => '30 Days',
+            '1year' => '1 Year',
+            '1years' => '1 Year',
+            '1tahun' => '1 Year',
+        ][$compact] ?? (preg_replace('/\s+/', ' ', trim($name)) ?: $name);
     }
 
     private function uniqueSlug(?string $value, string $fallback, ?Product $product = null): string
