@@ -588,17 +588,6 @@
         opacity: 1;
     }
 
-    .download-meta {
-        transition:
-            border-color 0.25s ease,
-            background-color 0.25s ease;
-    }
-
-    .download-card:hover .download-meta {
-        border-color: rgba(147, 51, 234, 0.42);
-        background: rgba(147, 51, 234, 0.08);
-    }
-
     .footer-link {
         @apply inline-flex w-fit text-gray-400 transition hover:text-white;
     }

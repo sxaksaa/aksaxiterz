@@ -16,65 +16,65 @@ return [
     'downloads' => [
         [
             'name' => 'Aurora-VN',
-            'version' => 'Setup Files',
+            'version' => 'Download Files',
             'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'PC and laptop',
             'description' => 'Licensed for PC & Laptop',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/DWpzRBxY#Qj4KYwI-zoeed9_k3sibOg',
                 ],
             ],
         ],
         [
             'name' => 'XG-Team',
-            'version' => 'Setup Files',
+            'version' => 'Download Files',
             'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'PC and laptop',
             'description' => 'Licensed for PC & Laptop',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://xgteam.pythonanywhere.com/public/7zXG-Team-March-24-2026.exe',
                 ],
             ],
         ],
         [
             'name' => 'Fluorite',
-            'version' => 'Setup Files',
+            'version' => 'Download Files',
             'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'iPhone',
             'description' => 'Licensed for iPhone',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/7CIGzDzJ#q7gUYmS7hXEDJi0RcI8Jvw',
                 ],
             ],
         ],
         [
             'name' => 'Drip Client',
-            'version' => 'Setup Files',
+            'version' => 'Download Files',
             'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Android',
             'description' => 'Licensed for Android',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/LKJiTRhB#qFUmHcxhhQzLYwHp5d9FEw',
                 ],
             ],
         ],
         [
             'name' => 'BR',
-            'version' => 'Setup Files',
+            'version' => 'Download Files',
             'updated_at' => '28 Apr 2026, 22:44 WIB',
             'platform' => 'Android, PC, and laptop',
             'description' => 'Licensed for Android, PC & Laptop',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/mKpVSYDR#HJnSvKF_JEaCqS2h__imVA',
                 ],
             ],
@@ -87,7 +87,7 @@ return [
             'description' => 'FF 32-bit (V7A), FF 64-bit (V8A)',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/GHZyxC7S#6LRgKRgQQPdfQer0JieYfA',
                 ],
             ],
@@ -100,7 +100,7 @@ return [
             'description' => 'Bluestacks, MSI, Debloater Package',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/jfJCxRpA#Q4DpP5I-o3eKMl_B9_di6w',
                 ],
             ],
@@ -113,7 +113,7 @@ return [
             'description' => 'Common Runtime Requirements For PC & Laptop Utilities',
             'links' => [
                 [
-                    'label' => 'Setup Files',
+                    'label' => 'Download Files',
                     'url' => 'https://mega.nz/folder/SGQXmaYQ#diOTQmruAL0pns5IJusjcQ',
                 ],
             ],

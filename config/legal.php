@@ -7,7 +7,7 @@ return [
         'terms' => [
             'title' => 'Terms of Service',
             'eyebrow' => 'Legal',
-            'summary' => 'These terms explain how Aksa Xiterz digital licenses, setup files, support, payments, and account access work.',
+            'summary' => 'These terms explain how Aksa Xiterz digital licenses, download files, support, payments, and account access work.',
             'sections' => [
                 [
                     'title' => 'Service Overview',

@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\DownloadController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PaymentController;
 use App\Models\Category;
+use App\Models\DownloadItem;
 use App\Models\License;
 use App\Models\Order;
 use App\Models\Product;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -95,9 +98,23 @@ Route::get('/products-fragment', $productsFragment)->name('products.fragment');
 Route::get('/api/products', $productsFragment);
 
 Route::get('/downloads', function () {
-    $downloads = collect(config('links.downloads', []))
-        ->filter(fn ($download) => filled($download['name'] ?? null))
-        ->values();
+    $downloads = collect();
+
+    if (Schema::hasTable('download_items')) {
+        $downloads = DownloadItem::query()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (DownloadItem $download) => $download->publicPayload())
+            ->values();
+    }
+
+    if ($downloads->isEmpty()) {
+        $downloads = collect(config('links.downloads', []))
+            ->filter(fn ($download) => filled($download['name'] ?? null))
+            ->sortBy(fn ($download) => Str::lower((string) ($download['name'] ?? '')))
+            ->values();
+    }
+
     $discordUrl = config('links.discord_url');
 
     return view('downloads', compact('downloads', 'discordUrl'));
@@ -297,6 +314,10 @@ Route::middleware(['auth', 'admin'])
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');
         Route::delete('/license-stocks/{licenseStock}', [LicenseStockController::class, 'destroy'])->name('license-stocks.destroy');
+        Route::get('/downloads', [DownloadController::class, 'index'])->name('downloads.index');
+        Route::post('/downloads', [DownloadController::class, 'store'])->name('downloads.store');
+        Route::patch('/downloads/{download}', [DownloadController::class, 'update'])->name('downloads.update');
+        Route::delete('/downloads/{download}', [DownloadController::class, 'destroy'])->name('downloads.destroy');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
