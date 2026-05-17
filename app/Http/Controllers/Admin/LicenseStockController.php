@@ -63,11 +63,19 @@ class LicenseStockController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'license_keys' => ['required', 'string', 'max:20000'],
         ]);
 
-        $package = Package::findOrFail($validated['package_id']);
+        $package = $this->packageForProduct($validated['package_id'], $validated['product_id']);
+
+        if (! $package) {
+            return back()
+                ->withInput()
+                ->withErrors(['package_id' => 'Select a package from the chosen product.']);
+        }
+
         $keys = $this->licenseKeys($validated['license_keys']);
 
         if ($keys->isEmpty()) {
@@ -113,6 +121,7 @@ class LicenseStockController extends Controller
         }
 
         $validated = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'license_key' => [
                 'required',
@@ -122,7 +131,13 @@ class LicenseStockController extends Controller
             ],
         ]);
 
-        $package = Package::findOrFail($validated['package_id']);
+        $package = $this->packageForProduct($validated['package_id'], $validated['product_id']);
+
+        if (! $package) {
+            return back()
+                ->withInput()
+                ->withErrors(['package_id' => 'Select a package from the chosen product.']);
+        }
 
         $licenseStock->update([
             'license_key' => trim($validated['license_key']),
@@ -164,5 +179,12 @@ class LicenseStockController extends Controller
             ->filter()
             ->unique()
             ->values();
+    }
+
+    private function packageForProduct(int $packageId, int $productId): ?Package
+    {
+        return Package::whereKey($packageId)
+            ->where('product_id', $productId)
+            ->first();
     }
 }

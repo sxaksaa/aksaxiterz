@@ -14,6 +14,16 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    private const PACKAGE_NAME_OPTIONS = [
+        '1 Day',
+        '3 Days',
+        '7 Days',
+        '10 Days',
+        '15 Days',
+        '30 Days',
+        '1 Year',
+    ];
+
     public function index(Request $request)
     {
         $products = Product::with([
@@ -29,7 +39,6 @@ class ProductController extends Controller
 
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('slug', 'like', '%'.$search.'%')
                         ->orWhere('description', 'like', '%'.$search.'%');
                 });
             })
@@ -56,7 +65,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateProduct($request);
-        $slug = $this->uniqueSlug($validated['slug'] ?? null, $validated['name']);
+        $slug = $this->uniqueSlug(null, $validated['name']);
 
         $product = Product::create([
             'category_id' => $validated['category_id'],
@@ -85,14 +94,15 @@ class ProductController extends Controller
         $categories = Category::orderBy('name')->get();
         $orderCount = Order::where('product_id', $product->id)->count();
         $statusOptions = Product::statusOptions();
+        $packageNameOptions = $this->packageNameOptions($product);
 
-        return view('admin.products.edit', compact('product', 'categories', 'orderCount', 'statusOptions'));
+        return view('admin.products.edit', compact('product', 'categories', 'orderCount', 'statusOptions', 'packageNameOptions'));
     }
 
     public function update(Request $request, Product $product)
     {
         $validated = $this->validateProduct($request, $product);
-        $slug = $this->uniqueSlug($validated['slug'] ?? null, $validated['name'], $product);
+        $slug = $this->uniqueSlug(null, $validated['name'], $product);
 
         $product->update([
             'category_id' => $validated['category_id'],
@@ -212,12 +222,6 @@ class ProductController extends Controller
                 'max:120',
                 Rule::unique('products', 'name')->ignore($product?->id),
             ],
-            'slug' => [
-                'nullable',
-                'string',
-                'max:160',
-                Rule::unique('products', 'slug')->ignore($product?->id),
-            ],
             'description' => ['required', 'string', 'max:1000'],
             'status' => ['required', 'string', Rule::in(array_keys(Product::statusOptions()))],
         ]);
@@ -244,6 +248,7 @@ class ProductController extends Controller
                 'required',
                 'string',
                 'max:80',
+                Rule::in($this->packageNameOptions($product, $package?->name)),
                 Rule::unique('packages', 'name')
                     ->where('product_id', $product->id)
                     ->ignore($package?->id),
@@ -257,6 +262,39 @@ class ProductController extends Controller
             'price' => $validated['package_price'],
             'price_usdt' => $validated['package_price_usdt'] ?? null,
         ];
+    }
+
+    private function packageNameOptions(?Product $product = null, ?string $currentName = null): array
+    {
+        $names = collect(self::PACKAGE_NAME_OPTIONS);
+
+        if ($product) {
+            $names = $names->merge($product->packages()->pluck('name'));
+        }
+
+        if ($currentName) {
+            $names = $names->push($currentName);
+        }
+
+        return $names
+            ->filter()
+            ->unique()
+            ->sortBy(fn ($name) => $this->packageNameSortWeight($name))
+            ->values()
+            ->all();
+    }
+
+    private function packageNameSortWeight(string $name): int
+    {
+        if (preg_match('/(\d+)\s*year/i', $name, $matches)) {
+            return ((int) $matches[1]) * 365;
+        }
+
+        if (preg_match('/(\d+)\s*day/i', $name, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 9999;
     }
 
     private function uniqueSlug(?string $value, string $fallback, ?Product $product = null): string

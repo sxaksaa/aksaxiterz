@@ -13,7 +13,7 @@
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Catalog</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Manage product names, public slugs, descriptions, categories, and package prices.
+                        Manage product names, descriptions, categories, and package prices.
                     </p>
                 </div>
 
@@ -84,12 +84,6 @@
                 </label>
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
-                    <input name="slug" value="{{ old('slug') }}" class="search-bar w-full"
-                        placeholder="auto from product name" maxlength="160">
-                </label>
-
-                <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
                     <select name="status" class="search-bar w-full" required>
                         @foreach ($statusOptions as $statusValue => $statusLabel)
@@ -118,7 +112,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
                     <input name="search" value="{{ request('search') }}" class="search-bar w-full"
-                        placeholder="Product, slug, or description">
+                        placeholder="Product or description">
                 </label>
 
                 <label class="block">
@@ -173,7 +167,6 @@
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $product->name }}</div>
-                                    <div class="mt-1 font-mono text-xs text-gray-500">/{{ $product->slug }}</div>
                                     <div class="mt-2 max-w-[300px] text-xs leading-5 text-gray-400">
                                         {{ $product->description }}
                                     </div>
@@ -234,7 +227,6 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="font-semibold text-white">{{ $product->name }}</div>
-                            <div class="mt-1 font-mono text-xs text-gray-500">/{{ $product->slug }}</div>
                             <div class="mt-1 text-xs text-gray-400">{{ $product->category->name ?? '-' }}</div>
                         </div>
                         <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">

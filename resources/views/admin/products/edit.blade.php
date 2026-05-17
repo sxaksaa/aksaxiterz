@@ -5,6 +5,7 @@
         $formatIdr = fn ($value) => 'Rp ' . number_format((int) $value, 0, ',', '.');
         $formatUsdt = fn ($value) => $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.') . ' USDT';
         $canDeleteProduct = $orderCount === 0 && $product->license_stocks_count === 0;
+        $existingPackageNames = $product->packages->pluck('name')->all();
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -82,12 +83,6 @@
                             </option>
                         @endforeach
                     </select>
-                </label>
-
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
-                    <input name="slug" value="{{ old('slug', $product->slug) }}" class="search-bar w-full"
-                        maxlength="160">
                 </label>
 
                 <label class="block">
@@ -203,9 +198,18 @@
                             @method('PATCH')
 
                             <label class="block">
-                                <span class="mb-2 block text-xs font-semibold text-gray-400">Package name</span>
-                                <input name="package_name" value="{{ $package->name }}" class="search-bar w-full"
-                                    required maxlength="80">
+                                <span class="mb-2 block text-xs font-semibold text-gray-400">Duration</span>
+                                <select name="package_name" class="search-bar w-full" required>
+                                    @foreach ($packageNameOptions as $packageOption)
+                                        @php
+                                            $isUsedByOtherPackage = in_array($packageOption, $existingPackageNames, true)
+                                                && $packageOption !== $package->name;
+                                        @endphp
+                                        <option value="{{ $packageOption }}" @selected($package->name === $packageOption) @disabled($isUsedByOtherPackage)>
+                                            {{ $packageOption }}{{ $isUsedByOtherPackage ? ' (already added)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </label>
 
                             <label class="block">
@@ -240,9 +244,16 @@
                 @csrf
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Package name</span>
-                    <input name="package_name" value="{{ old('package_name') }}" class="search-bar w-full"
-                        placeholder="30 Days" required maxlength="80">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Duration</span>
+                    <select name="package_name" class="search-bar w-full" required>
+                        <option value="">Select duration</option>
+                        @foreach ($packageNameOptions as $packageOption)
+                            @php $isAlreadyAdded = in_array($packageOption, $existingPackageNames, true); @endphp
+                            <option value="{{ $packageOption }}" @selected(old('package_name') === $packageOption) @disabled($isAlreadyAdded)>
+                                {{ $packageOption }}{{ $isAlreadyAdded ? ' (already added)' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
                 </label>
 
                 <label class="block">

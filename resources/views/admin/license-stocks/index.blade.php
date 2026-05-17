@@ -2,11 +2,22 @@
 
 @section('content')
     @php
-        $packageLabel = function ($package) {
+        $packageName = function ($package) {
             $name = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $package->name);
 
-            return ($package->product->name ?? 'Product') . ' - ' . $name;
+            return $name;
         };
+        $packageLabel = function ($package) use ($packageName) {
+            return ($package->product->name ?? 'Product') . ' - ' . $packageName($package);
+        };
+        $selectedCreateProductId = old('product_id');
+        $selectedCreatePackage = old('package_id') ? $packages->firstWhere('id', (int) old('package_id')) : null;
+
+        if (! $selectedCreateProductId && $selectedCreatePackage) {
+            $selectedCreateProductId = $selectedCreatePackage->product_id;
+        }
+
+        $selectedEditProductId = old('product_id', $editStock?->product_id);
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -94,16 +105,35 @@
                 <p class="mt-1 text-sm text-gray-400">Paste one key per line. Commas and semicolons also work.</p>
             </div>
 
-            <form action="{{ route('admin.license-stocks.store') }}" method="POST" class="grid gap-4 lg:grid-cols-[360px_1fr_auto] lg:items-end">
+            <form action="{{ route('admin.license-stocks.store') }}" method="POST"
+                class="grid gap-4 lg:grid-cols-[260px_260px_1fr_auto] lg:items-end">
                 @csrf
 
                 <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Product</span>
+                    <select name="product_id" class="search-bar w-full" required data-package-product-select
+                        data-package-target="stockCreatePackage">
+                        <option value="">Select product</option>
+                        @foreach ($products as $product)
+                            <option value="{{ $product->id }}" @selected((string) $selectedCreateProductId === (string) $product->id)>
+                                {{ $product->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Package</span>
-                    <select name="package_id" class="search-bar w-full" required>
-                        <option value="">Select package</option>
+                    <select id="stockCreatePackage" name="package_id" class="search-bar w-full" required
+                        data-package-select data-require-product="true" data-empty-label="Select product first"
+                        data-selected-empty-label="Select package">
+                        <option value="">Select product first</option>
                         @foreach ($packages as $package)
-                            <option value="{{ $package->id }}" @selected(old('package_id') == $package->id)>
-                                {{ $packageLabel($package) }}
+                            <option value="{{ $package->id }}" data-product-id="{{ $package->product_id }}"
+                                data-duration-label="{{ $packageName($package) }}"
+                                data-full-label="{{ $packageLabel($package) }}"
+                                @selected((string) old('package_id') === (string) $package->id)>
+                                {{ $packageName($package) }}
                             </option>
                         @endforeach
                     </select>
@@ -127,16 +157,34 @@
                 </div>
 
                 <form action="{{ route('admin.license-stocks.update', $editStock) }}" method="POST"
-                    class="grid gap-4 lg:grid-cols-[360px_1fr_auto] lg:items-end">
+                    class="grid gap-4 lg:grid-cols-[260px_260px_1fr_auto] lg:items-end">
                     @csrf
                     @method('PATCH')
 
                     <label class="block">
+                        <span class="mb-2 block text-xs font-semibold text-gray-400">Product</span>
+                        <select name="product_id" class="search-bar w-full" required data-package-product-select
+                            data-package-target="stockEditPackage">
+                            <option value="">Select product</option>
+                            @foreach ($products as $product)
+                                <option value="{{ $product->id }}" @selected((string) $selectedEditProductId === (string) $product->id)>
+                                    {{ $product->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block">
                         <span class="mb-2 block text-xs font-semibold text-gray-400">Package</span>
-                        <select name="package_id" class="search-bar w-full" required>
+                        <select id="stockEditPackage" name="package_id" class="search-bar w-full" required
+                            data-package-select data-require-product="true" data-empty-label="Select product first"
+                            data-selected-empty-label="Select package">
                             @foreach ($packages as $package)
-                                <option value="{{ $package->id }}" @selected($editStock->package_id === $package->id)>
-                                    {{ $packageLabel($package) }}
+                                <option value="{{ $package->id }}" data-product-id="{{ $package->product_id }}"
+                                    data-duration-label="{{ $packageName($package) }}"
+                                    data-full-label="{{ $packageLabel($package) }}"
+                                    @selected((string) old('package_id', $editStock->package_id) === (string) $package->id)>
+                                    {{ $packageName($package) }}
                                 </option>
                             @endforeach
                         </select>
@@ -166,7 +214,8 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Product</span>
-                    <select name="product_id" class="search-bar w-full">
+                    <select name="product_id" class="search-bar w-full" data-package-product-select
+                        data-package-target="stockFilterPackage" data-submit-on-change="true">
                         <option value="">All products</option>
                         @foreach ($products as $product)
                             <option value="{{ $product->id }}" @selected((string) request('product_id') === (string) $product->id)>
@@ -178,11 +227,16 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Package</span>
-                    <select name="package_id" class="search-bar w-full">
-                        <option value="">All packages</option>
+                    <select id="stockFilterPackage" name="package_id" class="search-bar w-full" data-package-select
+                        data-require-product="true" data-empty-label="Select product first"
+                        data-selected-empty-label="All packages">
+                        <option value="">Select product first</option>
                         @foreach ($packages as $package)
-                            <option value="{{ $package->id }}" @selected((string) request('package_id') === (string) $package->id)>
-                                {{ $packageLabel($package) }}
+                            <option value="{{ $package->id }}" data-product-id="{{ $package->product_id }}"
+                                data-duration-label="{{ $packageName($package) }}"
+                                data-full-label="{{ $packageLabel($package) }}"
+                                @selected((string) request('package_id') === (string) $package->id)>
+                                {{ request('product_id') ? $packageName($package) : $packageLabel($package) }}
                             </option>
                         @endforeach
                     </select>
@@ -351,6 +405,65 @@
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('stockFilterForm');
             const lowStockCount = @json($lowStockPackages->count());
+            const syncPackageOptions = (productSelect, packageSelect, options = {}) => {
+                if (!productSelect || !packageSelect) return;
+
+                const selectedProductId = productSelect.value;
+                const requireProduct = packageSelect.dataset.requireProduct === 'true';
+                const currentPackageId = packageSelect.value;
+                let currentPackageStillVisible = currentPackageId === '';
+
+                packageSelect.querySelectorAll('option[data-product-id]').forEach((option) => {
+                    const matchesProduct = selectedProductId === '' || option.dataset.productId === selectedProductId;
+                    const visible = requireProduct && selectedProductId === '' ? false : matchesProduct;
+
+                    option.hidden = !visible;
+                    option.disabled = !visible;
+                    option.textContent = selectedProductId ? option.dataset.durationLabel : option.dataset.fullLabel;
+
+                    if (visible && option.value === currentPackageId) {
+                        currentPackageStillVisible = true;
+                    }
+                });
+
+                if (!currentPackageStillVisible) {
+                    packageSelect.value = '';
+                }
+
+                packageSelect.disabled = requireProduct && selectedProductId === '';
+                const emptyOption = packageSelect.querySelector('option[value=""]');
+
+                if (emptyOption) {
+                    emptyOption.replaceChildren(
+                        document.createTextNode(
+                            selectedProductId ?
+                                (packageSelect.dataset.selectedEmptyLabel || 'Select package') :
+                                (packageSelect.dataset.emptyLabel || 'Select product first')
+                        )
+                    );
+                }
+
+                if (options.clearPackage) {
+                    packageSelect.value = '';
+                }
+            };
+
+            document.querySelectorAll('[data-package-product-select]').forEach((productSelect) => {
+                const packageSelect = document.getElementById(productSelect.dataset.packageTarget);
+
+                syncPackageOptions(productSelect, packageSelect);
+
+                productSelect.addEventListener('change', () => {
+                    syncPackageOptions(productSelect, packageSelect, {
+                        clearPackage: true
+                    });
+
+                    if (productSelect.dataset.submitOnChange === 'true' && form) {
+                        form.querySelector('input[name="page"]')?.remove();
+                        form.requestSubmit();
+                    }
+                });
+            });
 
             if (lowStockCount > 0) {
                 window.setTimeout(() => {
@@ -377,7 +490,7 @@
                 form.requestSubmit();
             };
 
-            form.querySelectorAll('select[name="product_id"], select[name="package_id"], select[name="status"]').forEach((select) => {
+            form.querySelectorAll('select[name="package_id"], select[name="status"]').forEach((select) => {
                 select.addEventListener('change', submitFilters);
             });
 

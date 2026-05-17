@@ -33,7 +33,6 @@ class AdminProductCatalogTest extends TestCase
         $response = $this->actingAs($admin)->patch(route('admin.products.update', $product), [
             'category_id' => $category->id,
             'name' => 'Updated Product',
-            'slug' => 'updated-product',
             'description' => 'Updated public description.',
             'status' => Product::STATUS_UPDATING,
         ]);
