@@ -38,8 +38,8 @@
                 </span>
             </div>
 
-            <span class="text-xs {{ $stock > 0 ? 'text-[#C084FC]' : 'text-red-300' }}">
-                {{ $stock > 0 ? $stock . ' stock' : 'Out of stock' }}
+            <span class="text-xs {{ $stock > 0 ? 'text-[#C084FC]' : 'text-amber-300' }}">
+                {{ $stock > 0 ? 'Auto delivery (' . $stock . ')' : 'Manual via Discord' }}
             </span>
         </div>
 

@@ -4,6 +4,7 @@
     @php
         $stock = $product->available_license_stocks_count ?? 0;
         $discordUrl = config('links.discord_url');
+        $hasAutoDelivery = $stock > 0;
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10">
@@ -16,9 +17,9 @@
                 <p class="text-gray-400 max-w-2xl">{{ $product->description }}</p>
 
                 <div class="mt-5 flex flex-wrap gap-2">
-                    <span class="support-pill">Instant delivery</span>
+                    <span class="support-pill">{{ $hasAutoDelivery ? 'Auto delivery ready' : 'Manual order via Discord' }}</span>
                     <span class="support-pill">Secure checkout</span>
-                    <span class="support-pill">Support ready</span>
+                    <span class="support-pill">Discord ready</span>
                 </div>
             </div>
 
@@ -26,12 +27,16 @@
                 <div class="text-xs uppercase text-gray-500 mb-2">Availability</div>
                 <div class="flex items-end justify-between">
                     <div>
-                        <div class="text-2xl font-bold {{ $stock > 0 ? 'text-[#C084FC]' : 'text-red-300' }}">
-                            {{ $stock }}
+                        <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-[#C084FC]' : 'text-amber-300' }}">
+                            {{ $hasAutoDelivery ? $stock : 'Manual' }}
                         </div>
-                        <div class="text-sm text-gray-400">license ready</div>
+                        <div class="text-sm text-gray-400">
+                            {{ $hasAutoDelivery ? 'license ready' : 'order via Discord' }}
+                        </div>
                     </div>
-                    <div class="text-xs text-gray-500">Auto delivery after paid</div>
+                    <div class="text-xs text-gray-500">
+                        {{ $hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order' }}
+                    </div>
                 </div>
             </div>
             </div>
@@ -54,7 +59,7 @@
                 <div>
                     <h2 class="text-sm font-semibold text-white">Need help before checkout?</h2>
                     <p class="mt-1 text-sm text-gray-400">
-                        Contact support for product questions, setup guidance, license resets, and checkout help.
+                        Join Discord for manual orders, setup guidance, license resets, and checkout help.
                     </p>
                 </div>
 
@@ -66,7 +71,7 @@
                     <a href="{{ $discordUrl ?: '#' }}"
                         @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                         class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        Contact Support
+                        Join Discord
                     </a>
                 </div>
             </div>
@@ -151,7 +156,7 @@
                 @endphp
 
                 <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }}, {{ $packageStock }})"
-                    class="package-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+                    class="package-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
@@ -166,15 +171,15 @@
                         Rp {{ number_format($p->price) }}
                     </p>
 
-                    <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-red-300' }}">
-                        {{ $packageStock > 0 ? $packageStock . ' left' : 'Out of stock' }}
+                    <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-amber-300' }}">
+                        {{ $packageStock > 0 ? 'Auto delivery: ' . $packageStock . ' ready' : 'Manual via Discord' }}
                     </p>
 
                     @if ($packageStock <= 0)
                         <button type="button"
                             onclick="requestManualOrder(event, {{ Illuminate\Support\Js::from($product->name) }}, {{ Illuminate\Support\Js::from($packageName) }})"
                             class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
-                            Request Manual Order
+                            Join Discord to Order
                         </button>
                     @endif
 
@@ -205,7 +210,7 @@
     {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
                 {{ $stock <= 0 ? 'disabled' : '' }}>
 
-                {{ $stock <= 0 ? 'Out of Stock' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
+                {{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
 
             </button>
             <!-- PAKASIR FORM -->
@@ -273,9 +278,9 @@
 
             try {
                 await copyRequest;
-                showToast('Message copied', 'Paste it in Discord support to request a manual order.', null, 'success');
+                showToast('Message copied', 'Paste it in Discord to request a manual order.', null, 'success');
             } catch (error) {
-                showToast('Manual order request', 'Open Discord and send the product plus package name to support.', null, 'warning');
+                showToast('Manual order request', 'Join Discord and send the product plus package name.', null, 'warning');
             }
         }
 
@@ -320,7 +325,7 @@
         ========================= */
         function selectPackage(e, price, id, name, usd, stock) {
             if (stock <= 0) {
-                showToast('Out of stock', 'This package is out of stock.', null, 'warning');
+                showToast('Manual order', 'Auto delivery is not ready for this package. Join Discord to order manually.', null, 'warning');
                 return;
             }
 
@@ -501,7 +506,7 @@
             }
 
             if (selectedPackageStock <= 0) {
-                showToast('Out of stock', 'This package is out of stock.', null, 'warning');
+                showToast('Manual order', 'Auto delivery is not ready for this package. Join Discord to order manually.', null, 'warning');
                 return;
             }
 
@@ -597,7 +602,7 @@
             if (btn) {
                 if (!hasStock) {
                     btn.disabled = true
-                    btn.innerText = "Out of Stock"
+                    btn.innerText = "Join Discord to Order"
                     return
                 }
 

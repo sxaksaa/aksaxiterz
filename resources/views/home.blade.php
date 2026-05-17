@@ -40,7 +40,7 @@
                     </div>
                     <div class="home-panel">
                         <div class="text-xl font-semibold text-white">Since 2024</div>
-                        <div class="mt-1 text-xs text-gray-400">{{ $totalStock }} licenses ready in stock.</div>
+                        <div class="mt-1 text-xs text-gray-400">{{ $totalStock }} licenses ready for auto delivery.</div>
                     </div>
                 </div>
             </div>

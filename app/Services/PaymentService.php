@@ -43,7 +43,7 @@ class PaymentService
             ->first();
 
         if (! $stock) {
-            throw new \Exception('Out of stock');
+            throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
         }
 
         if (! $order) {
@@ -135,7 +135,7 @@ class PaymentService
             ->first();
 
         if (! $stock) {
-            throw new \Exception('Out of stock');
+            throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
         }
 
         $baseAmount = (float) ($package->price_usdt ?? 0);

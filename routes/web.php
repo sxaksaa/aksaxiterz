@@ -28,7 +28,6 @@ use Laravel\Socialite\Two\InvalidStateException;
 
 Route::get('/', function (Request $request) {
     $categoryOrder = "CASE slug WHEN 'pc' THEN 1 WHEN 'mobile' THEN 2 WHEN 'android' THEN 3 WHEN 'ios' THEN 4 ELSE 99 END";
-    $productOrder = "CASE name WHEN 'Aurora-VN' THEN 1 WHEN 'XG-Team' THEN 2 WHEN 'Drip Client Root' THEN 3 WHEN 'Drip Client Non Root' THEN 4 WHEN 'Fluorite FF' THEN 5 WHEN 'Fluorite ML' THEN 6 ELSE 99 END";
 
     $categories = Category::whereIn('slug', ['pc', 'mobile', 'android', 'ios'])
         ->orderByRaw($categoryOrder)
@@ -40,7 +39,8 @@ Route::get('/', function (Request $request) {
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
         ->withCount('availableLicenseStocks')
-        ->orderByRaw($productOrder)
+        ->withExists(['availableLicenseStocks as has_available_stock'])
+        ->orderByDesc('has_available_stock')
         ->orderBy('name');
 
     if ($request->category === 'mobile') {
@@ -63,14 +63,13 @@ Route::get('/', function (Request $request) {
 });
 
 $productsFragment = function (Request $request) {
-    $productOrder = "CASE name WHEN 'Aurora-VN' THEN 1 WHEN 'XG-Team' THEN 2 WHEN 'Drip Client Root' THEN 3 WHEN 'Drip Client Non Root' THEN 4 WHEN 'Fluorite FF' THEN 5 WHEN 'Fluorite ML' THEN 6 ELSE 99 END";
-
     $query = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
         ->withCount('availableLicenseStocks')
-        ->orderByRaw($productOrder)
+        ->withExists(['availableLicenseStocks as has_available_stock'])
+        ->orderByDesc('has_available_stock')
         ->orderBy('name');
 
     if ($request->search) {

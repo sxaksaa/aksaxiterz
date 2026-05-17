@@ -208,7 +208,7 @@ class DirectCryptoOrderVerifier
     private function publicCryptoSyncError(\Exception $error): string
     {
         if ($error->getMessage() === 'No license stock available for this package') {
-            return 'Payment is verified, but no license stock is available for this package.';
+            return 'Payment is verified, but automatic license delivery is not ready for this package. Please join Discord for manual delivery.';
         }
 
         if ($error->getMessage() === 'Unable to verify crypto payment') {
