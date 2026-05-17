@@ -116,6 +116,57 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Features</p>
+                <h2 class="mt-1 text-xl font-semibold text-white">Included Features</h2>
+            </div>
+
+            <div class="grid gap-4">
+                @forelse ($product->features as $feature)
+                    <div class="rounded-xl border border-[#27272A] bg-black/15 p-4">
+                        <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                            <form action="{{ route('admin.features.update', $feature) }}" method="POST"
+                                class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                                @csrf
+                                @method('PATCH')
+
+                                <label class="block">
+                                    <span class="mb-2 block text-xs font-semibold text-gray-400">Feature text</span>
+                                    <input name="feature_name" value="{{ $feature->name }}" class="search-bar w-full"
+                                        required maxlength="120">
+                                </label>
+
+                                <button class="btn-footer h-12">Save</button>
+                            </form>
+
+                            <form action="{{ route('admin.features.destroy', $feature) }}" method="POST"
+                                onsubmit="return confirm('Delete this feature?')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="order-action order-action-danger h-12 w-full md:w-auto">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                @empty
+                    <div class="empty-state">No features yet</div>
+                @endforelse
+            </div>
+
+            <form action="{{ route('admin.products.features.store', $product) }}" method="POST"
+                class="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                @csrf
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">New feature</span>
+                    <input name="feature_name" value="{{ old('feature_name') }}" class="search-bar w-full"
+                        placeholder="Setup guide included" required maxlength="120">
+                </label>
+
+                <button class="btn-footer h-12">Add Feature</button>
+            </form>
+        </section>
+
+        <section class="product-section mb-6 fade-up">
+            <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Prices</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Package Prices</h2>
             </div>

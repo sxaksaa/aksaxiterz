@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\Feature;
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
@@ -56,6 +57,41 @@ class AdminProductCatalogTest extends TestCase
         $this->assertSame('30 Days', $package->name);
         $this->assertSame(125000, $package->price);
         $this->assertEquals(7.5, (float) $package->price_usdt);
+    }
+
+    public function test_admin_can_manage_product_features(): void
+    {
+        [$admin, $product] = $this->makeCatalogProduct();
+
+        $response = $this->actingAs($admin)->post(route('admin.products.features.store', $product), [
+            'feature_name' => 'Setup guide included',
+        ]);
+
+        $response->assertRedirect(route('admin.products.edit', $product));
+        $this->assertDatabaseHas('features', [
+            'product_id' => $product->id,
+            'name' => 'Setup guide included',
+        ]);
+
+        $feature = Feature::where('product_id', $product->id)->firstOrFail();
+
+        $response = $this->actingAs($admin)->patch(route('admin.features.update', $feature), [
+            'feature_name' => 'Priority setup guidance',
+        ]);
+
+        $response->assertRedirect(route('admin.products.edit', $product));
+        $this->assertDatabaseHas('features', [
+            'product_id' => $product->id,
+            'name' => 'Priority setup guidance',
+        ]);
+
+        $feature->refresh();
+        $response = $this->actingAs($admin)->delete(route('admin.features.destroy', $feature));
+
+        $response->assertRedirect(route('admin.products.edit', $product));
+        $this->assertDatabaseMissing('features', [
+            'id' => $feature->id,
+        ]);
     }
 
     public function test_admin_cannot_delete_product_with_order_or_stock_history(): void

@@ -302,6 +302,9 @@ Route::middleware(['auth', 'admin'])
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::patch('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('/products/{product}/features', [ProductController::class, 'storeFeature'])->name('products.features.store');
+        Route::patch('/features/{feature}', [ProductController::class, 'updateFeature'])->name('features.update');
+        Route::delete('/features/{feature}', [ProductController::class, 'destroyFeature'])->name('features.destroy');
         Route::post('/products/{product}/packages', [ProductController::class, 'storePackage'])->name('products.packages.store');
         Route::patch('/packages/{package}', [ProductController::class, 'updatePackage'])->name('packages.update');
         Route::delete('/packages/{package}', [ProductController::class, 'destroyPackage'])->name('packages.destroy');
