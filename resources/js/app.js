@@ -496,6 +496,19 @@ window.showAppToast = function(title, message = '', options = {}) {
     }, duration);
 };
 
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('form[data-confirm]');
+
+    if (!form) return;
+
+    const message = form.dataset.confirm || 'Continue this action?';
+
+    if (!window.confirm(message)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+}, true);
+
 document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-qris-close]')) return;
 

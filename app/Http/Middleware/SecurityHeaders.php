@@ -4,12 +4,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $request->attributes->set('csp_nonce', Str::random(32));
+
         $response = $next($request);
 
         if (function_exists('header_remove')) {
@@ -43,6 +46,9 @@ class SecurityHeaders
 
     private function contentSecurityPolicy(Request $request): string
     {
+        $nonce = (string) $request->attributes->get('csp_nonce', '');
+        $nonceSource = $nonce !== '' ? " 'nonce-{$nonce}'" : '';
+
         $directives = [
             "default-src 'self'",
             "base-uri 'self'",
@@ -50,8 +56,8 @@ class SecurityHeaders
             "frame-ancestors 'self'",
             "img-src 'self' data: https:",
             "font-src 'self' data:",
-            "script-src 'self' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self'{$nonceSource}",
+            "style-src 'self'{$nonceSource}",
             "connect-src 'self'",
             "form-action 'self'",
         ];

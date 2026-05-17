@@ -470,6 +470,52 @@
         background: rgba(147, 51, 234, 0.14);
     }
 
+    .site-navbar.nav-hidden {
+        transform: translateY(-100%);
+    }
+
+    .nav-item {
+        color: #9ca3af;
+        position: relative;
+        transition:
+            color 0.25s ease,
+            transform 0.25s ease;
+    }
+
+    .nav-item::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: -0.35rem;
+        left: 0;
+        height: 2px;
+        border-radius: 999px;
+        background: #9333ea;
+        opacity: 0;
+        transform: scaleX(0.6);
+        transition:
+            opacity 0.25s ease,
+            transform 0.25s ease;
+    }
+
+    .nav-item:hover {
+        color: #ffffff;
+    }
+
+    .nav-item:hover::after,
+    .nav-item.active::after {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+
+    .nav-item.active {
+        color: #c084fc;
+    }
+
+    .product-container-loading {
+        opacity: 0.45;
+    }
+
     .download-card {
         @apply surface relative overflow-hidden rounded-xl p-5 transition duration-300 md:p-6;
     }
@@ -982,6 +1028,14 @@
         box-shadow:
             0 0 0 1px rgba(147, 51, 234, 0.18),
             0 16px 36px rgba(147, 51, 234, 0.18);
+    }
+
+    .payment-card.is-pressing {
+        transform: scale(1.05);
+    }
+
+    .crypto-dropdown-arrow.is-open {
+        transform: rotate(180deg);
     }
 
     .payment-card.active::after,

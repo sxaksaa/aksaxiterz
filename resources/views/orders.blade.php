@@ -51,7 +51,7 @@
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         let lastPolledStatus = null;
         let ordersRefreshing = false;

@@ -269,7 +269,7 @@
         ])
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('catalogFilterForm');
 

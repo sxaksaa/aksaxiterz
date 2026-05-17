@@ -55,13 +55,13 @@
             </div>
 
             <div class="mt-4 flex flex-wrap gap-2 md:gap-3">
-                <a href="#" onclick="filterCategory('', this); return false;"
+                <a href="#" data-category-filter data-category=""
                     class="category-chip {{ !$active ? 'active' : '' }}">
                     All
                 </a>
 
                 @foreach ($categories as $category)
-                    <a href="#" onclick="filterCategory('{{ $category->slug }}', this); return false;"
+                    <a href="#" data-category-filter data-category="{{ $category->slug }}"
                         class="category-chip {{ $active == $category->slug ? 'active' : '' }}">
                         {{ $category->name }}
                     </a>
@@ -84,7 +84,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
 
             let timeout;
@@ -106,7 +106,14 @@
 
             });
 
-            window.filterCategory = function(cat, el) {
+            document.querySelectorAll('[data-category-filter]').forEach((chip) => {
+                chip.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    filterCategory(chip.dataset.category || '', chip);
+                });
+            });
+
+            function filterCategory(cat, el) {
 
                 currentCategory = cat;
                 const categoryName = el && el.textContent ? el.textContent.trim() : 'All';
@@ -137,7 +144,7 @@
                     category,
                 });
 
-                container.style.opacity = '0.45';
+                container.classList.add('product-container-loading');
 
                 fetch(`${productEndpoint}?${params.toString()}`, {
                         headers: {
@@ -167,7 +174,7 @@
                         }
                     })
                     .finally(() => {
-                        container.style.opacity = '1';
+                        container.classList.remove('product-container-loading');
                     });
             }
 

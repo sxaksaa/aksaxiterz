@@ -57,6 +57,9 @@ class SecurityMiddlewareTest extends TestCase
         $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         $this->assertSame('max-age=31536000; includeSubDomains', $response->headers->get('Strict-Transport-Security'));
         $this->assertStringContainsString("default-src 'self'", $response->headers->get('Content-Security-Policy'));
+        $this->assertStringContainsString("script-src 'self' 'nonce-", $response->headers->get('Content-Security-Policy'));
+        $this->assertStringContainsString("style-src 'self' 'nonce-", $response->headers->get('Content-Security-Policy'));
+        $this->assertStringNotContainsString("'unsafe-inline'", $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->assertFalse($response->headers->has('X-Powered-By'));
     }

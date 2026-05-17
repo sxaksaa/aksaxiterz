@@ -265,7 +265,7 @@
                                                 class="order-action">Edit</a>
 
                                             <form action="{{ route('admin.license-stocks.destroy', $stock) }}" method="POST"
-                                                onsubmit="return confirm('Delete this unsold license key?')">
+                                                data-confirm="Delete this unsold license key?">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button class="order-action order-action-danger">Delete</button>
@@ -327,7 +327,7 @@
                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"
                                 class="order-action">Edit</a>
                             <form action="{{ route('admin.license-stocks.destroy', $stock) }}" method="POST"
-                                onsubmit="return confirm('Delete this unsold license key?')">
+                                data-confirm="Delete this unsold license key?">
                                 @csrf
                                 @method('DELETE')
                                 <button class="order-action order-action-danger">Delete</button>
@@ -347,7 +347,7 @@
         ])
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('stockFilterForm');
             const lowStockCount = @json($lowStockPackages->count());

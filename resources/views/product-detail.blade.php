@@ -86,7 +86,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
 
-            <div onclick="selectPayment('pakasir')" id="btnPakasir"
+            <div id="btnPakasir" data-payment-method="pakasir"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">QRIS</div>
@@ -94,7 +94,7 @@
 
             </div>
 
-            <div onclick="selectPayment('crypto')" id="btnCrypto"
+            <div id="btnCrypto" data-payment-method="crypto"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">Crypto</div>
@@ -107,24 +107,24 @@
         <!-- CRYPTO -->
         <div id="cryptoBox" class="hidden relative mb-6 fade-up z-10">
 
-            <div onclick="toggleCryptoDropdown(event)" class="search-bar flex justify-between items-center cursor-pointer">
+            <div data-crypto-toggle class="search-bar flex justify-between items-center cursor-pointer">
 
                 <span id="selectedText">Select Network</span>
-                <span id="arrow" class="transition-transform">v</span>
+                <span id="arrow" class="crypto-dropdown-arrow transition-transform">v</span>
             </div>
 
             <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
 
-                <div onclick="selectNetwork('usdtbsc','BSC BNB Smart Chain (BEP20)', event)"
-                    class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdtbsc">
+                <div class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdtbsc"
+                    data-network-value="usdtbsc" data-network-text="BSC BNB Smart Chain (BEP20)">
                     <span class="font-bold text-white">BSC</span>
                     <span class="crypto-network-badge">Recommended</span>
                     <span class="text-xs text-gray-500 ml-auto">BEP20</span>
                     <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
                 </div>
 
-                <div onclick="selectNetwork('usdttrc20','TRX Tron (TRC20)', event)"
-                    class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdttrc20">
+                <div class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdttrc20"
+                    data-network-value="usdttrc20" data-network-text="TRX Tron (TRC20)">
                     <span class="font-bold text-white">TRX</span>
                     <span class="text-xs text-gray-500 ml-auto">TRC20</span>
                     <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
@@ -155,7 +155,9 @@
                     }
                 @endphp
 
-                <div onclick="selectPackage(event, {{ (float) $p->price }}, {{ $p->id }}, {{ Illuminate\Support\Js::from($p->name) }}, {{ (float) $p->price_usdt }}, {{ $packageStock }})"
+                <div data-package-card data-price="{{ (float) $p->price }}" data-package-id="{{ $p->id }}"
+                    data-package-name="{{ $p->name }}" data-price-usdt="{{ (float) $p->price_usdt }}"
+                    data-stock="{{ $packageStock }}"
                     class="package-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
 
                     @if ($badge)
@@ -177,7 +179,7 @@
 
                     @if ($packageStock <= 0)
                         <button type="button"
-                            onclick="requestManualOrder(event, {{ Illuminate\Support\Js::from($product->name) }}, {{ Illuminate\Support\Js::from($packageName) }})"
+                            data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
                             class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
                             Join Discord to Order
                         </button>
@@ -233,7 +235,7 @@
     @include('partials.payment-success-modal')
 
     @php $paymentError = $errors->first('payment'); @endphp
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         let selectedPackageId = null;
         let selectedPayment = null;
         let selectedCoin = null;
@@ -264,9 +266,7 @@
             showToast('Login required', 'Please login with Google before checkout.', loginUrl, 'warning');
         }
 
-        async function requestManualOrder(event, productName, packageName) {
-            event.stopPropagation();
-
+        async function requestManualOrder(productName, packageName) {
             const message = `I want to buy ${productName} - ${packageName}. Is manual order available?`;
             const copyRequest = navigator.clipboard
                 ? navigator.clipboard.writeText(message)
@@ -300,8 +300,8 @@
 
             el.classList.add('active');
 
-            el.style.transform = 'scale(1.05)';
-            setTimeout(() => el.style.transform = '', 150);
+            el.classList.add('is-pressing');
+            setTimeout(() => el.classList.remove('is-pressing'), 150);
 
             document.getElementById('cryptoBox')
                 .classList.toggle('hidden', type !== 'crypto');
@@ -323,7 +323,13 @@
         /* =========================
            PACKAGE
         ========================= */
-        function selectPackage(e, price, id, name, usd, stock) {
+        function selectPackage(card) {
+            const price = Number(card.dataset.price || 0);
+            const id = Number(card.dataset.packageId || 0);
+            const name = card.dataset.packageName || '';
+            const usd = Number(card.dataset.priceUsdt || 0);
+            const stock = Number(card.dataset.stock || 0);
+
             if (stock <= 0) {
                 showToast('Manual order', 'Auto delivery is not ready for this package. Join Discord to order manually.', null, 'warning');
                 return;
@@ -337,7 +343,7 @@
             document.querySelectorAll('.package')
                 .forEach(el => el.classList.remove('active'));
 
-            e.currentTarget.classList.add('active');
+            card.classList.add('active');
 
             document.getElementById('selectedPackage')
                 .innerText = formatPackageName(name);
@@ -415,10 +421,10 @@
             dropdownOpen = !dropdownOpen;
 
             box.classList.toggle('hidden');
-            arrow.style.transform = dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+            arrow.classList.toggle('is-open', dropdownOpen);
         }
 
-        function selectNetwork(value, text, e) {
+        function selectNetwork(value, text) {
             selectedCoin = value;
 
             document.getElementById('selectedText').innerText = text;
@@ -426,7 +432,7 @@
             dropdownOpen = false;
 
             document.getElementById('dropdownList').classList.add('hidden');
-            document.getElementById('arrow').style.transform = 'rotate(0deg)';
+            document.getElementById('arrow').classList.remove('is-open');
 
             showToast('Network selected', text, null, 'success');
         }
@@ -435,7 +441,7 @@
             if (!e.target.closest('#cryptoBox')) {
                 document.getElementById('dropdownList').classList.add('hidden');
                 dropdownOpen = false;
-                document.getElementById('arrow').style.transform = 'rotate(0deg)';
+                document.getElementById('arrow').classList.remove('is-open');
             }
         });
 
@@ -491,7 +497,28 @@
         /* =========================
            PAY BUTTON
         ========================= */
-        document.getElementById('payMainBtn').onclick = async function() {
+        document.querySelectorAll('[data-payment-method]').forEach((card) => {
+            card.addEventListener('click', () => selectPayment(card.dataset.paymentMethod));
+        });
+
+        document.querySelector('[data-crypto-toggle]')?.addEventListener('click', toggleCryptoDropdown);
+
+        document.querySelectorAll('[data-network-value]').forEach((item) => {
+            item.addEventListener('click', () => selectNetwork(item.dataset.networkValue, item.dataset.networkText));
+        });
+
+        document.querySelectorAll('[data-package-card]').forEach((card) => {
+            card.addEventListener('click', () => selectPackage(card));
+        });
+
+        document.querySelectorAll('[data-manual-order]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                requestManualOrder(button.dataset.productName || '', button.dataset.packageName || '');
+            });
+        });
+
+        document.getElementById('payMainBtn').addEventListener('click', async function() {
 
             if (this.disabled) return;
 
@@ -526,8 +553,6 @@
             this.classList.add('opacity-60')
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
-
-            const productId = {{ $product->id }};
 
             if (selectedPayment === 'pakasir') {
 
@@ -595,7 +620,7 @@
                     resetPayButton();
                 }
             }
-        };
+        });
 
         window.addEventListener('pageshow', function() {
             const btn = document.getElementById('payMainBtn')

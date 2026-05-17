@@ -115,9 +115,10 @@
 
                 <div class="mt-5 flex flex-wrap gap-2">
                     @if (! $isPaid)
-                        <form action="{{ route('admin.orders.mark-paid', $order) }}" method="POST">
+                        <form action="{{ route('admin.orders.mark-paid', $order) }}" method="POST"
+                            data-confirm="Mark this order as paid and deliver a license?">
                             @csrf
-                            <button class="order-action" onclick="return confirm('Mark this order as paid and deliver a license?')">
+                            <button class="order-action">
                                 {{ $isDirectCrypto ? 'Mark Paid Manually' : 'Mark Paid' }}
                             </button>
                         </form>

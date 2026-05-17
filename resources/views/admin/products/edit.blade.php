@@ -139,7 +139,7 @@
                             </form>
 
                             <form action="{{ route('admin.features.destroy', $feature) }}" method="POST"
-                                onsubmit="return confirm('Delete this feature?')">
+                                data-confirm="Delete this feature?">
                                 @csrf
                                 @method('DELETE')
                                 <button class="order-action order-action-danger h-12 w-full md:w-auto">Delete</button>
@@ -187,7 +187,7 @@
 
                             @if ($canDeletePackage)
                                 <form action="{{ route('admin.packages.destroy', $package) }}" method="POST"
-                                    onsubmit="return confirm('Delete this package?')">
+                                    data-confirm="Delete this package?">
                                     @csrf
                                     @method('DELETE')
                                     <button class="order-action order-action-danger">Delete</button>
@@ -272,7 +272,7 @@
                 </div>
 
                 <form action="{{ route('admin.products.destroy', $product) }}" method="POST"
-                    onsubmit="return confirm('Delete this product?')">
+                    data-confirm="Delete this product?">
                     @csrf
                     @method('DELETE')
                     <button class="order-action order-action-danger {{ $canDeleteProduct ? '' : 'cursor-not-allowed opacity-50' }}"
