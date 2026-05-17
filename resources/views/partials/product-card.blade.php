@@ -1,13 +1,19 @@
+@php
+    $starterProductId = $products
+        ->filter(fn ($product) => ($product->available_license_stocks_count ?? 0) > 0 && $product->packages->isNotEmpty())
+        ->sortBy(fn ($product) => sprintf('%012d|%s', (int) $product->packages->min('price'), strtolower($product->name)))
+        ->first()?->id;
+@endphp
+
 @forelse ($products as $product)
     @php
         $minPackage = $product->packages->sortBy('price')->first();
         $stock = $product->available_license_stocks_count ?? 0;
         $badge = null;
 
-        if ($minPackage && $minPackage->price <= 50000) {
-            $badge = 'Low Price';
-        }
-        if ($minPackage && $minPackage->price >= 100000) {
+        if ($product->id === $starterProductId) {
+            $badge = 'Starter Deal';
+        } elseif ($minPackage && $minPackage->price >= 100000) {
             $badge = 'Premium';
         }
     @endphp

@@ -3,7 +3,7 @@
 @section('content')
     <section class="page-shell pb-8 pt-6 md:pt-10">
         <div class="download-hero mx-auto max-w-5xl fade-up">
-            <div class="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end">
+            <div class="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-center">
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Public Guides</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
@@ -15,12 +15,6 @@
                 </div>
 
                 @include('guides._visual', ['variant' => 'overview', 'title' => 'Guide preview'])
-            </div>
-
-            <div class="mt-5 flex flex-wrap gap-2">
-                <span class="support-pill">Windows setup</span>
-                <span class="support-pill">Troubleshooting</span>
-                <span class="support-pill">Updated {{ $updatedAt }}</span>
             </div>
         </div>
     </section>

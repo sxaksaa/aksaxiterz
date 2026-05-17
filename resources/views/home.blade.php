@@ -2,13 +2,12 @@
 
 @section('content')
     @php
-        $discordUrl = config('links.discord_url');
         $totalStock = $products->sum('available_license_stocks_count');
     @endphp
 
     <section class="page-shell pb-6 pt-6 md:pt-10">
         <div class="home-hero fade-up">
-            <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-end">
+            <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Digital License Platform</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
@@ -18,15 +17,6 @@
                         Browse trusted digital tools, pay securely, and get quick access to license keys, setup
                         guides, and customer support.
                     </p>
-
-                    <div class="mt-5 flex flex-wrap gap-3">
-                        <a href="#products" class="btn-main">Browse Products</a>
-                        <a href="{{ $discordUrl ?: '#' }}"
-                            @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
-                            class="btn-footer {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                            Discord
-                        </a>
-                    </div>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
@@ -51,14 +41,14 @@
         @php $active = request('category'); @endphp
 
         <div class="home-toolbar fade-up">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_minmax(320px,420px)] lg:items-end lg:gap-8">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Products</p>
                     <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
                     <p class="mt-1 text-sm text-gray-400">Search by product name or filter by category.</p>
                 </div>
 
-                <div class="w-full lg:max-w-md">
+                <div class="w-full">
                     <input type="text" id="searchInput" placeholder="Search Products..."
                         class="search-bar w-full text-sm md:text-base" value="{{ request('search') }}">
                 </div>

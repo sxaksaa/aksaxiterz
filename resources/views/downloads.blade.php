@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="page-shell pb-8 pt-6 md:pt-10">
-        <div class="download-hero mx-auto max-w-5xl fade-up">
+        <div class="download-hero mx-auto flex max-w-5xl items-center fade-up">
             <div class="max-w-3xl">
                 <p class="mb-2 text-sm font-semibold text-[#C084FC]">Public Download Tools</p>
                 <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
@@ -13,22 +13,6 @@
                     runtimes. Use the matching card below and open the file folder you need.
                 </p>
             </div>
-
-            <div class="mt-6 grid max-w-4xl gap-3 md:grid-cols-3">
-                <div class="download-feature">
-                    <div class="text-sm font-semibold text-white">Public files</div>
-                    <div class="mt-1 text-xs leading-5 text-gray-400">Download folders and direct setup files.</div>
-                </div>
-                <div class="download-feature">
-                    <div class="text-sm font-semibold text-white">Setup included</div>
-                    <div class="mt-1 text-xs leading-5 text-gray-400">Tutorials, setup packages, and requirements when available.</div>
-                </div>
-                <div class="download-feature">
-                    <div class="text-sm font-semibold text-white">Support ready</div>
-                    <div class="mt-1 text-xs leading-5 text-gray-400">Need help or reset? Discord is available from the navbar.</div>
-                </div>
-            </div>
-
         </div>
     </section>
 

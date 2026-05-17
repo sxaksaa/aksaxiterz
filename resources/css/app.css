@@ -189,16 +189,25 @@
     }
 
     .search-bar {
-        @apply w-full rounded-xl border px-4 py-3 text-white transition;
+        @apply w-full rounded-[999px] border px-4 py-3 text-white transition;
         background: rgba(21, 21, 27, 0.9);
-        border-color: #27272a;
+        border-color: rgba(147, 51, 234, 0.72);
+        box-shadow:
+            0 0 0 3px rgba(147, 51, 234, 0.12),
+            0 12px 28px rgba(147, 51, 234, 0.08);
+    }
+
+    textarea.search-bar {
+        @apply rounded-2xl;
     }
 
     .search-bar:focus,
     .search-bar:hover {
-        border-color: rgba(147, 51, 234, 0.75);
+        border-color: rgba(192, 132, 252, 0.95);
         outline: none;
-        box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.12);
+        box-shadow:
+            0 0 0 4px rgba(147, 51, 234, 0.18),
+            0 16px 34px rgba(147, 51, 234, 0.14);
     }
 
     .btn-main {
