@@ -21,6 +21,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3">
+                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary">Catalog</a>
                     <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary">Orders</a>
                     <a href="{{ route('admin.users.index') }}" class="btn-footer-secondary">Users</a>
                     <a href="/licenses" class="btn-footer">Licenses</a>

@@ -1,0 +1,221 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\LicenseStock;
+use App\Models\Order;
+use App\Models\Package;
+use App\Models\Product;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+
+class ProductController extends Controller
+{
+    public function index(Request $request)
+    {
+        $products = Product::with([
+            'category',
+            'packages' => fn ($query) => $query
+                ->withCount('availableLicenseStocks')
+                ->orderBy('price')
+                ->orderBy('name'),
+        ])
+            ->withCount(['packages', 'licenseStocks', 'availableLicenseStocks'])
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->string('search')->toString();
+
+                $query->where(function ($query) use ($search) {
+                    $query->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('slug', 'like', '%'.$search.'%')
+                        ->orWhere('description', 'like', '%'.$search.'%');
+                });
+            })
+            ->when($request->filled('category_id'), function ($query) use ($request) {
+                $query->where('category_id', $request->integer('category_id'));
+            })
+            ->orderBy('name')
+            ->paginate(10)
+            ->withQueryString();
+
+        $categories = Category::orderBy('name')->get();
+
+        $stats = [
+            'products' => Product::count(),
+            'packages' => Package::count(),
+            'available' => LicenseStock::where('is_sold', false)->count(),
+            'stocked_products' => Product::has('availableLicenseStocks')->count(),
+        ];
+
+        return view('admin.products.index', compact('products', 'categories', 'stats'));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $this->validateProduct($request);
+        $slug = $this->uniqueSlug($validated['slug'] ?? null, $validated['name']);
+
+        $product = Product::create([
+            'category_id' => $validated['category_id'],
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'description' => $validated['description'],
+        ]);
+
+        return redirect()
+            ->route('admin.products.edit', $product)
+            ->with('info', 'Product created. Add package prices before selling it.');
+    }
+
+    public function edit(Product $product)
+    {
+        $product->load([
+            'category',
+            'packages' => fn ($query) => $query
+                ->withCount(['availableLicenseStocks', 'licenseStocks', 'orders'])
+                ->orderBy('price')
+                ->orderBy('name'),
+        ])->loadCount(['packages', 'licenseStocks', 'availableLicenseStocks']);
+
+        $categories = Category::orderBy('name')->get();
+        $orderCount = Order::where('product_id', $product->id)->count();
+
+        return view('admin.products.edit', compact('product', 'categories', 'orderCount'));
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $validated = $this->validateProduct($request, $product);
+        $slug = $this->uniqueSlug($validated['slug'] ?? null, $validated['name'], $product);
+
+        $product->update([
+            'category_id' => $validated['category_id'],
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'description' => $validated['description'],
+        ]);
+
+        return redirect()
+            ->route('admin.products.edit', $product->fresh())
+            ->with('info', 'Product details updated.');
+    }
+
+    public function destroy(Product $product)
+    {
+        if (Order::where('product_id', $product->id)->exists()) {
+            return back()->withErrors(['product' => 'Products with orders cannot be deleted. Rename or edit it instead.']);
+        }
+
+        if ($product->licenseStocks()->exists()) {
+            return back()->withErrors(['product' => 'Products with license stock cannot be deleted. Delete unused stock first.']);
+        }
+
+        $product->delete();
+
+        return redirect()
+            ->route('admin.products.index')
+            ->with('info', 'Product deleted.');
+    }
+
+    public function storePackage(Request $request, Product $product)
+    {
+        $validated = $this->validatePackage($request, $product);
+
+        $product->packages()->create($validated);
+
+        return redirect()
+            ->route('admin.products.edit', $product)
+            ->with('info', 'Package price added.');
+    }
+
+    public function updatePackage(Request $request, Package $package)
+    {
+        $validated = $this->validatePackage($request, $package->product, $package);
+
+        $package->update($validated);
+
+        return redirect()
+            ->route('admin.products.edit', $package->product)
+            ->with('info', 'Package price updated.');
+    }
+
+    public function destroyPackage(Package $package)
+    {
+        if ($package->orders()->exists()) {
+            return back()->withErrors(['package' => 'Packages with orders cannot be deleted. Edit the price/name instead.']);
+        }
+
+        if ($package->licenseStocks()->exists()) {
+            return back()->withErrors(['package' => 'Packages with license stock cannot be deleted. Delete unused stock first.']);
+        }
+
+        $product = $package->product;
+        $package->delete();
+
+        return redirect()
+            ->route('admin.products.edit', $product)
+            ->with('info', 'Package deleted.');
+    }
+
+    private function validateProduct(Request $request, ?Product $product = null): array
+    {
+        return $request->validate([
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'name' => [
+                'required',
+                'string',
+                'max:120',
+                Rule::unique('products', 'name')->ignore($product?->id),
+            ],
+            'slug' => [
+                'nullable',
+                'string',
+                'max:160',
+                Rule::unique('products', 'slug')->ignore($product?->id),
+            ],
+            'description' => ['required', 'string', 'max:1000'],
+        ]);
+    }
+
+    private function validatePackage(Request $request, Product $product, ?Package $package = null): array
+    {
+        $validated = $request->validate([
+            'package_name' => [
+                'required',
+                'string',
+                'max:80',
+                Rule::unique('packages', 'name')
+                    ->where('product_id', $product->id)
+                    ->ignore($package?->id),
+            ],
+            'package_price' => ['required', 'integer', 'min:0', 'max:999999999'],
+            'package_price_usdt' => ['nullable', 'numeric', 'min:0', 'max:999999.9999'],
+        ]);
+
+        return [
+            'name' => $validated['package_name'],
+            'price' => $validated['package_price'],
+            'price_usdt' => $validated['package_price_usdt'] ?? null,
+        ];
+    }
+
+    private function uniqueSlug(?string $value, string $fallback, ?Product $product = null): string
+    {
+        $baseSlug = Str::slug($value ?: $fallback) ?: 'product';
+        $slug = $baseSlug;
+        $suffix = 2;
+
+        while (
+            Product::where('slug', $slug)
+                ->when($product, fn ($query) => $query->whereKeyNot($product->id))
+                ->exists()
+        ) {
+            $slug = $baseSlug.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $slug;
+    }
+}

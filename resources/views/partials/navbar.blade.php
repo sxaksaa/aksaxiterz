@@ -4,7 +4,7 @@ bg-[#111115]/80 backdrop-blur-md
 border-b border-[#27272A] transition-transform duration-300">
 
 
-    <div class="grid w-full grid-cols-[auto_1fr_auto] items-center px-4 py-4 md:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)] md:px-12">
+    <div class="page-shell grid grid-cols-[auto_1fr_auto] items-center py-4 md:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
         <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
@@ -89,6 +89,10 @@ border-b border-[#27272A] transition-transform duration-300">
 
                         @if ($user->isAdmin())
                             <div class="border-b border-[#27272A]">
+                                <a href="{{ route('admin.products.index') }}"
+                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    Admin Catalog
+                                </a>
                                 <a href="{{ route('admin.license-stocks.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Admin Stock
@@ -99,7 +103,7 @@ border-b border-[#27272A] transition-transform duration-300">
                                 </a>
                                 <a href="{{ route('admin.users.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Users
+                                    Admin Users
                                 </a>
                             </div>
                         @endif
@@ -148,9 +152,10 @@ transition-all duration-300 ease-out">
             <a href="/orders" onclick="toggleMobileMenu(event)" class="nav-item">Orders</a>
             <a href="/licenses" onclick="toggleMobileMenu(event)" class="nav-item">Licenses</a>
             @if (auth()->user()?->isAdmin())
-                <a href="/admin/license-stocks" onclick="toggleMobileMenu(event)" class="nav-item">Admin</a>
+                <a href="{{ route('admin.products.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Admin Catalog</a>
+                <a href="/admin/license-stocks" onclick="toggleMobileMenu(event)" class="nav-item">Admin Stock</a>
                 <a href="{{ route('admin.orders.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Admin Orders</a>
-                <a href="{{ route('admin.users.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Users</a>
+                <a href="{{ route('admin.users.index') }}" onclick="toggleMobileMenu(event)" class="nav-item">Admin Users</a>
             @endif
 
             @php $discordUrl = config('links.discord_url'); @endphp

@@ -13,6 +13,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3">
+                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary">Catalog</a>
                     <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary">Stock</a>
                     <a href="{{ route('admin.users.index') }}" class="btn-footer-secondary">Users</a>
                     <a href="/orders" class="btn-footer">My Orders</a>

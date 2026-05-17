@@ -1,0 +1,258 @@
+@extends('layouts.app')
+
+@section('content')
+    @php
+        $formatIdr = fn ($value) => 'Rp ' . number_format((int) $value, 0, ',', '.');
+        $formatUsdt = fn ($value) => $value === null ? '-' : rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.') . ' USDT';
+    @endphp
+
+    <div class="page-shell py-6 md:py-10">
+        <section class="orders-hero fade-up mb-6">
+            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Catalog</h1>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+                        Manage product names, public slugs, descriptions, categories, and package prices.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary">Stock</a>
+                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary">Orders</a>
+                    <a href="{{ route('admin.users.index') }}" class="btn-footer-secondary">Users</a>
+                </div>
+            </div>
+
+            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['products'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Products</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['packages'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Packages</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['available'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Available keys</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['stocked_products'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Stocked products</div>
+                </div>
+            </div>
+        </section>
+
+        @if (session('info'))
+            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+                {{ session('info') }}
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
+        <section class="product-section mb-6 fade-up">
+            <div class="mb-4">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">New Product</p>
+                <h2 class="mt-1 text-xl font-semibold text-white">Add Catalog Item</h2>
+            </div>
+
+            <form action="{{ route('admin.products.store') }}" method="POST" class="grid gap-4 lg:grid-cols-2">
+                @csrf
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Product name</span>
+                    <input name="name" value="{{ old('name') }}" class="search-bar w-full"
+                        placeholder="Aurora-VN" required maxlength="120">
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Category</span>
+                    <select name="category_id" class="search-bar w-full" required>
+                        <option value="">Select category</option>
+                        @foreach ($categories as $category)
+                            <option value="{{ $category->id }}" @selected((string) old('category_id') === (string) $category->id)>
+                                {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
+                    <input name="slug" value="{{ old('slug') }}" class="search-bar w-full"
+                        placeholder="auto from product name" maxlength="160">
+                </label>
+
+                <label class="block lg:row-span-2">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Description</span>
+                    <textarea name="description" rows="4" class="search-bar min-h-28 w-full resize-y"
+                        placeholder="Short public product description" required>{{ old('description') }}</textarea>
+                </label>
+
+                <div class="flex items-end">
+                    <button class="btn-footer h-12">Create Product</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="product-section mb-6 fade-up">
+            <form id="catalogFilterForm" method="GET" action="{{ route('admin.products.index') }}"
+                class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_0.75fr_auto]">
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
+                    <input name="search" value="{{ request('search') }}" class="search-bar w-full"
+                        placeholder="Product, slug, or description">
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Category</span>
+                    <select name="category_id" class="search-bar w-full">
+                        <option value="">All categories</option>
+                        @foreach ($categories as $category)
+                            <option value="{{ $category->id }}" @selected((string) request('category_id') === (string) $category->id)>
+                                {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
+                <div class="flex gap-2">
+                    <button class="btn-footer h-12 md:hidden">Filter</button>
+                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                </div>
+            </form>
+        </section>
+
+        <div class="orders-table-wrap hidden md:block">
+            <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-white">Catalog Items</h2>
+                    <p class="mt-1 text-xs text-gray-500">Edit a product to update package prices.</p>
+                </div>
+                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                    {{ $products->total() }} records
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[1120px] text-sm">
+                    <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
+                        <tr>
+                            <th class="p-4 text-left">Product</th>
+                            <th class="p-4 text-left">Category</th>
+                            <th class="p-4 text-left">Packages</th>
+                            <th class="p-4 text-left">Stock</th>
+                            <th class="p-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($products as $product)
+                            <tr class="orders-table-row">
+                                <td class="p-4">
+                                    <div class="font-semibold text-white">{{ $product->name }}</div>
+                                    <div class="mt-1 font-mono text-xs text-gray-500">/{{ $product->slug }}</div>
+                                    <div class="mt-2 max-w-[300px] text-xs leading-5 text-gray-400">
+                                        {{ $product->description }}
+                                    </div>
+                                </td>
+                                <td class="p-4 text-gray-300">{{ $product->category->name ?? '-' }}</td>
+                                <td class="p-4">
+                                    <div class="grid gap-2">
+                                        @forelse ($product->packages as $package)
+                                            <div class="rounded-lg border border-[#27272A] bg-black/15 px-3 py-2">
+                                                <div class="font-semibold text-white">{{ $package->name }}</div>
+                                                <div class="mt-1 text-xs text-gray-400">
+                                                    {{ $formatIdr($package->price) }} / {{ $formatUsdt($package->price_usdt) }}
+                                                </div>
+                                                <div class="mt-1 text-xs text-gray-500">
+                                                    {{ $package->available_license_stocks_count }} keys
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <span class="text-xs text-gray-500">No packages</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                    <div class="font-semibold text-white">{{ $product->available_license_stocks_count }}</div>
+                                    <div class="mt-1 text-xs text-gray-500">
+                                        {{ $product->license_stocks_count }} total keys
+                                    </div>
+                                </td>
+                                <td class="p-4 text-right">
+                                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action">Edit</a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="p-8">
+                                    <div class="empty-state">No products found</div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="space-y-4 md:hidden">
+            @forelse ($products as $product)
+                <article class="order-mobile-card motion-card">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="font-semibold text-white">{{ $product->name }}</div>
+                            <div class="mt-1 font-mono text-xs text-gray-500">/{{ $product->slug }}</div>
+                            <div class="mt-1 text-xs text-gray-400">{{ $product->category->name ?? '-' }}</div>
+                        </div>
+                        <span class="status-pill status-pill-paid">{{ $product->available_license_stocks_count }} keys</span>
+                    </div>
+
+                    <div class="mt-4 grid gap-2 text-sm">
+                        @forelse ($product->packages as $package)
+                            <div class="rounded-lg border border-[#27272A] bg-black/15 px-3 py-2">
+                                <div class="font-semibold text-white">{{ $package->name }}</div>
+                                <div class="mt-1 text-xs text-gray-400">
+                                    {{ $formatIdr($package->price) }} / {{ $formatUsdt($package->price_usdt) }}
+                                </div>
+                            </div>
+                        @empty
+                            <span class="text-xs text-gray-500">No packages</span>
+                        @endforelse
+                    </div>
+
+                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action mt-4 w-full">Edit</a>
+                </article>
+            @empty
+                <div class="empty-state">No products found</div>
+            @endforelse
+        </div>
+
+        @include('partials.pagination', [
+            'paginator' => $products,
+            'label' => 'Catalog pagination',
+            'itemLabel' => 'products',
+        ])
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('catalogFilterForm');
+
+            if (!form) return;
+
+            let searchTimeout;
+            form.querySelector('input[name="search"]')?.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => form.requestSubmit(), 450);
+            });
+
+            form.querySelector('select[name="category_id"]')?.addEventListener('change', () => form.requestSubmit());
+        });
+    </script>
+@endsection
