@@ -41,7 +41,7 @@
         @php $active = request('category'); @endphp
 
         <div class="home-toolbar fade-up">
-            <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_minmax(320px,420px)] lg:items-end lg:gap-8">
+            <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Products</p>
                     <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
