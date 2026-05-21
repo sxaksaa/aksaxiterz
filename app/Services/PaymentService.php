@@ -199,7 +199,7 @@ class PaymentService
 
         $network = strtolower((string) ($payload['network'] ?? ''));
 
-        return match ($network) {
+        $inspection = match ($network) {
             'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
             'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload),
             default => [
@@ -207,6 +207,24 @@ class PaymentService
                 'mismatches' => [],
             ],
         };
+
+        if (! empty($inspection['transfer'])) {
+            return $inspection;
+        }
+
+        $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
+
+        if (! $binanceInspection) {
+            return $inspection;
+        }
+
+        return [
+            'transfer' => $binanceInspection['transfer'] ?? null,
+            'mismatches' => array_slice(array_merge(
+                $inspection['mismatches'] ?? [],
+                $binanceInspection['mismatches'] ?? [],
+            ), 0, 5),
+        ];
     }
 
     private function inspectDirectTrc20Transfers(Order $order, array $payload): array
@@ -375,6 +393,104 @@ class PaymentService
                 if (count($mismatches) < 5) {
                     $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
                 }
+            }
+        }
+
+        return [
+            'transfer' => null,
+            'mismatches' => $mismatches,
+        ];
+    }
+
+    private function inspectDirectBinanceDeposits(Order $order, array $payload): ?array
+    {
+        $fallback = config('services.binance.deposit_fallback', []);
+
+        if (! is_array($fallback) || ! ($fallback['enabled'] ?? false)) {
+            return null;
+        }
+
+        if (blank($fallback['api_key'] ?? null) || blank($fallback['api_secret'] ?? null)) {
+            return null;
+        }
+
+        $coin = strtolower((string) ($payload['network'] ?? ''));
+
+        if (! in_array($coin, self::ALLOWED_COINS, true)) {
+            return null;
+        }
+
+        $network = $this->directCryptoNetwork($coin);
+        $binanceNetwork = strtoupper(trim((string) ($network['binance_network'] ?? '')));
+        $address = trim((string) ($payload['address'] ?? ''));
+        $decimals = (int) ($payload['decimals'] ?? $network['decimals'] ?? 6);
+        $requiredUnits = $this->decimalToTokenUnits($payload['amount'] ?? null, $decimals);
+        $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
+
+        if ($address === '' || $binanceNetwork === '' || $requiredUnits === null) {
+            return null;
+        }
+
+        $deposits = $this->signedBinanceGet('/sapi/v1/capital/deposit/hisrec', [
+            'coin' => 'USDT',
+            'status' => 1,
+            'startTime' => max(0, (($createdAtTimestamp ?: now()->subDay()->timestamp) - 300) * 1000),
+            'endTime' => (now()->addMinutes(5)->timestamp) * 1000,
+            'limit' => 1000,
+            'recvWindow' => max(1000, (int) ($fallback['recv_window'] ?? 5000)),
+            'timestamp' => $this->millisecondsTimestamp(),
+        ], $fallback);
+
+        if (! is_array($deposits)) {
+            return null;
+        }
+
+        $mismatches = [];
+
+        foreach ($deposits as $deposit) {
+            if (! is_array($deposit)) {
+                continue;
+            }
+
+            $actualNetwork = strtoupper(trim((string) ($deposit['network'] ?? '')));
+            $actualAddress = trim((string) ($deposit['address'] ?? ''));
+            $value = $this->decimalToTokenUnits($deposit['amount'] ?? null, $decimals);
+            $timestampMs = (int) (($deposit['completeTime'] ?? null) ?: ($deposit['insertTime'] ?? 0));
+            $timestamp = (int) floor($timestampMs / 1000);
+
+            if (
+                strtoupper((string) ($deposit['coin'] ?? '')) !== 'USDT' ||
+                (int) ($deposit['status'] ?? -1) !== 1 ||
+                ! hash_equals($binanceNetwork, $actualNetwork) ||
+                ! $this->sameCryptoAddress($address, $actualAddress) ||
+                $value === null
+            ) {
+                continue;
+            }
+
+            if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
+                continue;
+            }
+
+            $transfer = [
+                'tx_hash' => (string) ($deposit['txId'] ?? $deposit['id'] ?? ''),
+                'network' => $coin,
+                'amount_units' => $value,
+                'amount' => $this->tokenUnitsToDecimal($value, $decimals),
+                'to' => $actualAddress,
+                'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
+                'source' => 'binance_deposit_history',
+            ];
+
+            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+                return [
+                    'transfer' => $transfer,
+                    'mismatches' => $mismatches,
+                ];
+            }
+
+            if (count($mismatches) < 5) {
+                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
             }
         }
 
@@ -582,6 +698,19 @@ class PaymentService
         return (bool) preg_match('/^0x[a-f0-9]{40}$/', $address);
     }
 
+    private function sameCryptoAddress(string $expected, string $actual): bool
+    {
+        if ($expected === '' || $actual === '') {
+            return false;
+        }
+
+        if (str_starts_with(strtolower($expected), '0x') || str_starts_with(strtolower($actual), '0x')) {
+            return hash_equals(strtolower($expected), strtolower($actual));
+        }
+
+        return hash_equals($expected, $actual);
+    }
+
     private function decimalToTokenUnits($amount, int $decimals = 18): ?string
     {
         if (! is_numeric($amount)) {
@@ -697,6 +826,48 @@ class PaymentService
         }
 
         return $payload['result'] ?? null;
+    }
+
+    private function signedBinanceGet(string $path, array $params, array $config): ?array
+    {
+        $baseUrl = rtrim((string) ($config['base_url'] ?? 'https://api.binance.com'), '/');
+        $apiKey = (string) ($config['api_key'] ?? '');
+        $apiSecret = (string) ($config['api_secret'] ?? '');
+
+        if ($baseUrl === '' || $apiKey === '' || $apiSecret === '') {
+            return null;
+        }
+
+        $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        $signature = hash_hmac('sha256', $query, $apiSecret);
+        $url = $baseUrl.$path.'?'.$query.'&signature='.$signature;
+
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->withHeaders([
+                'X-MBX-APIKEY' => $apiKey,
+            ])
+            ->timeout(20)
+            ->get($url);
+
+        $payload = $response->json();
+
+        if (! $response->successful() || ! is_array($payload)) {
+            Log::warning('Binance deposit history verification request failed', [
+                'path' => $path,
+                'status' => $response->status(),
+                'code' => is_array($payload) ? ($payload['code'] ?? null) : null,
+                'message' => is_array($payload) ? ($payload['msg'] ?? null) : null,
+            ]);
+
+            return null;
+        }
+
+        return $payload;
+    }
+
+    private function millisecondsTimestamp(): int
+    {
+        return (int) floor(microtime(true) * 1000);
     }
 
     private function hexQuantity(int $value): string

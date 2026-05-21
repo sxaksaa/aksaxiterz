@@ -47,7 +47,7 @@ class OrderFulfillmentService
         ]);
     }
 
-    private function markPaid(Order $order): void
+    public function markPaid(Order $order): void
     {
         $order->update([
             'status' => 'paid',

@@ -43,7 +43,7 @@ class DirectCryptoOrderVerifier
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
                     'message' => empty($inspection['mismatches'])
-                        ? 'Crypto payment is still being verified.'
+                        ? 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.'
                         : 'Received USDT amount does not match this order. Please contact support.',
                 ];
 
@@ -70,18 +70,37 @@ class DirectCryptoOrderVerifier
                 ];
             }
 
+            $deliveryPending = false;
+
             if ($lockedOrder->status !== 'paid') {
                 $this->rememberMatchedTransfer($lockedOrder, $transfer);
-                $this->orderFulfillmentService->fulfill($lockedOrder);
+
+                try {
+                    $this->orderFulfillmentService->fulfill($lockedOrder);
+                } catch (\Exception $fulfillmentError) {
+                    if ($fulfillmentError->getMessage() !== 'No license stock available for this package') {
+                        throw $fulfillmentError;
+                    }
+
+                    $deliveryPending = true;
+                    $this->orderFulfillmentService->markPaid($lockedOrder);
+                }
             }
 
             DB::commit();
 
-            return $this->withLicensePayload([
+            $payload = $this->withLicensePayload([
                 'order_id' => $lockedOrder->order_id,
                 'status' => $lockedOrder->fresh()->status,
                 'tx_hash' => $transfer['tx_hash'] ?? null,
             ], $lockedOrder);
+
+            if ($deliveryPending && empty($payload['license_key'] ?? null)) {
+                $payload['delivery_pending'] = true;
+                $payload['message'] = 'Payment is verified, but automatic license delivery is not ready for this package. Please join Discord for manual delivery.';
+            }
+
+            return $payload;
         } catch (\Exception $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
@@ -215,6 +234,6 @@ class DirectCryptoOrderVerifier
             return 'Crypto network API could not be reached. Please try Verify again.';
         }
 
-        return 'Crypto payment is still being verified.';
+        return 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.';
     }
 }

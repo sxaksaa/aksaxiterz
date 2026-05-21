@@ -378,11 +378,17 @@
                 const result = await syncCryptoOrder(orderId);
 
                 if (result?.status === 'paid') {
+                    const deliveryPending = result?.delivery_pending === true;
+
                     window.showAksaPaymentSuccess?.({
-                        message: 'Your USDT payment has been verified and your license is ready.',
+                        message: result.message || 'Your USDT payment has been verified and your license is ready.',
                         licenseKey: result.license_key,
                         orderId: result.order_id || orderId,
-                    }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                        primaryUrl: deliveryPending ? '/orders' : undefined,
+                        primaryText: deliveryPending ? 'Open Orders' : undefined,
+                        copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                        redirectDelay: deliveryPending ? 8000 : undefined,
+                    }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
                         variant: 'success',
                     });
                     await refreshOrders();
@@ -471,11 +477,17 @@
                     if (data.can_sync_crypto && data.payment_method === 'crypto' && data.order_id) {
                         syncCryptoOrder(data.order_id).then(result => {
                             if (result?.status === 'paid') {
+                                const deliveryPending = result?.delivery_pending === true;
+
                                 window.showAksaPaymentSuccess?.({
-                    message: 'Your USDT payment has been verified and your license is ready.',
+                                    message: result.message || 'Your USDT payment has been verified and your license is ready.',
                                     licenseKey: result.license_key,
                                     orderId: result.order_id || data.order_id,
-                                }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                                    primaryUrl: deliveryPending ? '/orders' : undefined,
+                                    primaryText: deliveryPending ? 'Open Orders' : undefined,
+                                    copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                                    redirectDelay: deliveryPending ? 8000 : undefined,
+                                }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
                                     variant: 'success',
                                 });
                                 refreshOrders();

@@ -194,10 +194,16 @@ function startCryptoPolling(orderId) {
 
             if (result?.status === 'paid') {
                 stopCryptoPolling();
+                const deliveryPending = result?.delivery_pending === true;
+
                 showPaymentSuccess({
-                    message: 'Your USDT payment has been verified and your license is ready.',
+                    message: result.message || 'Your USDT payment has been verified and your license is ready.',
                     licenseKey: result.license_key,
                     orderId: result.order_id || orderId,
+                    primaryUrl: deliveryPending ? '/orders' : undefined,
+                    primaryText: deliveryPending ? 'Open Orders' : undefined,
+                    copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                    redirectDelay: deliveryPending ? 8000 : undefined,
                 });
             }
         } catch (error) {
@@ -383,7 +389,7 @@ function showPaymentSuccess(options = {}) {
     }
 
     if (copyStatus) {
-        copyStatus.innerText = options.licenseKey ? 'Copying license key...' : 'License key is ready on My Licenses.';
+        copyStatus.innerText = options.copyStatusText || (options.licenseKey ? 'Copying license key...' : 'License key is ready on My Licenses.');
     }
 
     if (countdown) {
@@ -590,10 +596,16 @@ document.addEventListener('click', async (event) => {
 
         if (result?.status === 'paid') {
             stopCryptoPolling();
+            const deliveryPending = result?.delivery_pending === true;
+
             showPaymentSuccess({
-                message: 'Your USDT payment has been verified and your license is ready.',
+                message: result.message || 'Your USDT payment has been verified and your license is ready.',
                 licenseKey: result.license_key,
                 orderId: result.order_id || cryptoState.orderId,
+                primaryUrl: deliveryPending ? '/orders' : undefined,
+                primaryText: deliveryPending ? 'Open Orders' : undefined,
+                copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                redirectDelay: deliveryPending ? 8000 : undefined,
             });
             return;
         }

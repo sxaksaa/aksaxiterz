@@ -61,6 +61,7 @@ return [
                 'api_url' => env('TRONGRID_URL', 'https://api.trongrid.io'),
                 'api_key' => env('TRONGRID_API_KEY'),
                 'decimals' => 6,
+                'binance_network' => env('BINANCE_TRC20_NETWORK', 'TRX'),
             ],
             'usdtbsc' => [
                 'label' => 'BSC BNB Smart Chain (BEP20)',
@@ -71,7 +72,18 @@ return [
                 'rpc_scan_blocks' => (int) env('BSC_RPC_SCAN_BLOCKS', 40000),
                 'rpc_chunk_blocks' => (int) env('BSC_RPC_CHUNK_BLOCKS', 3000),
                 'decimals' => 18,
+                'binance_network' => env('BINANCE_BEP20_NETWORK', 'BSC'),
             ],
+        ],
+    ],
+
+    'binance' => [
+        'deposit_fallback' => [
+            'enabled' => (bool) env('BINANCE_DEPOSIT_FALLBACK', false),
+            'api_key' => env('BINANCE_API_KEY'),
+            'api_secret' => env('BINANCE_API_SECRET'),
+            'base_url' => env('BINANCE_API_URL', 'https://api.binance.com'),
+            'recv_window' => (int) env('BINANCE_RECV_WINDOW', 5000),
         ],
     ],
 

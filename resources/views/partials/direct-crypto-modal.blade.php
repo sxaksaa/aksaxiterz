@@ -46,7 +46,7 @@
                     The received USDT amount must match this invoice amount, or the order will stay pending.
                 </p>
                 <p class="mt-2 text-xs font-semibold leading-5 text-white">
-                    Do not use Binance Pay or internal exchange transfer. Send through the selected network only.
+                    Use the selected network and keep your wallet receipt. If Binance shows Off-chain Transfer, keep that receipt too.
                 </p>
             </div>
             <div class="qris-detail-row">
@@ -61,7 +61,7 @@
 
         <label class="crypto-confirm-row mt-5">
             <input type="checkbox" id="aksaCryptoAcknowledge" data-crypto-ack>
-            <span>I sent the exact amount through the selected network.</span>
+            <span>I sent the exact amount to the address shown above.</span>
         </label>
 
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
