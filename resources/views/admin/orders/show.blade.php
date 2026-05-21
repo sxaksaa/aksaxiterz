@@ -12,6 +12,8 @@
         $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
         $createdAt = $order->created_at?->timezone(config('app.timezone'));
         $expiresAt = $order->expired_at?->timezone(config('app.timezone'));
+        $canMarkPaidManually = ! $isPaid;
+        $canResyncLicense = $isPaid && ! $order->license;
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -114,7 +116,7 @@
                 </div>
 
                 <div class="mt-5 flex flex-wrap gap-2">
-                    @if (! $isPaid)
+                    @if ($canMarkPaidManually)
                         <form action="{{ route('admin.orders.mark-paid', $order) }}" method="POST"
                             data-confirm="Mark this order as paid and deliver a license?">
                             @csrf
@@ -124,12 +126,14 @@
                         </form>
                     @endif
 
-                    <form action="{{ route('admin.orders.resync-license', $order) }}" method="POST">
-                        @csrf
-                        <button class="order-action">
-                            Resync License
-                        </button>
-                    </form>
+                    @if ($canResyncLicense)
+                        <form action="{{ route('admin.orders.resync-license', $order) }}" method="POST">
+                            @csrf
+                            <button class="order-action">
+                                Resync License
+                            </button>
+                        </form>
+                    @endif
 
                     @if ($order->payment_url)
                         <a href="{{ $order->payment_url }}" target="_blank" rel="noopener noreferrer" class="order-action">

@@ -59,7 +59,45 @@ class AdminOrderOperationsTest extends TestCase
         $response->assertOk();
         $response->assertSee($order->order_id);
         $response->assertSee('Mark Paid');
+        $response->assertDontSee('Resync License');
+    }
+
+    public function test_paid_order_without_license_shows_resync_license_only(): void
+    {
+        [$admin, $order] = $this->makePendingOrder([
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.orders.show', $order));
+
+        $response->assertOk();
         $response->assertSee('Resync License');
+        $response->assertDontSee('Mark Paid');
+    }
+
+    public function test_paid_order_with_license_hides_manual_delivery_actions(): void
+    {
+        [$admin, $order] = $this->makePendingOrder([
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        License::create([
+            'user_id' => $order->user_id,
+            'product_id' => $order->product_id,
+            'license_key' => 'DELIVERED-LICENSE-KEY',
+            'duration' => $order->package->name,
+            'order_id' => $order->order_id,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.orders.show', $order));
+
+        $response->assertOk();
+        $response->assertDontSee('Mark Paid');
+        $response->assertDontSee('Resync License');
     }
 
     public function test_fulfillment_delivers_oldest_available_license_stock_first(): void
@@ -94,7 +132,7 @@ class AdminOrderOperationsTest extends TestCase
         ]);
     }
 
-    private function makePendingOrder(): array
+    private function makePendingOrder(array $orderOverrides = []): array
     {
         config(['admin.emails' => ['admin@example.com']]);
 
@@ -131,7 +169,7 @@ class AdminOrderOperationsTest extends TestCase
             'is_sold' => false,
         ]);
 
-        $order = Order::create([
+        $order = Order::create(array_merge([
             'order_id' => 'ORDER-ADMINTEST',
             'user_id' => $user->id,
             'product_id' => $product->id,
@@ -140,7 +178,7 @@ class AdminOrderOperationsTest extends TestCase
             'payment_method' => 'pakasir',
             'price' => 10000,
             'expired_at' => now()->addMinutes(10),
-        ]);
+        ], $orderOverrides));
 
         $this->assertSame(0, License::count());
 
