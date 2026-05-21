@@ -198,6 +198,16 @@ class PaymentService
         }
 
         $network = strtolower((string) ($payload['network'] ?? ''));
+        $binanceFirst = (bool) config('services.binance.deposit_fallback.primary', false);
+        $binanceInspection = null;
+
+        if ($binanceFirst) {
+            $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
+
+            if (! empty($binanceInspection['transfer'])) {
+                return $binanceInspection;
+            }
+        }
 
         $inspection = match ($network) {
             'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
@@ -212,18 +222,21 @@ class PaymentService
             return $inspection;
         }
 
-        $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
+        if ($binanceInspection === null) {
+            $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
+        }
 
         if (! $binanceInspection) {
             return $inspection;
         }
 
+        $mismatches = $binanceFirst
+            ? array_merge($binanceInspection['mismatches'] ?? [], $inspection['mismatches'] ?? [])
+            : array_merge($inspection['mismatches'] ?? [], $binanceInspection['mismatches'] ?? []);
+
         return [
             'transfer' => $binanceInspection['transfer'] ?? null,
-            'mismatches' => array_slice(array_merge(
-                $inspection['mismatches'] ?? [],
-                $binanceInspection['mismatches'] ?? [],
-            ), 0, 5),
+            'mismatches' => array_slice($mismatches, 0, 5),
         ];
     }
 

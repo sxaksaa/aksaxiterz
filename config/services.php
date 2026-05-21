@@ -80,6 +80,7 @@ return [
     'binance' => [
         'deposit_fallback' => [
             'enabled' => (bool) env('BINANCE_DEPOSIT_FALLBACK', false),
+            'primary' => (bool) env('BINANCE_DEPOSIT_PRIMARY', false),
             'api_key' => env('BINANCE_API_KEY'),
             'api_secret' => env('BINANCE_API_SECRET'),
             'base_url' => env('BINANCE_API_URL', 'https://api.binance.com'),
