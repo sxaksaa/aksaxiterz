@@ -49,8 +49,13 @@ return [
         'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
     ],
 
+    'payments' => [
+        'reservation_grace_minutes' => (int) env('PAYMENT_RESERVATION_GRACE_MINUTES', 20),
+    ],
+
     'crypto_direct' => [
         'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 60),
+        'grace_minutes' => (int) env('CRYPTO_DIRECT_GRACE_MINUTES', 15),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [
             'usdttrc20' => [

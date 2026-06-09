@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\License;
 use App\Models\Order;
 use App\Services\DirectCryptoOrderVerifier;
-use App\Services\OrderFulfillmentService;
+use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
+use App\Services\StockReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -21,7 +21,8 @@ class PaymentController extends Controller
     public function __construct(
         PaymentService $paymentService,
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
-        private readonly OrderFulfillmentService $orderFulfillmentService
+        private readonly PakasirOrderVerifier $pakasirOrderVerifier,
+        private readonly StockReservationService $stockReservationService
     )
     {
         $this->paymentService = $paymentService;
@@ -44,6 +45,14 @@ class PaymentController extends Controller
         $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
         $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
 
+        if (! $this->cancelBeforeReplacement($oldOrder)) {
+            return $this->paymentErrorResponse(
+                $request,
+                'The previous payment could not be closed. Check its status before trying again.',
+                409
+            );
+        }
+
         $newOrder = Order::create([
             'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
             'user_id' => $user->id,
@@ -55,10 +64,7 @@ class PaymentController extends Controller
             'expired_at' => now()->addMinutes(10),
         ]);
 
-        $oldOrder->update([
-            'status' => 'cancelled',
-            'replaced_by' => $newOrder->id,
-        ]);
+        $oldOrder->update(['replaced_by' => $newOrder->id]);
 
         Order::where('user_id', $user->id)
             ->where('status', 'pending')
@@ -97,6 +103,7 @@ class PaymentController extends Controller
             return redirect('/orders');
         } catch (\Exception $e) {
             $newOrder->update(['status' => 'cancelled']);
+            $this->stockReservationService->release($newOrder);
 
             Log::error('PAY AGAIN ERROR: '.$e->getMessage());
 
@@ -126,9 +133,8 @@ class PaymentController extends Controller
             'package_id' => 'required|exists:packages,id',
         ]);
 
-        $this->cancelPendingOrders($user->id);
-
         try {
+            $this->cancelPendingOrders($user->id);
             $payment = $this->paymentService->createPakasirPayment(
                 $user,
                 $id,
@@ -170,55 +176,10 @@ class PaymentController extends Controller
             ], $order));
         }
 
-        try {
-            $payload = $this->paymentService->getPakasirStatus($order);
+        $result = $this->pakasirOrderVerifier->verify($order);
+        $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
 
-            DB::beginTransaction();
-
-            $lockedOrder = Order::whereKey($order->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (! $this->validPakasirOrderPayload($lockedOrder, $payload)) {
-                DB::rollBack();
-
-                return response()->json(['error' => 'Invalid Pakasir status'], 403);
-            }
-
-            if ($lockedOrder->status !== 'paid') {
-                $this->applyPakasirStatus($lockedOrder, $payload);
-            }
-
-            DB::commit();
-
-            $freshStatus = $lockedOrder->fresh()->status;
-            $responsePayload = [
-                'order_id' => $lockedOrder->order_id,
-                'status' => $freshStatus,
-            ];
-
-            if ($freshStatus !== 'paid') {
-                $responsePayload['message'] = 'Payment is still being verified.';
-            } else {
-                $responsePayload = $this->withLicensePayload($responsePayload, $lockedOrder);
-            }
-
-            return $this->syncPaymentResponse($request, $responsePayload, $freshStatus === 'paid' ? 200 : 202);
-        } catch (\Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
-            Log::warning('PAKASIR SYNC ERROR: '.$e->getMessage(), [
-                'order_id' => $order->order_id,
-            ]);
-
-            return $this->syncPaymentResponse($request, [
-                'order_id' => $order->order_id,
-                'status' => $order->fresh()->status,
-                'message' => 'Payment is still being verified.',
-            ], 202);
-        }
+        return $this->syncPaymentResponse($request, $result, $status);
     }
 
     public function syncCryptoOrder(Request $request, string $orderId)
@@ -256,43 +217,12 @@ class PaymentController extends Controller
             $order = Order::where('order_id', $request->order_id)
                 ->firstOrFail();
 
-            if (! $this->validPakasirOrderPayload($order, $request->all())) {
+            if (! $this->pakasirOrderVerifier->validPayload($order, $request->all())) {
                 return response()->json(['error' => 'Invalid amount'], 403);
             }
 
-            $payload = $this->paymentService->getPakasirStatus($order);
-
-            DB::beginTransaction();
-
-            $lockedOrder = Order::whereKey($order->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (! $this->validPakasirOrderPayload($lockedOrder, $payload)) {
-                DB::rollBack();
-
-                return response()->json(['error' => 'Invalid amount'], 403);
-            }
-
-            if ($lockedOrder->status === 'paid') {
-                DB::commit();
-
-                return response()->json(['status' => 'already']);
-            }
-
-            $this->applyPakasirStatus($lockedOrder, $payload);
-
-            DB::commit();
-
-            return response()->json([
-                'order_id' => $lockedOrder->order_id,
-                'status' => $lockedOrder->fresh()->status,
-            ]);
+            return response()->json($this->pakasirOrderVerifier->verify($order));
         } catch (\Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
             Log::error('PAKASIR CALLBACK ERROR: '.$e->getMessage());
 
             return response()->json(['error' => 'failed'], 500);
@@ -327,9 +257,8 @@ class PaymentController extends Controller
             ],
         ]);
 
-        $this->cancelPendingOrders($user->id);
-
         try {
+            $this->cancelPendingOrders($user->id);
             $payment = $this->paymentService->createCryptoPayment(
                 $user,
                 $productId,
@@ -362,12 +291,49 @@ class PaymentController extends Controller
             ], 422);
         }
 
+        if (
+            $order->payment_method === 'pakasir' &&
+            is_array($order->payment_payload) &&
+            filled($order->payment_payload['payment_number'] ?? null)
+        ) {
+            try {
+                $this->paymentService->cancelPakasir($order);
+            } catch (\Exception $e) {
+                $result = $this->pakasirOrderVerifier->verify($order);
+
+                if (($result['status'] ?? null) === 'paid') {
+                    return $this->syncPaymentResponse($request, $result);
+                }
+
+                if (in_array(($result['provider_status'] ?? null), ['cancelled', 'canceled', 'expired', 'failed'], true)) {
+                    $order->update([
+                        'status' => 'cancelled',
+                        'expired_at' => now(),
+                    ]);
+                    $this->stockReservationService->release($order);
+
+                    return $this->orderActionResponse($request, [
+                        'order_id' => $order->order_id,
+                        'status' => 'cancelled',
+                        'message' => 'Order cancelled. You can start a new checkout now.',
+                    ]);
+                }
+
+                return $this->orderActionResponse($request, [
+                    'order_id' => $order->order_id,
+                    'status' => $order->fresh()->status,
+                    'message' => 'The QRIS payment could not be cancelled yet. Please check its status and try again.',
+                ], 409);
+            }
+        }
+
         if ($order->status !== 'cancelled') {
             $order->update([
                 'status' => 'cancelled',
                 'expired_at' => now(),
             ]);
         }
+        $this->stockReservationService->release($order);
 
         return $this->orderActionResponse($request, [
             'order_id' => $order->order_id,
@@ -381,38 +347,6 @@ class PaymentController extends Controller
     | CORE LOGIC
     |--------------------------------------------------------------------------
     */
-
-    private function validPakasirOrderPayload(Order $order, array $payload): bool
-    {
-        $transaction = $this->pakasirPayloadTransaction($payload);
-        $payloadOrderId = $transaction['order_id'] ?? null;
-        $amount = $transaction['amount'] ?? null;
-        $project = $transaction['project'] ?? null;
-
-        if (
-            $order->payment_method !== 'pakasir' ||
-            ! is_scalar($payloadOrderId) ||
-            ! hash_equals($order->order_id, (string) $payloadOrderId) ||
-            ! is_numeric($amount)
-        ) {
-            return false;
-        }
-
-        if ($project && ! hash_equals((string) config('services.pakasir.slug'), (string) $project)) {
-            return false;
-        }
-
-        return $this->sameAmount($amount, $order->price);
-    }
-
-    private function pakasirPayloadTransaction(array $payload): array
-    {
-        if (isset($payload['transaction']) && is_array($payload['transaction'])) {
-            return $payload['transaction'];
-        }
-
-        return $payload;
-    }
 
     private function pakasirCheckoutPayload(Order $order): array
     {
@@ -449,6 +383,7 @@ class PaymentController extends Controller
             'payment_method' => (string) ($payload['payment_method'] ?? 'qris'),
             'payment_number' => (string) $payload['payment_number'],
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
+            'remaining_seconds' => $this->remainingSeconds($order),
         ];
     }
 
@@ -471,7 +406,17 @@ class PaymentController extends Controller
             'base_amount' => (string) ($payload['base_amount'] ?? ''),
             'unique_amount' => (string) ($payload['unique_amount'] ?? ''),
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
+            'remaining_seconds' => $this->remainingSeconds($order),
         ];
+    }
+
+    private function remainingSeconds(Order $order): int
+    {
+        if (! $order->expired_at) {
+            return 0;
+        }
+
+        return max(0, (int) now()->diffInSeconds($order->expired_at, false));
     }
 
     private function retryCryptoNetwork(Order $order): string
@@ -521,22 +466,6 @@ class PaymentController extends Controller
         return $payload;
     }
 
-    private function applyPakasirStatus(Order $order, array $payload): void
-    {
-        $transaction = $this->pakasirPayloadTransaction($payload);
-        $status = strtolower((string) ($transaction['status'] ?? ''));
-
-        if ($status === 'completed') {
-            $this->orderFulfillmentService->fulfill($order);
-
-            return;
-        }
-
-        if (in_array($status, ['cancelled', 'canceled', 'expired', 'failed'], true) && $order->status !== 'paid') {
-            $order->update(['status' => 'cancelled']);
-        }
-    }
-
     private function hasTooManyRecentOrders(int $userId): bool
     {
         return Order::where('user_id', $userId)
@@ -547,9 +476,69 @@ class PaymentController extends Controller
 
     private function cancelPendingOrders(int $userId): void
     {
-        Order::where('user_id', $userId)
+        $orders = Order::where('user_id', $userId)
             ->where('status', 'pending')
-            ->update(['status' => 'cancelled']);
+            ->oldest()
+            ->get();
+
+        foreach ($orders as $order) {
+            if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
+                $result = $this->pakasirOrderVerifier->verify($order);
+
+                if (($result['status'] ?? null) === 'paid') {
+                    throw new \Exception('A previous payment was already completed');
+                }
+
+                if (! array_key_exists('provider_status', $result)) {
+                    throw new \Exception('Unable to verify the previous Pakasir payment');
+                }
+
+                if (! in_array($result['provider_status'], ['cancelled', 'canceled', 'expired', 'failed'], true)) {
+                    $this->paymentService->cancelPakasir($order);
+                }
+            }
+
+            if (
+                $order->payment_method === 'crypto' &&
+                $order->expired_at &&
+                $order->expired_at
+                    ->copy()
+                    ->addMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15)))
+                    ->isFuture()
+            ) {
+                continue;
+            }
+
+            $order->update(['status' => 'cancelled']);
+            $this->stockReservationService->release($order);
+        }
+    }
+
+    private function cancelBeforeReplacement(Order $order): bool
+    {
+        if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
+            $result = $this->pakasirOrderVerifier->verify($order);
+
+            if (($result['status'] ?? null) === 'paid' || ! array_key_exists('provider_status', $result)) {
+                return false;
+            }
+
+            if (! in_array($result['provider_status'], ['cancelled', 'canceled', 'expired', 'failed'], true)) {
+                try {
+                    $this->paymentService->cancelPakasir($order);
+                } catch (\Exception $e) {
+                    return false;
+                }
+            }
+        }
+
+        if ($order->status !== 'cancelled') {
+            $order->update(['status' => 'cancelled']);
+        }
+
+        $this->stockReservationService->release($order);
+
+        return true;
     }
 
     private function activePendingOrder(int $userId): ?Order
@@ -562,11 +551,6 @@ class PaymentController extends Controller
             })
             ->latest()
             ->first();
-    }
-
-    private function sameAmount($first, $second): bool
-    {
-        return round((float) $first, 6) === round((float) $second, 6);
     }
 
     private function wantsPaymentJson(Request $request): bool

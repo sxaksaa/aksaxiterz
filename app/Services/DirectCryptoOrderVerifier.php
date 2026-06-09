@@ -9,10 +9,14 @@ use Illuminate\Support\Facades\Log;
 
 class DirectCryptoOrderVerifier
 {
+    private StockReservationService $stockReservationService;
+
     public function __construct(
         private readonly PaymentService $paymentService,
-        private readonly OrderFulfillmentService $orderFulfillmentService
+        private readonly OrderFulfillmentService $orderFulfillmentService,
+        ?StockReservationService $stockReservationService = null
     ) {
+        $this->stockReservationService = $stockReservationService ?: app(StockReservationService::class);
     }
 
     public function verify(Order $order): array
@@ -32,7 +36,7 @@ class DirectCryptoOrderVerifier
             ], $order);
         }
 
-        if ($order->status !== 'pending') {
+        if (! in_array($order->status, ['pending', 'cancelled'], true)) {
             return [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
@@ -40,8 +44,11 @@ class DirectCryptoOrderVerifier
             ];
         }
 
-        if ($order->expired_at && $order->expired_at->lte(now())) {
-            $order->update(['status' => 'cancelled']);
+        if ($this->isPastGracePeriod($order)) {
+            if ($order->status === 'pending') {
+                $order->update(['status' => 'cancelled']);
+                $this->stockReservationService->release($order);
+            }
 
             return [
                 'order_id' => $order->order_id,
@@ -53,6 +60,10 @@ class DirectCryptoOrderVerifier
         try {
             $inspection = $this->paymentService->inspectDirectCryptoPayment($order);
             $transfer = $inspection['transfer'] ?? null;
+
+            if ($transfer && ! $this->transferWithinGracePeriod($order, $transfer)) {
+                $transfer = null;
+            }
 
             if (! $transfer) {
                 $this->rememberInspection($order, $inspection);
@@ -89,13 +100,27 @@ class DirectCryptoOrderVerifier
                 ];
             }
 
-            if ($lockedOrder->status !== 'pending') {
+            if (! in_array($lockedOrder->status, ['pending', 'cancelled'], true)) {
                 DB::rollBack();
 
                 return [
                     'order_id' => $lockedOrder->order_id,
                     'status' => $lockedOrder->status,
                     'message' => 'This order is no longer active. Please contact support if a payment was already sent.',
+                ];
+            }
+
+            if ($this->isPastGracePeriod($lockedOrder)) {
+                if ($lockedOrder->status === 'pending') {
+                    $lockedOrder->update(['status' => 'cancelled']);
+                    $this->stockReservationService->release($lockedOrder);
+                }
+                DB::commit();
+
+                return [
+                    'order_id' => $lockedOrder->order_id,
+                    'status' => 'cancelled',
+                    'message' => 'This crypto invoice has expired. Please contact support if a payment was already sent.',
                 ];
             }
 
@@ -167,11 +192,11 @@ class DirectCryptoOrderVerifier
     {
         $orders = Order::query()
             ->where('payment_method', 'crypto')
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'cancelled'])
             ->where('created_at', '>', now()->subDay())
             ->where(function ($query): void {
                 $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>', now());
+                    ->orWhere('expired_at', '>', now()->subMinutes($this->graceMinutes()));
             })
             ->oldest()
             ->limit(max(1, $limit))
@@ -288,6 +313,32 @@ class DirectCryptoOrderVerifier
         $token = is_array($payload) ? strtoupper(trim((string) ($payload['token'] ?? 'USDT'))) : 'USDT';
 
         return $token !== '' ? $token : 'USDT';
+    }
+
+    private function graceMinutes(): int
+    {
+        return max(0, (int) config('services.crypto_direct.grace_minutes', 15));
+    }
+
+    private function isPastGracePeriod(Order $order): bool
+    {
+        return $order->expired_at &&
+            $order->expired_at->copy()->addMinutes($this->graceMinutes())->lte(now());
+    }
+
+    private function transferWithinGracePeriod(Order $order, array $transfer): bool
+    {
+        if (! $order->expired_at) {
+            return true;
+        }
+
+        $confirmedAt = $transfer['confirmed_at'] ?? null;
+
+        if (! $confirmedAt instanceof \DateTimeInterface) {
+            return ! $this->isPastGracePeriod($order);
+        }
+
+        return $confirmedAt <= $order->expired_at->copy()->addMinutes($this->graceMinutes());
     }
 
     private function publicCryptoSyncError(\Exception $error): string

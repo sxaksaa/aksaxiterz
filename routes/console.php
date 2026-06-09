@@ -2,6 +2,8 @@
 
 use App\Models\LicenseStock;
 use App\Services\DirectCryptoOrderVerifier;
+use App\Services\PakasirOrderVerifier;
+use App\Services\StockReservationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
@@ -11,7 +13,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Artisan::command('license-stocks:purge-unsold {--execute : Delete the matching unsold license stocks} {--seeded-only : Only target known placeholder stock prefixes}', function () {
-    $query = LicenseStock::query()->where('is_sold', false);
+    $query = LicenseStock::query()->available();
 
     if ($this->option('seeded-only')) {
         $prefixes = [
@@ -98,3 +100,24 @@ Artisan::command('orders:scan-crypto {--limit=50 : Maximum pending crypto orders
 
     return self::SUCCESS;
 })->purpose('Scan pending direct stablecoin orders and fulfill exact on-chain matches');
+
+Artisan::command('orders:scan-pakasir {--limit=50 : Maximum recent Pakasir orders to reconcile}', function () {
+    $limit = max(1, (int) $this->option('limit'));
+    $summary = app(PakasirOrderVerifier::class)->scanRecent($limit);
+
+    $this->info('Pakasir reconciliation complete.');
+    $this->line("Checked: {$summary['checked']}");
+    $this->line("Paid: {$summary['paid']}");
+    $this->line("Cancelled: {$summary['cancelled']}");
+    $this->line("Still pending: {$summary['pending']}");
+
+    return self::SUCCESS;
+})->purpose('Reconcile recent Pakasir transactions with the provider status API');
+
+Artisan::command('orders:release-expired-reservations', function () {
+    $released = app(StockReservationService::class)->releaseExpiredReservations();
+
+    $this->info("Released {$released} expired stock reservations.");
+
+    return self::SUCCESS;
+})->purpose('Release expired unsold license stock reservations');

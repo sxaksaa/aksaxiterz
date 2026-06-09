@@ -65,6 +65,6 @@ class Product extends Model
 
     public function availableLicenseStocks()
     {
-        return $this->hasMany(LicenseStock::class)->where('is_sold', false);
+        return $this->hasMany(LicenseStock::class)->available();
     }
 }

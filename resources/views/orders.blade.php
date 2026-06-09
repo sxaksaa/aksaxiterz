@@ -518,9 +518,12 @@
 
         function updateCountdowns() {
             document.querySelectorAll('.countdown').forEach(el => {
-                const expireTime = new Date(el.dataset.expire).getTime();
-                const now = new Date().getTime();
-                const diff = expireTime - now;
+                if (!el.dataset.deadline) {
+                    const remaining = Math.max(0, Number(el.dataset.remaining || 0));
+                    el.dataset.deadline = String(performance.now() + remaining * 1000);
+                }
+
+                const diff = Number(el.dataset.deadline) - performance.now();
 
                 if (diff <= 0) {
                     el.innerText = 'Expired';

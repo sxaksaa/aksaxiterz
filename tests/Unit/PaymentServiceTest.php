@@ -48,6 +48,40 @@ class PaymentServiceTest extends TestCase
         $this->assertSame('2026-06-10 01:34:00', (new Order)->fromDateTime($expiresAt));
     }
 
+    public function test_pakasir_cancel_calls_provider_and_remembers_status(): void
+    {
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.api_key' => 'test-key',
+            'services.pakasir.url' => 'https://app.pakasir.test',
+        ]);
+
+        Http::fake([
+            'https://app.pakasir.test/api/transactioncancel' => Http::response(['status' => 'success']),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-CANCEL-QRIS',
+            'payment_method' => 'pakasir',
+            'price' => 30000,
+            'payment_payload' => [
+                'payment_number' => '000201010212',
+            ],
+        ]);
+
+        (new PaymentService)->cancelPakasir($order);
+
+        $this->assertSame('cancelled', $order->payment_payload['provider_status'] ?? null);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'POST' &&
+                $request->url() === 'https://app.pakasir.test/api/transactioncancel' &&
+                $request['project'] === 'aksaxiterz' &&
+                $request['order_id'] === 'ORDER-CANCEL-QRIS' &&
+                $request['amount'] === 30000 &&
+                $request['api_key'] === 'test-key';
+        });
+    }
+
     public function test_direct_crypto_amount_adds_small_unique_suffix(): void
     {
         config([

@@ -6,7 +6,6 @@ use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request as HttpRequest;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -42,11 +41,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'pakasir-callback',
         ]);
-    })
-    ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('orders:scan-crypto --limit=50')
-            ->everyMinute()
-            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

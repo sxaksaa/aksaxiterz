@@ -189,8 +189,10 @@ Route::get('/product/{product}', function (string $product) {
 Route::middleware('auth')->group(function () {
 
     // Pay again
-    Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain']);
-    Route::post('/cancel-order/{id}', [PaymentController::class, 'cancelOrder']);
+    Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain'])
+        ->middleware('throttle:10,1');
+    Route::post('/cancel-order/{id}', [PaymentController::class, 'cancelOrder'])
+        ->middleware('throttle:20,1');
 
     // Pakasir
     Route::post('/process-order/{id}', [PaymentController::class, 'payPakasir'])
@@ -229,8 +231,13 @@ Route::middleware('auth')->group(function () {
         }
 
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
+        $cryptoGraceSeconds = max(0, (int) config('services.crypto_direct.grace_minutes', 15)) * 60;
 
-        if ($remaining <= 0 && $order->status === 'pending') {
+        if (
+            $order->payment_method === 'crypto' &&
+            $remaining <= -$cryptoGraceSeconds &&
+            $order->status === 'pending'
+        ) {
             $order->update(['status' => 'cancelled']);
         }
 
@@ -241,7 +248,7 @@ Route::middleware('auth')->group(function () {
             'payment_method' => $order->payment_method,
             'can_sync_crypto' => $order->payment_method === 'crypto' &&
                 $order->status === 'pending' &&
-                $remaining > 0,
+                $remaining > -$cryptoGraceSeconds,
         ]);
     })->middleware('throttle:30,1');
 
@@ -256,8 +263,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders', function () {
 
         Order::where('status', 'pending')
+            ->where('payment_method', 'crypto')
             ->whereNotNull('expired_at')
-            ->where('expired_at', '<', now())
+            ->where('expired_at', '<=', now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15))))
             ->update(['status' => 'cancelled']);
 
         $orderStats = [
@@ -277,8 +285,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/orders-fragment', function () {
         Order::where('status', 'pending')
+            ->where('payment_method', 'crypto')
             ->whereNotNull('expired_at')
-            ->where('expired_at', '<', now())
+            ->where('expired_at', '<=', now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15))))
             ->update(['status' => 'cancelled']);
 
         $orders = Order::with(['product', 'package'])

@@ -14,11 +14,18 @@ use Illuminate\Support\Str;
 
 class PaymentService
 {
+    private StockReservationService $stockReservationService;
+
     private const ALLOWED_COINS = [
         'usdttrc20',
         'usdtbsc',
         'usdcbsc',
     ];
+
+    public function __construct(?StockReservationService $stockReservationService = null)
+    {
+        $this->stockReservationService = $stockReservationService ?: app(StockReservationService::class);
+    }
 
     public function createPakasir($user, $productId, $packageId, ?Order $order = null)
     {
@@ -41,7 +48,7 @@ class PaymentService
 
         $stock = LicenseStock::where('product_id', $product->id)
             ->where('package_id', $package->id)
-            ->where('is_sold', false)
+            ->available()
             ->first();
 
         if (! $stock) {
@@ -64,6 +71,7 @@ class PaymentService
         $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
 
         try {
+            $this->stockReservationService->reserve($order);
             $payment = $this->createPakasirQrisTransaction($order);
 
             $order->update([
@@ -71,8 +79,10 @@ class PaymentService
                 'payment_payload' => $this->normalizePakasirPayment($payment),
                 'expired_at' => $this->pakasirExpiredAt($payment['expired_at'] ?? null) ?? $order->expired_at,
             ]);
+            $this->stockReservationService->reserve($order->fresh());
         } catch (\Exception $e) {
             $order->update(['status' => 'cancelled']);
+            $this->stockReservationService->release($order);
 
             throw $e;
         }
@@ -105,6 +115,36 @@ class PaymentService
         return $response->json() ?: [];
     }
 
+    public function cancelPakasir(Order $order): void
+    {
+        $this->ensurePakasirConfigured();
+
+        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
+        $response = Http::withOptions($this->gatewayHttpOptions())
+            ->asJson()
+            ->post($baseUrl.'/api/transactioncancel', [
+                'project' => config('services.pakasir.slug'),
+                'order_id' => $order->order_id,
+                'amount' => $this->idrAmount($order->price),
+                'api_key' => config('services.pakasir.api_key'),
+            ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('Unable to cancel Pakasir payment');
+        }
+
+        $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
+        $payload['provider_status'] = 'cancelled';
+        $payload['cancelled_at'] = now()->toIso8601String();
+        $payload['last_checked_at'] = now()->toIso8601String();
+
+        if ($order->exists) {
+            $order->update(['payment_payload' => $payload]);
+        } else {
+            $order->payment_payload = $payload;
+        }
+    }
+
     public function createCrypto($user, $productId, $packageId, $coin, ?Order $order = null)
     {
         return $this->createCryptoPayment($user, $productId, $packageId, $coin, $order)['crypto_payment'];
@@ -133,7 +173,7 @@ class PaymentService
 
         $stock = LicenseStock::where('product_id', $product->id)
             ->where('package_id', $package->id)
-            ->where('is_sold', false)
+            ->available()
             ->first();
 
         if (! $stock) {
@@ -158,6 +198,7 @@ class PaymentService
         }
 
         try {
+            $this->stockReservationService->reserve($order);
             $amount = $this->claimDirectCryptoAmount($order, $network, $coin, $baseAmount);
 
             $order->update([
@@ -179,6 +220,7 @@ class PaymentService
             Log::error('CRYPTO ERROR: '.$e->getMessage());
 
             $order->update(['status' => 'cancelled']);
+            $this->stockReservationService->release($order);
 
             throw $e;
         }

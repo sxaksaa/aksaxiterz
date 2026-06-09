@@ -39,7 +39,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['total'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Total keys</div>
@@ -47,6 +47,10 @@
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['available'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Available</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['reserved'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Reserved</div>
                 </div>
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['sold'] }}</div>
@@ -247,6 +251,7 @@
                     <select name="status" class="search-bar w-full">
                         <option value="">All status</option>
                         <option value="available" @selected(request('status') === 'available')>Available</option>
+                        <option value="reserved" @selected(request('status') === 'reserved')>Reserved</option>
                         <option value="sold" @selected(request('status') === 'sold')>Sold</option>
                     </select>
                 </label>
@@ -285,7 +290,12 @@
                     </thead>
                     <tbody>
                         @forelse ($stocks as $stock)
-                            @php $soldUser = $stock->soldLicense?->user; @endphp
+                            @php
+                                $soldUser = $stock->soldLicense?->user;
+                                $isReserved = $stock->isReserved();
+                                $statusLabel = $stock->is_sold ? 'Sold' : ($isReserved ? 'Reserved' : 'Available');
+                                $statusClass = $stock->is_sold ? 'status-pill-cancelled' : ($isReserved ? 'status-pill-pending' : 'status-pill-paid');
+                            @endphp
 
                             <tr class="orders-table-row">
                                 <td class="p-4">
@@ -294,8 +304,8 @@
                                 <td class="p-4 font-semibold text-white">{{ $stock->product->name ?? '-' }}</td>
                                 <td class="p-4 text-gray-300">{{ $stock->package->name ?? '-' }}</td>
                                 <td class="p-4">
-                                    <span class="status-pill {{ $stock->is_sold ? 'status-pill-cancelled' : 'status-pill-paid' }}">
-                                        {{ $stock->is_sold ? 'Sold' : 'Available' }}
+                                    <span class="status-pill {{ $statusClass }}">
+                                        {{ $statusLabel }}
                                     </span>
                                 </td>
                                 <td class="p-4 text-xs text-gray-400">{{ $stock->created_at?->format('d M Y, H:i') ?? '-' }}</td>
@@ -306,12 +316,14 @@
                                         <div class="max-w-[180px] truncate text-xs text-gray-500">{{ $soldUser->email }}</div>
                                     @elseif ($stock->is_sold)
                                         <span class="text-xs text-gray-500">Unknown user</span>
+                                    @elseif ($isReserved)
+                                        <span class="text-xs text-gray-500">{{ $stock->reservedOrder?->user?->email ?? 'Reserved order' }}</span>
                                     @else
                                         <span class="text-xs text-gray-500">-</span>
                                     @endif
                                 </td>
                                 <td class="p-4 text-right">
-                                    @if ($stock->is_sold)
+                                    @if ($stock->is_sold || $isReserved)
                                         <span class="text-xs text-gray-500">Locked</span>
                                     @else
                                         <div class="inline-flex justify-end gap-2">
@@ -342,7 +354,12 @@
 
         <div class="space-y-4 md:hidden">
             @forelse ($stocks as $stock)
-                @php $soldUser = $stock->soldLicense?->user; @endphp
+                @php
+                    $soldUser = $stock->soldLicense?->user;
+                    $isReserved = $stock->isReserved();
+                    $statusLabel = $stock->is_sold ? 'Sold' : ($isReserved ? 'Reserved' : 'Available');
+                    $statusClass = $stock->is_sold ? 'status-pill-cancelled' : ($isReserved ? 'status-pill-pending' : 'status-pill-paid');
+                @endphp
 
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">
@@ -350,8 +367,8 @@
                             <div class="text-[10px] uppercase tracking-normal text-gray-500">License Key</div>
                             <div class="mt-1 truncate font-mono text-xs text-gray-300">{{ $stock->license_key }}</div>
                         </div>
-                        <span class="status-pill {{ $stock->is_sold ? 'status-pill-cancelled' : 'status-pill-paid' }}">
-                            {{ $stock->is_sold ? 'Sold' : 'Available' }}
+                        <span class="status-pill {{ $statusClass }}">
+                            {{ $statusLabel }}
                         </span>
                     </div>
 
@@ -367,6 +384,8 @@
                                     {{ $soldUser->name }} ({{ $soldUser->email }})
                                 @elseif ($stock->is_sold)
                                     Unknown user
+                                @elseif ($isReserved)
+                                    {{ $stock->reservedOrder?->user?->email ?? 'Reserved order' }}
                                 @else
                                     -
                                 @endif
@@ -375,7 +394,7 @@
                     </div>
 
                     <div class="mt-4 flex gap-2">
-                        @if ($stock->is_sold)
+                        @if ($stock->is_sold || $isReserved)
                             <span class="text-xs text-gray-500">Locked</span>
                         @else
                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"

@@ -44,20 +44,26 @@ function formatIdr(amount) {
     return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
 }
 
-function formatCountdown(value) {
-    if (!value) return '-';
+function countdownDeadline(value, remainingSeconds) {
+    const seconds = Number(remainingSeconds);
+
+    if (Number.isFinite(seconds)) {
+        return performance.now() + Math.max(0, seconds) * 1000;
+    }
 
     const expireTime = new Date(value).getTime();
 
-    if (Number.isNaN(expireTime)) {
-        return '-';
-    }
+    if (Number.isNaN(expireTime)) return null;
 
-    const diff = expireTime - Date.now();
+    return performance.now() + Math.max(0, expireTime - Date.now());
+}
 
-    if (diff <= 0) {
-        return 'Expired';
-    }
+function formatCountdown(deadline) {
+    if (!Number.isFinite(deadline)) return '-';
+
+    const diff = deadline - performance.now();
+
+    if (diff <= 0) return 'Expired';
 
     const totalSeconds = Math.floor(diff / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -165,16 +171,16 @@ function stopQrisExpiryCountdown() {
     }
 }
 
-function startQrisExpiryCountdown(value) {
+function startQrisExpiryCountdown(value, remainingSeconds) {
     const element = document.getElementById('aksaQrisExpires');
 
     if (!element) return;
 
     stopQrisExpiryCountdown();
-    element.dataset.expire = value || '';
+    const deadline = countdownDeadline(value, remainingSeconds);
 
     const update = () => {
-        element.innerText = formatCountdown(value);
+        element.innerText = formatCountdown(deadline);
         element.classList.toggle('text-red-300', element.innerText === 'Expired');
     };
 
@@ -226,16 +232,16 @@ function stopCryptoExpiryCountdown() {
     }
 }
 
-function startCryptoExpiryCountdown(value) {
+function startCryptoExpiryCountdown(value, remainingSeconds) {
     const element = document.getElementById('aksaCryptoExpires');
 
     if (!element) return;
 
     stopCryptoExpiryCountdown();
-    element.dataset.expire = value || '';
+    const deadline = countdownDeadline(value, remainingSeconds);
 
     const update = () => {
-        element.innerText = formatCountdown(value);
+        element.innerText = formatCountdown(deadline);
         element.classList.toggle('text-red-300', element.innerText === 'Expired');
     };
 
@@ -257,7 +263,7 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.amount);
     document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
     document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
-    startQrisExpiryCountdown(payment.expired_at);
+    startQrisExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -307,7 +313,7 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
     document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, token);
     document.getElementById('aksaCryptoAddress').innerText = payment.address || '-';
     document.getElementById('aksaCryptoContract').innerText = payment.contract || '-';
-    startCryptoExpiryCountdown(payment.expired_at);
+    startCryptoExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     const copyAddress = document.getElementById('aksaCryptoCopyAddress');
     const copyAmount = document.getElementById('aksaCryptoCopyAmount');

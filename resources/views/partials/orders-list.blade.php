@@ -42,6 +42,7 @@
                     'payment_method' => (string) ($pakasirPayload['payment_method'] ?? 'qris'),
                     'payment_number' => (string) ($pakasirPayload['payment_number'] ?? ''),
                     'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
+                    'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                 ],
             ];
             $cryptoCheckout = [
@@ -59,6 +60,7 @@
                     'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
                     'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
                     'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                    'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                 ],
             ];
             $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
@@ -79,7 +81,7 @@
                     @endif
                     @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
-                            <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at->toIso8601String() }}"></span>
+                            <span class="countdown animate-pulse text-yellow-400" data-remaining="{{ max(0, (int) now()->diffInSeconds($order->expired_at, false)) }}"></span>
                         </div>
                     @endif
                 </div>
@@ -234,6 +236,7 @@
                                 'payment_method' => (string) ($pakasirPayload['payment_method'] ?? 'qris'),
                                 'payment_number' => (string) ($pakasirPayload['payment_number'] ?? ''),
                                 'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expired_at'] ?? ''),
+                                'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                             ],
                         ];
                         $cryptoCheckout = [
@@ -251,6 +254,7 @@
                                 'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
                                 'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
                                 'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                                'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                             ],
                         ];
                         $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
@@ -287,7 +291,7 @@
                             @endif
                             @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
-                                    <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at->toIso8601String() }}"></span>
+                                    <span class="countdown animate-pulse text-yellow-400" data-remaining="{{ max(0, (int) now()->diffInSeconds($order->expired_at, false)) }}"></span>
                                 </div>
                             @endif
                         </td>

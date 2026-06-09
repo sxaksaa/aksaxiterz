@@ -14,7 +14,7 @@ class LicenseStockController extends Controller
 {
     public function index(Request $request)
     {
-        $stocks = LicenseStock::with(['product', 'package', 'soldLicense.user'])
+        $stocks = LicenseStock::with(['product', 'package', 'soldLicense.user', 'reservedOrder.user'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $query->where('license_key', 'like', '%'.$request->search.'%');
             })
@@ -24,7 +24,8 @@ class LicenseStockController extends Controller
             ->when($request->filled('package_id'), function ($query) use ($request) {
                 $query->where('package_id', $request->integer('package_id'));
             })
-            ->when($request->status === 'available', fn ($query) => $query->where('is_sold', false))
+            ->when($request->status === 'available', fn ($query) => $query->available())
+            ->when($request->status === 'reserved', fn ($query) => $query->reserved())
             ->when($request->status === 'sold', fn ($query) => $query->where('is_sold', true))
             ->latest()
             ->paginate(15)
@@ -44,7 +45,8 @@ class LicenseStockController extends Controller
 
         $stats = [
             'total' => LicenseStock::count(),
-            'available' => LicenseStock::where('is_sold', false)->count(),
+            'available' => LicenseStock::available()->count(),
+            'reserved' => LicenseStock::reserved()->count(),
             'sold' => LicenseStock::where('is_sold', true)->count(),
             'low_stock' => $lowStockPackages->count(),
         ];
@@ -116,8 +118,8 @@ class LicenseStockController extends Controller
 
     public function update(Request $request, LicenseStock $licenseStock)
     {
-        if ($licenseStock->is_sold) {
-            return back()->withErrors(['license_key' => 'Sold license keys cannot be edited.']);
+        if ($licenseStock->is_sold || $licenseStock->isReserved()) {
+            return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be edited.']);
         }
 
         $validated = $request->validate([
@@ -152,8 +154,8 @@ class LicenseStockController extends Controller
 
     public function destroy(LicenseStock $licenseStock)
     {
-        if ($licenseStock->is_sold) {
-            return back()->withErrors(['license_key' => 'Sold license keys cannot be deleted.']);
+        if ($licenseStock->is_sold || $licenseStock->isReserved()) {
+            return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be deleted.']);
         }
 
         $licenseStock->delete();
@@ -168,7 +170,7 @@ class LicenseStockController extends Controller
         }
 
         return LicenseStock::with(['product', 'package'])
-            ->where('is_sold', false)
+            ->available()
             ->find($request->integer('edit'));
     }
 

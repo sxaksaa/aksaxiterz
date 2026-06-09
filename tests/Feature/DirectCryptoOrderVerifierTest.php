@@ -65,28 +65,40 @@ class DirectCryptoOrderVerifierTest extends TestCase
         ]);
     }
 
-    public function test_cancelled_crypto_order_is_not_verified(): void
+    public function test_recently_cancelled_crypto_order_is_still_verified(): void
     {
         $order = $this->directCryptoOrder([
             'status' => 'cancelled',
         ]);
         $paymentService = Mockery::mock(PaymentService::class);
-        $paymentService->shouldNotReceive('inspectDirectCryptoPayment');
+        $paymentService->shouldReceive('inspectDirectCryptoPayment')
+            ->once()
+            ->andReturn([
+                'transfer' => [
+                    'tx_hash' => '0xcancelled-late-transfer',
+                    'network' => 'usdtbsc',
+                    'amount_units' => '1100123000000000000',
+                    'amount' => '1.100123',
+                    'to' => '0x1111111111111111111111111111111111111111',
+                    'confirmed_at' => now(),
+                ],
+                'mismatches' => [],
+            ]);
 
         $result = (new DirectCryptoOrderVerifier(
             $paymentService,
             app(OrderFulfillmentService::class),
         ))->verify($order);
 
-        $this->assertSame('cancelled', $result['status']);
-        $this->assertStringContainsString('no longer active', $result['message']);
-        $this->assertNull($order->fresh()->payment_reference);
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertSame('0xcancelled-late-transfer', $order->fresh()->payment_reference);
     }
 
     public function test_expired_crypto_order_is_cancelled_without_verification(): void
     {
         $order = $this->directCryptoOrder([
-            'expired_at' => now()->subSecond(),
+            'expired_at' => now()->subMinutes(16),
         ]);
         $paymentService = Mockery::mock(PaymentService::class);
         $paymentService->shouldNotReceive('inspectDirectCryptoPayment');
@@ -100,6 +112,37 @@ class DirectCryptoOrderVerifierTest extends TestCase
         $this->assertStringContainsString('expired', $result['message']);
         $this->assertSame('cancelled', $order->fresh()->status);
         $this->assertNotNull($order->fresh()->payment_match_key);
+    }
+
+    public function test_crypto_payment_within_grace_period_is_still_verified(): void
+    {
+        config(['services.crypto_direct.grace_minutes' => 15]);
+
+        $order = $this->directCryptoOrder([
+            'expired_at' => now()->subMinutes(5),
+        ]);
+        $paymentService = Mockery::mock(PaymentService::class);
+        $paymentService->shouldReceive('inspectDirectCryptoPayment')
+            ->once()
+            ->andReturn([
+                'transfer' => [
+                    'tx_hash' => '0xwithingrace',
+                    'network' => 'usdtbsc',
+                    'amount_units' => '1100123000000000000',
+                    'amount' => '1.100123',
+                    'to' => '0x1111111111111111111111111111111111111111',
+                    'confirmed_at' => now(),
+                ],
+                'mismatches' => [],
+            ]);
+
+        $result = (new DirectCryptoOrderVerifier(
+            $paymentService,
+            app(OrderFulfillmentService::class),
+        ))->verify($order);
+
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('0xwithingrace', $order->fresh()->payment_reference);
     }
 
     public function test_crypto_transfer_reference_cannot_pay_two_orders(): void
