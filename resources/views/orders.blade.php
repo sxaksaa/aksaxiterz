@@ -185,7 +185,9 @@
             }
 
             if (data.method === 'crypto' && data.crypto_payment) {
-                const opened = await window.openAksaCryptoModal?.(data);
+                const opened = await window.openAksaCryptoModal?.(data, {
+                    startPolling: true,
+                });
 
                 if (!opened) {
                     await refreshOrders();
@@ -305,7 +307,9 @@
                 checkout = null;
             }
 
-            const opened = await window.openAksaCryptoModal?.(checkout);
+            const opened = await window.openAksaCryptoModal?.(checkout, {
+                startPolling: true,
+            });
 
             if (!opened && checkout?.payment_url) {
                 openHostedPayment(checkout.payment_url);

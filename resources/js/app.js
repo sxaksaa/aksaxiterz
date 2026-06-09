@@ -1,4 +1,3 @@
-import './bootstrap';
 import QRCode from 'qrcode';
 
 let appToastTimer = null;

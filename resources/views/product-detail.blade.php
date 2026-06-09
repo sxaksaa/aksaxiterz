@@ -596,7 +596,9 @@
 
                 try {
                     const data = await fetchPaymentJson(form);
-                    const opened = await window.openAksaCryptoModal?.(data);
+                    const opened = await window.openAksaCryptoModal?.(data, {
+                        startPolling: true,
+                    });
 
                     if (!opened) {
                         window.location.href = '/orders';
