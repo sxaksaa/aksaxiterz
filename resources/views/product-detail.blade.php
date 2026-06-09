@@ -44,8 +44,8 @@
 
         <div class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Included</p>
-                <h3 class="mt-1 text-xl font-semibold text-white">Features</h3>
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
+                <h3 class="mt-1 text-xl font-semibold text-white">Important Note</h3>
             </div>
             <ul class="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
                 @foreach ($product->features as $f)
