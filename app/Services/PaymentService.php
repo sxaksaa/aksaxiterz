@@ -209,14 +209,26 @@ class PaymentService
             }
         }
 
-        $inspection = match ($network) {
-            'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
-            'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload),
-            default => [
-                'transfer' => null,
-                'mismatches' => [],
-            ],
-        };
+        try {
+            $inspection = match ($network) {
+                'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
+                'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload),
+                default => [
+                    'transfer' => null,
+                    'mismatches' => [],
+                ],
+            };
+        } catch (\Exception $e) {
+            if ($binanceInspection === null) {
+                $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
+            }
+
+            if (! empty($binanceInspection['transfer'])) {
+                return $binanceInspection;
+            }
+
+            throw $e;
+        }
 
         if (! empty($inspection['transfer'])) {
             return $inspection;
@@ -474,7 +486,7 @@ class PaymentService
             if (
                 strtoupper((string) ($deposit['coin'] ?? '')) !== 'USDT' ||
                 (int) ($deposit['status'] ?? -1) !== 1 ||
-                ! hash_equals($binanceNetwork, $actualNetwork) ||
+                ! $this->sameBinanceDepositNetwork($coin, $binanceNetwork, $actualNetwork) ||
                 ! $this->sameCryptoAddress($address, $actualAddress) ||
                 $value === null
             ) {
@@ -722,6 +734,30 @@ class PaymentService
         }
 
         return hash_equals($expected, $actual);
+    }
+
+    private function sameBinanceDepositNetwork(string $coin, string $expected, string $actual): bool
+    {
+        $actual = strtoupper(trim($actual));
+
+        if ($actual === '') {
+            return false;
+        }
+
+        return in_array($actual, $this->binanceDepositNetworkAliases($coin, $expected), true);
+    }
+
+    private function binanceDepositNetworkAliases(string $coin, string $configuredNetwork): array
+    {
+        $aliases = [strtoupper(trim($configuredNetwork))];
+
+        $aliases = array_merge($aliases, match ($coin) {
+            'usdttrc20' => ['TRX', 'TRC20', 'TRON'],
+            'usdtbsc' => ['BSC', 'BEP20'],
+            default => [],
+        });
+
+        return array_values(array_unique(array_filter($aliases)));
     }
 
     private function decimalToTokenUnits($amount, int $decimals = 18): ?string

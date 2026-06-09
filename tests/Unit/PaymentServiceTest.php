@@ -210,6 +210,56 @@ class PaymentServiceTest extends TestCase
         });
     }
 
+    public function test_direct_crypto_scanner_uses_binance_fallback_when_chain_scanner_fails(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdttrc20.api_url' => 'https://trongrid.test',
+            'services.crypto_direct.networks.usdttrc20.binance_network' => 'TRC20',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+            'services.binance.deposit_fallback.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://trongrid.test/*' => Http::response(['error' => 'temporarily unavailable'], 503),
+            'https://binance.test/*' => Http::response([[
+                'id' => '769800519366885376',
+                'amount' => '6.00858100',
+                'coin' => 'USDT',
+                'network' => 'TRX',
+                'status' => 1,
+                'address' => 'TJ5hvdAa5MVFebXXGhL3R81F6SpAMUi7z5',
+                'txId' => 'Off-chain Transfer 372959316369',
+                'insertTime' => now()->subMinute()->timestamp * 1000,
+                'completeTime' => now()->subMinute()->timestamp * 1000,
+            ]], 200),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-BINANCE-CHAIN-FAIL',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdttrc20',
+                'address' => 'TJ5hvdAa5MVFebXXGhL3R81F6SpAMUi7z5',
+                'contract' => 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+                'amount' => '6.008581',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('Off-chain Transfer 372959316369', $transfer['tx_hash'] ?? null);
+        $this->assertSame('binance_deposit_history', $transfer['source'] ?? null);
+
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://trongrid.test/'));
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://binance.test/sapi/v1/capital/deposit/hisrec?'));
+    }
+
     public function test_direct_crypto_scanner_can_prioritize_binance_deposit_history(): void
     {
         config([
