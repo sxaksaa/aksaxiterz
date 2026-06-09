@@ -14,10 +14,10 @@
             $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
             $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
             $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
-            $canSyncCrypto = $isCrypto &&
+            $canSyncCrypto = $isDirectCrypto &&
                 $order->status === 'pending' &&
-                $order->created_at &&
-                $order->created_at->gt(now()->subDay());
+                $order->expired_at &&
+                $now->lt($order->expired_at);
             $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
             $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
@@ -79,7 +79,7 @@
                     @endif
                     @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
-                            <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
+                            <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at->toIso8601String() }}"></span>
                         </div>
                     @endif
                 </div>
@@ -206,10 +206,10 @@
                         $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
                         $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
                         $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
-                        $canSyncCrypto = $isCrypto &&
+                        $canSyncCrypto = $isDirectCrypto &&
                             $order->status === 'pending' &&
-                            $order->created_at &&
-                            $order->created_at->gt(now()->subDay());
+                            $order->expired_at &&
+                            $now->lt($order->expired_at);
                         $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
@@ -287,7 +287,7 @@
                             @endif
                             @if ($isPending && ! $canSyncCrypto && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
-                                    <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at }}"></span>
+                                    <span class="countdown animate-pulse text-yellow-400" data-expire="{{ $order->expired_at->toIso8601String() }}"></span>
                                 </div>
                             @endif
                         </td>

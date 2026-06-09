@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -141,8 +142,7 @@ class PaymentService
 
         $baseAmount = (float) ($package->price_usdt ?? 0);
         $orderId = $order?->order_id ?: 'ORDER-'.strtoupper(Str::random(10));
-        $amount = $this->directCryptoAmount($baseAmount, $orderId, $coin);
-        $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 1440)));
+        $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 60)));
 
         if (! $order) {
             $order = Order::create([
@@ -151,13 +151,15 @@ class PaymentService
                 'user_id' => $user->id,
                 'status' => 'pending',
                 'payment_method' => 'crypto',
-                'price' => $amount,
+                'price' => $baseAmount,
                 'package_id' => $package->id,
                 'expired_at' => $expiresAt,
             ]);
         }
 
         try {
+            $amount = $this->claimDirectCryptoAmount($order, $network, $coin, $baseAmount);
+
             $order->update([
                 'price' => $amount,
                 'payment_url' => null,
@@ -251,6 +253,7 @@ class PaymentService
         return [
             'transfer' => $binanceInspection['transfer'] ?? null,
             'mismatches' => array_slice($mismatches, 0, 5),
+            'last_scanned_block' => $inspection['last_scanned_block'] ?? null,
         ];
     }
 
@@ -326,7 +329,10 @@ class PaymentService
                 'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
             ];
 
-            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+            if (
+                $this->decimalStringCompare($value, $requiredUnits) === 0 &&
+                $this->paymentReferenceAvailable($order, $transfer)
+            ) {
                 return [
                     'transfer' => $transfer,
                     'mismatches' => $mismatches,
@@ -366,14 +372,22 @@ class PaymentService
             throw new \Exception('Unable to verify crypto payment');
         }
 
-        $latestBlock = $this->bscRpcBlockNumber($rpcUrl);
-        $scanBlocks = max(1, min(120000, (int) ($network['rpc_scan_blocks'] ?? 40000)));
+        $chainHead = $this->bscRpcBlockNumber($rpcUrl);
+        $confirmations = max(0, min(500, (int) ($network['rpc_confirmations'] ?? 5)));
+        $latestBlock = max(0, $chainHead - $confirmations);
+        $scanBlocks = $this->directBep20ScanBlocks($order, $network);
         $chunkBlocks = max(100, min(5000, (int) ($network['rpc_chunk_blocks'] ?? 3000)));
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
         $toTopic = '0x'.str_pad(substr($address, 2), 64, '0', STR_PAD_LEFT);
         $eventTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
         $mismatches = [];
         $oldestBlock = max(0, $latestBlock - $scanBlocks);
+        $lastScannedBlock = max(0, (int) ($payload['last_scanned_block'] ?? 0));
+        $overlapBlocks = max(1, min(10000, (int) ($network['rpc_overlap_blocks'] ?? 1000)));
+
+        if ($lastScannedBlock > 0 && $lastScannedBlock <= $latestBlock) {
+            $oldestBlock = max($oldestBlock, $lastScannedBlock - $overlapBlocks);
+        }
 
         for ($toBlock = $latestBlock; $toBlock >= $oldestBlock; $toBlock -= ($chunkBlocks + 1)) {
             $fromBlock = max($oldestBlock, $toBlock - $chunkBlocks);
@@ -389,12 +403,17 @@ class PaymentService
             ]);
 
             foreach (array_reverse($logs) as $log) {
-                if (! is_array($log)) {
+                if (! is_array($log) || (bool) ($log['removed'] ?? false)) {
                     continue;
                 }
 
                 $value = $this->hexToDecimalString((string) ($log['data'] ?? '0x0'));
                 $blockNumber = hexdec((string) ($log['blockNumber'] ?? '0x0'));
+
+                if ($blockNumber > $latestBlock) {
+                    continue;
+                }
+
                 $confirmedAt = $this->bscRpcBlockTimestamp($rpcUrl, $blockNumber);
 
                 if ($createdAtTimestamp && $confirmedAt && $confirmedAt->timestamp < ($createdAtTimestamp - 300)) {
@@ -410,7 +429,10 @@ class PaymentService
                     'confirmed_at' => $confirmedAt,
                 ];
 
-                if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+                if (
+                    $this->decimalStringCompare($value, $requiredUnits) === 0 &&
+                    $this->paymentReferenceAvailable($order, $transfer)
+                ) {
                     return [
                         'transfer' => $transfer,
                         'mismatches' => $mismatches,
@@ -426,6 +448,7 @@ class PaymentService
         return [
             'transfer' => null,
             'mismatches' => $mismatches,
+            'last_scanned_block' => $latestBlock,
         ];
     }
 
@@ -510,7 +533,10 @@ class PaymentService
                 'source' => 'binance_deposit_history',
             ];
 
-            if ($this->decimalStringCompare($value, $requiredUnits) === 0) {
+            if (
+                $this->decimalStringCompare($value, $requiredUnits) === 0 &&
+                $this->paymentReferenceAvailable($order, $transfer)
+            ) {
                 return [
                     'transfer' => $transfer,
                     'mismatches' => $mismatches,
@@ -546,7 +572,29 @@ class PaymentService
         return $token !== '' ? $token : 'USDT';
     }
 
-    private function directCryptoAmount(float $baseAmount, string $orderId, string $coin): float
+    private function paymentReferenceAvailable(Order $order, array $transfer): bool
+    {
+        $reference = strtolower(trim((string) ($transfer['tx_hash'] ?? '')));
+
+        if ($reference === '') {
+            return false;
+        }
+
+        if (! $order->exists) {
+            return true;
+        }
+
+        if (blank($order->payment_match_key)) {
+            return false;
+        }
+
+        return ! Order::query()
+            ->where('payment_reference', $reference)
+            ->whereKeyNot($order->getKey())
+            ->exists();
+    }
+
+    private function directCryptoAmount(float $baseAmount, string $orderId, string $coin, int $attempt = 0): float
     {
         if ($baseAmount <= 0) {
             throw new \Exception('Invalid crypto amount');
@@ -554,10 +602,52 @@ class PaymentService
 
         $uniqueMax = max(1, min(9999, (int) config('services.crypto_direct.unique_max', 9999)));
         $hash = (int) sprintf('%u', crc32($orderId.'|'.$coin));
-        $uniqueUnits = ($hash % $uniqueMax) + 1;
+        $uniqueUnits = (($hash + max(0, $attempt)) % $uniqueMax) + 1;
         $uniqueAmount = $uniqueUnits / 1000000;
 
         return round($baseAmount + $uniqueAmount, 6);
+    }
+
+    private function claimDirectCryptoAmount(Order $order, array $network, string $coin, float $baseAmount): float
+    {
+        Order::whereNotNull('payment_match_key')
+            ->where(function ($query): void {
+                $query->where('status', 'paid')
+                    ->orWhere('created_at', '<', now()->subDay());
+            })
+            ->update(['payment_match_key' => null]);
+
+        $uniqueMax = max(1, min(9999, (int) config('services.crypto_direct.unique_max', 9999)));
+
+        for ($attempt = 0; $attempt < $uniqueMax; $attempt++) {
+            $amount = $this->directCryptoAmount($baseAmount, $order->order_id, $coin, $attempt);
+            $matchKey = $this->directCryptoMatchKey($network, $coin, $amount);
+
+            try {
+                $order->update([
+                    'price' => $amount,
+                    'payment_match_key' => $matchKey,
+                ]);
+
+                return $amount;
+            } catch (QueryException $error) {
+                if (! str_contains(strtolower($error->getMessage()), 'payment_match_key')) {
+                    throw $error;
+                }
+            }
+        }
+
+        throw new \Exception('No unique crypto amount is currently available');
+    }
+
+    private function directCryptoMatchKey(array $network, string $coin, float $amount): string
+    {
+        return hash('sha256', implode('|', [
+            strtolower($coin),
+            strtolower(trim((string) ($network['address'] ?? ''))),
+            strtolower(trim((string) ($network['contract'] ?? ''))),
+            number_format($amount, 6, '.', ''),
+        ]));
     }
 
     private function normalizeDirectCryptoPayment(Order $order, array $network, string $coin, float $baseAmount, float $amount, Carbon $expiresAt): array
@@ -684,7 +774,7 @@ class PaymentService
         $normalized = preg_replace('/\.(\d{6})\d+(Z|[+-]\d{2}:\d{2})$/', '.$1$2', $expiredAt);
 
         try {
-            return Carbon::parse($normalized);
+            return Carbon::parse($normalized)->timezone(config('app.timezone'));
         } catch (\Exception $e) {
             return null;
         }
@@ -726,6 +816,17 @@ class PaymentService
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    private function directBep20ScanBlocks(Order $order, array $network): int
+    {
+        $configuredScanBlocks = max(1, (int) ($network['rpc_scan_blocks'] ?? 40000));
+        $blockSeconds = max(0.1, min(10, (float) ($network['rpc_block_seconds'] ?? 0.4)));
+        $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at) ?? now()->timestamp;
+        $orderAgeSeconds = max(600, now()->timestamp - $createdAtTimestamp + 600);
+        $requiredScanBlocks = (int) ceil($orderAgeSeconds / $blockSeconds);
+
+        return min(300000, max($configuredScanBlocks, $requiredScanBlocks));
     }
 
     private function looksLikeEvmAddress(string $address): bool

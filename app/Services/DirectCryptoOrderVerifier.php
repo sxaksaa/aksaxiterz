@@ -32,6 +32,24 @@ class DirectCryptoOrderVerifier
             ], $order);
         }
 
+        if ($order->status !== 'pending') {
+            return [
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'This order is no longer active. Please contact support if a payment was already sent.',
+            ];
+        }
+
+        if ($order->expired_at && $order->expired_at->lte(now())) {
+            $order->update(['status' => 'cancelled']);
+
+            return [
+                'order_id' => $order->order_id,
+                'status' => 'cancelled',
+                'message' => 'This crypto invoice has expired. Please contact support if a payment was already sent.',
+            ];
+        }
+
         try {
             $inspection = $this->paymentService->inspectDirectCryptoPayment($order);
             $transfer = $inspection['transfer'] ?? null;
@@ -71,21 +89,47 @@ class DirectCryptoOrderVerifier
                 ];
             }
 
+            if ($lockedOrder->status !== 'pending') {
+                DB::rollBack();
+
+                return [
+                    'order_id' => $lockedOrder->order_id,
+                    'status' => $lockedOrder->status,
+                    'message' => 'This order is no longer active. Please contact support if a payment was already sent.',
+                ];
+            }
+
+            $reference = $this->paymentReference($transfer);
+
+            if ($reference === '') {
+                throw new \Exception('Crypto transfer reference is missing');
+            }
+
+            if (blank($lockedOrder->payment_match_key)) {
+                throw new \Exception('Crypto invoice match key is missing');
+            }
+
+            if (
+                Order::where('payment_reference', $reference)
+                    ->whereKeyNot($lockedOrder->getKey())
+                    ->exists()
+            ) {
+                throw new \Exception('Crypto transfer was already used');
+            }
+
             $deliveryPending = false;
 
-            if ($lockedOrder->status !== 'paid') {
-                $this->rememberMatchedTransfer($lockedOrder, $transfer);
+            $this->rememberMatchedTransfer($lockedOrder, $transfer, $reference);
 
-                try {
-                    $this->orderFulfillmentService->fulfill($lockedOrder);
-                } catch (\Exception $fulfillmentError) {
-                    if ($fulfillmentError->getMessage() !== 'No license stock available for this package') {
-                        throw $fulfillmentError;
-                    }
-
-                    $deliveryPending = true;
-                    $this->orderFulfillmentService->markPaid($lockedOrder);
+            try {
+                $this->orderFulfillmentService->fulfill($lockedOrder);
+            } catch (\Exception $fulfillmentError) {
+                if ($fulfillmentError->getMessage() !== 'No license stock available for this package') {
+                    throw $fulfillmentError;
                 }
+
+                $deliveryPending = true;
+                $this->orderFulfillmentService->markPaid($lockedOrder);
             }
 
             DB::commit();
@@ -171,6 +215,12 @@ class DirectCryptoOrderVerifier
         if (! empty($inspection['mismatches'])) {
             $payload['amount_mismatch'] = $inspection['mismatches'][0];
             $payload['amount_mismatches'] = array_slice($inspection['mismatches'], 0, 5);
+        } else {
+            unset($payload['amount_mismatch'], $payload['amount_mismatches']);
+        }
+
+        if (isset($inspection['last_scanned_block']) && is_numeric($inspection['last_scanned_block'])) {
+            $payload['last_scanned_block'] = max(0, (int) $inspection['last_scanned_block']);
         }
 
         $order->update([
@@ -178,7 +228,7 @@ class DirectCryptoOrderVerifier
         ]);
     }
 
-    private function rememberMatchedTransfer(Order $order, array $transfer): void
+    private function rememberMatchedTransfer(Order $order, array $transfer, string $reference): void
     {
         $payload = $order->payment_payload;
 
@@ -198,7 +248,14 @@ class DirectCryptoOrderVerifier
 
         $order->update([
             'payment_payload' => $payload,
+            'payment_reference' => $reference,
+            'payment_match_key' => null,
         ]);
+    }
+
+    private function paymentReference(array $transfer): string
+    {
+        return strtolower(trim((string) ($transfer['tx_hash'] ?? '')));
     }
 
     private function withLicensePayload(array $payload, Order $order): array
@@ -241,6 +298,14 @@ class DirectCryptoOrderVerifier
 
         if ($error->getMessage() === 'Unable to verify crypto payment') {
             return 'Crypto network API could not be reached. Please try Verify again.';
+        }
+
+        if (in_array($error->getMessage(), [
+            'Crypto transfer reference is missing',
+            'Crypto transfer was already used',
+            'Crypto invoice match key is missing',
+        ], true)) {
+            return 'This transfer cannot be matched automatically. Please contact support with the transaction receipt.';
         }
 
         return 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.';

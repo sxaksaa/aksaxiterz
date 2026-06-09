@@ -17,6 +17,8 @@ class Order extends Model
         'package_id',
         'payment_url',
         'payment_payload',
+        'payment_reference',
+        'payment_match_key',
         'expired_at',
         'replaced_by',
     ];

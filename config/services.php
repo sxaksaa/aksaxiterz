@@ -50,7 +50,7 @@ return [
     ],
 
     'crypto_direct' => [
-        'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 1440),
+        'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 60),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [
             'usdttrc20' => [
@@ -73,6 +73,9 @@ return [
                 'rpc_url' => env('BSC_RPC_URL', 'https://bsc-rpc.publicnode.com'),
                 'rpc_scan_blocks' => (int) env('BSC_RPC_SCAN_BLOCKS', 40000),
                 'rpc_chunk_blocks' => (int) env('BSC_RPC_CHUNK_BLOCKS', 3000),
+                'rpc_block_seconds' => (float) env('BSC_RPC_BLOCK_SECONDS', 0.4),
+                'rpc_confirmations' => (int) env('BSC_RPC_CONFIRMATIONS', 5),
+                'rpc_overlap_blocks' => (int) env('BSC_RPC_OVERLAP_BLOCKS', 1000),
                 'decimals' => 18,
                 'binance_network' => env('BINANCE_BEP20_NETWORK', 'BSC'),
             ],
@@ -85,6 +88,9 @@ return [
                 'rpc_url' => env('BSC_RPC_URL', 'https://bsc-rpc.publicnode.com'),
                 'rpc_scan_blocks' => (int) env('BSC_RPC_SCAN_BLOCKS', 40000),
                 'rpc_chunk_blocks' => (int) env('BSC_RPC_CHUNK_BLOCKS', 3000),
+                'rpc_block_seconds' => (float) env('BSC_RPC_BLOCK_SECONDS', 0.4),
+                'rpc_confirmations' => (int) env('BSC_RPC_CONFIRMATIONS', 5),
+                'rpc_overlap_blocks' => (int) env('BSC_RPC_OVERLAP_BLOCKS', 1000),
                 'decimals' => 18,
                 'binance_network' => env('BINANCE_USDC_BEP20_NETWORK') ?: env('BINANCE_BEP20_NETWORK', 'BSC'),
             ],

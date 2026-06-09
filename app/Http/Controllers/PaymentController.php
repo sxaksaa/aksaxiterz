@@ -558,11 +558,7 @@ class PaymentController extends Controller
             ->where('status', 'pending')
             ->where(function ($query) {
                 $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>', now())
-                    ->orWhere(function ($cryptoQuery) {
-                        $cryptoQuery->where('payment_method', 'crypto')
-                            ->where('created_at', '>', now()->subDay());
-                    });
+                    ->orWhere('expired_at', '>', now());
             })
             ->latest()
             ->first();

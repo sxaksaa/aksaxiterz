@@ -32,8 +32,8 @@
                 <span id="aksaQrisAmount" class="font-semibold text-[#D8B4FE]">-</span>
             </div>
             <div class="qris-detail-row">
-                <span>Expires</span>
-                <span id="aksaQrisExpires" class="text-right text-gray-300">-</span>
+                <span>Time remaining</span>
+                <span id="aksaQrisExpires" class="text-right font-mono text-gray-300">-</span>
             </div>
         </div>
 

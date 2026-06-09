@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 let appToastTimer = null;
 let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
+let qrisExpiryCountdownTimer = null;
 let cryptoExpiryCountdownTimer = null;
 
 window.renderAksaQrCode = async function(target, value, options = {}) {
@@ -41,23 +42,6 @@ function csrfToken() {
 
 function formatIdr(amount) {
     return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
-}
-
-function formatQrisExpiry(value) {
-    if (!value) return '-';
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return '-';
-    }
-
-    return date.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 }
 
 function formatCountdown(value) {
@@ -174,6 +158,30 @@ function startQrisPolling(orderId) {
     }, 5000);
 }
 
+function stopQrisExpiryCountdown() {
+    if (qrisExpiryCountdownTimer) {
+        clearInterval(qrisExpiryCountdownTimer);
+        qrisExpiryCountdownTimer = null;
+    }
+}
+
+function startQrisExpiryCountdown(value) {
+    const element = document.getElementById('aksaQrisExpires');
+
+    if (!element) return;
+
+    stopQrisExpiryCountdown();
+    element.dataset.expire = value || '';
+
+    const update = () => {
+        element.innerText = formatCountdown(value);
+        element.classList.toggle('text-red-300', element.innerText === 'Expired');
+    };
+
+    update();
+    qrisExpiryCountdownTimer = setInterval(update, 1000);
+}
+
 window.syncAksaPakasirOrder = syncPakasirOrder;
 window.syncAksaCryptoOrder = syncCryptoOrder;
 
@@ -249,7 +257,7 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.amount);
     document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
     document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
-    document.getElementById('aksaQrisExpires').innerText = formatQrisExpiry(payment.expired_at);
+    startQrisExpiryCountdown(payment.expired_at);
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -272,6 +280,7 @@ window.closeAksaQrisModal = function() {
     if (!modal) return;
 
     stopQrisPolling();
+    stopQrisExpiryCountdown();
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('overflow-hidden');

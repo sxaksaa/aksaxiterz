@@ -72,6 +72,19 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('action="/cancel-order/1"', $html);
     }
 
+    public function test_expired_crypto_orders_do_not_render_payment_actions(): void
+    {
+        $order = $this->fakeOrder([
+            'expired_at' => now()->subSecond(),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('Expired', $html);
+        $this->assertStringNotContainsString('View Address', $html);
+        $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
+    }
+
     public function test_pakasir_orders_render_check_and_continue_actions(): void
     {
         $order = $this->fakeOrder([
@@ -177,7 +190,7 @@ class PaymentPresentationTest extends TestCase
                 'decimals' => 18,
                 'expires_at' => now()->addHour()->toIso8601String(),
             ],
-            'expired_at' => now()->subMinute(),
+            'expired_at' => now()->addHour(),
         ], $attributes));
         $order->id = 1;
         $order->created_at = now()->subMinutes(5);

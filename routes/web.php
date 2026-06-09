@@ -224,18 +224,13 @@ Route::middleware('auth')->group(function () {
                 'payment_method' => $order->payment_method,
                 'can_sync_crypto' => $order->payment_method === 'crypto' &&
                     $order->status === 'pending' &&
-                    $order->created_at &&
-                    $order->created_at->gt(now()->subDay()),
+                    ! $order->expired_at,
             ]);
         }
 
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
 
-        $canStillVerifyCrypto = $order->payment_method === 'crypto' &&
-            $order->created_at &&
-            $order->created_at->gt(now()->subDay());
-
-        if ($remaining <= 0 && $order->status === 'pending' && ! $canStillVerifyCrypto) {
+        if ($remaining <= 0 && $order->status === 'pending') {
             $order->update(['status' => 'cancelled']);
         }
 
@@ -246,8 +241,7 @@ Route::middleware('auth')->group(function () {
             'payment_method' => $order->payment_method,
             'can_sync_crypto' => $order->payment_method === 'crypto' &&
                 $order->status === 'pending' &&
-                $order->created_at &&
-                $order->created_at->gt(now()->subDay()),
+                $remaining > 0,
         ]);
     })->middleware('throttle:30,1');
 
@@ -264,10 +258,6 @@ Route::middleware('auth')->group(function () {
         Order::where('status', 'pending')
             ->whereNotNull('expired_at')
             ->where('expired_at', '<', now())
-            ->where(function ($query) {
-                $query->where('payment_method', '!=', 'crypto')
-                    ->orWhere('created_at', '<', now()->subDay());
-            })
             ->update(['status' => 'cancelled']);
 
         $orderStats = [
@@ -289,10 +279,6 @@ Route::middleware('auth')->group(function () {
         Order::where('status', 'pending')
             ->whereNotNull('expired_at')
             ->where('expired_at', '<', now())
-            ->where(function ($query) {
-                $query->where('payment_method', '!=', 'crypto')
-                    ->orWhere('created_at', '<', now()->subDay());
-            })
             ->update(['status' => 'cancelled']);
 
         $orders = Order::with(['product', 'package'])
@@ -378,12 +364,16 @@ Route::get('/auth/google/callback', function (Request $request) use ($isSafeLogi
     try {
         $googleUser = Socialite::driver('google')->user();
     } catch (InvalidStateException $e) {
-        Log::warning('GOOGLE LOGIN STATE MISMATCH, retrying stateless auth', [
+        Log::warning('GOOGLE LOGIN STATE MISMATCH, rejecting callback', [
             'host' => $request->getHost(),
             'has_session_cookie' => $request->hasCookie(config('session.cookie')),
         ]);
 
-        $googleUser = Socialite::driver('google')->stateless()->user();
+        Cookie::queue(Cookie::forget('login_redirect'));
+
+        return redirect('/')->withErrors([
+            'auth' => 'Login session expired. Please try signing in again.',
+        ]);
     }
 
     $googlePayload = $googleUser->user ?? [];
@@ -412,8 +402,10 @@ Route::get('/auth/google/callback', function (Request $request) use ($isSafeLogi
     return redirect($isSafeLoginRedirect($request, $redirect) ? $redirect : '/');
 })->middleware('throttle:120,1');
 
-Route::post('/logout', function () {
+Route::post('/logout', function (Request $request) {
     Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
 
     return redirect('/');
 });
