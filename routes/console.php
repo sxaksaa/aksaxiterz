@@ -97,4 +97,4 @@ Artisan::command('orders:scan-crypto {--limit=50 : Maximum pending crypto orders
     $this->line("Still pending: {$summary['pending']}");
 
     return self::SUCCESS;
-})->purpose('Scan pending direct USDT orders and fulfill exact on-chain matches');
+})->purpose('Scan pending direct stablecoin orders and fulfill exact on-chain matches');

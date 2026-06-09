@@ -196,7 +196,7 @@ function startCryptoPolling(orderId) {
                 const deliveryPending = result?.delivery_pending === true;
 
                 showPaymentSuccess({
-                    message: result.message || 'Your USDT payment has been verified and your license is ready.',
+                    message: result.message || 'Your crypto payment has been verified and your license is ready.',
                     licenseKey: result.license_key,
                     orderId: result.order_id || orderId,
                     primaryUrl: deliveryPending ? '/orders' : undefined,
@@ -286,10 +286,16 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
     }
 
     cryptoState.orderId = checkout.order_id || null;
+    const token = (payment.token || 'USDT').toUpperCase();
+    const tokenLabel = document.getElementById('aksaCryptoTokenLabel');
+
+    if (tokenLabel) {
+        tokenLabel.innerText = `${token} Address`;
+    }
 
     document.getElementById('aksaCryptoOrderId').innerText = checkout.order_id || '-';
     document.getElementById('aksaCryptoNetwork').innerText = payment.network_label || payment.network || '-';
-    document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, payment.token || 'USDT');
+    document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, token);
     document.getElementById('aksaCryptoAddress').innerText = payment.address || '-';
     document.getElementById('aksaCryptoContract').innerText = payment.contract || '-';
     startCryptoExpiryCountdown(payment.expired_at);
@@ -308,7 +314,7 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
     if (copyAmount) {
         copyAmount.dataset.copyValue = payment.amount || '';
         copyAmount.dataset.copyTitle = 'Amount copied';
-        copyAmount.dataset.copyMessage = 'Paste the exact USDT amount in your wallet.';
+        copyAmount.dataset.copyMessage = `Paste the exact ${token} amount in your wallet.`;
     }
 
     if (acknowledgement) {
@@ -598,7 +604,7 @@ document.addEventListener('click', async (event) => {
             const deliveryPending = result?.delivery_pending === true;
 
             showPaymentSuccess({
-                message: result.message || 'Your USDT payment has been verified and your license is ready.',
+                message: result.message || 'Your crypto payment has been verified and your license is ready.',
                 licenseKey: result.license_key,
                 orderId: result.order_id || cryptoState.orderId,
                 primaryUrl: deliveryPending ? '/orders' : undefined,

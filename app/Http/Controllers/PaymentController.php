@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class PaymentController extends Controller
@@ -41,6 +42,7 @@ class PaymentController extends Controller
         }
 
         $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
+        $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
 
         $newOrder = Order::create([
             'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
@@ -84,7 +86,7 @@ class PaymentController extends Controller
                 $user,
                 $newOrder->product_id,
                 $newOrder->package_id,
-                'usdttrc20',
+                $cryptoNetwork,
                 $newOrder
             );
 
@@ -317,7 +319,12 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
-            'coin' => 'required|string|max:20',
+            'coin' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::in(array_keys(config('services.crypto_direct.networks', []))),
+            ],
         ]);
 
         $this->cancelPendingOrders($user->id);
@@ -465,6 +472,15 @@ class PaymentController extends Controller
             'unique_amount' => (string) ($payload['unique_amount'] ?? ''),
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
         ];
+    }
+
+    private function retryCryptoNetwork(Order $order): string
+    {
+        $payload = $order->payment_payload;
+        $network = is_array($payload) ? strtolower(trim((string) ($payload['network'] ?? ''))) : '';
+        $configuredNetworks = array_keys(config('services.crypto_direct.networks', []));
+
+        return in_array($network, $configuredNetworks, true) ? $network : 'usdttrc20';
     }
 
     private function syncPaymentResponse(Request $request, array $payload, int $status = 200)

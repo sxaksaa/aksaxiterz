@@ -6,7 +6,8 @@
         $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
         $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
         $isDirectCrypto = $order->payment_method === 'crypto' && ($payload['type'] ?? null) === 'direct_crypto';
-        $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
+        $cryptoToken = strtoupper((string) ($payload['token'] ?? 'USDT'));
+        $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
         $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
         $amountMismatch = is_array($payload['amount_mismatch'] ?? null) ? $payload['amount_mismatch'] : null;
         $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
@@ -98,7 +99,7 @@
                     <div class="qris-detail-row">
                         <span>Amount</span>
                         <span class="font-semibold text-[#D8B4FE]">
-                            {{ $order->payment_method === 'crypto' ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price) }}
+                            {{ $order->payment_method === 'crypto' ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price) }}
                         </span>
                     </div>
                     <div class="qris-detail-row">
@@ -195,7 +196,7 @@
                             </div>
                             <div class="qris-detail-row qris-total-row">
                                 <span>Expected amount</span>
-                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} USDT</span>
+                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
                             </div>
                             <div class="qris-detail-row">
                                 <span>Receive address</span>
@@ -217,7 +218,7 @@
                                 <div class="crypto-payment-warning">
                                     <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Amount Mismatch</p>
                                     <p class="mt-1 text-xs leading-5 text-gray-300">
-                                        Expected {{ $amountMismatch['expected_amount'] ?? '-' }} USDT, received {{ $amountMismatch['received_amount'] ?? '-' }} USDT.
+                                        Expected {{ $amountMismatch['expected_amount'] ?? '-' }} {{ $cryptoToken }}, received {{ $amountMismatch['received_amount'] ?? '-' }} {{ $cryptoToken }}.
                                     </p>
                                     <p class="mt-1 break-all font-mono text-[11px] text-[#F5D0FE]">
                                         {{ $amountMismatch['tx_hash'] ?? '-' }}

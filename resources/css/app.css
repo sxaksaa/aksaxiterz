@@ -940,6 +940,23 @@
         color: #f5d0fe;
     }
 
+    .crypto-coin-option {
+        @apply flex min-h-16 flex-col items-start justify-center rounded-lg border px-4 py-3 text-left transition;
+        background: rgba(17, 17, 23, 0.72);
+        border-color: rgba(113, 113, 122, 0.38);
+    }
+
+    .crypto-coin-option:hover {
+        border-color: rgba(192, 132, 252, 0.62);
+        background: rgba(147, 51, 234, 0.08);
+    }
+
+    .crypto-coin-option.active {
+        border-color: rgba(147, 51, 234, 0.86);
+        background: rgba(147, 51, 234, 0.14);
+        box-shadow: 0 0 0 1px rgba(147, 51, 234, 0.16);
+    }
+
     .app-toast {
         @apply fixed right-4 z-50 w-[calc(100vw-2rem)] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md transition-all duration-300 sm:right-6;
         bottom: 1.25rem;

@@ -4,7 +4,7 @@
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaCryptoTitle">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">USDT Address</p>
+                <p id="aksaCryptoTokenLabel" class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Stablecoin Address</p>
                 <h2 id="aksaCryptoTitle" class="mt-1 text-xl font-semibold text-white">Send Exact Amount</h2>
             </div>
             <button type="button" class="qris-close-button" data-crypto-close aria-label="Close crypto checkout">x</button>
@@ -43,7 +43,7 @@
                     Send exactly the amount shown above. Network/exchange fee is not included.
                 </p>
                 <p class="mt-1 text-xs leading-5 text-gray-300">
-                    The received USDT amount must match this invoice amount, or the order will stay pending.
+                    The received token amount must match this invoice amount, or the order will stay pending.
                 </p>
                 <p class="mt-2 text-xs font-semibold leading-5 text-white">
                     Use the selected network and keep your wallet receipt. If Binance shows Off-chain Transfer, keep that receipt too.

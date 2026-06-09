@@ -30,6 +30,33 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('href="/sync-crypto-order/ORDER-VERIFYTEST"', $html);
     }
 
+    public function test_direct_crypto_orders_render_usdc_token_label(): void
+    {
+        $order = $this->fakeOrder([
+            'order_id' => 'ORDER-USDC',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDC',
+                'network' => 'usdcbsc',
+                'network_label' => 'USDC BNB Smart Chain (BEP20)',
+                'network_short_label' => 'USDC BEP20',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
+                'amount' => '1.100123',
+                'base_amount' => '1.100000',
+                'unique_amount' => '0.000123',
+                'decimals' => 18,
+                'expires_at' => now()->addHour()->toIso8601String(),
+            ],
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('USDC Address', $html);
+        $this->assertStringContainsString('1.100123 USDC', $html);
+        $this->assertStringNotContainsString('USDT Address', $html);
+    }
+
     public function test_cancelled_crypto_orders_do_not_render_as_verifying(): void
     {
         $order = $this->fakeOrder([

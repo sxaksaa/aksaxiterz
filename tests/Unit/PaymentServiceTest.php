@@ -85,6 +85,40 @@ class PaymentServiceTest extends TestCase
         $this->assertSame('usdtbsc', $transfer['network'] ?? null);
     }
 
+    public function test_direct_bep20_scanner_matches_exact_usdc_transfer(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdcbsc.rpc_url' => 'https://bsc-rpc.test',
+            'services.crypto_direct.networks.usdcbsc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdcbsc.rpc_chunk_blocks' => 100,
+        ]);
+
+        Http::fake([
+            'https://bsc-rpc.test' => $this->fakeBscRpcTransfer('0xusdc', '2100123000000000000'),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-USDC-CHAIN',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDC',
+                'network' => 'usdcbsc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
+                'amount' => '2.100123',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('0xusdc', $transfer['tx_hash'] ?? null);
+        $this->assertSame('usdcbsc', $transfer['network'] ?? null);
+        $this->assertSame('2.100123', $transfer['amount'] ?? null);
+    }
+
     public function test_direct_bep20_scanner_reports_amount_mismatch(): void
     {
         config([
@@ -258,6 +292,61 @@ class PaymentServiceTest extends TestCase
 
         Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://trongrid.test/'));
         Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://binance.test/sapi/v1/capital/deposit/hisrec?'));
+    }
+
+    public function test_direct_crypto_binance_fallback_uses_usdc_coin_for_usdc_bsc(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdcbsc.binance_network' => 'BSC',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.primary' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+            'services.binance.deposit_fallback.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([[
+                'id' => 'usdc-deposit-1',
+                'amount' => '2.10012300',
+                'coin' => 'USDC',
+                'network' => 'BSC',
+                'status' => 1,
+                'address' => '0x1111111111111111111111111111111111111111',
+                'txId' => '0xbinanceusdc',
+                'insertTime' => now()->subMinute()->timestamp * 1000,
+                'completeTime' => now()->subMinute()->timestamp * 1000,
+            ]], 200),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-USDC-BINANCE',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDC',
+                'network' => 'usdcbsc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
+                'amount' => '2.100123',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('0xbinanceusdc', $transfer['tx_hash'] ?? null);
+        $this->assertSame('usdcbsc', $transfer['network'] ?? null);
+        $this->assertSame('2.100123', $transfer['amount'] ?? null);
+        $this->assertSame('binance_deposit_history', $transfer['source'] ?? null);
+
+        Http::assertSent(function ($request) {
+            return str_starts_with($request->url(), 'https://binance.test/sapi/v1/capital/deposit/hisrec?') &&
+                str_contains($request->url(), 'coin=USDC') &&
+                str_contains($request->url(), 'signature=');
+        });
     }
 
     public function test_direct_crypto_scanner_can_prioritize_binance_deposit_history(): void

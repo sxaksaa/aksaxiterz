@@ -16,6 +16,7 @@ class PaymentService
     private const ALLOWED_COINS = [
         'usdttrc20',
         'usdtbsc',
+        'usdcbsc',
     ];
 
     public function createPakasir($user, $productId, $packageId, ?Order $order = null)
@@ -212,7 +213,8 @@ class PaymentService
         try {
             $inspection = match ($network) {
                 'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
-                'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload),
+                'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload, 'usdtbsc'),
+                'usdcbsc' => $this->inspectDirectBep20Transfers($order, $payload, 'usdcbsc'),
                 default => [
                     'transfer' => null,
                     'mismatches' => [],
@@ -342,9 +344,9 @@ class PaymentService
         ];
     }
 
-    private function inspectDirectBep20Transfers(Order $order, array $payload): array
+    private function inspectDirectBep20Transfers(Order $order, array $payload, string $coin = 'usdtbsc'): array
     {
-        $network = $this->directCryptoNetwork('usdtbsc');
+        $network = $this->directCryptoNetwork($coin);
 
         $address = strtolower(trim((string) ($payload['address'] ?? '')));
         $contract = strtolower(trim((string) ($payload['contract'] ?? '')));
@@ -401,7 +403,7 @@ class PaymentService
 
                 $transfer = [
                     'tx_hash' => (string) ($log['transactionHash'] ?? ''),
-                    'network' => 'usdtbsc',
+                    'network' => $coin,
                     'amount_units' => $value,
                     'amount' => $this->tokenUnitsToDecimal($value, $decimals),
                     'to' => $address,
@@ -446,6 +448,7 @@ class PaymentService
         }
 
         $network = $this->directCryptoNetwork($coin);
+        $token = $this->directCryptoToken($payload, $network);
         $binanceNetwork = strtoupper(trim((string) ($network['binance_network'] ?? '')));
         $address = trim((string) ($payload['address'] ?? ''));
         $decimals = (int) ($payload['decimals'] ?? $network['decimals'] ?? 6);
@@ -457,7 +460,7 @@ class PaymentService
         }
 
         $deposits = $this->signedBinanceGet('/sapi/v1/capital/deposit/hisrec', [
-            'coin' => 'USDT',
+            'coin' => $token,
             'status' => 1,
             'startTime' => max(0, (($createdAtTimestamp ?: now()->subDay()->timestamp) - 300) * 1000),
             'endTime' => (now()->addMinutes(5)->timestamp) * 1000,
@@ -484,7 +487,7 @@ class PaymentService
             $timestamp = (int) floor($timestampMs / 1000);
 
             if (
-                strtoupper((string) ($deposit['coin'] ?? '')) !== 'USDT' ||
+                strtoupper((string) ($deposit['coin'] ?? '')) !== $token ||
                 (int) ($deposit['status'] ?? -1) !== 1 ||
                 ! $this->sameBinanceDepositNetwork($coin, $binanceNetwork, $actualNetwork) ||
                 ! $this->sameCryptoAddress($address, $actualAddress) ||
@@ -536,6 +539,13 @@ class PaymentService
         return $network;
     }
 
+    private function directCryptoToken(array $payload, array $network): string
+    {
+        $token = strtoupper(trim((string) ($network['token'] ?? $payload['token'] ?? 'USDT')));
+
+        return $token !== '' ? $token : 'USDT';
+    }
+
     private function directCryptoAmount(float $baseAmount, string $orderId, string $coin): float
     {
         if ($baseAmount <= 0) {
@@ -554,7 +564,7 @@ class PaymentService
     {
         return [
             'type' => 'direct_crypto',
-            'token' => 'USDT',
+            'token' => $this->directCryptoToken([], $network),
             'network' => $coin,
             'network_label' => (string) ($network['label'] ?? strtoupper($coin)),
             'network_short_label' => (string) ($network['short_label'] ?? strtoupper($coin)),
@@ -695,7 +705,7 @@ class PaymentService
             throw new \Exception('Direct crypto checkout is not configured');
         }
 
-        if ($coin === 'usdtbsc' && blank($network['rpc_url'] ?? null)) {
+        if (str_ends_with($coin, 'bsc') && blank($network['rpc_url'] ?? null)) {
             throw new \Exception('Direct crypto checkout is not configured');
         }
     }
@@ -753,7 +763,7 @@ class PaymentService
 
         $aliases = array_merge($aliases, match ($coin) {
             'usdttrc20' => ['TRX', 'TRC20', 'TRON'],
-            'usdtbsc' => ['BSC', 'BEP20'],
+            'usdtbsc', 'usdcbsc' => ['BSC', 'BEP20'],
             default => [],
         });
 

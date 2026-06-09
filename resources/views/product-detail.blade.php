@@ -98,7 +98,7 @@
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">Crypto</div>
-                <span class="text-xs text-gray-400">USDT Address</span>
+                <span class="text-xs text-gray-400">Stablecoin Address</span>
 
             </div>
 
@@ -106,32 +106,59 @@
 
         <!-- CRYPTO -->
         <div id="cryptoBox" class="hidden relative mb-6 fade-up z-10">
-
-            <div data-crypto-toggle class="search-bar flex justify-between items-center cursor-pointer">
-
-                <span id="selectedText">Select Network</span>
-                <span id="arrow" class="crypto-dropdown-arrow transition-transform">v</span>
-            </div>
-
-            <div id="dropdownList" class="hidden w-full mt-2 panel-card overflow-hidden">
-
-                <div class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdtbsc"
-                    data-network-value="usdtbsc" data-network-text="BSC BNB Smart Chain (BEP20)">
-                    <span class="font-bold text-white">BSC</span>
-                    <span class="crypto-network-badge">Recommended</span>
-                    <span class="text-xs text-gray-500 ml-auto">BEP20</span>
-                    <span class="font-normal text-gray-400 text-sm">BNB Smart Chain (BEP20)</span>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
+                    <div class="grid grid-cols-2 gap-2" role="group" aria-label="Select crypto coin">
+                        <button type="button" class="crypto-coin-option" data-crypto-coin="usdt" aria-pressed="false">
+                            <span class="font-semibold text-white">USDT</span>
+                            <span class="text-xs text-gray-500">Tether</span>
+                        </button>
+                        <button type="button" class="crypto-coin-option" data-crypto-coin="usdc" aria-pressed="false">
+                            <span class="font-semibold text-white">USDC</span>
+                            <span class="text-xs text-gray-500">USD Coin</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="dropdown-item flex flex-wrap items-center gap-2" data-coin="usdttrc20"
-                    data-network-value="usdttrc20" data-network-text="TRX Tron (TRC20)">
-                    <span class="font-bold text-white">TRX</span>
-                    <span class="text-xs text-gray-500 ml-auto">TRC20</span>
-                    <span class="font-normal text-gray-400 text-sm">Tron (TRC20)</span>
+                <div class="relative">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Network</p>
+                    <button type="button" data-network-toggle
+                        class="search-bar flex min-h-16 w-full justify-between items-center text-left disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled aria-expanded="false">
+                        <span id="selectedNetworkText">Select coin first</span>
+                        <span id="networkArrow" class="crypto-dropdown-arrow transition-transform">v</span>
+                    </button>
+
+                    <div id="networkDropdown"
+                        class="hidden mt-2 w-full panel-card overflow-hidden">
+                        <button type="button"
+                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
+                            data-token="usdt" data-network-value="usdtbsc"
+                            data-network-text="BNB Smart Chain (BEP20)">
+                            <span class="font-bold text-white">BNB Smart Chain</span>
+                            <span class="crypto-network-badge">Recommended</span>
+                            <span class="ml-auto text-xs text-gray-500">BEP20</span>
+                        </button>
+
+                        <button type="button"
+                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
+                            data-token="usdt" data-network-value="usdttrc20"
+                            data-network-text="Tron (TRC20)">
+                            <span class="font-bold text-white">Tron</span>
+                            <span class="ml-auto text-xs text-gray-500">TRC20</span>
+                        </button>
+
+                        <button type="button"
+                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
+                            data-token="usdc" data-network-value="usdcbsc"
+                            data-network-text="BNB Smart Chain (BEP20)">
+                            <span class="font-bold text-white">BNB Smart Chain</span>
+                            <span class="ml-auto text-xs text-gray-500">BEP20</span>
+                        </button>
+                    </div>
                 </div>
-
             </div>
-
         </div>
         </div>
 
@@ -238,11 +265,12 @@
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         let selectedPackageId = null;
         let selectedPayment = null;
+        let selectedToken = null;
         let selectedCoin = null;
         let selectedPrice = 0;
         let selectedUsd = 0;
         let selectedPackageStock = 0;
-        let dropdownOpen = false;
+        let networkDropdownOpen = false;
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
@@ -313,7 +341,7 @@
 
             showToast(
                 'Payment selected',
-                type === 'crypto' ? 'Direct USDT address is active. Choose a network next.' :
+                type === 'crypto' ? 'Direct stablecoin address is active. Choose a coin and network next.' :
                 'QRIS via Pakasir is active.',
                 null,
                 'success'
@@ -395,8 +423,7 @@
 
         function refreshNetworkAvailability() {
             document.querySelectorAll('.dropdown-item').forEach(item => {
-                item.classList.remove('disabled');
-                item.setAttribute('aria-disabled', 'false');
+                item.classList.toggle('hidden', item.dataset.token !== selectedToken);
             });
         }
 
@@ -409,39 +436,60 @@
         }
 
         /* =========================
-           DROPDOWN
+           CRYPTO COIN & NETWORK
         ========================= */
-        function toggleCryptoDropdown(e) {
-
+        function toggleNetworkDropdown(e) {
             e.stopPropagation();
 
-            const box = document.getElementById('dropdownList');
-            const arrow = document.getElementById('arrow');
+            if (!selectedToken) return;
 
-            dropdownOpen = !dropdownOpen;
+            const box = document.getElementById('networkDropdown');
+            const arrow = document.getElementById('networkArrow');
+            const toggle = document.querySelector('[data-network-toggle]');
 
-            box.classList.toggle('hidden');
-            arrow.classList.toggle('is-open', dropdownOpen);
+            networkDropdownOpen = !networkDropdownOpen;
+            box.classList.toggle('hidden', !networkDropdownOpen);
+            arrow.classList.toggle('is-open', networkDropdownOpen);
+            toggle?.setAttribute('aria-expanded', networkDropdownOpen ? 'true' : 'false');
+        }
+
+        function closeNetworkDropdown() {
+            networkDropdownOpen = false;
+            document.getElementById('networkDropdown').classList.add('hidden');
+            document.getElementById('networkArrow').classList.remove('is-open');
+            document.querySelector('[data-network-toggle]')?.setAttribute('aria-expanded', 'false');
+        }
+
+        function selectCryptoCoin(token) {
+            selectedToken = token;
+            selectedCoin = null;
+
+            document.querySelectorAll('[data-crypto-coin]').forEach(option => {
+                const isActive = option.dataset.cryptoCoin === token;
+                option.classList.toggle('active', isActive);
+                option.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+
+            const networkToggle = document.querySelector('[data-network-toggle]');
+            networkToggle.disabled = false;
+            document.getElementById('selectedNetworkText').innerText = 'Select Network';
+            refreshNetworkAvailability();
+            closeNetworkDropdown();
+
+            showToast('Coin selected', `${token.toUpperCase()} selected. Choose its network next.`, null, 'success');
         }
 
         function selectNetwork(value, text) {
             selectedCoin = value;
+            document.getElementById('selectedNetworkText').innerText = text;
+            closeNetworkDropdown();
 
-            document.getElementById('selectedText').innerText = text;
-
-            dropdownOpen = false;
-
-            document.getElementById('dropdownList').classList.add('hidden');
-            document.getElementById('arrow').classList.remove('is-open');
-
-            showToast('Network selected', text, null, 'success');
+            showToast('Network selected', `${selectedToken.toUpperCase()} on ${text}`, null, 'success');
         }
 
         window.addEventListener('click', function(e) {
             if (!e.target.closest('#cryptoBox')) {
-                document.getElementById('dropdownList').classList.add('hidden');
-                dropdownOpen = false;
-                document.getElementById('arrow').classList.remove('is-open');
+                closeNetworkDropdown();
             }
         });
 
@@ -501,7 +549,11 @@
             card.addEventListener('click', () => selectPayment(card.dataset.paymentMethod));
         });
 
-        document.querySelector('[data-crypto-toggle]')?.addEventListener('click', toggleCryptoDropdown);
+        document.querySelectorAll('[data-crypto-coin]').forEach((option) => {
+            option.addEventListener('click', () => selectCryptoCoin(option.dataset.cryptoCoin));
+        });
+
+        document.querySelector('[data-network-toggle]')?.addEventListener('click', toggleNetworkDropdown);
 
         document.querySelectorAll('[data-network-value]').forEach((item) => {
             item.addEventListener('click', () => selectNetwork(item.dataset.networkValue, item.dataset.networkText));
@@ -543,7 +595,8 @@
             }
 
             if (selectedPayment === 'crypto' && !selectedCoin) {
-                showToast('Select network', 'Select a crypto network first.', null, 'warning');
+                const message = selectedToken ? 'Select a crypto network first.' : 'Select a coin and network first.';
+                showToast('Complete crypto selection', message, null, 'warning');
                 return;
             }
 
@@ -606,7 +659,7 @@
                     }
 
                     this.innerText = 'Payment Pending';
-                    showToast('USDT address ready', 'Send the exact amount shown in the modal.', null, 'success');
+                    showToast('Crypto address ready', 'Send the exact amount shown in the modal.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;

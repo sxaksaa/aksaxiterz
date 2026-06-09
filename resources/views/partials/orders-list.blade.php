@@ -12,6 +12,7 @@
             $isPakasir = ! $isCrypto;
             $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
             $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
+            $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
             $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
             $canSyncCrypto = $isCrypto &&
                 $order->status === 'pending' &&
@@ -21,10 +22,10 @@
             $isPending = $order->status === 'pending' && ! $isExpired;
             $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
             $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
-            $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
+            $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
             $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
-            $priceLabel = $isCrypto ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price);
+            $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
             $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
@@ -203,6 +204,7 @@
                         $isPakasir = ! $isCrypto;
                         $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
                         $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
+                        $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
                         $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
                         $canSyncCrypto = $isCrypto &&
                             $order->status === 'pending' &&
@@ -212,10 +214,10 @@
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
                         $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
-                        $methodLabel = $isCrypto ? ($isDirectCrypto ? 'USDT Address' : 'Crypto') : 'QRIS';
+                        $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
                         $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
-                        $priceLabel = $isCrypto ? '$' . rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') : 'Rp ' . number_format($order->price);
+                        $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
                         $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;

@@ -376,7 +376,7 @@
             button.innerText = 'Verifying...';
             button.classList.add('opacity-60', 'pointer-events-none');
 
-            window.showAppToast?.('Payment check', 'Scanning the selected USDT network.');
+            window.showAppToast?.('Payment check', 'Scanning the selected crypto network.');
 
             try {
                 const result = await syncCryptoOrder(orderId);
@@ -385,7 +385,7 @@
                     const deliveryPending = result?.delivery_pending === true;
 
                     window.showAksaPaymentSuccess?.({
-                        message: result.message || 'Your USDT payment has been verified and your license is ready.',
+                        message: result.message || 'Your crypto payment has been verified and your license is ready.',
                         licenseKey: result.license_key,
                         orderId: result.order_id || orderId,
                         primaryUrl: deliveryPending ? '/orders' : undefined,
@@ -484,7 +484,7 @@
                                 const deliveryPending = result?.delivery_pending === true;
 
                                 window.showAksaPaymentSuccess?.({
-                                    message: result.message || 'Your USDT payment has been verified and your license is ready.',
+                                    message: result.message || 'Your crypto payment has been verified and your license is ready.',
                                     licenseKey: result.license_key,
                                     orderId: result.order_id || data.order_id,
                                     primaryUrl: deliveryPending ? '/orders' : undefined,

@@ -21,7 +21,7 @@ class DirectCryptoOrderVerifier
             return [
                 'order_id' => $order->order_id,
                 'status' => $order->status,
-                'message' => 'This crypto order uses the old checkout flow. Please cancel it and start a new USDT address checkout.',
+                'message' => 'This crypto order uses the old checkout flow. Please cancel it and start a new stablecoin address checkout.',
             ];
         }
 
@@ -38,13 +38,14 @@ class DirectCryptoOrderVerifier
 
             if (! $transfer) {
                 $this->rememberInspection($order, $inspection);
+                $token = $this->cryptoToken($order);
 
                 $payload = [
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
                     'message' => empty($inspection['mismatches'])
                         ? 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.'
-                        : 'Received USDT amount does not match this order. Please contact support.',
+                        : "Received {$token} amount does not match this order. Please contact support.",
                 ];
 
                 if (! empty($inspection['mismatches'][0])) {
@@ -222,6 +223,14 @@ class DirectCryptoOrderVerifier
         return $order->payment_method === 'crypto' &&
             is_array($payload) &&
             ($payload['type'] ?? null) === 'direct_crypto';
+    }
+
+    private function cryptoToken(Order $order): string
+    {
+        $payload = $order->payment_payload;
+        $token = is_array($payload) ? strtoupper(trim((string) ($payload['token'] ?? 'USDT'))) : 'USDT';
+
+        return $token !== '' ? $token : 'USDT';
     }
 
     private function publicCryptoSyncError(\Exception $error): string
