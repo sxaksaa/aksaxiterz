@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
+use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -95,10 +97,72 @@ class DirectCryptoOrderVerifierTest extends TestCase
         $this->assertSame('0xcancelled-late-transfer', $order->fresh()->payment_reference);
     }
 
-    public function test_expired_crypto_order_is_cancelled_without_verification(): void
+    public function test_expired_crypto_order_is_cancelled_and_can_retry_recovery_verification(): void
     {
         $order = $this->directCryptoOrder([
             'expired_at' => now()->subMinutes(16),
+        ]);
+        $paymentService = Mockery::mock(PaymentService::class);
+        $paymentService->shouldReceive('inspectDirectCryptoPayment')
+            ->once()
+            ->andReturn([
+                'transfer' => null,
+                'mismatches' => [],
+            ]);
+
+        $result = (new DirectCryptoOrderVerifier(
+            $paymentService,
+            app(OrderFulfillmentService::class),
+        ))->verify($order);
+
+        $this->assertSame('cancelled', $result['status']);
+        $this->assertStringContainsString('recovery window', $result['message']);
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertNotNull($order->fresh()->payment_match_key);
+    }
+
+    public function test_payment_confirmed_before_grace_can_be_verified_hours_later(): void
+    {
+        config([
+            'services.crypto_direct.grace_minutes' => 15,
+            'services.crypto_direct.recovery_hours' => 24,
+        ]);
+
+        $order = $this->directCryptoOrder([
+            'status' => 'cancelled',
+            'expired_at' => now()->subHours(3),
+        ]);
+        $paymentService = Mockery::mock(PaymentService::class);
+        $paymentService->shouldReceive('inspectDirectCryptoPayment')
+            ->once()
+            ->andReturn([
+                'transfer' => [
+                    'tx_hash' => '0xrecoveredhourslater',
+                    'network' => 'usdtbsc',
+                    'amount_units' => '1100123000000000000',
+                    'amount' => '1.100123',
+                    'to' => '0x1111111111111111111111111111111111111111',
+                    'confirmed_at' => $order->expired_at->copy()->addMinutes(5),
+                ],
+                'mismatches' => [],
+            ]);
+
+        $result = (new DirectCryptoOrderVerifier(
+            $paymentService,
+            app(OrderFulfillmentService::class),
+        ))->verify($order);
+
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('0xrecoveredhourslater', $order->fresh()->payment_reference);
+    }
+
+    public function test_crypto_order_after_recovery_window_is_not_scanned(): void
+    {
+        config(['services.crypto_direct.recovery_hours' => 24]);
+
+        $order = $this->directCryptoOrder([
+            'status' => 'cancelled',
+            'expired_at' => now()->subHours(25),
         ]);
         $paymentService = Mockery::mock(PaymentService::class);
         $paymentService->shouldNotReceive('inspectDirectCryptoPayment');
@@ -109,9 +173,32 @@ class DirectCryptoOrderVerifierTest extends TestCase
         ))->verify($order);
 
         $this->assertSame('cancelled', $result['status']);
-        $this->assertStringContainsString('expired', $result['message']);
-        $this->assertSame('cancelled', $order->fresh()->status);
-        $this->assertNotNull($order->fresh()->payment_match_key);
+        $this->assertStringContainsString('verification window', $result['message']);
+    }
+
+    public function test_stale_expired_order_cannot_overwrite_a_concurrently_paid_order(): void
+    {
+        config(['services.crypto_direct.recovery_hours' => 24]);
+
+        $order = $this->directCryptoOrder([
+            'expired_at' => now()->subHours(25),
+        ]);
+        $staleOrder = Order::findOrFail($order->id);
+        Order::whereKey($order->id)->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $paymentService = Mockery::mock(PaymentService::class);
+        $paymentService->shouldNotReceive('inspectDirectCryptoPayment');
+
+        $result = (new DirectCryptoOrderVerifier(
+            $paymentService,
+            app(OrderFulfillmentService::class),
+        ))->verify($staleOrder);
+
+        $this->assertSame('paid', $result['status']);
+        $this->assertSame('paid', $order->fresh()->status);
     }
 
     public function test_crypto_payment_within_grace_period_is_still_verified(): void
@@ -189,6 +276,48 @@ class DirectCryptoOrderVerifierTest extends TestCase
         $this->assertSame('pending', $result['status']);
         $this->assertStringContainsString('cannot be matched automatically', $result['message']);
         $this->assertNull($order->fresh()->payment_reference);
+    }
+
+    public function test_expired_cleanup_only_cancels_users_own_orders_and_releases_their_reservation(): void
+    {
+        config(['services.crypto_direct.grace_minutes' => 15]);
+
+        $ownOrder = $this->directCryptoOrder([
+            'expired_at' => now()->subMinutes(16),
+        ]);
+        $otherOrder = Order::create([
+            'order_id' => 'ORDER-OTHER-USER',
+            'product_id' => $ownOrder->product_id,
+            'user_id' => User::factory()->create()->id,
+            'status' => 'pending',
+            'payment_method' => 'crypto',
+            'price' => $ownOrder->price,
+            'package_id' => $ownOrder->package_id,
+            'payment_payload' => $ownOrder->payment_payload,
+            'payment_match_key' => hash('sha256', 'other-user-match-key'),
+            'expired_at' => now()->subMinutes(16),
+        ]);
+
+        foreach ([$ownOrder, $otherOrder] as $index => $order) {
+            LicenseStock::create([
+                'product_id' => $order->product_id,
+                'package_id' => $order->package_id,
+                'license_key' => "EXPIRY-CLEANUP-{$index}",
+                'is_sold' => false,
+            ]);
+            app(StockReservationService::class)->reserve($order);
+        }
+
+        $cancelled = app(DirectCryptoOrderVerifier::class)->cancelExpiredForUser($ownOrder->user_id);
+
+        $this->assertSame(1, $cancelled);
+        $this->assertSame('cancelled', $ownOrder->fresh()->status);
+        $this->assertNull(LicenseStock::where('license_key', 'EXPIRY-CLEANUP-0')->value('reserved_order_id'));
+        $this->assertSame('pending', $otherOrder->fresh()->status);
+        $this->assertSame(
+            $otherOrder->id,
+            LicenseStock::where('license_key', 'EXPIRY-CLEANUP-1')->value('reserved_order_id')
+        );
     }
 
     private function directCryptoOrder(array $overrides = []): Order

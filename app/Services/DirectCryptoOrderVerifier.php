@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\License;
 use App\Models\Order;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,6 +23,32 @@ class DirectCryptoOrderVerifier
 
     public function verify(Order $order): array
     {
+        try {
+            return Cache::lock("payment-verify:crypto:{$order->id}", 120)
+                ->block(0, fn () => $this->verifyUnlocked($order));
+        } catch (LockTimeoutException) {
+            if ($order->exists) {
+                $order->refresh();
+            }
+
+            $payload = [
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'Crypto payment is already being checked. Please wait for the current check to finish.',
+            ];
+
+            return $order->status === 'paid'
+                ? $this->withLicensePayload($payload, $order)
+                : $payload;
+        }
+    }
+
+    private function verifyUnlocked(Order $order): array
+    {
+        if ($order->exists) {
+            $order->refresh();
+        }
+
         if (! $this->isDirectCryptoOrder($order)) {
             return [
                 'order_id' => $order->order_id,
@@ -44,17 +72,34 @@ class DirectCryptoOrderVerifier
             ];
         }
 
-        if ($this->isPastGracePeriod($order)) {
+        if ($this->isPastRecoveryPeriod($order)) {
             if ($order->status === 'pending') {
-                $order->update(['status' => 'cancelled']);
-                $this->stockReservationService->release($order);
+                $order = $this->cancelPendingOrder($order);
+            }
+
+            if ($order->status === 'paid') {
+                return $this->withLicensePayload([
+                    'order_id' => $order->order_id,
+                    'status' => 'paid',
+                ], $order);
             }
 
             return [
                 'order_id' => $order->order_id,
                 'status' => 'cancelled',
-                'message' => 'This crypto invoice has expired. Please contact support if a payment was already sent.',
+                'message' => 'The automatic verification window for this crypto invoice has ended. Please contact support with the transaction receipt.',
             ];
+        }
+
+        if ($order->status === 'pending' && $this->isPastGracePeriod($order)) {
+            $order = $this->cancelPendingOrder($order);
+
+            if ($order->status === 'paid') {
+                return $this->withLicensePayload([
+                    'order_id' => $order->order_id,
+                    'status' => 'paid',
+                ], $order);
+            }
         }
 
         try {
@@ -67,19 +112,13 @@ class DirectCryptoOrderVerifier
 
             if (! $transfer) {
                 $this->rememberInspection($order, $inspection);
-                $token = $this->cryptoToken($order);
-
                 $payload = [
                     'order_id' => $order->order_id,
                     'status' => $order->fresh()->status,
-                    'message' => empty($inspection['mismatches'])
-                        ? 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.'
-                        : "Received {$token} amount does not match this order. Please contact support.",
+                    'message' => $this->isPastGracePeriod($order)
+                        ? 'No qualifying payment confirmed before the invoice deadline was found. You can retry Verify Sent Payment during the recovery window.'
+                        : 'Crypto payment is still being verified. Make sure it was sent to the exact address, exact amount, and selected network. If Binance shows Off-chain Transfer, keep the receipt for support.',
                 ];
-
-                if (! empty($inspection['mismatches'][0])) {
-                    $payload['amount_mismatch'] = $inspection['mismatches'][0];
-                }
 
                 return $payload;
             }
@@ -110,7 +149,7 @@ class DirectCryptoOrderVerifier
                 ];
             }
 
-            if ($this->isPastGracePeriod($lockedOrder)) {
+            if ($this->isPastRecoveryPeriod($lockedOrder)) {
                 if ($lockedOrder->status === 'pending') {
                     $lockedOrder->update(['status' => 'cancelled']);
                     $this->stockReservationService->release($lockedOrder);
@@ -120,7 +159,7 @@ class DirectCryptoOrderVerifier
                 return [
                     'order_id' => $lockedOrder->order_id,
                     'status' => 'cancelled',
-                    'message' => 'This crypto invoice has expired. Please contact support if a payment was already sent.',
+                    'message' => 'The automatic verification window for this crypto invoice has ended. Please contact support with the transaction receipt.',
                 ];
             }
 
@@ -193,10 +232,10 @@ class DirectCryptoOrderVerifier
         $orders = Order::query()
             ->where('payment_method', 'crypto')
             ->whereIn('status', ['pending', 'cancelled'])
-            ->where('created_at', '>', now()->subDay())
+            ->where('created_at', '>', now()->subHours($this->recoveryHours() + 2))
             ->where(function ($query): void {
                 $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>', now()->subMinutes($this->graceMinutes()));
+                    ->orWhere('expired_at', '>', now()->subHours($this->recoveryHours()));
             })
             ->oldest()
             ->limit(max(1, $limit))
@@ -216,14 +255,43 @@ class DirectCryptoOrderVerifier
 
             if (($result['status'] ?? null) === 'paid') {
                 $summary['paid']++;
-            } elseif (! empty($result['amount_mismatch'] ?? null)) {
-                $summary['mismatch']++;
             } else {
                 $summary['pending']++;
             }
         }
 
         return $summary;
+    }
+
+    public function cancelExpiredForUser(int $userId): int
+    {
+        $orders = Order::query()
+            ->where('user_id', $userId)
+            ->where('payment_method', 'crypto')
+            ->where('status', 'pending')
+            ->whereNotNull('expired_at')
+            ->where('expired_at', '<=', now()->subMinutes($this->graceMinutes()))
+            ->get();
+
+        $cancelled = 0;
+
+        foreach ($orders as $order) {
+            DB::transaction(function () use ($order, &$cancelled): void {
+                $lockedOrder = Order::whereKey($order->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $lockedOrder || $lockedOrder->status !== 'pending' || ! $this->isPastGracePeriod($lockedOrder)) {
+                    return;
+                }
+
+                $lockedOrder->update(['status' => 'cancelled']);
+                $this->stockReservationService->release($lockedOrder);
+                $cancelled++;
+            });
+        }
+
+        return $cancelled;
     }
 
     private function rememberInspection(Order $order, array $inspection): void
@@ -234,23 +302,33 @@ class DirectCryptoOrderVerifier
             return;
         }
 
-        $payload['scanner_status'] = empty($inspection['mismatches']) ? 'pending' : 'amount_mismatch';
+        $payload['scanner_status'] = 'pending';
         $payload['last_checked_at'] = now()->toIso8601String();
-
-        if (! empty($inspection['mismatches'])) {
-            $payload['amount_mismatch'] = $inspection['mismatches'][0];
-            $payload['amount_mismatches'] = array_slice($inspection['mismatches'], 0, 5);
-        } else {
-            unset($payload['amount_mismatch'], $payload['amount_mismatches']);
-        }
+        unset($payload['amount_mismatch'], $payload['amount_mismatches']);
 
         if (isset($inspection['last_scanned_block']) && is_numeric($inspection['last_scanned_block'])) {
             $payload['last_scanned_block'] = max(0, (int) $inspection['last_scanned_block']);
         }
 
-        $order->update([
-            'payment_payload' => $payload,
-        ]);
+        DB::transaction(function () use ($order, $payload): void {
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $lockedOrder ||
+                ! in_array($lockedOrder->status, ['pending', 'cancelled'], true) ||
+                filled($lockedOrder->payment_reference)
+            ) {
+                return;
+            }
+
+            $lockedOrder->update([
+                'payment_payload' => $payload,
+            ]);
+        });
+
+        $order->refresh();
     }
 
     private function rememberMatchedTransfer(Order $order, array $transfer, string $reference): void
@@ -307,23 +385,26 @@ class DirectCryptoOrderVerifier
             ($payload['type'] ?? null) === 'direct_crypto';
     }
 
-    private function cryptoToken(Order $order): string
-    {
-        $payload = $order->payment_payload;
-        $token = is_array($payload) ? strtoupper(trim((string) ($payload['token'] ?? 'USDT'))) : 'USDT';
-
-        return $token !== '' ? $token : 'USDT';
-    }
-
     private function graceMinutes(): int
     {
         return max(0, (int) config('services.crypto_direct.grace_minutes', 15));
+    }
+
+    private function recoveryHours(): int
+    {
+        return max(1, (int) config('services.crypto_direct.recovery_hours', 24));
     }
 
     private function isPastGracePeriod(Order $order): bool
     {
         return $order->expired_at &&
             $order->expired_at->copy()->addMinutes($this->graceMinutes())->lte(now());
+    }
+
+    private function isPastRecoveryPeriod(Order $order): bool
+    {
+        return $order->expired_at &&
+            $order->expired_at->copy()->addHours($this->recoveryHours())->lte(now());
     }
 
     private function transferWithinGracePeriod(Order $order, array $transfer): bool
@@ -335,10 +416,25 @@ class DirectCryptoOrderVerifier
         $confirmedAt = $transfer['confirmed_at'] ?? null;
 
         if (! $confirmedAt instanceof \DateTimeInterface) {
-            return ! $this->isPastGracePeriod($order);
+            return false;
         }
 
         return $confirmedAt <= $order->expired_at->copy()->addMinutes($this->graceMinutes());
+    }
+
+    private function cancelPendingOrder(Order $order): Order
+    {
+        $cancelled = Order::whereKey($order->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'cancelled']);
+
+        $freshOrder = $order->fresh();
+
+        if ($cancelled > 0) {
+            $this->stockReservationService->release($freshOrder);
+        }
+
+        return $freshOrder;
     }
 
     private function publicCryptoSyncError(\Exception $error): string

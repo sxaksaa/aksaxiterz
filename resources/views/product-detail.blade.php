@@ -154,6 +154,7 @@
                             data-token="usdc" data-network-value="usdcbsc"
                             data-network-text="BNB Smart Chain (BEP20)">
                             <span class="font-bold text-white">BNB Smart Chain</span>
+                            <span class="crypto-network-badge">Recommended</span>
                             <span class="ml-auto text-xs text-gray-500">BEP20</span>
                         </button>
                     </div>

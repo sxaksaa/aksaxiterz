@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class OrderFulfillmentService
 {
+    public function __construct(
+        private readonly StockReservationService $stockReservationService
+    ) {}
+
     public function fulfill(Order $order): License
     {
         return DB::transaction(function () use ($order): License {
@@ -17,8 +21,10 @@ class OrderFulfillmentService
                 ->lockForUpdate()
                 ->first() ?: $order;
 
+            $this->cancelPendingReplacements($lockedOrder);
+
             if ($license = License::where('order_id', $lockedOrder->order_id)->first()) {
-                $this->markPaid($lockedOrder);
+                $this->markPaidOrder($lockedOrder);
 
                 return $license;
             }
@@ -31,6 +37,18 @@ class OrderFulfillmentService
                 ->first();
 
             if (! $stock) {
+                $stock = LicenseStock::where('product_id', $lockedOrder->product_id)
+                    ->where('package_id', $package->id)
+                    ->available()
+                    ->oldest('created_at')
+                    ->oldest('id')
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if (! $stock) {
+                $this->releaseCompetingReservations($lockedOrder);
+
                 $stock = LicenseStock::where('product_id', $lockedOrder->product_id)
                     ->where('package_id', $package->id)
                     ->available()
@@ -56,7 +74,7 @@ class OrderFulfillmentService
                 'sold_at' => now(),
             ]);
 
-            $this->markPaid($lockedOrder);
+            $this->markPaidOrder($lockedOrder);
 
             return License::create([
                 'user_id' => $lockedOrder->user_id,
@@ -69,6 +87,75 @@ class OrderFulfillmentService
     }
 
     public function markPaid(Order $order): void
+    {
+        DB::transaction(function () use ($order): void {
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->first() ?: $order;
+
+            $this->cancelPendingReplacements($lockedOrder);
+            $this->markPaidOrder($lockedOrder);
+        });
+    }
+
+    private function cancelPendingReplacements(Order $order): void
+    {
+        $replacementId = (int) $order->replaced_by;
+        $visited = [(int) $order->id => true];
+
+        for ($depth = 0; $replacementId > 0 && $depth < 20; $depth++) {
+            if (isset($visited[$replacementId])) {
+                break;
+            }
+
+            $visited[$replacementId] = true;
+            $replacement = Order::whereKey($replacementId)
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $replacement ||
+                (int) $replacement->user_id !== (int) $order->user_id ||
+                (int) $replacement->product_id !== (int) $order->product_id ||
+                (int) $replacement->package_id !== (int) $order->package_id ||
+                ! in_array($replacement->status, ['pending', 'cancelled'], true)
+            ) {
+                break;
+            }
+
+            $replacementId = (int) $replacement->replaced_by;
+
+            if ($replacement->status === 'pending') {
+                $replacement->update(['status' => 'cancelled']);
+            }
+
+            $this->stockReservationService->release($replacement);
+        }
+    }
+
+    private function releaseCompetingReservations(Order $order): void
+    {
+        $competitors = Order::query()
+            ->where('user_id', $order->user_id)
+            ->where('product_id', $order->product_id)
+            ->where('package_id', $order->package_id)
+            ->where('status', 'pending')
+            ->whereKeyNot($order->id)
+            ->whereIn('id', LicenseStock::query()
+                ->select('reserved_order_id')
+                ->where('is_sold', false)
+                ->whereNotNull('reserved_order_id'))
+            ->oldest('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($competitors as $competitor) {
+            $competitor->update(['status' => 'cancelled']);
+            $this->stockReservationService->release($competitor);
+        }
+    }
+
+    private function markPaidOrder(Order $order): void
     {
         $order->update([
             'status' => 'paid',

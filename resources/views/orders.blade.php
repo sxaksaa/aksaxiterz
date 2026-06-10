@@ -55,6 +55,7 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         let lastPolledStatus = null;
         let ordersRefreshing = false;
+        let orderStatusPolling = false;
 
         async function fetchPaymentJson(url, formData) {
             const response = await fetch(url, {
@@ -451,70 +452,81 @@
             }
         });
 
-        setInterval(() => {
-            fetch('/check-order')
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.status) return;
+        setInterval(async () => {
+            if (orderStatusPolling || document.hidden) return;
 
-                    if (data.status === 'pending' && data.payment_method === 'pakasir' && data.order_id) {
-                        syncPakasirOrder(data.order_id).then(result => {
-                            if (result?.status === 'paid') {
-                                window.showAksaPaymentSuccess?.({
-                                    message: 'Your QRIS payment has been verified and your license is ready.',
-                                    licenseKey: result.license_key,
-                                    orderId: result.order_id || data.order_id,
-                                }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
-                                    variant: 'success',
-                                });
-                                refreshOrders();
-                                return;
-                            }
+            orderStatusPolling = true;
 
-                            if (result?.status && result.status !== lastPolledStatus) {
-                                lastPolledStatus = result.status;
-                                refreshOrders();
-                            }
-                        }).catch(() => {});
-                    }
+            try {
+                const response = await fetch('/check-order');
+                const data = await response.json();
 
-                    if (data.can_sync_crypto && data.payment_method === 'crypto' && data.order_id) {
-                        syncCryptoOrder(data.order_id).then(result => {
-                            if (result?.status === 'paid') {
-                                const deliveryPending = result?.delivery_pending === true;
+                if (!data.status) return;
 
-                                window.showAksaPaymentSuccess?.({
-                                    message: result.message || 'Your crypto payment has been verified and your license is ready.',
-                                    licenseKey: result.license_key,
-                                    orderId: result.order_id || data.order_id,
-                                    primaryUrl: deliveryPending ? '/orders' : undefined,
-                                    primaryText: deliveryPending ? 'Open Orders' : undefined,
-                                    copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
-                                    redirectDelay: deliveryPending ? 8000 : undefined,
-                                }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
-                                    variant: 'success',
-                                });
-                                refreshOrders();
-                                return;
-                            }
+                const qrisModalOpen = document.getElementById('aksaQrisModal')?.getAttribute('aria-hidden') === 'false';
+                const cryptoModalOpen = document.getElementById('aksaCryptoModal')?.getAttribute('aria-hidden') === 'false';
 
-                            if (result?.status && result.status !== lastPolledStatus) {
-                                lastPolledStatus = result.status;
-                                refreshOrders();
-                            }
+                if (data.status === 'pending' && data.payment_method === 'pakasir' && data.order_id && !qrisModalOpen) {
+                    const result = await syncPakasirOrder(data.order_id);
+
+                    if (result?.status === 'paid') {
+                        window.showAksaPaymentSuccess?.({
+                            message: 'Your QRIS payment has been verified and your license is ready.',
+                            licenseKey: result.license_key,
+                            orderId: result.order_id || data.order_id,
+                        }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                            variant: 'success',
                         });
+                        refreshOrders();
+                        return;
                     }
 
-                    if (data.status !== lastPolledStatus) {
-                        lastPolledStatus = data.status;
-
-                        if (data.status !== 'pending') {
-                            refreshOrders();
-                        }
+                    if (result?.status && result.status !== lastPolledStatus) {
+                        lastPolledStatus = result.status;
+                        refreshOrders();
                     }
-                })
-                .catch(() => {});
-        }, 5000);
+                }
+
+                if (data.can_sync_crypto && data.payment_method === 'crypto' && data.order_id && !cryptoModalOpen) {
+                    const result = await syncCryptoOrder(data.order_id);
+
+                    if (result?.status === 'paid') {
+                        const deliveryPending = result?.delivery_pending === true;
+
+                        window.showAksaPaymentSuccess?.({
+                            message: result.message || 'Your crypto payment has been verified and your license is ready.',
+                            licenseKey: result.license_key,
+                            orderId: result.order_id || data.order_id,
+                            primaryUrl: deliveryPending ? '/orders' : undefined,
+                            primaryText: deliveryPending ? 'Open Orders' : undefined,
+                            copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                            redirectDelay: deliveryPending ? 8000 : undefined,
+                        }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
+                            variant: 'success',
+                        });
+                        refreshOrders();
+                        return;
+                    }
+
+                    if (result?.status && result.status !== lastPolledStatus) {
+                        lastPolledStatus = result.status;
+                        refreshOrders();
+                    }
+                }
+
+                if (data.status !== lastPolledStatus) {
+                    lastPolledStatus = data.status;
+
+                    if (data.status !== 'pending') {
+                        refreshOrders();
+                    }
+                }
+            } catch (error) {
+                // Polling is best-effort; manual payment checks remain available.
+            } finally {
+                orderStatusPolling = false;
+            }
+        }, 15000);
 
         function updateCountdowns() {
             document.querySelectorAll('.countdown').forEach(el => {

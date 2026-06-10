@@ -12,6 +12,7 @@ use App\Models\License;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\DirectCryptoOrderVerifier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -207,7 +208,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1');
 
     // Check latest order for polling.
-    Route::get('/check-order', function () {
+    Route::get('/check-order', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
+        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
 
         $order = Order::where('user_id', auth()->id())->latest()->first();
 
@@ -233,14 +235,6 @@ Route::middleware('auth')->group(function () {
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
         $cryptoGraceSeconds = max(0, (int) config('services.crypto_direct.grace_minutes', 15)) * 60;
 
-        if (
-            $order->payment_method === 'crypto' &&
-            $remaining <= -$cryptoGraceSeconds &&
-            $order->status === 'pending'
-        ) {
-            $order->update(['status' => 'cancelled']);
-        }
-
         return response()->json([
             'status' => $order->status,
             'remaining' => max(0, (int) $remaining),
@@ -260,13 +254,8 @@ Route::middleware('auth')->group(function () {
     });
 
     // Orders
-    Route::get('/orders', function () {
-
-        Order::where('status', 'pending')
-            ->where('payment_method', 'crypto')
-            ->whereNotNull('expired_at')
-            ->where('expired_at', '<=', now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15))))
-            ->update(['status' => 'cancelled']);
+    Route::get('/orders', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
+        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
 
         $orderStats = [
             'total' => Order::where('user_id', auth()->id())->count(),
@@ -283,12 +272,8 @@ Route::middleware('auth')->group(function () {
         return view('orders', compact('orders', 'orderStats'));
     });
 
-    Route::get('/orders-fragment', function () {
-        Order::where('status', 'pending')
-            ->where('payment_method', 'crypto')
-            ->whereNotNull('expired_at')
-            ->where('expired_at', '<=', now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15))))
-            ->update(['status' => 'cancelled']);
+    Route::get('/orders-fragment', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
+        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
 
         $orders = Order::with(['product', 'package'])
             ->where('user_id', auth()->id())

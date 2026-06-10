@@ -29,11 +29,13 @@ window.renderAksaQrCode = async function(target, value, options = {}) {
 const qrisState = {
     orderId: null,
     pollTimer: null,
+    isChecking: false,
 };
 
 const cryptoState = {
     orderId: null,
     pollTimer: null,
+    isChecking: false,
 };
 
 function csrfToken() {
@@ -141,12 +143,18 @@ function stopQrisPolling() {
         clearInterval(qrisState.pollTimer);
         qrisState.pollTimer = null;
     }
+
+    qrisState.isChecking = false;
 }
 
 function startQrisPolling(orderId) {
     stopQrisPolling();
 
     qrisState.pollTimer = setInterval(async () => {
+        if (qrisState.isChecking || document.hidden) return;
+
+        qrisState.isChecking = true;
+
         try {
             const result = await syncPakasirOrder(orderId);
 
@@ -157,11 +165,15 @@ function startQrisPolling(orderId) {
                     licenseKey: result.license_key,
                     orderId: result.order_id || orderId,
                 });
+            } else if (result?.status && result.status !== 'pending') {
+                stopQrisPolling();
             }
         } catch (error) {
             stopQrisPolling();
+        } finally {
+            qrisState.isChecking = false;
         }
-    }, 5000);
+    }, 15000);
 }
 
 function stopQrisExpiryCountdown() {
@@ -196,12 +208,18 @@ function stopCryptoPolling() {
         clearInterval(cryptoState.pollTimer);
         cryptoState.pollTimer = null;
     }
+
+    cryptoState.isChecking = false;
 }
 
 function startCryptoPolling(orderId) {
     stopCryptoPolling();
 
     cryptoState.pollTimer = setInterval(async () => {
+        if (cryptoState.isChecking || document.hidden) return;
+
+        cryptoState.isChecking = true;
+
         try {
             const result = await syncCryptoOrder(orderId);
 
@@ -218,11 +236,15 @@ function startCryptoPolling(orderId) {
                     copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
                     redirectDelay: deliveryPending ? 8000 : undefined,
                 });
+            } else if (result?.status && result.status !== 'pending') {
+                stopCryptoPolling();
             }
         } catch (error) {
             stopCryptoPolling();
+        } finally {
+            cryptoState.isChecking = false;
         }
-    }, 8000);
+    }, 15000);
 }
 
 function stopCryptoExpiryCountdown() {

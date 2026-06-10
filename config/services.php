@@ -51,11 +51,14 @@ return [
 
     'payments' => [
         'reservation_grace_minutes' => (int) env('PAYMENT_RESERVATION_GRACE_MINUTES', 20),
+        'checkout_lock_ttl_seconds' => 120,
+        'checkout_lock_wait_seconds' => 5,
     ],
 
     'crypto_direct' => [
         'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 60),
         'grace_minutes' => (int) env('CRYPTO_DIRECT_GRACE_MINUTES', 15),
+        'recovery_hours' => (int) env('CRYPTO_DIRECT_RECOVERY_HOURS', 24),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [
             'usdttrc20' => [

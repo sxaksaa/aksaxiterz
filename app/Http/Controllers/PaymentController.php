@@ -4,15 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\License;
 use App\Models\Order;
+use App\Services\CheckoutLockService;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\StockReservationService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PaymentController extends Controller
 {
@@ -20,11 +22,11 @@ class PaymentController extends Controller
 
     public function __construct(
         PaymentService $paymentService,
+        private readonly CheckoutLockService $checkoutLockService,
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
         private readonly PakasirOrderVerifier $pakasirOrderVerifier,
         private readonly StockReservationService $stockReservationService
-    )
-    {
+    ) {
         $this->paymentService = $paymentService;
     }
 
@@ -32,83 +34,83 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        $oldOrder = Order::findOrFail($orderId);
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $orderId, $user) {
+            $oldOrder = Order::findOrFail($orderId);
 
-        if ($oldOrder->user_id !== $user->id) {
-            abort(403);
-        }
+            if ($oldOrder->user_id !== $user->id) {
+                abort(403);
+            }
 
-        if ($oldOrder->status === 'paid') {
-            return back()->withErrors(['msg' => 'Already paid']);
-        }
+            if ($oldOrder->status === 'paid') {
+                return back()->withErrors(['msg' => 'Already paid']);
+            }
 
-        $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
-        $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
+            if ($pendingOrder = $this->activePendingOrder($user->id, $oldOrder->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
+            }
 
-        if (! $this->cancelBeforeReplacement($oldOrder)) {
-            return $this->paymentErrorResponse(
-                $request,
-                'The previous payment could not be closed. Check its status before trying again.',
-                409
-            );
-        }
+            $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
+            $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
 
-        $newOrder = Order::create([
-            'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
-            'user_id' => $user->id,
-            'product_id' => $oldOrder->product_id,
-            'package_id' => $oldOrder->package_id,
-            'status' => 'pending',
-            'payment_method' => $paymentMethod,
-            'price' => $oldOrder->price,
-            'expired_at' => now()->addMinutes(10),
-        ]);
+            if (! $this->cancelBeforeReplacement($oldOrder)) {
+                return $this->paymentErrorResponse(
+                    $request,
+                    'The previous payment could not be closed. Check its status before trying again.',
+                    409
+                );
+            }
 
-        $oldOrder->update(['replaced_by' => $newOrder->id]);
+            $newOrder = Order::create([
+                'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
+                'user_id' => $user->id,
+                'product_id' => $oldOrder->product_id,
+                'package_id' => $oldOrder->package_id,
+                'status' => 'pending',
+                'payment_method' => $paymentMethod,
+                'price' => $oldOrder->price,
+                'expired_at' => now()->addMinutes(10),
+            ]);
 
-        Order::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->where('id', '!=', $newOrder->id)
-            ->update(['status' => 'cancelled']);
+            $oldOrder->update(['replaced_by' => $newOrder->id]);
 
-        try {
-            if ($newOrder->payment_method === 'pakasir') {
+            try {
+                if ($newOrder->payment_method === 'pakasir') {
 
-                $payment = $this->paymentService->createPakasirPayment(
+                    $payment = $this->paymentService->createPakasirPayment(
+                        $user,
+                        $newOrder->product_id,
+                        $newOrder->package_id,
+                        $newOrder
+                    );
+
+                    if ($this->wantsPaymentJson($request)) {
+                        return response()->json($this->pakasirCheckoutPayload($payment['order']));
+                    }
+
+                    return redirect($payment['payment_url']);
+                }
+
+                $payment = $this->paymentService->createCryptoPayment(
                     $user,
                     $newOrder->product_id,
                     $newOrder->package_id,
+                    $cryptoNetwork,
                     $newOrder
                 );
 
                 if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->pakasirCheckoutPayload($payment['order']));
+                    return response()->json($this->cryptoCheckoutPayload($payment['order']));
                 }
 
-                return redirect($payment['payment_url']);
+                return redirect('/orders');
+            } catch (\Exception $e) {
+                $this->cancelPendingOrder($newOrder);
+
+                Log::error('PAY AGAIN ERROR: '.$e->getMessage());
+
+                return $this->paymentErrorResponse($request, $e);
             }
-
-            $payment = $this->paymentService->createCryptoPayment(
-                $user,
-                $newOrder->product_id,
-                $newOrder->package_id,
-                $cryptoNetwork,
-                $newOrder
-            );
-
-            if ($this->wantsPaymentJson($request)) {
-                return response()->json($this->cryptoCheckoutPayload($payment['order']));
-            }
-
-            return redirect('/orders');
-        } catch (\Exception $e) {
-            $newOrder->update(['status' => 'cancelled']);
-            $this->stockReservationService->release($newOrder);
-
-            Log::error('PAY AGAIN ERROR: '.$e->getMessage());
-
-            return $this->paymentErrorResponse($request, $e);
-        }
+        });
     }
 
     /*
@@ -121,36 +123,38 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        if ($pendingOrder = $this->activePendingOrder($user->id)) {
-            return $this->pendingPaymentResponse($request, $pendingOrder);
-        }
-
-        if ($this->hasTooManyRecentOrders($user->id)) {
-            return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
-        }
-
         $request->validate([
             'package_id' => 'required|exists:packages,id',
         ]);
 
-        try {
-            $this->cancelPendingOrders($user->id);
-            $payment = $this->paymentService->createPakasirPayment(
-                $user,
-                $id,
-                $request->package_id
-            );
-
-            if ($this->wantsPaymentJson($request)) {
-                return response()->json($this->pakasirCheckoutPayload($payment['order']));
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $id) {
+            if ($pendingOrder = $this->activePendingOrder($user->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
             }
 
-            return redirect($payment['payment_url']);
-        } catch (\Exception $e) {
-            Log::error('PAKASIR ERROR: '.$e->getMessage());
+            if ($this->hasTooManyRecentOrders($user->id)) {
+                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
+            }
 
-            return $this->paymentErrorResponse($request, $e);
-        }
+            try {
+                $this->cancelPendingOrders($user->id);
+                $payment = $this->paymentService->createPakasirPayment(
+                    $user,
+                    $id,
+                    $request->package_id
+                );
+
+                if ($this->wantsPaymentJson($request)) {
+                    return response()->json($this->pakasirCheckoutPayload($payment['order']));
+                }
+
+                return redirect($payment['payment_url']);
+            } catch (\Exception $e) {
+                Log::error('PAKASIR ERROR: '.$e->getMessage());
+
+                return $this->paymentErrorResponse($request, $e);
+            }
+        });
     }
 
     /*
@@ -239,14 +243,6 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
-        if ($pendingOrder = $this->activePendingOrder($user->id)) {
-            return $this->pendingPaymentResponse($request, $pendingOrder);
-        }
-
-        if ($this->hasTooManyRecentOrders($user->id)) {
-            return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
-        }
-
         $request->validate([
             'package_id' => 'required|exists:packages,id',
             'coin' => [
@@ -257,26 +253,35 @@ class PaymentController extends Controller
             ],
         ]);
 
-        try {
-            $this->cancelPendingOrders($user->id);
-            $payment = $this->paymentService->createCryptoPayment(
-                $user,
-                $productId,
-                $request->package_id,
-                $request->coin
-            );
-
-            if ($this->wantsPaymentJson($request)) {
-                return response()->json($this->cryptoCheckoutPayload($payment['order']));
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $productId) {
+            if ($pendingOrder = $this->activePendingOrder($user->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
             }
 
-            return redirect('/orders');
-        } catch (\Exception $e) {
+            if ($this->hasTooManyRecentOrders($user->id)) {
+                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
+            }
 
-            Log::error('CRYPTO ERROR: '.$e->getMessage());
+            try {
+                $this->cancelPendingOrders($user->id);
+                $payment = $this->paymentService->createCryptoPayment(
+                    $user,
+                    $productId,
+                    $request->package_id,
+                    $request->coin
+                );
 
-            return $this->paymentErrorResponse($request, $e);
-        }
+                if ($this->wantsPaymentJson($request)) {
+                    return response()->json($this->cryptoCheckoutPayload($payment['order']));
+                }
+
+                return redirect('/orders');
+            } catch (\Exception $e) {
+                Log::error('CRYPTO ERROR: '.$e->getMessage());
+
+                return $this->paymentErrorResponse($request, $e);
+            }
+        });
     }
 
     public function cancelOrder(Request $request, $orderId)
@@ -306,17 +311,7 @@ class PaymentController extends Controller
                 }
 
                 if (in_array(($result['provider_status'] ?? null), ['cancelled', 'canceled', 'expired', 'failed'], true)) {
-                    $order->update([
-                        'status' => 'cancelled',
-                        'expired_at' => now(),
-                    ]);
-                    $this->stockReservationService->release($order);
-
-                    return $this->orderActionResponse($request, [
-                        'order_id' => $order->order_id,
-                        'status' => 'cancelled',
-                        'message' => 'Order cancelled. You can start a new checkout now.',
-                    ]);
+                    return $this->cancelOrderResponse($request, $this->cancelPendingOrder($order));
                 }
 
                 return $this->orderActionResponse($request, [
@@ -327,19 +322,7 @@ class PaymentController extends Controller
             }
         }
 
-        if ($order->status !== 'cancelled') {
-            $order->update([
-                'status' => 'cancelled',
-                'expired_at' => now(),
-            ]);
-        }
-        $this->stockReservationService->release($order);
-
-        return $this->orderActionResponse($request, [
-            'order_id' => $order->order_id,
-            'status' => 'cancelled',
-            'message' => 'Order cancelled. You can start a new checkout now.',
-        ]);
+        return $this->cancelOrderResponse($request, $this->cancelPendingOrder($order));
     }
 
     /*
@@ -437,7 +420,7 @@ class PaymentController extends Controller
         if (($payload['status'] ?? null) === 'paid') {
             $orderId = (string) ($payload['order_id'] ?? '');
             $target = $orderId !== ''
-                ? '/licenses?order=' . rawurlencode($orderId) . '#license-' . $orderId
+                ? '/licenses?order='.rawurlencode($orderId).'#license-'.$orderId
                 : '/licenses';
 
             return redirect($target);
@@ -509,8 +492,11 @@ class PaymentController extends Controller
                 continue;
             }
 
-            $order->update(['status' => 'cancelled']);
-            $this->stockReservationService->release($order);
+            $cancelledOrder = $this->cancelPendingOrder($order);
+
+            if ($cancelledOrder->status === 'paid') {
+                throw new \Exception('A previous payment was already completed');
+            }
         }
     }
 
@@ -532,30 +518,87 @@ class PaymentController extends Controller
             }
         }
 
-        if ($order->status !== 'cancelled') {
-            $order->update(['status' => 'cancelled']);
-        }
-
-        $this->stockReservationService->release($order);
-
-        return true;
+        return $this->cancelPendingOrder($order)->status === 'cancelled';
     }
 
-    private function activePendingOrder(int $userId): ?Order
+    private function activePendingOrder(int $userId, ?int $exceptOrderId = null): ?Order
     {
+        $cryptoGraceCutoff = now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15)));
+
         return Order::where('user_id', $userId)
             ->where('status', 'pending')
-            ->where(function ($query) {
+            ->when($exceptOrderId, fn ($query) => $query->whereKeyNot($exceptOrderId))
+            ->where(function ($query) use ($cryptoGraceCutoff) {
                 $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>', now());
+                    ->orWhere(function ($activeCrypto) use ($cryptoGraceCutoff): void {
+                        $activeCrypto->where('payment_method', 'crypto')
+                            ->where('expired_at', '>', $cryptoGraceCutoff);
+                    })
+                    ->orWhere(function ($activePakasir): void {
+                        $activePakasir->where('payment_method', '!=', 'crypto')
+                            ->where('expired_at', '>', now());
+                    });
             })
             ->latest()
             ->first();
     }
 
+    private function cancelPendingOrder(Order $order): Order
+    {
+        $cancelled = Order::whereKey($order->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'cancelled']);
+
+        $freshOrder = $order->fresh();
+
+        if ($cancelled > 0) {
+            $this->stockReservationService->release($freshOrder);
+        }
+
+        return $freshOrder;
+    }
+
+    private function cancelOrderResponse(Request $request, Order $order)
+    {
+        if ($order->status === 'paid') {
+            return $this->syncPaymentResponse($request, $this->withLicensePayload([
+                'order_id' => $order->order_id,
+                'status' => 'paid',
+                'message' => 'Payment was completed before the cancellation finished.',
+            ], $order));
+        }
+
+        if ($order->status !== 'cancelled') {
+            return $this->orderActionResponse($request, [
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'This order could not be cancelled. Please check its latest status.',
+            ], 409);
+        }
+
+        return $this->orderActionResponse($request, [
+            'order_id' => $order->order_id,
+            'status' => 'cancelled',
+            'message' => 'Order cancelled. You can start a new checkout now.',
+        ]);
+    }
+
     private function wantsPaymentJson(Request $request): bool
     {
         return $request->expectsJson() || $request->ajax();
+    }
+
+    private function runCheckoutLocked(Request $request, int $userId, callable $callback)
+    {
+        try {
+            return $this->checkoutLockService->run($userId, $callback);
+        } catch (LockTimeoutException) {
+            return $this->paymentErrorResponse(
+                $request,
+                'Another checkout is being prepared. Please wait a moment and try again.',
+                409
+            );
+        }
     }
 
     private function pendingPaymentResponse(Request $request, Order $order)

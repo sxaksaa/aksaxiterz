@@ -195,7 +195,7 @@ class PaymentServiceTest extends TestCase
         $this->assertSame('2.100123', $transfer['amount'] ?? null);
     }
 
-    public function test_direct_bep20_scanner_reports_amount_mismatch(): void
+    public function test_direct_bep20_scanner_ignores_unattributable_amount_mismatch(): void
     {
         config([
             'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
@@ -224,9 +224,90 @@ class PaymentServiceTest extends TestCase
         $inspection = (new PaymentService)->inspectDirectCryptoPayment($order);
 
         $this->assertNull($inspection['transfer']);
-        $this->assertSame('0xunderpaid', $inspection['mismatches'][0]['tx_hash'] ?? null);
-        $this->assertSame('1.100123', $inspection['mismatches'][0]['expected_amount'] ?? null);
-        $this->assertSame('1', $inspection['mismatches'][0]['received_amount'] ?? null);
+        $this->assertSame([], $inspection['mismatches']);
+    }
+
+    public function test_direct_bep20_scanner_ignores_transfer_without_confirmation_time(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
+            'services.crypto_direct.networks.usdtbsc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdtbsc.rpc_chunk_blocks' => 100,
+        ]);
+
+        Http::fake([
+            'https://bsc-rpc.test' => function ($request) {
+                $method = $request->data()['method'] ?? '';
+
+                if ($method === 'eth_blockNumber') {
+                    return Http::response(['jsonrpc' => '2.0', 'id' => 1, 'result' => '0x64']);
+                }
+
+                if ($method === 'eth_getLogs') {
+                    return Http::response([
+                        'jsonrpc' => '2.0',
+                        'id' => 1,
+                        'result' => [[
+                            'blockNumber' => '0x5f',
+                            'transactionHash' => '0xmissingtime',
+                            'data' => '0x'.str_pad(dechex(1000000000000000000), 64, '0', STR_PAD_LEFT),
+                            'removed' => false,
+                        ]],
+                    ]);
+                }
+
+                return Http::response(['jsonrpc' => '2.0', 'id' => 1, 'result' => []]);
+            },
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-MISSING-TIME',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtbsc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '1.000000',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now();
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertNull($transfer);
+    }
+
+    public function test_pakasir_create_rejects_response_for_a_different_order(): void
+    {
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.api_key' => 'test-key',
+            'services.pakasir.url' => 'https://app.pakasir.test',
+        ]);
+
+        Http::fake([
+            'https://app.pakasir.test/api/transactioncreate/qris' => Http::response([
+                'payment' => [
+                    'project' => 'different-project',
+                    'order_id' => 'WRONG-ORDER',
+                    'amount' => 99999,
+                    'payment_number' => 'WRONG-QR',
+                ],
+            ]),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-EXPECTED',
+            'price' => 10000,
+        ]);
+        $method = new ReflectionMethod(PaymentService::class, 'createPakasirQrisTransaction');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Unable to create Pakasir QRIS payment');
+
+        $method->invoke(new PaymentService, $order);
     }
 
     public function test_direct_bep20_scanner_uses_rpc_logs_without_etherscan(): void
@@ -603,8 +684,7 @@ class PaymentServiceTest extends TestCase
         string $units,
         string $blockNumber = '0x5f',
         bool $removed = false
-    ): callable
-    {
+    ): callable {
         return function ($request) use ($hash, $units, $blockNumber, $removed) {
             $payload = $request->data();
             $method = $payload['method'] ?? '';

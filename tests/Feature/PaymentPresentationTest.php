@@ -57,7 +57,7 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('USDT Address', $html);
     }
 
-    public function test_cancelled_crypto_orders_do_not_render_as_verifying(): void
+    public function test_cancelled_crypto_orders_within_recovery_render_verify_sent_without_address(): void
     {
         $order = $this->fakeOrder([
             'order_id' => 'ORDER-CANCELLED',
@@ -68,11 +68,13 @@ class PaymentPresentationTest extends TestCase
 
         $this->assertStringContainsString('Cancelled', $html);
         $this->assertStringNotContainsString('Verifying', $html);
-        $this->assertStringNotContainsString('data-order-id="ORDER-CANCELLED"', $html);
+        $this->assertStringContainsString('Verify Sent Payment', $html);
+        $this->assertStringContainsString('data-order-id="ORDER-CANCELLED"', $html);
+        $this->assertStringNotContainsString('View Address', $html);
         $this->assertStringNotContainsString('action="/cancel-order/1"', $html);
     }
 
-    public function test_expired_crypto_orders_do_not_render_payment_actions(): void
+    public function test_expired_crypto_orders_within_recovery_render_verify_sent_without_address(): void
     {
         $order = $this->fakeOrder([
             'expired_at' => now()->subSecond(),
@@ -82,6 +84,22 @@ class PaymentPresentationTest extends TestCase
 
         $this->assertStringContainsString('Expired', $html);
         $this->assertStringNotContainsString('View Address', $html);
+        $this->assertStringContainsString('Verify Sent Payment', $html);
+        $this->assertStringContainsString('class="sync-crypto-form"', $html);
+    }
+
+    public function test_crypto_orders_after_recovery_do_not_render_payment_actions(): void
+    {
+        $order = $this->fakeOrder([
+            'status' => 'cancelled',
+            'expired_at' => now()->subHours(25),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringNotContainsString('View Address', $html);
+        $this->assertStringNotContainsString('Verify Sent Payment', $html);
         $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
     }
 

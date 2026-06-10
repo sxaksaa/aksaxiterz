@@ -14,20 +14,27 @@
             $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
             $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
             $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
-            $canSyncCrypto = $isDirectCrypto &&
+            $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
+                ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
+                : null;
+            $isCryptoInvoiceActive = $isDirectCrypto &&
                 $order->status === 'pending' &&
-                $order->expired_at &&
-                $now->lt($order->expired_at);
-            $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
+                (! $order->expired_at || $now->lt($order->expired_at));
+            $isCryptoRecoverable = $isDirectCrypto &&
+                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $cryptoRecoveryEndsAt &&
+                $now->lt($cryptoRecoveryEndsAt);
+            $canSyncCrypto = $isCryptoInvoiceActive || $isCryptoRecoverable;
+            $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
-            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
+            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isCryptoInvoiceActive ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
             $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
             $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
             $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-            $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
+            $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
             $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
             $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
@@ -131,7 +138,7 @@
                         <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
                             @csrf
                             <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
-                                Verify Payment
+                                {{ $isCryptoInvoiceActive ? 'Verify Payment' : 'Verify Sent Payment' }}
                             </button>
                         </form>
                     @elseif ($canContinueCrypto)
@@ -208,20 +215,27 @@
                         $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
                         $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
                         $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
-                        $canSyncCrypto = $isDirectCrypto &&
+                        $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
+                            ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
+                            : null;
+                        $isCryptoInvoiceActive = $isDirectCrypto &&
                             $order->status === 'pending' &&
-                            $order->expired_at &&
-                            $now->lt($order->expired_at);
-                        $isExpired = $order->status === 'pending' && ! $canSyncCrypto && $order->expired_at && $now->gt($order->expired_at);
+                            (! $order->expired_at || $now->lt($order->expired_at));
+                        $isCryptoRecoverable = $isDirectCrypto &&
+                            in_array($order->status, ['pending', 'cancelled'], true) &&
+                            $cryptoRecoveryEndsAt &&
+                            $now->lt($cryptoRecoveryEndsAt);
+                        $canSyncCrypto = $isCryptoInvoiceActive || $isCryptoRecoverable;
+                        $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
-                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($canSyncCrypto ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($canSyncCrypto ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
+                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isCryptoInvoiceActive ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
                         $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
                         $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
                         $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-                        $canOpenCryptoAddress = $isPending && $isDirectCrypto && filled($cryptoPayload['address'] ?? null);
+                        $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
                         $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
                         $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
@@ -308,7 +322,7 @@
                                     <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
-                                            Verify
+                                            {{ $isCryptoInvoiceActive ? 'Verify' : 'Verify Sent' }}
                                         </button>
                                     </form>
                                 @elseif ($canContinueCrypto)

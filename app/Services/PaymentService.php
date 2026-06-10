@@ -66,6 +66,9 @@ class PaymentService
                 'package_id' => $package->id,
                 'expired_at' => now()->addMinutes(10),
             ]);
+        } else {
+            $order->update(['price' => $package->price]);
+            $order->refresh();
         }
 
         $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
@@ -81,8 +84,7 @@ class PaymentService
             ]);
             $this->stockReservationService->reserve($order->fresh());
         } catch (\Exception $e) {
-            $order->update(['status' => 'cancelled']);
-            $this->stockReservationService->release($order);
+            $this->cancelPendingOrder($order);
 
             throw $e;
         }
@@ -209,6 +211,7 @@ class PaymentService
             ]);
 
             $freshOrder = $order->fresh();
+            $this->stockReservationService->reserve($freshOrder);
 
             return [
                 'payment_url' => null,
@@ -219,8 +222,7 @@ class PaymentService
 
             Log::error('CRYPTO ERROR: '.$e->getMessage());
 
-            $order->update(['status' => 'cancelled']);
-            $this->stockReservationService->release($order);
+            $this->cancelPendingOrder($order);
 
             throw $e;
         }
@@ -337,8 +339,6 @@ class PaymentService
 
         $transactions = $response->json('data') ?: [];
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
-        $mismatches = [];
-
         foreach ($transactions as $transaction) {
             if (! is_array($transaction)) {
                 continue;
@@ -350,6 +350,10 @@ class PaymentService
             $value = $this->normalizeDecimalString((string) ($transaction['value'] ?? ''));
             $timestamp = (int) floor(((int) ($transaction['block_timestamp'] ?? 0)) / 1000);
 
+            if ($timestamp <= 0) {
+                continue;
+            }
+
             if (! hash_equals($address, $actualTo)) {
                 continue;
             }
@@ -358,7 +362,7 @@ class PaymentService
                 continue;
             }
 
-            if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
+            if ($createdAtTimestamp && $timestamp < ($createdAtTimestamp - 300)) {
                 continue;
             }
 
@@ -368,7 +372,7 @@ class PaymentService
                 'amount_units' => $value,
                 'amount' => $this->tokenUnitsToDecimal($value, $decimals),
                 'to' => $actualTo,
-                'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
+                'confirmed_at' => Carbon::createFromTimestamp($timestamp),
             ];
 
             if (
@@ -377,18 +381,14 @@ class PaymentService
             ) {
                 return [
                     'transfer' => $transfer,
-                    'mismatches' => $mismatches,
+                    'mismatches' => [],
                 ];
-            }
-
-            if (count($mismatches) < 5) {
-                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
             }
         }
 
         return [
             'transfer' => null,
-            'mismatches' => $mismatches,
+            'mismatches' => [],
         ];
     }
 
@@ -422,7 +422,6 @@ class PaymentService
         $createdAtTimestamp = $this->paymentCreatedAtTimestamp($order->created_at);
         $toTopic = '0x'.str_pad(substr($address, 2), 64, '0', STR_PAD_LEFT);
         $eventTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-        $mismatches = [];
         $oldestBlock = max(0, $latestBlock - $scanBlocks);
         $lastScannedBlock = max(0, (int) ($payload['last_scanned_block'] ?? 0));
         $overlapBlocks = max(1, min(10000, (int) ($network['rpc_overlap_blocks'] ?? 1000)));
@@ -458,7 +457,11 @@ class PaymentService
 
                 $confirmedAt = $this->bscRpcBlockTimestamp($rpcUrl, $blockNumber);
 
-                if ($createdAtTimestamp && $confirmedAt && $confirmedAt->timestamp < ($createdAtTimestamp - 300)) {
+                if (! $confirmedAt) {
+                    continue;
+                }
+
+                if ($createdAtTimestamp && $confirmedAt->timestamp < ($createdAtTimestamp - 300)) {
                     continue;
                 }
 
@@ -477,19 +480,15 @@ class PaymentService
                 ) {
                     return [
                         'transfer' => $transfer,
-                        'mismatches' => $mismatches,
+                        'mismatches' => [],
                     ];
-                }
-
-                if (count($mismatches) < 5) {
-                    $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
                 }
             }
         }
 
         return [
             'transfer' => null,
-            'mismatches' => $mismatches,
+            'mismatches' => [],
             'last_scanned_block' => $latestBlock,
         ];
     }
@@ -538,8 +537,6 @@ class PaymentService
             return null;
         }
 
-        $mismatches = [];
-
         foreach ($deposits as $deposit) {
             if (! is_array($deposit)) {
                 continue;
@@ -551,6 +548,10 @@ class PaymentService
             $timestampMs = (int) (($deposit['completeTime'] ?? null) ?: ($deposit['insertTime'] ?? 0));
             $timestamp = (int) floor($timestampMs / 1000);
 
+            if ($timestamp <= 0) {
+                continue;
+            }
+
             if (
                 strtoupper((string) ($deposit['coin'] ?? '')) !== $token ||
                 (int) ($deposit['status'] ?? -1) !== 1 ||
@@ -561,7 +562,7 @@ class PaymentService
                 continue;
             }
 
-            if ($createdAtTimestamp && $timestamp > 0 && $timestamp < ($createdAtTimestamp - 300)) {
+            if ($createdAtTimestamp && $timestamp < ($createdAtTimestamp - 300)) {
                 continue;
             }
 
@@ -571,7 +572,7 @@ class PaymentService
                 'amount_units' => $value,
                 'amount' => $this->tokenUnitsToDecimal($value, $decimals),
                 'to' => $actualAddress,
-                'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp) : null,
+                'confirmed_at' => Carbon::createFromTimestamp($timestamp),
                 'source' => 'binance_deposit_history',
             ];
 
@@ -581,18 +582,14 @@ class PaymentService
             ) {
                 return [
                     'transfer' => $transfer,
-                    'mismatches' => $mismatches,
+                    'mismatches' => [],
                 ];
-            }
-
-            if (count($mismatches) < 5) {
-                $mismatches[] = $this->directCryptoMismatchPayload($transfer, $payload);
             }
         }
 
         return [
             'transfer' => null,
-            'mismatches' => $mismatches,
+            'mismatches' => [],
         ];
     }
 
@@ -652,10 +649,21 @@ class PaymentService
 
     private function claimDirectCryptoAmount(Order $order, array $network, string $coin, float $baseAmount): float
     {
+        $recoveryHours = max(1, (int) config('services.crypto_direct.recovery_hours', 24));
+
         Order::whereNotNull('payment_match_key')
-            ->where(function ($query): void {
+            ->where(function ($query) use ($recoveryHours): void {
                 $query->where('status', 'paid')
-                    ->orWhere('created_at', '<', now()->subDay());
+                    ->orWhere(function ($expired) use ($recoveryHours): void {
+                        $expired->where('status', 'cancelled')
+                            ->where(function ($deadline) use ($recoveryHours): void {
+                                $deadline->where('expired_at', '<=', now()->subHours($recoveryHours))
+                                    ->orWhere(function ($missingExpiry) use ($recoveryHours): void {
+                                        $missingExpiry->whereNull('expired_at')
+                                            ->where('created_at', '<=', now()->subHours($recoveryHours + 1));
+                                    });
+                            });
+                    });
             })
             ->update(['payment_match_key' => null]);
 
@@ -692,6 +700,17 @@ class PaymentService
         ]));
     }
 
+    private function cancelPendingOrder(Order $order): void
+    {
+        $cancelled = Order::whereKey($order->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'cancelled']);
+
+        if ($cancelled > 0) {
+            $this->stockReservationService->release($order);
+        }
+    }
+
     private function normalizeDirectCryptoPayment(Order $order, array $network, string $coin, float $baseAmount, float $amount, Carbon $expiresAt): array
     {
         return [
@@ -708,24 +727,6 @@ class PaymentService
             'decimals' => (int) ($network['decimals'] ?? 6),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
-        ];
-    }
-
-    private function directCryptoMismatchPayload(array $transfer, array $payload): array
-    {
-        $actualAmount = (string) ($transfer['amount'] ?? '0');
-        $expectedAmount = (string) ($payload['amount'] ?? '0');
-
-        return [
-            'tx_hash' => (string) ($transfer['tx_hash'] ?? ''),
-            'network' => (string) ($payload['network'] ?? $transfer['network'] ?? ''),
-            'expected_amount' => $expectedAmount,
-            'received_amount' => $actualAmount,
-            'difference' => number_format(((float) $actualAmount) - ((float) $expectedAmount), 6, '.', ''),
-            'checked_at' => now()->toIso8601String(),
-            'confirmed_at' => ! empty($transfer['confirmed_at']) && $transfer['confirmed_at'] instanceof \DateTimeInterface
-                ? $transfer['confirmed_at']->format(DATE_ATOM)
-                : null,
         ];
     }
 
@@ -780,8 +781,8 @@ class PaymentService
         $payload = $response->json() ?: [];
         $payment = $payload['payment'] ?? null;
 
-        if (! $response->successful() || ! is_array($payment) || blank($payment['payment_number'] ?? null)) {
-            Log::warning('Pakasir QRIS response missing payment number', [
+        if (! $response->successful() || ! is_array($payment) || ! $this->validPakasirCreatedPayment($order, $payment)) {
+            Log::warning('Pakasir QRIS response does not match the requested order', [
                 'order_id' => $order->order_id,
                 'status' => $response->status(),
                 'body' => $payload ?: $response->body(),
@@ -791,6 +792,21 @@ class PaymentService
         }
 
         return $payment;
+    }
+
+    private function validPakasirCreatedPayment(Order $order, array $payment): bool
+    {
+        $project = $payment['project'] ?? null;
+        $orderId = $payment['order_id'] ?? null;
+        $amount = $payment['amount'] ?? null;
+
+        return is_scalar($project) &&
+            hash_equals((string) config('services.pakasir.slug'), (string) $project) &&
+            is_scalar($orderId) &&
+            hash_equals($order->order_id, (string) $orderId) &&
+            is_numeric($amount) &&
+            $this->idrAmount($amount) === $this->idrAmount($order->price) &&
+            filled($payment['payment_number'] ?? null);
     }
 
     private function normalizePakasirPayment(array $payment): array
