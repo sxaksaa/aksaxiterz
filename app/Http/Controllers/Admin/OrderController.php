@@ -37,6 +37,7 @@ class OrderController extends Controller
             })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
             ->when($request->filled('method'), fn ($query) => $query->where('payment_method', $request->method))
+            ->when($request->delivery === 'incomplete', fn ($query) => $this->deliveryIssues($query))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -46,6 +47,7 @@ class OrderController extends Controller
             'pending' => Order::where('status', 'pending')->count(),
             'paid' => Order::where('status', 'paid')->count(),
             'cancelled' => Order::where('status', 'cancelled')->count(),
+            'delivery_issues' => $this->deliveryIssues(Order::query())->count(),
             'licenses' => License::count(),
         ];
 
@@ -97,5 +99,14 @@ class OrderController extends Controller
         return redirect()
             ->route('admin.orders.show', $order)
             ->with('info', 'License delivery was resynced for this order.');
+    }
+
+    private function deliveryIssues($query)
+    {
+        return $query
+            ->where('status', 'paid')
+            ->whereRaw(
+                '(SELECT COUNT(*) FROM licenses WHERE licenses.order_id = orders.order_id) < COALESCE(orders.quantity, 1)'
+            );
     }
 }

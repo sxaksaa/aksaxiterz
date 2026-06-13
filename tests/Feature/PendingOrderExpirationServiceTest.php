@@ -74,6 +74,54 @@ class PendingOrderExpirationServiceTest extends TestCase
         $this->assertSame(1, LicenseStock::where('reserved_order_id', $qrisOrder->id)->reserved()->count());
     }
 
+    public function test_hard_stale_qris_is_closed_locally_when_provider_no_longer_accepts_cancellation(): void
+    {
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.api_key' => 'test-key',
+            'services.pakasir.url' => 'https://app.pakasir.test',
+            'services.payments.stale_pending_hours' => 24,
+        ]);
+        Http::fake([
+            'https://app.pakasir.test/api/transactioncancel' => Http::response([], 404),
+        ]);
+
+        [$qrisOrder] = $this->orders();
+        $qrisOrder->update([
+            'expired_at' => now()->subHours(25),
+            'payment_payload' => [
+                'payment_number' => '000201010212',
+            ],
+        ]);
+        app(StockReservationService::class)->reserve($qrisOrder);
+
+        app(PendingOrderExpirationService::class)->expire();
+
+        $this->assertSame('cancelled', $qrisOrder->fresh()->status);
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $qrisOrder->id)->count());
+    }
+
+    public function test_expired_legacy_non_pakasir_order_does_not_call_pakasir_cancellation(): void
+    {
+        Http::fake();
+
+        [$legacyOrder] = $this->orders();
+        $legacyOrder->update([
+            'payment_method' => 'midtrans',
+            'expired_at' => now()->subMinute(),
+            'payment_payload' => [
+                'legacy' => true,
+            ],
+        ]);
+        app(StockReservationService::class)->reserve($legacyOrder);
+
+        app(PendingOrderExpirationService::class)->expire();
+
+        $this->assertSame('cancelled', $legacyOrder->fresh()->status);
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $legacyOrder->id)->count());
+        Http::assertNothingSent();
+    }
+
     public function test_expired_qris_is_cancelled_at_provider_before_stock_is_released(): void
     {
         config([

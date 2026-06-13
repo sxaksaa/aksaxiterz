@@ -16,6 +16,7 @@ class ExpirePendingOrdersFromTrafficTest extends TestCase
     {
         config([
             'services.payments.traffic_cleanup_seconds' => 60,
+            'services.payments.traffic_cleanup_limit' => 20,
             'services.payments.traffic_cleanup_cache_store' => 'array',
         ]);
         Cache::store('array')->flush();
@@ -23,7 +24,7 @@ class ExpirePendingOrdersFromTrafficTest extends TestCase
         $service = $this->mock(PendingOrderExpirationService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('expire')
                 ->once()
-                ->with(null, 500)
+                ->with(null, 20)
                 ->andReturn(['cancelled' => 0, 'pakasir' => 0, 'crypto' => 0]);
         });
         $middleware = new ExpirePendingOrdersFromTraffic($service);
@@ -31,5 +32,17 @@ class ExpirePendingOrdersFromTrafficTest extends TestCase
 
         $this->assertSame('ok', $middleware->handle(Request::create('/products'), $next)->getContent());
         $this->assertSame('ok', $middleware->handle(Request::create('/guides'), $next)->getContent());
+    }
+
+    public function test_traffic_cleanup_skips_health_check(): void
+    {
+        $service = $this->mock(PendingOrderExpirationService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('expire');
+        });
+        $middleware = new ExpirePendingOrdersFromTraffic($service);
+
+        $response = $middleware->handle(Request::create('/up'), fn () => new Response('healthy'));
+
+        $this->assertSame('healthy', $response->getContent());
     }
 }

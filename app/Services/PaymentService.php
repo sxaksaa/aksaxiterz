@@ -115,7 +115,7 @@ class PaymentService
 
         $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
 
-        $response = Http::withOptions($this->gatewayHttpOptions())
+        $response = $this->pakasirHttp()
             ->get($baseUrl.'/api/transactiondetail', [
                 'project' => config('services.pakasir.slug'),
                 'amount' => $this->idrAmount($order->price),
@@ -135,7 +135,7 @@ class PaymentService
         $this->ensurePakasirConfigured();
 
         $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
-        $response = Http::withOptions($this->gatewayHttpOptions())
+        $response = $this->pakasirHttp()
             ->asJson()
             ->post($baseUrl.'/api/transactioncancel', [
                 'project' => config('services.pakasir.slug'),
@@ -873,7 +873,7 @@ class PaymentService
     {
         $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
 
-        $response = Http::withOptions($this->gatewayHttpOptions())
+        $response = $this->pakasirHttp()
             ->asJson()
             ->post($baseUrl.'/api/transactioncreate/qris', [
                 'project' => config('services.pakasir.slug'),
@@ -1269,5 +1269,12 @@ class PaymentService
             'proxy' => '',
             'curl' => $this->gatewayCurlOptions(),
         ];
+    }
+
+    private function pakasirHttp()
+    {
+        return Http::withOptions($this->gatewayHttpOptions())
+            ->connectTimeout(3)
+            ->timeout(8);
     }
 }

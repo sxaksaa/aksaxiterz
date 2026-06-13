@@ -79,7 +79,7 @@ class PendingOrderExpirationService
 
     private function closeExpiredPakasirInvoice(Order $order): bool
     {
-        if ($order->payment_method === 'crypto' || ! is_array($order->payment_payload)) {
+        if ($order->payment_method !== 'pakasir' || ! is_array($order->payment_payload)) {
             return true;
         }
 
@@ -94,6 +94,14 @@ class PendingOrderExpirationService
 
             return true;
         } catch (\Throwable $error) {
+            if ($this->isHardStalePakasirOrder($order)) {
+                Log::warning('HARD STALE PAKASIR ORDER CLOSED LOCALLY: '.$error->getMessage(), [
+                    'order_id' => $order->order_id,
+                ]);
+
+                return true;
+            }
+
             $this->stockReservationService->holdFor($order, 1);
 
             Log::warning('EXPIRED PAKASIR CANCELLATION ERROR: '.$error->getMessage(), [
@@ -102,6 +110,18 @@ class PendingOrderExpirationService
 
             return false;
         }
+    }
+
+    private function isHardStalePakasirOrder(Order $order): bool
+    {
+        if ($order->payment_method !== 'pakasir') {
+            return false;
+        }
+
+        $referenceTime = $order->expired_at ?: $order->created_at;
+
+        return $referenceTime &&
+            $referenceTime->copy()->addHours($this->stalePendingHours())->lte(now());
     }
 
     private function shouldExpire(Order $order, $now): bool

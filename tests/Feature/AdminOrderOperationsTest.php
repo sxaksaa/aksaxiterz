@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\OrderFulfillmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
 use Tests\TestCase;
@@ -100,6 +101,36 @@ class AdminOrderOperationsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Resync License');
         $response->assertDontSee('Mark Paid');
+    }
+
+    public function test_admin_can_filter_paid_orders_with_incomplete_delivery(): void
+    {
+        [$admin, $incomplete] = $this->makePendingOrder();
+        $incomplete->update(['status' => 'paid']);
+        $complete = Order::create([
+            'order_id' => 'ORDER-ADMIN-COMPLETE',
+            'user_id' => $incomplete->user_id,
+            'product_id' => $incomplete->product_id,
+            'package_id' => $incomplete->package_id,
+            'status' => 'pending',
+            'payment_method' => 'pakasir',
+            'price' => 10000,
+            'expired_at' => now()->addMinutes(10),
+        ]);
+        LicenseStock::create([
+            'product_id' => $complete->product_id,
+            'package_id' => $complete->package_id,
+            'license_key' => 'TEST-LICENSE-KEY-COMPLETE',
+            'is_sold' => false,
+        ]);
+        app(OrderFulfillmentService::class)->fulfill($complete);
+
+        $this->actingAs($admin)
+            ->get(route('admin.orders.index', ['delivery' => 'incomplete']))
+            ->assertOk()
+            ->assertSee($incomplete->order_id)
+            ->assertDontSee($complete->order_id)
+            ->assertSee('Delivery issues');
     }
 
     public function test_paid_order_with_license_hides_manual_delivery_actions(): void

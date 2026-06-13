@@ -54,6 +54,7 @@ return [
         'reservation_grace_minutes' => (int) env('PAYMENT_RESERVATION_GRACE_MINUTES', 0),
         'stale_pending_hours' => (int) env('PAYMENT_STALE_PENDING_HOURS', 24),
         'traffic_cleanup_seconds' => (int) env('PAYMENT_TRAFFIC_CLEANUP_SECONDS', 30),
+        'traffic_cleanup_limit' => (int) env('PAYMENT_TRAFFIC_CLEANUP_LIMIT', 20),
         'traffic_cleanup_cache_store' => env('PAYMENT_TRAFFIC_CLEANUP_CACHE_STORE', 'file'),
         'checkout_lock_ttl_seconds' => 120,
         'checkout_lock_wait_seconds' => 5,

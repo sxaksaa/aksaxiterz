@@ -13,7 +13,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['total'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Total orders</div>
@@ -30,6 +30,12 @@
                     <div class="text-xl font-semibold text-white">{{ $stats['cancelled'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Cancelled</div>
                 </div>
+                <a href="{{ route('admin.orders.index', ['delivery' => 'incomplete']) }}" class="order-stat transition hover:border-red-500/40">
+                    <div class="text-xl font-semibold {{ $stats['delivery_issues'] > 0 ? 'text-red-300' : 'text-white' }}">
+                        {{ $stats['delivery_issues'] }}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-400">Delivery issues</div>
+                </a>
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['licenses'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Licenses</div>
@@ -51,7 +57,7 @@
 
         <section class="product-section mb-6 fade-up">
             <form id="adminOrderFilterForm" method="GET" action="{{ route('admin.orders.index') }}"
-                class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_0.7fr_0.7fr_auto]">
+                class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_0.65fr_0.65fr_0.65fr_auto]">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
                     <input name="search" value="{{ request('search') }}" class="search-bar w-full"
@@ -74,6 +80,14 @@
                         <option value="">All methods</option>
                         <option value="pakasir" @selected(request('method') === 'pakasir')>QRIS</option>
                         <option value="crypto" @selected(request('method') === 'crypto')>Crypto</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Delivery</span>
+                    <select name="delivery" class="search-bar w-full">
+                        <option value="">All delivery</option>
+                        <option value="incomplete" @selected(request('delivery') === 'incomplete')>Needs attention</option>
                     </select>
                 </label>
 
@@ -112,7 +126,11 @@
                         @forelse ($orders as $order)
                             @php
                                 $isPaid = $order->status === 'paid';
-                                $methodLabel = $order->payment_method === 'crypto' ? 'Crypto' : 'QRIS';
+                                $methodLabel = match ($order->payment_method) {
+                                    'crypto' => 'Crypto',
+                                    'pakasir' => 'QRIS',
+                                    default => ucfirst($order->payment_method ?: 'Legacy'),
+                                };
                                 $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
                                 $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
                             @endphp
@@ -135,7 +153,7 @@
                                 <td class="p-4 text-gray-300">{{ $methodLabel }}</td>
                                 <td class="p-4">
                                     <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
-                                    <div class="mt-1 text-xs text-gray-500">
+                                    <div class="mt-1 text-xs {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-gray-500' }}">
                                         {{ $order->licenses_count }} / {{ $order->quantity }} delivered
                                     </div>
                                 </td>
@@ -175,10 +193,22 @@
                     </div>
 
                     <div class="mt-4 grid gap-2 text-sm text-gray-400">
-                        <div>Method: <span class="font-semibold text-white">{{ $order->payment_method === 'crypto' ? 'Crypto' : 'QRIS' }}</span></div>
+                        <div>Method:
+                            <span class="font-semibold text-white">
+                                {{ match ($order->payment_method) {
+                                    'crypto' => 'Crypto',
+                                    'pakasir' => 'QRIS',
+                                    default => ucfirst($order->payment_method ?: 'Legacy'),
+                                } }}
+                            </span>
+                        </div>
                         <div>Package: <span class="font-semibold text-white">{{ $order->package->name ?? '-' }}</span></div>
                         <div>Quantity: <span class="font-semibold text-white">{{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}</span></div>
-                        <div>Delivery: <span class="font-semibold text-white">{{ $order->licenses_count }} / {{ $order->quantity }} delivered</span></div>
+                        <div>Delivery:
+                            <span class="font-semibold {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-white' }}">
+                                {{ $order->licenses_count }} / {{ $order->quantity }} delivered
+                            </span>
+                        </div>
                     </div>
 
                     <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">Detail</a>
