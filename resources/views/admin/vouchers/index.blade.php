@@ -150,7 +150,8 @@
             <form method="GET" action="{{ route('admin.vouchers.index') }}" class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search code</span>
-                    <input name="search" value="{{ request('search') }}" class="search-bar w-full" placeholder="AKSA10">
+                    <input name="search" value="{{ request('search') }}" class="search-bar w-full"
+                        placeholder="Enter voucher code">
                 </label>
                 <div class="flex gap-2">
                     <button class="btn-footer h-12">Filter</button>
