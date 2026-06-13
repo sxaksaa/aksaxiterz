@@ -5,7 +5,9 @@ use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\VoucherController;
 use App\Models\Category;
 use App\Models\DownloadItem;
 use App\Models\License;
@@ -172,7 +174,6 @@ Route::get('/contact', fn () => $legalPage('contact'))->name('contact');
 Route::get('/product/{product}', function (string $product) {
     $product = Product::with([
         'category',
-        'features',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
         ->withCount('availableLicenseStocks')
@@ -188,6 +189,9 @@ Route::get('/product/{product}', function (string $product) {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
+    Route::post('/voucher/preview', [VoucherController::class, 'preview'])
+        ->middleware('throttle:10,1')
+        ->name('vouchers.preview');
 
     // Pay again
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain'])
@@ -298,14 +302,17 @@ Route::middleware(['auth', 'admin'])
         Route::post('/downloads', [DownloadController::class, 'store'])->name('downloads.store');
         Route::patch('/downloads/{download}', [DownloadController::class, 'update'])->name('downloads.update');
         Route::delete('/downloads/{download}', [DownloadController::class, 'destroy'])->name('downloads.destroy');
+        Route::get('/vouchers', [AdminVoucherController::class, 'index'])->name('vouchers.index');
+        Route::post('/vouchers', [AdminVoucherController::class, 'store'])->name('vouchers.store');
+        Route::patch('/vouchers/{voucher}', [AdminVoucherController::class, 'update'])->name('vouchers.update');
+        Route::delete('/vouchers/{voucher}', [AdminVoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::patch('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-        Route::post('/products/{product}/features', [ProductController::class, 'storeFeature'])->name('products.features.store');
-        Route::patch('/features/{feature}', [ProductController::class, 'updateFeature'])->name('features.update');
-        Route::delete('/features/{feature}', [ProductController::class, 'destroyFeature'])->name('features.destroy');
+        Route::patch('/products/{product}/important-note', [ProductController::class, 'updateImportantNote'])
+            ->name('products.important-note.update');
         Route::post('/products/{product}/packages', [ProductController::class, 'storePackage'])->name('products.packages.store');
         Route::patch('/packages/{package}', [ProductController::class, 'updatePackage'])->name('packages.update');
         Route::delete('/packages/{package}', [ProductController::class, 'destroyPackage'])->name('packages.destroy');

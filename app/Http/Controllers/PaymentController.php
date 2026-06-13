@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
 use App\Services\CheckoutLockService;
@@ -65,6 +66,7 @@ class PaymentController extends Controller
                 'user_id' => $user->id,
                 'product_id' => $oldOrder->product_id,
                 'package_id' => $oldOrder->package_id,
+                'voucher_id' => $oldOrder->voucher_id,
                 'status' => 'pending',
                 'payment_method' => $paymentMethod,
                 'price' => $oldOrder->price,
@@ -125,6 +127,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
+            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $id) {
@@ -141,7 +144,9 @@ class PaymentController extends Controller
                 $payment = $this->paymentService->createPakasirPayment(
                     $user,
                     $id,
-                    $request->package_id
+                    $request->package_id,
+                    null,
+                    $request->string('voucher_code')->toString() ?: null
                 );
 
                 if ($this->wantsPaymentJson($request)) {
@@ -251,6 +256,7 @@ class PaymentController extends Controller
                 'max:20',
                 Rule::in(array_keys(config('services.crypto_direct.networks', []))),
             ],
+            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $productId) {
@@ -268,7 +274,9 @@ class PaymentController extends Controller
                     $user,
                     $productId,
                     $request->package_id,
-                    $request->coin
+                    $request->coin,
+                    null,
+                    $request->string('voucher_code')->toString() ?: null
                 );
 
                 if ($this->wantsPaymentJson($request)) {
@@ -636,7 +644,8 @@ class PaymentController extends Controller
 
         if (
             ! in_array($message, ['Crypto checkout is not configured yet.', 'Invalid crypto amount'], true) &&
-            $error instanceof \Exception
+            $error instanceof \Exception &&
+            ! $error instanceof VoucherException
         ) {
             $message = 'Payment failed';
         }

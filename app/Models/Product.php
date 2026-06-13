@@ -16,6 +16,7 @@ class Product extends Model
         'slug',
         'status',
         'description',
+        'important_note',
     ];
 
     public static function statusOptions(): array
@@ -41,11 +42,6 @@ class Product extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
-    }
-
-    public function features()
-    {
-        return $this->hasMany(Feature::class)->orderBy('id');
     }
 
     public function category()

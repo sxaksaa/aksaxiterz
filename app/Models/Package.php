@@ -12,6 +12,7 @@ class Package extends Model
         'price',
         'price_usdt',
     ];
+
     public function product()
     {
         return $this->belongsTo(Product::class);
@@ -30,5 +31,22 @@ class Package extends Model
     public function availableLicenseStocks()
     {
         return $this->hasMany(LicenseStock::class)->available();
+    }
+
+    public function durationDays(): ?int
+    {
+        if (preg_match('/(\d+)\s*year/i', $this->name, $matches)) {
+            return ((int) $matches[1]) * 365;
+        }
+
+        if (preg_match('/(\d+)\s*month/i', $this->name, $matches)) {
+            return ((int) $matches[1]) * 30;
+        }
+
+        if (preg_match('/(\d+)\s*(?:day|hari)/i', $this->name, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return null;
     }
 }

@@ -5,6 +5,24 @@
         $stock = $product->available_license_stocks_count ?? 0;
         $discordUrl = config('links.discord_url');
         $hasAutoDelivery = $stock > 0;
+        $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
+        $packageSavings = $product->packages->mapWithKeys(function ($package) use ($dailyPackage) {
+            $days = $package->durationDays();
+            $comparisonPrice = $dailyPackage && $days ? ((int) $dailyPackage->price * $days) : 0;
+            $saving = max(0, $comparisonPrice - (int) $package->price);
+
+            return [$package->id => [
+                'days' => $days,
+                'saving' => $saving,
+                'percent' => $comparisonPrice > 0 ? (int) round(($saving / $comparisonPrice) * 100) : 0,
+                'per_day' => $days ? (int) round($package->price / $days) : null,
+            ]];
+        });
+        $bestValuePackageId = $packageSavings
+            ->filter(fn ($saving) => $saving['saving'] > 0)
+            ->sortByDesc('percent')
+            ->keys()
+            ->first();
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10">
@@ -42,17 +60,15 @@
             </div>
         </div>
 
-        <div class="product-section mb-6 fade-up">
-            <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
-                <h3 class="mt-1 text-xl font-semibold text-white">Important Note</h3>
+        @if (filled($product->important_note))
+            <div class="product-section mb-6 fade-up">
+                <div class="mb-4">
+                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
+                    <h3 class="mt-1 text-xl font-semibold text-white">Important Note</h3>
+                </div>
+                <p class="max-w-4xl whitespace-pre-line text-sm leading-6 text-gray-300">{{ $product->important_note }}</p>
             </div>
-            <ul class="grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
-                @foreach ($product->features as $f)
-                    <li class="rounded-lg bg-white/5 px-3 py-2">{{ $f->name }}</li>
-                @endforeach
-            </ul>
-        </div>
+        @endif
 
         <div class="discord-mini-panel mb-8 fade-up">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -175,12 +191,8 @@
                 @php
                     $packageStock = $p->available_license_stocks_count ?? 0;
                     $packageName = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name);
-                    $badge = null;
-                    if (str_contains($p->name, '30') || str_contains($p->name, 'Month')) {
-                        $badge = 'Best Deal';
-                    } elseif (str_contains($p->name, '90')) {
-                        $badge = 'Premium';
-                    }
+                    $saving = $packageSavings[$p->id] ?? null;
+                    $badge = $bestValuePackageId === $p->id ? 'Best Value' : null;
                 @endphp
 
                 <div data-package-card data-price="{{ (float) $p->price }}" data-package-id="{{ $p->id }}"
@@ -200,6 +212,17 @@
                         data-usd="${{ rtrim(rtrim($p->price_usdt, '0'), '.') }}">
                         Rp {{ number_format($p->price) }}
                     </p>
+
+                    @if (($saving['saving'] ?? 0) > 0)
+                        <p class="mt-2 text-xs font-semibold text-emerald-300">
+                            Save Rp {{ number_format($saving['saving']) }} vs daily package
+                        </p>
+                        <p class="mt-1 text-xs text-gray-500">
+                            Rp {{ number_format($saving['per_day']) }}/day · {{ $saving['percent'] }}% better value
+                        </p>
+                    @elseif (($saving['per_day'] ?? null) !== null)
+                        <p class="mt-2 text-xs text-gray-500">Rp {{ number_format($saving['per_day']) }}/day</p>
+                    @endif
 
                     <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-amber-300' }}">
                         {{ $packageStock > 0 ? 'Auto delivery: ' . $packageStock . ' ready' : 'Manual via Discord' }}
@@ -230,9 +253,39 @@
                 <span id="selectedPackage">-</span>
             </div>
 
+            <div class="summary-row mb-2">
+                <span>Subtotal</span>
+                <span id="subtotalPrice">-</span>
+            </div>
+
+            <div class="my-4 rounded-xl border border-[#27272A] bg-black/15 p-4">
+                <label for="voucherCode" class="mb-2 block text-xs font-semibold uppercase tracking-normal text-gray-400">
+                    Voucher Code
+                </label>
+                <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <input id="voucherCode" class="search-bar min-w-0 w-full uppercase" maxlength="50"
+                        placeholder="Enter voucher code" autocomplete="off" spellcheck="false">
+                    <button id="applyVoucherBtn" type="button" class="btn-footer h-12">Apply</button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">
+                    Want a voucher code?
+                    <a href="{{ $discordUrl ?: '#' }}"
+                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                        class="font-semibold text-[#C084FC] hover:text-white {{ $discordUrl ? '' : 'pointer-events-none opacity-50' }}">
+                        Join our Discord server to get promo codes.
+                    </a>
+                </p>
+                <p id="voucherFeedback" class="mt-2 hidden text-xs"></p>
+            </div>
+
+            <div id="voucherDiscountRow" class="summary-row mb-2 hidden">
+                <span id="voucherDiscountLabel">Voucher</span>
+                <span id="voucherDiscountAmount" class="text-emerald-300">-</span>
+            </div>
+
             <div class="summary-row">
                 <span>Total</span>
-                <span id="totalPrice" class="text-[#C084FC]">-</span>
+                <span id="totalPrice" class="font-semibold text-[#C084FC]">-</span>
             </div>
 
             <button id="payMainBtn"
@@ -247,6 +300,7 @@
             <form id="pakasirForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="pakasir_package">
+                <input type="hidden" name="voucher_code" id="pakasir_voucher">
             </form>
 
             <!-- CRYPTO FORM -->
@@ -254,6 +308,7 @@
                 @csrf
                 <input type="hidden" name="package_id" id="crypto_package">
                 <input type="hidden" name="coin" id="crypto_coin">
+                <input type="hidden" name="voucher_code" id="crypto_voucher">
             </form>
         </div>
     </div>
@@ -271,6 +326,9 @@
         let selectedPrice = 0;
         let selectedUsd = 0;
         let selectedPackageStock = 0;
+        let voucherQuote = null;
+        let appliedVoucherCode = null;
+        let voucherRequestSequence = 0;
         let networkDropdownOpen = false;
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
@@ -337,7 +395,15 @@
 
             refreshNetworkAvailability();
             updateAllPrices();
-            updatePrice();
+            if (appliedVoucherCode && type === 'crypto' && !selectedCoin) {
+                voucherQuote = null;
+                setVoucherFeedback('Select a crypto coin and network to check this voucher.', 'loading');
+                updatePrice();
+            } else if (appliedVoucherCode) {
+                refreshVoucher();
+            } else {
+                updatePrice();
+            }
             showSummary();
 
             showToast(
@@ -377,7 +443,11 @@
             document.getElementById('selectedPackage')
                 .innerText = formatPackageName(name);
             refreshNetworkAvailability();
-            updatePrice();
+            if (appliedVoucherCode) {
+                refreshVoucher();
+            } else {
+                updatePrice();
+            }
             showSummary();
 
             const priceText = selectedPayment === 'crypto' ?
@@ -404,15 +474,30 @@
         }
 
         function updatePrice() {
-            let text = '-';
+            let subtotal = '-';
+            let total = '-';
+            let discount = '-';
 
-            if (selectedPayment === 'pakasir')
-                text = "Rp " + selectedPrice.toLocaleString();
+            if (selectedPayment === 'pakasir') {
+                subtotal = formatIdr(selectedPrice);
+                total = voucherQuote ? formatIdr(voucherQuote.final_idr) : subtotal;
+                discount = voucherQuote ? `-${formatIdr(voucherQuote.discount_idr)}` : '-';
+            }
 
-            if (selectedPayment === 'crypto')
-                text = `${formatUsd(selectedUsd)} + unique amount`;
+            if (selectedPayment === 'crypto') {
+                subtotal = formatUsd(selectedUsd);
+                total = `${formatUsd(voucherQuote ? voucherQuote.final_usdt : selectedUsd)} + unique amount`;
+                discount = voucherQuote ? `-${formatUsd(voucherQuote.discount_usdt)}` : '-';
+            }
 
-            document.getElementById('totalPrice').innerText = text;
+            document.getElementById('subtotalPrice').innerText = subtotal;
+            document.getElementById('totalPrice').innerText = total;
+            document.getElementById('voucherDiscountAmount').innerText = discount;
+            document.getElementById('voucherDiscountRow').classList.toggle('hidden', !voucherQuote);
+        }
+
+        function formatIdr(amount) {
+            return `Rp ${Number(amount).toLocaleString('id-ID')}`;
         }
 
         function formatUsd(amount) {
@@ -434,6 +519,197 @@
                 .replace('7 Hari', '7 Days')
                 .replace('30 Hari', '30 Days')
                 .replace('Hari', 'Days');
+        }
+
+        async function requestVoucherQuote(code) {
+            if (!selectedPayment) {
+                throw new Error('Select a payment method before applying a voucher.');
+            }
+
+            if (selectedPayment === 'crypto' && !selectedCoin) {
+                throw new Error('Select a crypto coin and network before applying a voucher.');
+            }
+
+            const body = new FormData();
+            body.set('code', code);
+            body.set('package_id', selectedPackageId);
+            body.set('payment_method', selectedPayment);
+
+            if (selectedCoin) {
+                body.set('coin', selectedCoin);
+            }
+
+            const response = await fetch(@json(route('vouchers.preview')), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body,
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Voucher could not be applied.');
+            }
+
+            return data;
+        }
+
+        function voucherExpiryText(expiresAt) {
+            if (!expiresAt) return '';
+
+            const expiry = new Date(expiresAt);
+
+            if (Number.isNaN(expiry.getTime())) return '';
+
+            return ` Valid until ${expiry.toLocaleString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZoneName: 'short',
+            })}.`;
+        }
+
+        function voucherAppliedMessage(quote) {
+            const saving = quote.payment_method === 'crypto'
+                ? `${formatUsd(quote.discount_usdt)} ${quote.token}`
+                : formatIdr(quote.discount_idr);
+
+            return `${quote.discount_percent}% voucher applied. You save ${saving}.${voucherExpiryText(quote.expires_at)}`;
+        }
+
+        function setVoucherFeedback(message, variant = 'success') {
+            const feedback = document.getElementById('voucherFeedback');
+            feedback.innerText = message;
+            feedback.classList.remove('hidden', 'text-emerald-300', 'text-red-300', 'text-gray-400');
+            feedback.classList.add(variant === 'success' ? 'text-emerald-300' : (variant === 'loading' ? 'text-gray-400' : 'text-red-300'));
+        }
+
+        function clearVoucher(message = null) {
+            voucherRequestSequence++;
+            voucherQuote = null;
+            appliedVoucherCode = null;
+            document.getElementById('pakasir_voucher').value = '';
+            document.getElementById('crypto_voucher').value = '';
+            document.getElementById('voucherDiscountLabel').innerText = 'Voucher';
+            document.getElementById('voucherDiscountRow').classList.add('hidden');
+
+            if (message) {
+                setVoucherFeedback(message, 'error');
+            } else {
+                document.getElementById('voucherFeedback').classList.add('hidden');
+            }
+
+            updatePrice();
+        }
+
+        async function applyVoucher() {
+            if (!isAuthenticated) {
+                requireLogin();
+                return;
+            }
+
+            if (!selectedPackageId) {
+                showToast('Select package', 'Select a package before applying a voucher.', null, 'warning');
+                return;
+            }
+
+            if (!selectedPayment) {
+                showToast('Select payment', 'Select a payment method before applying a voucher.', null, 'warning');
+                return;
+            }
+
+            if (selectedPayment === 'crypto' && !selectedCoin) {
+                showToast('Select crypto network', 'Select a coin and network before applying a voucher.', null, 'warning');
+                return;
+            }
+
+            const code = document.getElementById('voucherCode').value.trim().toUpperCase();
+
+            if (!code) {
+                clearVoucher('Enter a voucher code first.');
+                return;
+            }
+
+            const button = document.getElementById('applyVoucherBtn');
+            const requestSequence = ++voucherRequestSequence;
+            const paymentSnapshot = selectedPayment;
+            const coinSnapshot = selectedCoin;
+            button.disabled = true;
+            button.innerText = 'Checking...';
+
+            try {
+                const quote = await requestVoucherQuote(code);
+
+                if (
+                    requestSequence !== voucherRequestSequence ||
+                    paymentSnapshot !== selectedPayment ||
+                    coinSnapshot !== selectedCoin
+                ) {
+                    return;
+                }
+
+                voucherQuote = quote;
+                appliedVoucherCode = voucherQuote.code;
+                document.getElementById('voucherCode').value = appliedVoucherCode;
+                document.getElementById('pakasir_voucher').value = appliedVoucherCode;
+                document.getElementById('crypto_voucher').value = appliedVoucherCode;
+                document.getElementById('voucherDiscountLabel').innerText = `Voucher ${appliedVoucherCode}`;
+                setVoucherFeedback(voucherAppliedMessage(voucherQuote));
+                updatePrice();
+                showToast('Voucher applied', voucherAppliedMessage(voucherQuote), null, 'success');
+            } catch (error) {
+                if (requestSequence !== voucherRequestSequence) return;
+
+                clearVoucher(error.message || 'Voucher could not be applied.');
+            } finally {
+                button.disabled = false;
+                button.innerText = 'Apply';
+            }
+        }
+
+        async function refreshVoucher() {
+            if (!appliedVoucherCode || !selectedPackageId) return;
+
+            if (selectedPayment === 'crypto' && !selectedCoin) {
+                voucherQuote = null;
+                setVoucherFeedback('Select a crypto coin and network to check this voucher.', 'loading');
+                updatePrice();
+                return;
+            }
+
+            voucherQuote = null;
+            setVoucherFeedback('Checking voucher for the selected package...', 'loading');
+            updatePrice();
+            const requestSequence = ++voucherRequestSequence;
+            const paymentSnapshot = selectedPayment;
+            const coinSnapshot = selectedCoin;
+
+            try {
+                const quote = await requestVoucherQuote(appliedVoucherCode);
+
+                if (
+                    requestSequence !== voucherRequestSequence ||
+                    paymentSnapshot !== selectedPayment ||
+                    coinSnapshot !== selectedCoin
+                ) {
+                    return;
+                }
+
+                voucherQuote = quote;
+                document.getElementById('pakasir_voucher').value = appliedVoucherCode;
+                document.getElementById('crypto_voucher').value = appliedVoucherCode;
+                setVoucherFeedback(voucherAppliedMessage(voucherQuote));
+                updatePrice();
+            } catch (error) {
+                if (requestSequence !== voucherRequestSequence) return;
+
+                clearVoucher(error.message || 'Voucher is not available for this package.');
+            }
         }
 
         /* =========================
@@ -477,6 +753,12 @@
             refreshNetworkAvailability();
             closeNetworkDropdown();
 
+            if (appliedVoucherCode) {
+                voucherQuote = null;
+                setVoucherFeedback('Select a network to check this voucher for crypto.', 'loading');
+                updatePrice();
+            }
+
             showToast('Coin selected', `${token.toUpperCase()} selected. Choose its network next.`, null, 'success');
         }
 
@@ -484,6 +766,10 @@
             selectedCoin = value;
             document.getElementById('selectedNetworkText').innerText = text;
             closeNetworkDropdown();
+
+            if (appliedVoucherCode) {
+                refreshVoucher();
+            }
 
             showToast('Network selected', `${selectedToken.toUpperCase()} on ${text}`, null, 'success');
         }
@@ -569,6 +855,21 @@
                 event.stopPropagation();
                 requestManualOrder(button.dataset.productName || '', button.dataset.packageName || '');
             });
+        });
+
+        document.getElementById('applyVoucherBtn')?.addEventListener('click', applyVoucher);
+        document.getElementById('voucherCode')?.addEventListener('input', (event) => {
+            event.target.value = event.target.value.toUpperCase();
+
+            if (appliedVoucherCode && event.target.value.trim() !== appliedVoucherCode) {
+                clearVoucher();
+            }
+        });
+        document.getElementById('voucherCode')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applyVoucher();
+            }
         });
 
         document.getElementById('payMainBtn').addEventListener('click', async function() {

@@ -22,20 +22,13 @@
 
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
-            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">License Stock</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Add, search, and maintain unsold license keys before they are delivered to customers.
                     </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary">Catalog</a>
-                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary">Orders</a>
-                    <a href="{{ route('admin.users.index') }}" class="btn-footer-secondary">Users</a>
-                    <a href="/licenses" class="btn-footer">Licenses</a>
                 </div>
             </div>
 

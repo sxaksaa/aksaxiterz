@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
-use App\Models\Feature;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
@@ -84,7 +83,6 @@ class ProductController extends Controller
     {
         $product->load([
             'category',
-            'features',
             'packages' => fn ($query) => $query
                 ->withCount(['availableLicenseStocks', 'licenseStocks', 'orders'])
                 ->orderBy('price')
@@ -134,42 +132,21 @@ class ProductController extends Controller
             ->with('info', 'Product deleted.');
     }
 
-    public function storeFeature(Request $request, Product $product)
+    public function updateImportantNote(Request $request, Product $product)
     {
-        $validated = $this->validateFeature($request, $product);
+        $validated = $request->validate([
+            'important_note' => ['nullable', 'string', 'max:5000'],
+        ]);
 
-        $product->features()->create([
-            'name' => $validated['feature_name'],
+        $product->update([
+            'important_note' => filled($validated['important_note'] ?? null)
+                ? trim($validated['important_note'])
+                : null,
         ]);
 
         return redirect()
             ->route('admin.products.edit', $product)
-            ->with('info', 'Feature added.');
-    }
-
-    public function updateFeature(Request $request, Feature $feature)
-    {
-        $feature->load('product');
-        $validated = $this->validateFeature($request, $feature->product, $feature);
-
-        $feature->update([
-            'name' => $validated['feature_name'],
-        ]);
-
-        return redirect()
-            ->route('admin.products.edit', $feature->product)
-            ->with('info', 'Feature updated.');
-    }
-
-    public function destroyFeature(Feature $feature)
-    {
-        $product = $feature->product;
-
-        $feature->delete();
-
-        return redirect()
-            ->route('admin.products.edit', $product)
-            ->with('info', 'Feature deleted.');
+            ->with('info', $product->important_note ? 'Important note updated.' : 'Important note removed.');
     }
 
     public function storePackage(Request $request, Product $product)
@@ -224,20 +201,6 @@ class ProductController extends Controller
             ],
             'description' => ['required', 'string', 'max:1000'],
             'status' => ['required', 'string', Rule::in(array_keys(Product::statusOptions()))],
-        ]);
-    }
-
-    private function validateFeature(Request $request, Product $product, ?Feature $feature = null): array
-    {
-        return $request->validate([
-            'feature_name' => [
-                'required',
-                'string',
-                'max:120',
-                Rule::unique('features', 'name')
-                    ->where('product_id', $product->id)
-                    ->ignore($feature?->id),
-            ],
         ]);
     }
 

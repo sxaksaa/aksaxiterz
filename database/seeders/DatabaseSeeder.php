@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProductSeeder::class,
             PackageSeeder::class,
-            FeatureSeeder::class,
+            ImportantNoteSeeder::class,
             LicenseStockSeeder::class,
         ]);
     }

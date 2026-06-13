@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
-use App\Models\Feature;
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
@@ -58,39 +57,33 @@ class AdminProductCatalogTest extends TestCase
         $this->assertEquals(7.5, (float) $package->price_usdt);
     }
 
-    public function test_admin_can_manage_product_features(): void
+    public function test_admin_can_manage_optional_product_important_note(): void
     {
         [$admin, $product] = $this->makeCatalogProduct();
 
-        $response = $this->actingAs($admin)->post(route('admin.products.features.store', $product), [
-            'feature_name' => 'Setup guide included',
+        $response = $this->actingAs($admin)->patch(route('admin.products.important-note.update', $product), [
+            'important_note' => 'Please turn off Discord activity while using this product.',
         ]);
 
         $response->assertRedirect(route('admin.products.edit', $product));
-        $this->assertDatabaseHas('features', [
-            'product_id' => $product->id,
-            'name' => 'Setup guide included',
-        ]);
+        $this->assertSame(
+            'Please turn off Discord activity while using this product.',
+            $product->fresh()->important_note
+        );
+        $this->get(route('products.show', $product))
+            ->assertOk()
+            ->assertSee('Important Note')
+            ->assertSee('Please turn off Discord activity while using this product.');
 
-        $feature = Feature::where('product_id', $product->id)->firstOrFail();
-
-        $response = $this->actingAs($admin)->patch(route('admin.features.update', $feature), [
-            'feature_name' => 'Priority setup guidance',
+        $response = $this->actingAs($admin)->patch(route('admin.products.important-note.update', $product), [
+            'important_note' => '',
         ]);
 
         $response->assertRedirect(route('admin.products.edit', $product));
-        $this->assertDatabaseHas('features', [
-            'product_id' => $product->id,
-            'name' => 'Priority setup guidance',
-        ]);
-
-        $feature->refresh();
-        $response = $this->actingAs($admin)->delete(route('admin.features.destroy', $feature));
-
-        $response->assertRedirect(route('admin.products.edit', $product));
-        $this->assertDatabaseMissing('features', [
-            'id' => $feature->id,
-        ]);
+        $this->assertNull($product->fresh()->important_note);
+        $this->get(route('products.show', $product))
+            ->assertOk()
+            ->assertDontSee('Important Note');
     }
 
     public function test_admin_cannot_delete_product_with_order_or_stock_history(): void

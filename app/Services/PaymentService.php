@@ -8,6 +8,7 @@ use App\Models\Package;
 use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -16,15 +17,20 @@ class PaymentService
 {
     private StockReservationService $stockReservationService;
 
+    private VoucherService $voucherService;
+
     private const ALLOWED_COINS = [
         'usdttrc20',
         'usdtbsc',
         'usdcbsc',
     ];
 
-    public function __construct(?StockReservationService $stockReservationService = null)
-    {
+    public function __construct(
+        ?StockReservationService $stockReservationService = null,
+        ?VoucherService $voucherService = null
+    ) {
         $this->stockReservationService = $stockReservationService ?: app(StockReservationService::class);
+        $this->voucherService = $voucherService ?: app(VoucherService::class);
     }
 
     public function createPakasir($user, $productId, $packageId, ?Order $order = null)
@@ -32,8 +38,13 @@ class PaymentService
         return $this->createPakasirPayment($user, $productId, $packageId, $order)['payment_url'];
     }
 
-    public function createPakasirPayment($user, $productId, $packageId, ?Order $order = null): array
-    {
+    public function createPakasirPayment(
+        $user,
+        $productId,
+        $packageId,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
         $this->ensurePakasirConfigured();
 
         $product = Product::findOrFail($productId);
@@ -55,21 +66,17 @@ class PaymentService
             throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
         }
 
-        if (! $order) {
-            $order = Order::create([
-                'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
-                'product_id' => $product->id,
-                'user_id' => $user->id,
-                'status' => 'pending',
-                'payment_method' => 'pakasir',
-                'price' => $package->price,
-                'package_id' => $package->id,
-                'expired_at' => now()->addMinutes(10),
-            ]);
-        } else {
-            $order->update(['price' => $package->price]);
-            $order->refresh();
-        }
+        $order = $this->prepareOrder(
+            $user,
+            $product,
+            $package,
+            'pakasir',
+            $order,
+            $voucherCode,
+            now()->addMinutes(10),
+            null,
+            null
+        );
 
         $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
 
@@ -152,8 +159,14 @@ class PaymentService
         return $this->createCryptoPayment($user, $productId, $packageId, $coin, $order)['crypto_payment'];
     }
 
-    public function createCryptoPayment($user, $productId, $packageId, $coin, ?Order $order = null): array
-    {
+    public function createCryptoPayment(
+        $user,
+        $productId,
+        $packageId,
+        $coin,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
         $coin = strtolower($coin);
 
         if (! in_array($coin, self::ALLOWED_COINS, true)) {
@@ -182,22 +195,21 @@ class PaymentService
             throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
         }
 
-        $baseAmount = (float) ($package->price_usdt ?? 0);
         $orderId = $order?->order_id ?: 'ORDER-'.strtoupper(Str::random(10));
         $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 60)));
 
-        if (! $order) {
-            $order = Order::create([
-                'order_id' => $orderId,
-                'product_id' => $product->id,
-                'user_id' => $user->id,
-                'status' => 'pending',
-                'payment_method' => 'crypto',
-                'price' => $baseAmount,
-                'package_id' => $package->id,
-                'expired_at' => $expiresAt,
-            ]);
-        }
+        $order = $this->prepareOrder(
+            $user,
+            $product,
+            $package,
+            'crypto',
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $orderId,
+            $coin
+        );
+        $baseAmount = (float) $order->price;
 
         try {
             $this->stockReservationService->reserve($order);
@@ -709,6 +721,62 @@ class PaymentService
         if ($cancelled > 0) {
             $this->stockReservationService->release($order);
         }
+    }
+
+    private function prepareOrder(
+        $user,
+        Product $product,
+        Package $package,
+        string $paymentMethod,
+        ?Order $order,
+        ?string $voucherCode,
+        Carbon $expiresAt,
+        ?string $orderId = null,
+        ?string $coin = null
+    ): Order {
+        return DB::transaction(function () use (
+            $user,
+            $product,
+            $package,
+            $paymentMethod,
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $orderId,
+            $coin
+        ): Order {
+            $quote = $this->voucherService->quote(
+                $package,
+                $user,
+                $order?->voucher_id ? null : $voucherCode,
+                $order?->voucher_id,
+                $order?->id,
+                true,
+                $paymentMethod,
+                $coin
+            );
+
+            $attributes = [
+                'price' => $this->voucherService->checkoutPrice($quote, $paymentMethod),
+                'voucher_id' => $quote['voucher_id'],
+                'expired_at' => $expiresAt,
+            ];
+
+            if ($order) {
+                $order->update($attributes);
+
+                return $order->fresh();
+            }
+
+            return Order::create($attributes + [
+                'order_id' => $orderId ?: 'ORDER-'.strtoupper(Str::random(10)),
+                'product_id' => $product->id,
+                'user_id' => $user->id,
+                'status' => 'pending',
+                'payment_method' => $paymentMethod,
+                'package_id' => $package->id,
+            ]);
+        });
     }
 
     private function normalizeDirectCryptoPayment(Order $order, array $network, string $coin, float $baseAmount, float $amount, Carbon $expiresAt): array

@@ -10,19 +10,13 @@
 
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
-            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin Catalog</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">{{ $product->name }}</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Update public product details and package prices used by checkout.
                     </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary">Catalog</a>
-                    <a href="{{ route('products.show', $product) }}" class="btn-footer-secondary">View Product</a>
-                    <a href="{{ route('admin.license-stocks.index', ['product_id' => $product->id]) }}" class="btn-footer">Stock</a>
                 </div>
             </div>
 
@@ -111,52 +105,28 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Features</p>
-                <h2 class="mt-1 text-xl font-semibold text-white">Included Features</h2>
+                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
+                <h2 class="mt-1 text-xl font-semibold text-white">Important Note</h2>
+                <p class="mt-2 text-sm leading-6 text-gray-400">
+                    Optional. This note appears on the product page and is hidden completely when empty.
+                </p>
             </div>
 
-            <div class="grid gap-4">
-                @forelse ($product->features as $feature)
-                    <div class="rounded-xl border border-[#27272A] bg-black/15 p-4">
-                        <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-                            <form action="{{ route('admin.features.update', $feature) }}" method="POST"
-                                class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                                @csrf
-                                @method('PATCH')
-
-                                <label class="block">
-                                    <span class="mb-2 block text-xs font-semibold text-gray-400">Feature text</span>
-                                    <input name="feature_name" value="{{ $feature->name }}" class="search-bar w-full"
-                                        required maxlength="120">
-                                </label>
-
-                                <button class="btn-footer h-12">Save</button>
-                            </form>
-
-                            <form action="{{ route('admin.features.destroy', $feature) }}" method="POST"
-                                data-confirm="Delete this feature?">
-                                @csrf
-                                @method('DELETE')
-                                <button class="order-action order-action-danger h-12 w-full md:w-auto">Delete</button>
-                            </form>
-                        </div>
-                    </div>
-                @empty
-                    <div class="empty-state">No features yet</div>
-                @endforelse
-            </div>
-
-            <form action="{{ route('admin.products.features.store', $product) }}" method="POST"
-                class="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <form action="{{ route('admin.products.important-note.update', $product) }}" method="POST"
+                class="grid gap-3">
                 @csrf
+                @method('PATCH')
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">New feature</span>
-                    <input name="feature_name" value="{{ old('feature_name') }}" class="search-bar w-full"
-                        placeholder="Setup guide included" required maxlength="120">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Note shown to customers</span>
+                    <textarea name="important_note" rows="6" maxlength="5000"
+                        class="search-bar min-h-36 w-full resize-y"
+                        placeholder="Write an important note customers should read before purchasing.">{{ old('important_note', $product->important_note) }}</textarea>
                 </label>
 
-                <button class="btn-footer h-12">Add Feature</button>
+                <div>
+                    <button class="btn-footer h-12">Save Important Note</button>
+                </div>
             </form>
         </section>
 

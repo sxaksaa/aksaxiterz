@@ -11,20 +11,13 @@
 
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
-            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Downloads</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Manage public download cards, setup folders, and direct file links shown on the Downloads page.
                     </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="/downloads" class="btn-footer-secondary">Public Page</a>
-                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary">Catalog</a>
-                    <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary">Stock</a>
-                    <a href="{{ route('admin.orders.index') }}" class="btn-footer">Orders</a>
                 </div>
             </div>
 
@@ -77,7 +70,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Name</span>
                     <input name="name" value="{{ old('name', $editDownload->name ?? '') }}" class="search-bar w-full"
-                        placeholder="Aurora-VN" required maxlength="120">
+                        placeholder="Enter download name" required maxlength="120">
                 </label>
 
                 <label class="block lg:col-span-2">

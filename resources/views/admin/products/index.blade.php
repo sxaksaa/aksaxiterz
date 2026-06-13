@@ -8,19 +8,13 @@
 
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
-            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
                 <div>
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Catalog</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Manage product names, descriptions, categories, and package prices.
                     </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary">Stock</a>
-                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary">Orders</a>
-                    <a href="{{ route('admin.users.index') }}" class="btn-footer-secondary">Users</a>
                 </div>
             </div>
 
@@ -68,7 +62,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Product name</span>
                     <input name="name" value="{{ old('name') }}" class="search-bar w-full"
-                        placeholder="Aurora-VN" required maxlength="120">
+                        placeholder="Enter product name" required maxlength="120">
                 </label>
 
                 <label class="block">

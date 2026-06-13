@@ -15,6 +15,7 @@ class Order extends Model
         'payment_method',
         'price',
         'package_id',
+        'voucher_id',
         'payment_url',
         'payment_payload',
         'payment_reference',
@@ -38,6 +39,11 @@ class Order extends Model
     public function package()
     {
         return $this->belongsTo(Package::class);
+    }
+
+    public function voucher()
+    {
+        return $this->belongsTo(Voucher::class);
     }
 
     public function user()
