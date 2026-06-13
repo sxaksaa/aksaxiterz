@@ -28,8 +28,15 @@ class LicenseStock extends Model
             ->where('is_sold', false)
             ->where(function ($query): void {
                 $query->whereNull('reserved_order_id')
-                    ->orWhereNull('reserved_until')
-                    ->orWhere('reserved_until', '<=', now());
+                    ->orWhereDoesntHave('reservedOrder')
+                    ->orWhereHas('reservedOrder', fn ($order) => $order->where('status', 'cancelled'))
+                    ->orWhere(function ($expiredCrypto): void {
+                        $expiredCrypto->where('reserved_until', '<=', now())
+                            ->whereHas('reservedOrder', function ($order): void {
+                                $order->where('status', 'pending')
+                                    ->where('payment_method', 'crypto');
+                            });
+                    });
             });
     }
 
@@ -38,15 +45,40 @@ class LicenseStock extends Model
         return $query
             ->where('is_sold', false)
             ->whereNotNull('reserved_order_id')
-            ->where('reserved_until', '>', now());
+            ->where(function ($query): void {
+                $query->whereHas('reservedOrder', fn ($order) => $order->where('status', 'paid'))
+                    ->orWhereHas('reservedOrder', function ($order): void {
+                        $order->where('status', 'pending')
+                            ->where(function ($method): void {
+                                $method->whereNull('payment_method')
+                                    ->orWhere('payment_method', '!=', 'crypto');
+                            });
+                    })
+                    ->orWhere(function ($activeCrypto): void {
+                        $activeCrypto->where('reserved_until', '>', now())
+                            ->whereHas('reservedOrder', function ($order): void {
+                                $order->where('status', 'pending')
+                                    ->where('payment_method', 'crypto');
+                            });
+                    });
+            });
     }
 
     public function isReserved(): bool
     {
-        return ! $this->is_sold &&
-            filled($this->reserved_order_id) &&
-            $this->reserved_until &&
-            $this->reserved_until->isFuture();
+        if ($this->is_sold || blank($this->reserved_order_id)) {
+            return false;
+        }
+
+        $order = $this->reservedOrder;
+
+        if (! $order || $order->status === 'cancelled') {
+            return false;
+        }
+
+        return $order->status === 'paid' ||
+            $order->payment_method !== 'crypto' ||
+            ($this->reserved_until && $this->reserved_until->isFuture());
     }
 
     public function product()

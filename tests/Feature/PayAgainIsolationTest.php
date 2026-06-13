@@ -50,6 +50,7 @@ class PayAgainIsolationTest extends TestCase
     public function test_pay_again_replaces_only_the_selected_order_when_no_other_order_is_active(): void
     {
         [$user, $oldOrder, $unrelatedOrder] = $this->pendingOrders();
+        $oldOrder->update(['quantity' => 3]);
         $unrelatedOrder->update([
             'status' => 'cancelled',
             'expired_at' => now()->subHour(),
@@ -72,6 +73,7 @@ class PayAgainIsolationTest extends TestCase
         $this->assertSame('cancelled', $oldOrder->fresh()->status);
         $this->assertNotNull($oldOrder->fresh()->replaced_by);
         $this->assertSame('cancelled', $unrelatedOrder->fresh()->status);
+        $this->assertSame(3, Order::findOrFail($oldOrder->fresh()->replaced_by)->quantity);
     }
 
     public function test_new_checkout_is_blocked_while_crypto_order_is_within_grace_period(): void

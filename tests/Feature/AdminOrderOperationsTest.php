@@ -49,6 +49,31 @@ class AdminOrderOperationsTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_deliver_multiple_licenses_for_one_order(): void
+    {
+        [$admin, $order] = $this->makePendingOrder(['quantity' => 2]);
+        LicenseStock::create([
+            'product_id' => $order->product_id,
+            'package_id' => $order->package_id,
+            'license_key' => 'TEST-LICENSE-KEY-SECOND',
+            'is_sold' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.orders.mark-paid', $order))
+            ->assertRedirect(route('admin.orders.show', $order));
+
+        $this->assertSame(2, $order->licenses()->count());
+
+        $this->actingAs($admin)
+            ->get(route('admin.orders.show', $order))
+            ->assertOk()
+            ->assertSee('2 / 2')
+            ->assertSee('TEST-LICENSE-KEY')
+            ->assertSee('TEST-LICENSE-KEY-SECOND')
+            ->assertDontSee('Resync License');
+    }
+
     public function test_admin_order_detail_shows_operations_context(): void
     {
         [$admin, $order] = $this->makePendingOrder();

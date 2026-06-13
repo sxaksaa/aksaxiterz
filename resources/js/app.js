@@ -163,6 +163,7 @@ function startQrisPolling(orderId) {
                 showPaymentSuccess({
                     message: 'Your QRIS payment has been verified and your license is ready.',
                     licenseKey: result.license_key,
+                    licenseKeys: result.license_keys,
                     orderId: result.order_id || orderId,
                 });
             } else if (result?.status && result.status !== 'pending') {
@@ -230,6 +231,7 @@ function startCryptoPolling(orderId) {
                 showPaymentSuccess({
                     message: result.message || 'Your crypto payment has been verified and your license is ready.',
                     licenseKey: result.license_key,
+                    licenseKeys: result.license_keys,
                     orderId: result.order_id || orderId,
                     primaryUrl: deliveryPending ? '/orders' : undefined,
                     primaryText: deliveryPending ? 'Open Orders' : undefined,
@@ -399,6 +401,9 @@ function licenseUrlForOrder(orderId) {
 function showPaymentSuccess(options = {}) {
     const modal = document.getElementById('aksaPaymentSuccessModal');
     const redirectUrl = options.primaryUrl || licenseUrlForOrder(options.orderId);
+    const licenseKeys = Array.isArray(options.licenseKeys)
+        ? options.licenseKeys.filter((key) => typeof key === 'string' && key !== '')
+        : (options.licenseKey ? [options.licenseKey] : []);
 
     if (!modal) {
         window.showAppToast?.('Payment successful', options.message || 'Your payment has been verified.', {
@@ -427,11 +432,15 @@ function showPaymentSuccess(options = {}) {
 
     if (primary) {
         primary.href = redirectUrl;
-        primary.innerText = options.primaryText || 'View License';
+        primary.innerText = options.primaryText || (licenseKeys.length > 1 ? 'View Licenses' : 'View License');
     }
 
     if (copyStatus) {
-        copyStatus.innerText = options.copyStatusText || (options.licenseKey ? 'Copying license key...' : 'License key is ready on My Licenses.');
+        copyStatus.innerText = options.copyStatusText || (
+            licenseKeys.length > 1
+                ? `Copying ${licenseKeys.length} license keys...`
+                : (licenseKeys.length === 1 ? 'Copying license key...' : 'License keys are ready on My Licenses.')
+        );
     }
 
     if (countdown) {
@@ -442,7 +451,7 @@ function showPaymentSuccess(options = {}) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
 
-    copyLicenseKey(options.licenseKey, copyStatus);
+    copyLicenseKeys(licenseKeys, copyStatus);
     startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown);
 
     return true;
@@ -460,28 +469,33 @@ window.closeAksaPaymentSuccessModal = function() {
     document.body.classList.remove('overflow-hidden');
 };
 
-async function copyLicenseKey(licenseKey, statusElement) {
-    if (!licenseKey) return false;
+async function copyLicenseKeys(licenseKeys, statusElement) {
+    if (!licenseKeys.length) return false;
+
+    const copiedValue = licenseKeys.join('\n');
+    const successMessage = licenseKeys.length > 1
+        ? `${licenseKeys.length} license keys copied automatically.`
+        : 'License key copied automatically.';
 
     if (!navigator.clipboard || !window.isSecureContext) {
         if (statusElement) {
-            statusElement.innerText = 'License key is ready on My Licenses.';
+            statusElement.innerText = 'License keys are ready on My Licenses.';
         }
 
         return false;
     }
 
     try {
-        await navigator.clipboard.writeText(licenseKey);
+        await navigator.clipboard.writeText(copiedValue);
 
         if (statusElement) {
-            statusElement.innerText = 'License key copied automatically.';
+            statusElement.innerText = successMessage;
         }
 
         return true;
     } catch (error) {
         if (statusElement) {
-            statusElement.innerText = 'License key is ready on My Licenses.';
+            statusElement.innerText = 'License keys are ready on My Licenses.';
         }
 
         return false;
@@ -594,6 +608,7 @@ document.addEventListener('click', async (event) => {
             showPaymentSuccess({
                 message: 'Your QRIS payment has been verified and your license is ready.',
                 licenseKey: result.license_key,
+                licenseKeys: result.license_keys,
                 orderId: result.order_id || qrisState.orderId,
             });
             return;
@@ -643,6 +658,7 @@ document.addEventListener('click', async (event) => {
             showPaymentSuccess({
                 message: result.message || 'Your crypto payment has been verified and your license is ready.',
                 licenseKey: result.license_key,
+                licenseKeys: result.license_keys,
                 orderId: result.order_id || cryptoState.orderId,
                 primaryUrl: deliveryPending ? '/orders' : undefined,
                 primaryText: deliveryPending ? 'Open Orders' : undefined,

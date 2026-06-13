@@ -96,7 +96,9 @@
 
             <div class="mt-4">
                 <h2 class="text-base font-semibold text-white">{{ $order->product->name ?? '-' }}</h2>
-                <p class="mt-1 text-sm text-gray-400">{{ $order->package->name ?? '-' }}</p>
+                <p class="mt-1 text-sm text-gray-400">
+                    {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
+                </p>
             </div>
 
             <div class="mt-4 grid gap-3 rounded-xl border border-[#27272A] bg-black/20 p-4 text-sm">
@@ -283,7 +285,9 @@
                         </td>
                         <td class="p-4">
                             <div class="font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
-                            <div class="mt-1 text-xs text-gray-500">{{ $order->package->name ?? '-' }}</div>
+                            <div class="mt-1 text-xs text-gray-500">
+                                {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
+                            </div>
                         </td>
                         <td class="p-4">
                             <span class="method-pill {{ $methodClass }}">{{ $methodLabel }}</span>

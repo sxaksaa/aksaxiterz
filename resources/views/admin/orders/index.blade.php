@@ -128,13 +128,15 @@
                                 </td>
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
-                                    <div class="mt-1 text-xs text-gray-500">{{ $order->package->name ?? '-' }}</div>
+                                    <div class="mt-1 text-xs text-gray-500">
+                                        {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
+                                    </div>
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $methodLabel }}</td>
                                 <td class="p-4">
                                     <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
                                     <div class="mt-1 text-xs text-gray-500">
-                                        {{ $order->license ? 'License delivered' : 'No license yet' }}
+                                        {{ $order->licenses_count }} / {{ $order->quantity }} delivered
                                     </div>
                                 </td>
                                 <td class="p-4 text-xs text-gray-300">
@@ -175,7 +177,8 @@
                     <div class="mt-4 grid gap-2 text-sm text-gray-400">
                         <div>Method: <span class="font-semibold text-white">{{ $order->payment_method === 'crypto' ? 'Crypto' : 'QRIS' }}</span></div>
                         <div>Package: <span class="font-semibold text-white">{{ $order->package->name ?? '-' }}</span></div>
-                        <div>License: <span class="font-semibold text-white">{{ $order->license ? 'Delivered' : 'Not delivered' }}</span></div>
+                        <div>Quantity: <span class="font-semibold text-white">{{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}</span></div>
+                        <div>Delivery: <span class="font-semibold text-white">{{ $order->licenses_count }} / {{ $order->quantity }} delivered</span></div>
                     </div>
 
                     <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">Detail</a>

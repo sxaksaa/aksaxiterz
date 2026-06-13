@@ -47,17 +47,21 @@ return [
         'url' => env('PAKASIR_URL', 'https://app.pakasir.com'),
         'return_url' => env('PAKASIR_RETURN_URL'),
         'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
+        'expires_minutes' => (int) env('PAKASIR_EXPIRES_MINUTES', 5),
     ],
 
     'payments' => [
-        'reservation_grace_minutes' => (int) env('PAYMENT_RESERVATION_GRACE_MINUTES', 20),
+        'reservation_grace_minutes' => (int) env('PAYMENT_RESERVATION_GRACE_MINUTES', 0),
+        'stale_pending_hours' => (int) env('PAYMENT_STALE_PENDING_HOURS', 24),
+        'traffic_cleanup_seconds' => (int) env('PAYMENT_TRAFFIC_CLEANUP_SECONDS', 30),
+        'traffic_cleanup_cache_store' => env('PAYMENT_TRAFFIC_CLEANUP_CACHE_STORE', 'file'),
         'checkout_lock_ttl_seconds' => 120,
         'checkout_lock_wait_seconds' => 5,
     ],
 
     'crypto_direct' => [
-        'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 60),
-        'grace_minutes' => (int) env('CRYPTO_DIRECT_GRACE_MINUTES', 15),
+        'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 10),
+        'grace_minutes' => (int) env('CRYPTO_DIRECT_GRACE_MINUTES', 2),
         'recovery_hours' => (int) env('CRYPTO_DIRECT_RECOVERY_HOURS', 24),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [

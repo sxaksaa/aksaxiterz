@@ -340,6 +340,7 @@
                     window.showAksaPaymentSuccess?.({
                         message: 'Your QRIS payment has been verified and your license is ready.',
                         licenseKey: result.license_key,
+                        licenseKeys: result.license_keys,
                         orderId: result.order_id || orderId,
                     }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
                         variant: 'success',
@@ -388,6 +389,7 @@
                     window.showAksaPaymentSuccess?.({
                         message: result.message || 'Your crypto payment has been verified and your license is ready.',
                         licenseKey: result.license_key,
+                        licenseKeys: result.license_keys,
                         orderId: result.order_id || orderId,
                         primaryUrl: deliveryPending ? '/orders' : undefined,
                         primaryText: deliveryPending ? 'Open Orders' : undefined,
@@ -473,6 +475,7 @@
                         window.showAksaPaymentSuccess?.({
                             message: 'Your QRIS payment has been verified and your license is ready.',
                             licenseKey: result.license_key,
+                            licenseKeys: result.license_keys,
                             orderId: result.order_id || data.order_id,
                         }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
                             variant: 'success',
@@ -496,6 +499,7 @@
                         window.showAksaPaymentSuccess?.({
                             message: result.message || 'Your crypto payment has been verified and your license is ready.',
                             licenseKey: result.license_key,
+                            licenseKeys: result.license_keys,
                             orderId: result.order_id || data.order_id,
                             primaryUrl: deliveryPending ? '/orders' : undefined,
                             primaryText: deliveryPending ? 'Open Orders' : undefined,

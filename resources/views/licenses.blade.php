@@ -7,6 +7,7 @@
         $latestLicense = $licenses->first();
         $selectedOrderId = request()->query('order');
         $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
+        $renderedOrderAnchors = [];
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -78,8 +79,12 @@
             @forelse($licenses as $license)
                 @php
                     $licenseOrderId = (string) $license->order_id;
-                    $licenseAnchor = $licenseOrderId !== '' ? 'license-' . $licenseOrderId : 'license-' . $license->id;
+                    $isFirstForOrder = $licenseOrderId !== '' && ! isset($renderedOrderAnchors[$licenseOrderId]);
+                    $licenseAnchor = $licenseOrderId !== ''
+                        ? 'license-' . $licenseOrderId . ($isFirstForOrder ? '' : '-' . $license->id)
+                        : 'license-' . $license->id;
                     $isSelectedLicense = $selectedOrderId !== '' && $licenseOrderId !== '' && hash_equals($selectedOrderId, $licenseOrderId);
+                    $renderedOrderAnchors[$licenseOrderId] = true;
                 @endphp
 
                 <div id="{{ $licenseAnchor }}" class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedLicense ? 'license-card-selected' : '' }}">

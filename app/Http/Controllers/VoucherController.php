@@ -16,6 +16,7 @@ class VoucherController extends Controller
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'payment_method' => ['required', Rule::in(['pakasir', 'crypto'])],
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'coin' => [
                 'nullable',
                 'string',
@@ -26,6 +27,11 @@ class VoucherController extends Controller
         ]);
 
         $package = Package::findOrFail($validated['package_id']);
+        $quantity = (int) ($validated['quantity'] ?? 1);
+
+        if ($quantity > $package->availableLicenseStocks()->count()) {
+            return response()->json(['message' => 'The selected quantity is no longer available.'], 422);
+        }
 
         try {
             $quote = $voucherService->quote(
@@ -36,7 +42,8 @@ class VoucherController extends Controller
                 null,
                 false,
                 $validated['payment_method'],
-                $validated['coin'] ?? null
+                $validated['coin'] ?? null,
+                $quantity
             );
         } catch (VoucherException $error) {
             return response()->json(['message' => $error->getMessage()], 422);

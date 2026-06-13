@@ -17,10 +17,12 @@ class VoucherService
         ?int $excludeOrderId = null,
         bool $lock = false,
         string $paymentMethod = 'pakasir',
-        ?string $coin = null
+        ?string $coin = null,
+        int $quantity = 1
     ): array {
-        $baseIdr = max(0, (int) $package->price);
-        $baseUsdt = max(0, (float) ($package->price_usdt ?? 0));
+        $quantity = max(1, $quantity);
+        $baseIdr = max(0, (int) $package->price) * $quantity;
+        $baseUsdt = round(max(0, (float) ($package->price_usdt ?? 0)) * $quantity, 6);
         $paymentMethod = strtolower($paymentMethod);
 
         if (! in_array($paymentMethod, ['pakasir', 'crypto'], true)) {
@@ -30,7 +32,7 @@ class VoucherService
         $token = $paymentMethod === 'crypto' ? $this->cryptoToken($coin) : null;
 
         if (blank($code) && ! $voucherId) {
-            return $this->emptyQuote($baseIdr, $baseUsdt, $paymentMethod, $token);
+            return $this->emptyQuote($baseIdr, $baseUsdt, $paymentMethod, $token, $quantity);
         }
 
         $query = Voucher::query();
@@ -70,6 +72,7 @@ class VoucherService
             'code' => $voucher->code,
             'payment_method' => $paymentMethod,
             'token' => $token,
+            'quantity' => $quantity,
             'discount_percent' => $voucher->discount_percent,
             'max_discount' => $voucher->max_discount,
             'max_discount_crypto' => $maxDiscountCrypto,
@@ -155,13 +158,14 @@ class VoucherService
             : $voucher->max_discount_usdt));
     }
 
-    private function emptyQuote(int $baseIdr, float $baseUsdt, string $paymentMethod, ?string $token): array
+    private function emptyQuote(int $baseIdr, float $baseUsdt, string $paymentMethod, ?string $token, int $quantity): array
     {
         return [
             'voucher_id' => null,
             'code' => null,
             'payment_method' => $paymentMethod,
             'token' => $token,
+            'quantity' => $quantity,
             'discount_percent' => 0,
             'max_discount' => 0,
             'max_discount_crypto' => 0,

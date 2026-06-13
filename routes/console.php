@@ -3,10 +3,12 @@
 use App\Models\LicenseStock;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
+use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -121,3 +123,31 @@ Artisan::command('orders:release-expired-reservations', function () {
 
     return self::SUCCESS;
 })->purpose('Release expired unsold license stock reservations');
+
+Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending orders to cancel}', function () {
+    $limit = max(1, (int) $this->option('limit'));
+    $summary = app(PendingOrderExpirationService::class)->expire(limit: $limit);
+
+    $this->info('Expired pending order cleanup complete.');
+    $this->line("Cancelled: {$summary['cancelled']}");
+    $this->line("QRIS: {$summary['pakasir']}");
+    $this->line("Crypto: {$summary['crypto']}");
+
+    return self::SUCCESS;
+})->purpose('Cancel expired pending orders and release their reserved license stocks');
+
+Schedule::command('orders:expire-pending --limit=500')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('orders:scan-pakasir --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('orders:scan-crypto --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('orders:release-expired-reservations')
+    ->everyMinute()
+    ->withoutOverlapping();

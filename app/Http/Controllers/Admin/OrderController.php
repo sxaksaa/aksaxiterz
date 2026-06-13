@@ -6,18 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Models\License;
 use App\Models\Order;
 use App\Services\OrderFulfillmentService;
+use App\Services\PendingOrderExpirationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function __construct(private readonly OrderFulfillmentService $orderFulfillmentService)
-    {
-    }
+    public function __construct(
+        private readonly OrderFulfillmentService $orderFulfillmentService,
+        private readonly PendingOrderExpirationService $pendingOrderExpirationService
+    ) {}
 
     public function index(Request $request)
     {
-        $orders = Order::with(['user', 'product', 'package', 'license'])
+        $this->pendingOrderExpirationService->expire(limit: 500);
+
+        $orders = Order::with(['user', 'product', 'package'])
+            ->withCount('licenses')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->search;
 
@@ -49,7 +54,9 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        $order->load(['user', 'product', 'package', 'license']);
+        $this->pendingOrderExpirationService->expire($order->user_id);
+        $order->refresh();
+        $order->load(['user', 'product', 'package', 'licenses']);
 
         return view('admin.orders.show', compact('order'));
     }
@@ -70,7 +77,7 @@ class OrderController extends Controller
 
         return redirect()
             ->route('admin.orders.show', $order)
-            ->with('info', 'Order marked paid and license is visible to the customer.');
+            ->with('info', 'Order marked paid and all available licenses are visible to the customer.');
     }
 
     public function resyncLicense(Order $order)

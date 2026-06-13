@@ -14,7 +14,7 @@ use App\Models\License;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
-use App\Services\DirectCryptoOrderVerifier;
+use App\Services\PendingOrderExpirationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -212,8 +212,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1');
 
     // Check latest order for polling.
-    Route::get('/check-order', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
-        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
+    Route::get('/check-order', function (PendingOrderExpirationService $pendingOrderExpirationService) {
+        $pendingOrderExpirationService->expire((int) auth()->id());
 
         $order = Order::where('user_id', auth()->id())->latest()->first();
 
@@ -237,7 +237,7 @@ Route::middleware('auth')->group(function () {
         }
 
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
-        $cryptoGraceSeconds = max(0, (int) config('services.crypto_direct.grace_minutes', 15)) * 60;
+        $cryptoGraceSeconds = max(0, (int) config('services.crypto_direct.grace_minutes', 2)) * 60;
 
         return response()->json([
             'status' => $order->status,
@@ -252,14 +252,14 @@ Route::middleware('auth')->group(function () {
 
     // License
     Route::get('/licenses', function () {
-        $licenses = License::where('user_id', auth()->id())->latest()->get();
+        $licenses = License::with('product')->where('user_id', auth()->id())->latest()->get();
 
         return view('licenses', compact('licenses'));
     });
 
     // Orders
-    Route::get('/orders', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
-        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
+    Route::get('/orders', function (PendingOrderExpirationService $pendingOrderExpirationService) {
+        $pendingOrderExpirationService->expire((int) auth()->id());
 
         $orderStats = [
             'total' => Order::where('user_id', auth()->id())->count(),
@@ -268,6 +268,7 @@ Route::middleware('auth')->group(function () {
         ];
 
         $orders = Order::with(['product', 'package'])
+            ->withCount('licenses')
             ->where('user_id', auth()->id())
             ->latest()
             ->paginate(8)
@@ -276,10 +277,11 @@ Route::middleware('auth')->group(function () {
         return view('orders', compact('orders', 'orderStats'));
     });
 
-    Route::get('/orders-fragment', function (DirectCryptoOrderVerifier $directCryptoOrderVerifier) {
-        $directCryptoOrderVerifier->cancelExpiredForUser((int) auth()->id());
+    Route::get('/orders-fragment', function (PendingOrderExpirationService $pendingOrderExpirationService) {
+        $pendingOrderExpirationService->expire((int) auth()->id());
 
         $orders = Order::with(['product', 'package'])
+            ->withCount('licenses')
             ->where('user_id', auth()->id())
             ->latest()
             ->paginate(8)

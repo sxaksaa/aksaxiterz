@@ -43,7 +43,8 @@ class PaymentService
         $productId,
         $packageId,
         ?Order $order = null,
-        ?string $voucherCode = null
+        ?string $voucherCode = null,
+        int $quantity = 1
     ): array {
         $this->ensurePakasirConfigured();
 
@@ -57,15 +58,14 @@ class PaymentService
             $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'pakasir');
         }
 
-        $stock = LicenseStock::where('product_id', $product->id)
-            ->where('package_id', $package->id)
-            ->available()
-            ->first();
+        $quantity = $this->checkoutQuantity($order ? (int) $order->quantity : $quantity);
+        $stockCount = $this->availableStockCount($product, $package, $order);
 
-        if (! $stock) {
-            throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
+        if ($stockCount < $quantity) {
+            throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
         }
 
+        $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
         $order = $this->prepareOrder(
             $user,
             $product,
@@ -73,9 +73,10 @@ class PaymentService
             'pakasir',
             $order,
             $voucherCode,
-            now()->addMinutes(10),
+            $localExpiresAt,
             null,
-            null
+            null,
+            $quantity
         );
 
         $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
@@ -84,10 +85,15 @@ class PaymentService
             $this->stockReservationService->reserve($order);
             $payment = $this->createPakasirQrisTransaction($order);
 
+            $providerExpiresAt = $this->pakasirExpiredAt($payment['expired_at'] ?? null);
+            $expiresAt = $providerExpiresAt && $providerExpiresAt->lt($localExpiresAt)
+                ? $providerExpiresAt
+                : $localExpiresAt;
+
             $order->update([
                 'payment_url' => $paymentUrl,
                 'payment_payload' => $this->normalizePakasirPayment($payment),
-                'expired_at' => $this->pakasirExpiredAt($payment['expired_at'] ?? null) ?? $order->expired_at,
+                'expired_at' => $expiresAt,
             ]);
             $this->stockReservationService->reserve($order->fresh());
         } catch (\Exception $e) {
@@ -165,7 +171,8 @@ class PaymentService
         $packageId,
         $coin,
         ?Order $order = null,
-        ?string $voucherCode = null
+        ?string $voucherCode = null,
+        int $quantity = 1
     ): array {
         $coin = strtolower($coin);
 
@@ -186,17 +193,15 @@ class PaymentService
             $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'crypto');
         }
 
-        $stock = LicenseStock::where('product_id', $product->id)
-            ->where('package_id', $package->id)
-            ->available()
-            ->first();
+        $quantity = $this->checkoutQuantity($order ? (int) $order->quantity : $quantity);
+        $stockCount = $this->availableStockCount($product, $package, $order);
 
-        if (! $stock) {
-            throw new \Exception('Automatic delivery is unavailable for this package. Please join Discord to order manually.');
+        if ($stockCount < $quantity) {
+            throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
         }
 
         $orderId = $order?->order_id ?: 'ORDER-'.strtoupper(Str::random(10));
-        $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 60)));
+        $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 10)));
 
         $order = $this->prepareOrder(
             $user,
@@ -207,7 +212,8 @@ class PaymentService
             $voucherCode,
             $expiresAt,
             $orderId,
-            $coin
+            $coin,
+            $quantity
         );
         $baseAmount = (float) $order->price;
 
@@ -732,7 +738,8 @@ class PaymentService
         ?string $voucherCode,
         Carbon $expiresAt,
         ?string $orderId = null,
-        ?string $coin = null
+        ?string $coin = null,
+        int $quantity = 1
     ): Order {
         return DB::transaction(function () use (
             $user,
@@ -743,7 +750,8 @@ class PaymentService
             $voucherCode,
             $expiresAt,
             $orderId,
-            $coin
+            $coin,
+            $quantity
         ): Order {
             $quote = $this->voucherService->quote(
                 $package,
@@ -753,13 +761,15 @@ class PaymentService
                 $order?->id,
                 true,
                 $paymentMethod,
-                $coin
+                $coin,
+                $quantity
             );
 
             $attributes = [
                 'price' => $this->voucherService->checkoutPrice($quote, $paymentMethod),
                 'voucher_id' => $quote['voucher_id'],
                 'expired_at' => $expiresAt,
+                'quantity' => $quantity,
             ];
 
             if ($order) {
@@ -791,6 +801,7 @@ class PaymentService
             'contract' => trim((string) ($network['contract'] ?? '')),
             'amount' => number_format($amount, 6, '.', ''),
             'base_amount' => number_format($baseAmount, 6, '.', ''),
+            'quantity' => (int) $order->quantity,
             'unique_amount' => number_format(max(0, $amount - $baseAmount), 6, '.', ''),
             'decimals' => (int) ($network['decimals'] ?? 6),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
@@ -809,6 +820,31 @@ class PaymentService
         ) {
             throw new \Exception('Invalid order');
         }
+    }
+
+    private function checkoutQuantity(int $quantity): int
+    {
+        if ($quantity < 1) {
+            throw new \Exception('Select at least one license key.');
+        }
+
+        return $quantity;
+    }
+
+    private function availableStockCount(Product $product, Package $package, ?Order $order): int
+    {
+        return LicenseStock::query()
+            ->where('product_id', $product->id)
+            ->where('package_id', $package->id)
+            ->where('is_sold', false)
+            ->where(function ($query) use ($order): void {
+                $query->where(fn ($available) => $available->available());
+
+                if ($order) {
+                    $query->orWhere('reserved_order_id', $order->id);
+                }
+            })
+            ->count();
     }
 
     private function pakasirPaymentUrl(string $orderId, $amount): string

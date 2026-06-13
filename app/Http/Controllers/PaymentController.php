@@ -66,11 +66,15 @@ class PaymentController extends Controller
                 'user_id' => $user->id,
                 'product_id' => $oldOrder->product_id,
                 'package_id' => $oldOrder->package_id,
+                'quantity' => $oldOrder->quantity,
                 'voucher_id' => $oldOrder->voucher_id,
                 'status' => 'pending',
                 'payment_method' => $paymentMethod,
                 'price' => $oldOrder->price,
-                'expired_at' => now()->addMinutes(10),
+                'expired_at' => now()->addMinutes(max(1, (int) config(
+                    $paymentMethod === 'crypto' ? 'services.crypto_direct.expires_minutes' : 'services.pakasir.expires_minutes',
+                    $paymentMethod === 'crypto' ? 10 : 5
+                ))),
             ]);
 
             $oldOrder->update(['replaced_by' => $newOrder->id]);
@@ -127,6 +131,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
 
@@ -146,7 +151,8 @@ class PaymentController extends Controller
                     $id,
                     $request->package_id,
                     null,
-                    $request->string('voucher_code')->toString() ?: null
+                    $request->string('voucher_code')->toString() ?: null,
+                    $request->integer('quantity', 1)
                 );
 
                 if ($this->wantsPaymentJson($request)) {
@@ -250,6 +256,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'coin' => [
                 'required',
                 'string',
@@ -276,7 +283,8 @@ class PaymentController extends Controller
                     $request->package_id,
                     $request->coin,
                     null,
-                    $request->string('voucher_code')->toString() ?: null
+                    $request->string('voucher_code')->toString() ?: null,
+                    $request->integer('quantity', 1)
                 );
 
                 if ($this->wantsPaymentJson($request)) {
@@ -345,6 +353,7 @@ class PaymentController extends Controller
             'method' => 'pakasir',
             'payment_url' => $order->payment_url,
             'order_id' => $order->order_id,
+            'quantity' => (int) $order->quantity,
             'pakasir_payment' => $this->publicPakasirPaymentPayload($order),
         ];
     }
@@ -355,6 +364,7 @@ class PaymentController extends Controller
             'method' => 'crypto',
             'payment_url' => $order->payment_url,
             'order_id' => $order->order_id,
+            'quantity' => (int) $order->quantity,
             'crypto_payment' => $this->publicDirectCryptoPaymentPayload($order),
         ];
     }
@@ -375,6 +385,7 @@ class PaymentController extends Controller
             'payment_number' => (string) $payload['payment_number'],
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
             'remaining_seconds' => $this->remainingSeconds($order),
+            'quantity' => (int) $order->quantity,
         ];
     }
 
@@ -398,6 +409,7 @@ class PaymentController extends Controller
             'unique_amount' => (string) ($payload['unique_amount'] ?? ''),
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
             'remaining_seconds' => $this->remainingSeconds($order),
+            'quantity' => (int) $order->quantity,
         ];
     }
 
@@ -446,13 +458,16 @@ class PaymentController extends Controller
             return $payload;
         }
 
-        $license = License::where('order_id', $order->order_id)->first();
+        $licenses = License::where('order_id', $order->order_id)->oldest('id')->get();
+        $payload['quantity'] = max(1, (int) $order->quantity);
+        $payload['delivered_count'] = $licenses->count();
 
-        if (! $license) {
+        if ($licenses->isEmpty()) {
             return $payload;
         }
 
-        $payload['license_key'] = $license->license_key;
+        $payload['license_key'] = $licenses->first()->license_key;
+        $payload['license_keys'] = $licenses->pluck('license_key')->all();
 
         return $payload;
     }
@@ -494,7 +509,7 @@ class PaymentController extends Controller
                 $order->expired_at &&
                 $order->expired_at
                     ->copy()
-                    ->addMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15)))
+                    ->addMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 2)))
                     ->isFuture()
             ) {
                 continue;
@@ -531,7 +546,7 @@ class PaymentController extends Controller
 
     private function activePendingOrder(int $userId, ?int $exceptOrderId = null): ?Order
     {
-        $cryptoGraceCutoff = now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 15)));
+        $cryptoGraceCutoff = now()->subMinutes(max(0, (int) config('services.crypto_direct.grace_minutes', 2)));
 
         return Order::where('user_id', $userId)
             ->where('status', 'pending')

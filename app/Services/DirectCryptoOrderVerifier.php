@@ -204,9 +204,9 @@ class DirectCryptoOrderVerifier
                 'tx_hash' => $transfer['tx_hash'] ?? null,
             ], $lockedOrder);
 
-            if ($deliveryPending && empty($payload['license_key'] ?? null)) {
+            if ($deliveryPending && ($payload['delivered_count'] ?? 0) < ($payload['quantity'] ?? 1)) {
                 $payload['delivery_pending'] = true;
-                $payload['message'] = 'Payment is verified, but automatic license delivery is not ready for this package. Please join Discord for manual delivery.';
+                $payload['message'] = 'Payment is verified, but automatic delivery could not provide every license key. Please join Discord for manual delivery.';
             }
 
             return $payload;
@@ -367,10 +367,13 @@ class DirectCryptoOrderVerifier
             return $payload;
         }
 
-        $license = License::where('order_id', $order->order_id)->first();
+        $licenses = License::where('order_id', $order->order_id)->oldest('id')->get();
+        $payload['quantity'] = max(1, (int) $order->quantity);
+        $payload['delivered_count'] = $licenses->count();
 
-        if ($license) {
-            $payload['license_key'] = $license->license_key;
+        if ($licenses->isNotEmpty()) {
+            $payload['license_key'] = $licenses->first()->license_key;
+            $payload['license_keys'] = $licenses->pluck('license_key')->all();
         }
 
         return $payload;
@@ -387,7 +390,7 @@ class DirectCryptoOrderVerifier
 
     private function graceMinutes(): int
     {
-        return max(0, (int) config('services.crypto_direct.grace_minutes', 15));
+        return max(0, (int) config('services.crypto_direct.grace_minutes', 2));
     }
 
     private function recoveryHours(): int

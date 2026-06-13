@@ -254,6 +254,20 @@
             </div>
 
             <div class="summary-row mb-2">
+                <span>
+                    Quantity
+                    <small id="quantityLimit" class="ml-1 text-gray-500">Max: -</small>
+                </span>
+                <div class="quantity-stepper" aria-label="License quantity">
+                    <button id="quantityMinus" type="button" class="quantity-stepper-button" aria-label="Decrease quantity"
+                        disabled>-</button>
+                    <output id="quantityValue" class="quantity-stepper-value" aria-live="polite">1</output>
+                    <button id="quantityPlus" type="button" class="quantity-stepper-button" aria-label="Increase quantity"
+                        disabled>+</button>
+                </div>
+            </div>
+
+            <div class="summary-row mb-2">
                 <span>Subtotal</span>
                 <span id="subtotalPrice">-</span>
             </div>
@@ -300,6 +314,7 @@
             <form id="pakasirForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="pakasir_package">
+                <input type="hidden" name="quantity" id="pakasir_quantity" value="1">
                 <input type="hidden" name="voucher_code" id="pakasir_voucher">
             </form>
 
@@ -307,6 +322,7 @@
             <form id="cryptoForm" method="POST" action="/pay-crypto/{{ $product->id }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="crypto_package">
+                <input type="hidden" name="quantity" id="crypto_quantity" value="1">
                 <input type="hidden" name="coin" id="crypto_coin">
                 <input type="hidden" name="voucher_code" id="crypto_voucher">
             </form>
@@ -326,6 +342,7 @@
         let selectedPrice = 0;
         let selectedUsd = 0;
         let selectedPackageStock = 0;
+        let selectedQuantity = 1;
         let voucherQuote = null;
         let appliedVoucherCode = null;
         let voucherRequestSequence = 0;
@@ -434,6 +451,8 @@
             selectedPrice = price;
             selectedUsd = usd;
             selectedPackageStock = stock;
+            selectedQuantity = 1;
+            refreshQuantityOptions();
 
             document.querySelectorAll('.package')
                 .forEach(el => el.classList.remove('active'));
@@ -477,16 +496,18 @@
             let subtotal = '-';
             let total = '-';
             let discount = '-';
+            const subtotalIdr = selectedPrice * selectedQuantity;
+            const subtotalUsd = selectedUsd * selectedQuantity;
 
             if (selectedPayment === 'pakasir') {
-                subtotal = formatIdr(selectedPrice);
+                subtotal = formatIdr(subtotalIdr);
                 total = voucherQuote ? formatIdr(voucherQuote.final_idr) : subtotal;
                 discount = voucherQuote ? `-${formatIdr(voucherQuote.discount_idr)}` : '-';
             }
 
             if (selectedPayment === 'crypto') {
-                subtotal = formatUsd(selectedUsd);
-                total = `${formatUsd(voucherQuote ? voucherQuote.final_usdt : selectedUsd)} + unique amount`;
+                subtotal = formatUsd(subtotalUsd);
+                total = `${formatUsd(voucherQuote ? voucherQuote.final_usdt : subtotalUsd)} + unique amount`;
                 discount = voucherQuote ? `-${formatUsd(voucherQuote.discount_usdt)}` : '-';
             }
 
@@ -521,6 +542,31 @@
                 .replace('Hari', 'Days');
         }
 
+        function refreshQuantityOptions() {
+            const maxQuantity = Math.max(1, selectedPackageStock);
+            const minusButton = document.getElementById('quantityMinus');
+            const plusButton = document.getElementById('quantityPlus');
+
+            selectedQuantity = Math.min(selectedQuantity, maxQuantity);
+            document.getElementById('quantityValue').innerText = selectedQuantity;
+            document.getElementById('quantityLimit').innerText = `Max: ${selectedPackageStock}`;
+            minusButton.disabled = !selectedPackageId || selectedQuantity <= 1;
+            plusButton.disabled = !selectedPackageId || selectedPackageStock <= 0 || selectedQuantity >= maxQuantity;
+            document.getElementById('pakasir_quantity').value = selectedQuantity;
+            document.getElementById('crypto_quantity').value = selectedQuantity;
+        }
+
+        function changeQuantity(change) {
+            selectedQuantity = Math.max(1, Math.min(selectedPackageStock, selectedQuantity + change));
+            refreshQuantityOptions();
+
+            if (appliedVoucherCode) {
+                refreshVoucher();
+            } else {
+                updatePrice();
+            }
+        }
+
         async function requestVoucherQuote(code) {
             if (!selectedPayment) {
                 throw new Error('Select a payment method before applying a voucher.');
@@ -534,6 +580,7 @@
             body.set('code', code);
             body.set('package_id', selectedPackageId);
             body.set('payment_method', selectedPayment);
+            body.set('quantity', selectedQuantity);
 
             if (selectedCoin) {
                 body.set('coin', selectedCoin);
@@ -639,6 +686,7 @@
             const requestSequence = ++voucherRequestSequence;
             const paymentSnapshot = selectedPayment;
             const coinSnapshot = selectedCoin;
+            const quantitySnapshot = selectedQuantity;
             button.disabled = true;
             button.innerText = 'Checking...';
 
@@ -648,7 +696,8 @@
                 if (
                     requestSequence !== voucherRequestSequence ||
                     paymentSnapshot !== selectedPayment ||
-                    coinSnapshot !== selectedCoin
+                    coinSnapshot !== selectedCoin ||
+                    quantitySnapshot !== selectedQuantity
                 ) {
                     return;
                 }
@@ -688,6 +737,7 @@
             const requestSequence = ++voucherRequestSequence;
             const paymentSnapshot = selectedPayment;
             const coinSnapshot = selectedCoin;
+            const quantitySnapshot = selectedQuantity;
 
             try {
                 const quote = await requestVoucherQuote(appliedVoucherCode);
@@ -695,7 +745,8 @@
                 if (
                     requestSequence !== voucherRequestSequence ||
                     paymentSnapshot !== selectedPayment ||
-                    coinSnapshot !== selectedCoin
+                    coinSnapshot !== selectedCoin ||
+                    quantitySnapshot !== selectedQuantity
                 ) {
                     return;
                 }
@@ -858,6 +909,8 @@
         });
 
         document.getElementById('applyVoucherBtn')?.addEventListener('click', applyVoucher);
+        document.getElementById('quantityMinus')?.addEventListener('click', () => changeQuantity(-1));
+        document.getElementById('quantityPlus')?.addEventListener('click', () => changeQuantity(1));
         document.getElementById('voucherCode')?.addEventListener('input', (event) => {
             event.target.value = event.target.value.toUpperCase();
 
@@ -886,8 +939,8 @@
                 return;
             }
 
-            if (selectedPackageStock <= 0) {
-                showToast('Manual order', 'Auto delivery is not ready for this package. Join Discord to order manually.', null, 'warning');
+            if (selectedPackageStock < selectedQuantity) {
+                showToast('Not enough stock', 'The selected quantity is no longer available.', null, 'warning');
                 return;
             }
 
@@ -912,6 +965,7 @@
             if (selectedPayment === 'pakasir') {
 
                 document.getElementById('pakasir_package').value = selectedPackageId;
+                document.getElementById('pakasir_quantity').value = selectedQuantity;
 
                 const form = document.getElementById('pakasirForm');
                 sessionStorage.setItem('last_product', window.location.href);
@@ -945,6 +999,7 @@
 
             if (selectedPayment === 'crypto') {
                 document.getElementById('crypto_package').value = selectedPackageId;
+                document.getElementById('crypto_quantity').value = selectedQuantity;
                 document.getElementById('crypto_coin').value = selectedCoin;
 
                 const form = document.getElementById('cryptoForm');

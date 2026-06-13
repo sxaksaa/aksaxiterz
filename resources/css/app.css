@@ -471,6 +471,32 @@
         border-color: rgba(63, 63, 70, 0.8);
     }
 
+    .quantity-stepper {
+        @apply inline-flex items-center overflow-hidden rounded-lg border;
+        background: rgba(17, 17, 21, 0.9);
+        border-color: rgba(147, 51, 234, 0.45);
+    }
+
+    .quantity-stepper-button {
+        @apply flex h-9 w-9 items-center justify-center text-lg font-semibold text-[#D8B4FE] transition;
+    }
+
+    .quantity-stepper-button:hover:not(:disabled) {
+        background: rgba(147, 51, 234, 0.18);
+        color: #ffffff;
+    }
+
+    .quantity-stepper-button:disabled {
+        @apply cursor-not-allowed text-gray-600;
+        background: rgba(9, 9, 12, 0.32);
+    }
+
+    .quantity-stepper-value {
+        @apply flex h-9 min-w-12 items-center justify-center border-x px-3 text-sm font-semibold text-white;
+        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(9, 9, 12, 0.55);
+    }
+
     .license-key-box {
         @apply rounded-xl border px-3 py-3 sm:px-4;
         background: rgba(9, 9, 12, 0.38);

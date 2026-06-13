@@ -14,7 +14,10 @@
         $createdAt = $order->created_at?->timezone(config('app.timezone'));
         $expiresAt = $order->expired_at?->timezone(config('app.timezone'));
         $canMarkPaidManually = ! $isPaid;
-        $canResyncLicense = $isPaid && ! $order->license;
+        $quantity = max(1, (int) $order->quantity);
+        $deliveredCount = $order->licenses->count();
+        $isDeliveryComplete = $deliveredCount >= $quantity;
+        $canResyncLicense = $isPaid && ! $isDeliveryComplete;
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -39,7 +42,7 @@
                     <div class="mt-1 text-xs text-gray-400">Payment method</div>
                 </div>
                 <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $order->license ? 'Delivered' : 'Missing' }}</div>
+                    <div class="text-xl font-semibold text-white">{{ $deliveredCount }} / {{ $quantity }}</div>
                     <div class="mt-1 text-xs text-gray-400">License state</div>
                 </div>
                 <div class="order-stat">
@@ -91,6 +94,10 @@
                         <span class="text-right text-gray-200">{{ $order->package->name ?? '-' }}</span>
                     </div>
                     <div class="qris-detail-row">
+                        <span>Quantity</span>
+                        <span class="text-right text-gray-200">{{ $quantity }} {{ $quantity === 1 ? 'key' : 'keys' }}</span>
+                    </div>
+                    <div class="qris-detail-row">
                         <span>Amount</span>
                         <span class="font-semibold text-[#D8B4FE]">
                             {{ $order->payment_method === 'crypto' ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price) }}
@@ -113,7 +120,7 @@
                 <div class="mt-5 flex flex-wrap gap-2">
                     @if ($canMarkPaidManually)
                         <form action="{{ route('admin.orders.mark-paid', $order) }}" method="POST"
-                            data-confirm="Mark this order as paid and deliver a license?">
+                            data-confirm="Mark this order as paid and deliver {{ $quantity }} license {{ $quantity === 1 ? 'key' : 'keys' }}?">
                             @csrf
                             <button class="order-action">
                                 {{ $isDirectCrypto ? 'Mark Paid Manually' : 'Mark Paid' }}
@@ -141,7 +148,7 @@
                     <div class="crypto-payment-warning mt-5">
                         <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Manual Override</p>
                         <p class="mt-1 text-xs leading-5 text-gray-300">
-                            Use Mark Paid Manually only after checking the Binance deposit record yourself. This will deliver the license even if the scanner has not matched the exact on-chain amount.
+                            Use Mark Paid Manually only after checking the Binance deposit record yourself. This will deliver all license keys even if the scanner has not matched the exact on-chain amount.
                         </p>
                     </div>
                 @endif
@@ -151,22 +158,24 @@
                 <section class="product-section fade-up">
                     <div class="mb-4">
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Delivery</p>
-                        <h2 class="mt-1 text-xl font-semibold text-white">License</h2>
+                        <h2 class="mt-1 text-xl font-semibold text-white">Licenses</h2>
                     </div>
 
-                    @if ($order->license)
+                    @if ($order->licenses->isNotEmpty())
                         <div class="grid gap-3 text-sm">
-                            <div class="qris-detail-row">
-                                <span>License key</span>
-                                <span class="break-all text-right font-mono text-xs text-gray-200">{{ $order->license->license_key }}</span>
-                            </div>
-                            <div class="qris-detail-row">
-                                <span>Delivered</span>
-                                <span class="text-right text-gray-200">{{ $order->license->created_at?->timezone(config('app.timezone'))->format('d M Y, H:i:s') ?? '-' }} WIB</span>
+                            @foreach ($order->licenses as $license)
+                                <div class="qris-detail-row">
+                                    <span>Key {{ $loop->iteration }}</span>
+                                    <span class="break-all text-right font-mono text-xs text-gray-200">{{ $license->license_key }}</span>
+                                </div>
+                            @endforeach
+                            <div class="qris-detail-row qris-total-row">
+                                <span>Delivery progress</span>
+                                <span class="text-right font-semibold text-[#D8B4FE]">{{ $deliveredCount }} / {{ $quantity }}</span>
                             </div>
                         </div>
                     @else
-                        <div class="empty-state">No license has been attached to this order yet.</div>
+                        <div class="empty-state">No licenses have been attached to this order yet.</div>
                     @endif
                 </section>
 

@@ -15,6 +15,7 @@ class Order extends Model
         'payment_method',
         'price',
         'package_id',
+        'quantity',
         'voucher_id',
         'payment_url',
         'payment_payload',
@@ -29,6 +30,7 @@ class Order extends Model
         'paid_at' => 'datetime',
         'price' => 'decimal:6',
         'payment_payload' => 'array',
+        'quantity' => 'integer',
     ];
 
     public function product()
@@ -54,5 +56,10 @@ class Order extends Model
     public function license()
     {
         return $this->hasOne(License::class, 'order_id', 'order_id');
+    }
+
+    public function licenses()
+    {
+        return $this->hasMany(License::class, 'order_id', 'order_id')->orderBy('id');
     }
 }

@@ -54,6 +54,43 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame('USDT', $cryptoQuote['token']);
     }
 
+    public function test_quantity_uses_combined_subtotal_but_keeps_one_voucher_cap(): void
+    {
+        [$user, , $package] = $this->makeCatalog(100000, 6);
+        $voucher = $this->makeVoucher();
+
+        $quote = app(VoucherService::class)->quote(
+            $package,
+            $user,
+            $voucher->code,
+            null,
+            null,
+            false,
+            'pakasir',
+            null,
+            3
+        );
+        $cryptoQuote = app(VoucherService::class)->quote(
+            $package,
+            $user,
+            $voucher->code,
+            null,
+            null,
+            false,
+            'crypto',
+            'usdtbsc',
+            3
+        );
+
+        $this->assertSame(3, $quote['quantity']);
+        $this->assertSame(300000, $quote['base_idr']);
+        $this->assertSame(15000, $quote['discount_idr']);
+        $this->assertSame(285000, $quote['final_idr']);
+        $this->assertSame(18.0, $cryptoQuote['base_usdt']);
+        $this->assertSame(0.25, $cryptoQuote['discount_usdt']);
+        $this->assertSame(17.75, $cryptoQuote['final_usdt']);
+    }
+
     public function test_usdc_uses_its_own_discount_cap_and_expiry_is_returned(): void
     {
         [$user, , $package] = $this->makeCatalog(250000, 15);
@@ -122,6 +159,21 @@ class VoucherFeatureTest extends TestCase
             ->assertJsonPath('token', 'USDC')
             ->assertJsonPath('discount_usdt', 0.4)
             ->assertJsonMissingPath('voucher_id');
+    }
+
+    public function test_preview_rejects_quantity_above_available_stock(): void
+    {
+        [$user, , $package] = $this->makeCatalog(100000, 6, true);
+        $this->makeVoucher();
+
+        $this->actingAs($user)->postJson(route('vouchers.preview'), [
+            'code' => 'AKSA10',
+            'package_id' => $package->id,
+            'payment_method' => 'pakasir',
+            'quantity' => 2,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The selected quantity is no longer available.');
     }
 
     public function test_cancelled_order_releases_voucher_for_the_same_account(): void

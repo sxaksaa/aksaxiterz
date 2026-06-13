@@ -13,8 +13,7 @@ class PakasirOrderVerifier
         private readonly PaymentService $paymentService,
         private readonly OrderFulfillmentService $orderFulfillmentService,
         private readonly StockReservationService $stockReservationService
-    ) {
-    }
+    ) {}
 
     public function verify(Order $order): array
     {
@@ -83,9 +82,9 @@ class PakasirOrderVerifier
                 'provider_status' => $providerStatus,
             ], $freshOrder);
 
-            if ($deliveryPending && empty($result['license_key'] ?? null)) {
+            if ($deliveryPending && ($result['delivered_count'] ?? 0) < ($result['quantity'] ?? 1)) {
                 $result['delivery_pending'] = true;
-                $result['message'] = 'Payment is verified, but automatic license delivery is not ready for this package. Please join Discord for manual delivery.';
+                $result['message'] = 'Payment is verified, but automatic delivery could not provide every license key. Please join Discord for manual delivery.';
             } elseif ($freshOrder->status !== 'paid') {
                 $result['message'] = 'Payment is still being verified.';
             }
@@ -208,10 +207,13 @@ class PakasirOrderVerifier
             return $payload;
         }
 
-        $license = License::where('order_id', $order->order_id)->first();
+        $licenses = License::where('order_id', $order->order_id)->oldest('id')->get();
+        $payload['quantity'] = max(1, (int) $order->quantity);
+        $payload['delivered_count'] = $licenses->count();
 
-        if ($license) {
-            $payload['license_key'] = $license->license_key;
+        if ($licenses->isNotEmpty()) {
+            $payload['license_key'] = $licenses->first()->license_key;
+            $payload['license_keys'] = $licenses->pluck('license_key')->all();
         }
 
         return $payload;

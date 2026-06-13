@@ -37,9 +37,60 @@ class StockReservationServiceTest extends TestCase
         $service->reserve($firstOrder);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Automatic delivery is unavailable');
+        $this->expectExceptionMessage('does not have enough license stock');
 
         $service->reserve($secondOrder);
+    }
+
+    public function test_expired_pending_qris_stock_stays_reserved_until_provider_invoice_is_closed(): void
+    {
+        [$qrisOrder, $nextOrder] = $this->ordersSharingOneStock();
+        $qrisOrder->update(['expired_at' => now()->subMinute()]);
+        $service = app(StockReservationService::class);
+
+        $reservation = $service->reserve($qrisOrder);
+
+        $this->assertSame(0, $service->releaseExpiredReservations());
+        $this->assertTrue($reservation->fresh()->isReserved());
+        $this->assertSame(0, LicenseStock::available()->count());
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('does not have enough license stock');
+
+        $service->reserve($nextOrder);
+    }
+
+    public function test_expired_pending_crypto_stock_can_be_reused_during_verification_grace(): void
+    {
+        [$cryptoOrder, $nextOrder] = $this->ordersSharingOneStock();
+        $cryptoOrder->update([
+            'payment_method' => 'crypto',
+            'expired_at' => now()->subMinute(),
+        ]);
+        $service = app(StockReservationService::class);
+
+        $reservation = $service->reserve($cryptoOrder);
+
+        $this->assertFalse($reservation->fresh()->isReserved());
+        $this->assertSame(1, $service->releaseExpiredReservations());
+
+        $replacement = $service->reserve($nextOrder);
+
+        $this->assertSame($nextOrder->id, $replacement->fresh()->reserved_order_id);
+    }
+
+    public function test_cancelled_qris_stock_can_be_reused_before_original_reservation_deadline(): void
+    {
+        [$qrisOrder, $nextOrder] = $this->ordersSharingOneStock();
+        $service = app(StockReservationService::class);
+        $reservation = $service->reserve($qrisOrder);
+
+        $qrisOrder->update(['status' => 'cancelled']);
+
+        $replacement = $service->reserve($nextOrder);
+
+        $this->assertSame($reservation->id, $replacement->id);
+        $this->assertSame($nextOrder->id, $replacement->fresh()->reserved_order_id);
     }
 
     public function test_fulfillment_consumes_the_order_reserved_stock(): void
@@ -52,6 +103,31 @@ class StockReservationServiceTest extends TestCase
         $this->assertSame($reservation->license_key, $license->license_key);
         $this->assertTrue($reservation->fresh()->is_sold);
         $this->assertNull($reservation->fresh()->reserved_order_id);
+        $this->assertSame('paid', $order->fresh()->status);
+    }
+
+    public function test_quantity_reserves_and_fulfills_every_requested_license(): void
+    {
+        [$order] = $this->ordersSharingOneStock();
+        $order->update(['quantity' => 7]);
+
+        foreach (range(2, 7) as $index) {
+            LicenseStock::create([
+                'product_id' => $order->product_id,
+                'package_id' => $order->package_id,
+                'license_key' => "RESERVED-KEY-{$index}",
+                'is_sold' => false,
+            ]);
+        }
+
+        app(StockReservationService::class)->reserve($order);
+
+        $this->assertSame(7, LicenseStock::where('reserved_order_id', $order->id)->count());
+
+        app(OrderFulfillmentService::class)->fulfill($order);
+
+        $this->assertSame(7, $order->licenses()->count());
+        $this->assertSame(7, LicenseStock::where('package_id', $order->package_id)->where('is_sold', true)->count());
         $this->assertSame('paid', $order->fresh()->status);
     }
 
@@ -120,6 +196,7 @@ class StockReservationServiceTest extends TestCase
             'price' => 1,
             'expired_at' => now()->addMinutes(10),
         ]);
+        app(StockReservationService::class)->reserve($order);
 
         $result = app(PaymentService::class)->createCryptoPayment(
             $order->user,
@@ -146,6 +223,8 @@ class StockReservationServiceTest extends TestCase
             'services.pakasir.api_key' => 'test-key',
             'services.pakasir.url' => 'https://app.pakasir.test',
             'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
+            'services.pakasir.expires_minutes' => 5,
+            'services.payments.reservation_grace_minutes' => 0,
         ]);
 
         Http::fake([
@@ -165,6 +244,7 @@ class StockReservationServiceTest extends TestCase
 
         [$order] = $this->ordersSharingOneStock();
         $order->package->update(['price' => 20000]);
+        $startedAt = now();
 
         $result = app(PaymentService::class)->createPakasirPayment(
             $order->user,
@@ -174,6 +254,16 @@ class StockReservationServiceTest extends TestCase
         );
 
         $this->assertSame('20000.000000', $result['order']->price);
+        $this->assertTrue($result['order']->expired_at->between(
+            $startedAt->copy()->addMinutes(4)->addSeconds(55),
+            $startedAt->copy()->addMinutes(5)->addSeconds(5)
+        ));
+        $this->assertTrue(
+            LicenseStock::where('reserved_order_id', $result['order']->id)
+                ->firstOrFail()
+                ->reserved_until
+                ->equalTo($result['order']->expired_at)
+        );
         $this->assertStringContainsString('/pay/aksaxiterz/20000?', $result['payment_url']);
         Http::assertSent(fn ($request): bool => $request->url() === 'https://app.pakasir.test/api/transactioncreate/qris'
             && $request['amount'] === 20000);
