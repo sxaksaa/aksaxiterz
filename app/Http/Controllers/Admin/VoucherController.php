@@ -104,6 +104,7 @@ class VoucherController extends Controller
             'minimum_purchase' => ['required', 'integer', 'min:0', 'max:999999999'],
             'usage_limit' => ['nullable', 'integer', 'min:1', 'max:999999999'],
             'per_user_limit' => ['required', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['required', 'boolean'],
             'starts_at' => ['nullable', 'date'],
             'expires_at' => array_values(array_filter([
                 'nullable',
@@ -112,8 +113,8 @@ class VoucherController extends Controller
             ])),
         ]);
 
-        return $validated + [
-            'is_active' => $request->boolean('is_active'),
-        ];
+        $validated['is_active'] = $request->boolean('is_active');
+
+        return $validated;
     }
 }

@@ -9,6 +9,7 @@
         $formatIdr = fn ($value) => 'Rp ' . number_format((int) $value, 0, ',', '.');
         $formatCrypto = fn ($value, $token) => rtrim(rtrim(number_format((float) $value, 6, '.', ''), '0'), '.') . ' ' . $token;
         $formatDateInput = fn ($value) => $value?->format('Y-m-d\TH:i');
+        $selectedActiveStatus = (string) old('is_active', $editVoucher ? (int) $editVoucher->is_active : 1);
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -155,13 +156,15 @@
                     </label>
                 </div>
 
-                <label class="flex items-center gap-3 rounded-lg border border-[#27272A] bg-black/15 px-4 py-3">
-                    <input type="checkbox" name="is_active" value="1"
-                        @checked(old('is_active', $editVoucher?->is_active ?? true))>
-                    <span class="text-sm font-semibold text-gray-300">Voucher active</span>
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
+                    <select name="is_active" class="search-bar w-full" required>
+                        <option value="1" @selected($selectedActiveStatus === '1')>Active</option>
+                        <option value="0" @selected($selectedActiveStatus === '0')>Inactive</option>
+                    </select>
                 </label>
 
-                <div class="flex items-end xl:col-span-3">
+                <div class="flex items-end">
                     <button class="btn-footer h-12">{{ $isEditing ? 'Save Voucher' : 'Create Voucher' }}</button>
                 </div>
             </form>
@@ -183,12 +186,13 @@
 
         <div class="orders-table-wrap hidden md:block">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[1040px] text-sm">
+                <table class="w-full min-w-[1120px] text-sm">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
                         <tr>
                             <th class="p-4 text-left">Voucher</th>
                             <th class="p-4 text-left">Offer</th>
                             <th class="p-4 text-left">Limits</th>
+                            <th class="p-4 text-left">Status</th>
                             <th class="p-4 text-left">Schedule</th>
                             <th class="p-4 text-left">Usage</th>
                             <th class="p-4 text-right">Action</th>
@@ -199,9 +203,6 @@
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $voucher->code }}</div>
-                                    <div class="mt-1 text-xs {{ $voucher->is_active ? 'text-emerald-300' : 'text-gray-500' }}">
-                                        {{ $voucher->is_active ? 'Active' : 'Inactive' }}
-                                    </div>
                                 </td>
                                 <td class="p-4 text-gray-300">
                                     <div>{{ $voucher->discount_percent }}% up to {{ $formatIdr($voucher->max_discount) }} QRIS</div>
@@ -216,6 +217,11 @@
                                     <div class="mt-1 text-xs text-gray-500">
                                         {{ $voucher->per_user_limit > 0 ? $voucher->per_user_limit : 'Unlimited' }} per account
                                     </div>
+                                </td>
+                                <td class="p-4">
+                                    <span class="status-pill {{ $voucher->availabilityBadgeClass() }}">
+                                        {{ $voucher->availabilityLabel() }}
+                                    </span>
                                 </td>
                                 <td class="p-4 text-xs text-gray-400">
                                     <div>{{ $voucher->starts_at?->format('d M Y, H:i') ?? 'Immediately' }}</div>
@@ -238,7 +244,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="p-8"><div class="empty-state">No vouchers found</div></td></tr>
+                            <tr><td colspan="7" class="p-8"><div class="empty-state">No vouchers found</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -257,8 +263,8 @@
                                 {{ $formatCrypto($voucher->max_discount_usdc, 'USDC') }}
                             </div>
                         </div>
-                        <span class="text-xs {{ $voucher->is_active ? 'text-emerald-300' : 'text-gray-500' }}">
-                            {{ $voucher->is_active ? 'Active' : 'Inactive' }}
+                        <span class="status-pill {{ $voucher->availabilityBadgeClass() }}">
+                            {{ $voucher->availabilityLabel() }}
                         </span>
                     </div>
                     <div class="mt-4 text-xs text-gray-400">

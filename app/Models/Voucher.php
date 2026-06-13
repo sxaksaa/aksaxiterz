@@ -37,4 +37,47 @@ class Voucher extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+    public function availabilityStatus(): string
+    {
+        if (! $this->is_active) {
+            return 'inactive';
+        }
+
+        if ($this->starts_at?->isFuture()) {
+            return 'scheduled';
+        }
+
+        if ($this->expires_at && ! $this->expires_at->isFuture()) {
+            return 'expired';
+        }
+
+        $activeUses = $this->getAttribute('active_uses_count');
+
+        if ($this->usage_limit !== null && $activeUses !== null && (int) $activeUses >= $this->usage_limit) {
+            return 'limit_reached';
+        }
+
+        return 'active';
+    }
+
+    public function availabilityLabel(): string
+    {
+        return match ($this->availabilityStatus()) {
+            'inactive' => 'Inactive',
+            'scheduled' => 'Scheduled',
+            'expired' => 'Expired',
+            'limit_reached' => 'Limit Reached',
+            default => 'Active Now',
+        };
+    }
+
+    public function availabilityBadgeClass(): string
+    {
+        return match ($this->availabilityStatus()) {
+            'active' => 'status-pill-paid',
+            'scheduled' => 'status-pill-pending',
+            default => 'status-pill-cancelled',
+        };
+    }
 }
