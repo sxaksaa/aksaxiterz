@@ -95,21 +95,21 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Admin Downloads
                                 </a>
-                                <a href="{{ route('admin.vouchers.index') }}"
+                                <a href="{{ route('admin.orders.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Vouchers
+                                    Admin Orders
                                 </a>
                                 <a href="{{ route('admin.license-stocks.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Admin Stock
                                 </a>
-                                <a href="{{ route('admin.orders.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Orders
-                                </a>
                                 <a href="{{ route('admin.users.index') }}"
                                     class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     Admin Users
+                                </a>
+                                <a href="{{ route('admin.vouchers.index') }}"
+                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    Admin Vouchers
                                 </a>
                             </div>
                         @endif
@@ -160,10 +160,10 @@ transition-all duration-300 ease-out">
             @if (auth()->user()?->isAdmin())
                 <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">Admin Catalog</a>
                 <a href="{{ route('admin.downloads.index') }}" data-mobile-menu-link class="nav-item">Admin Downloads</a>
-                <a href="{{ route('admin.vouchers.index') }}" data-mobile-menu-link class="nav-item">Admin Vouchers</a>
-                <a href="/admin/license-stocks" data-mobile-menu-link class="nav-item">Admin Stock</a>
                 <a href="{{ route('admin.orders.index') }}" data-mobile-menu-link class="nav-item">Admin Orders</a>
+                <a href="/admin/license-stocks" data-mobile-menu-link class="nav-item">Admin Stock</a>
                 <a href="{{ route('admin.users.index') }}" data-mobile-menu-link class="nav-item">Admin Users</a>
+                <a href="{{ route('admin.vouchers.index') }}" data-mobile-menu-link class="nav-item">Admin Vouchers</a>
             @endif
 
             @php $discordUrl = config('links.discord_url'); @endphp

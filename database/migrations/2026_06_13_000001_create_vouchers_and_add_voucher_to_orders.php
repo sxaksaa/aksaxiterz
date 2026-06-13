@@ -13,9 +13,9 @@ return new class extends Migration
             $table->string('code', 50)->unique();
             $table->unsignedTinyInteger('discount_percent');
             $table->unsignedInteger('max_discount');
-            $table->unsignedInteger('minimum_purchase')->default(0);
+            $table->unsignedInteger('minimum_purchase')->default(20000);
             $table->unsignedInteger('usage_limit')->nullable();
-            $table->unsignedSmallInteger('per_user_limit')->default(1);
+            $table->unsignedSmallInteger('per_user_limit')->default(2);
             $table->boolean('is_active')->default(true);
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('expires_at')->nullable();

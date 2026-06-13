@@ -105,7 +105,7 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Minimum purchase (IDR)</span>
-                    <input name="minimum_purchase" value="{{ old('minimum_purchase', $editVoucher->minimum_purchase ?? 45000) }}"
+                    <input name="minimum_purchase" value="{{ old('minimum_purchase', $editVoucher->minimum_purchase ?? 20000) }}"
                         type="number" min="0" step="1" class="search-bar w-full" required>
                 </label>
 
@@ -117,7 +117,7 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Limit per account</span>
-                    <input name="per_user_limit" value="{{ old('per_user_limit', $editVoucher->per_user_limit ?? 1) }}"
+                    <input name="per_user_limit" value="{{ old('per_user_limit', $editVoucher->per_user_limit ?? 2) }}"
                         type="number" min="1" step="1" class="search-bar w-full" required>
                 </label>
 
