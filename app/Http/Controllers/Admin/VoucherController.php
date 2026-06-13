@@ -79,6 +79,16 @@ class VoucherController extends Controller
             $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
         }
 
+        if (! $request->filled('per_user_limit')) {
+            $request->merge(['per_user_limit' => 0]);
+        }
+
+        foreach (['usage_limit', 'starts_at', 'expires_at'] as $optionalField) {
+            if (! $request->filled($optionalField)) {
+                $request->merge([$optionalField => null]);
+            }
+        }
+
         $validated = $request->validate([
             'code' => [
                 'required',
@@ -93,7 +103,7 @@ class VoucherController extends Controller
             'max_discount_usdc' => ['required', 'numeric', 'min:0.000001', 'max:999999.999999'],
             'minimum_purchase' => ['required', 'integer', 'min:0', 'max:999999999'],
             'usage_limit' => ['nullable', 'integer', 'min:1', 'max:999999999'],
-            'per_user_limit' => ['required', 'integer', 'min:1', 'max:9999'],
+            'per_user_limit' => ['required', 'integer', 'min:0', 'max:9999'],
             'starts_at' => ['nullable', 'date'],
             'expires_at' => array_values(array_filter([
                 'nullable',

@@ -75,8 +75,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Code</span>
                     <input name="code" value="{{ old('code', $editVoucher->code ?? '') }}" class="search-bar w-full uppercase"
-                        placeholder="AKSA10" maxlength="50" required>
-                    <span class="mt-2 block text-xs text-gray-500">Use a code that is not easy to guess. Preview attempts are rate-limited.</span>
+                        placeholder="Type voucher code" maxlength="50" required>
                 </label>
 
                 <label class="block">
@@ -117,22 +116,44 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Limit per account</span>
-                    <input name="per_user_limit" value="{{ old('per_user_limit', $editVoucher->per_user_limit ?? 2) }}"
-                        type="number" min="1" step="1" class="search-bar w-full" required>
+                    <input name="per_user_limit"
+                        value="{{ old('per_user_limit', ($editVoucher?->per_user_limit ?? 0) > 0 ? $editVoucher->per_user_limit : '') }}"
+                        type="number" min="1" step="1" class="search-bar w-full" placeholder="Unlimited">
                 </label>
 
-                <label class="block">
+                <div class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Starts at (WIB)</span>
-                    <input name="starts_at" value="{{ old('starts_at', $formatDateInput($editVoucher?->starts_at)) }}"
-                        type="datetime-local" class="search-bar w-full">
-                </label>
+                    <label class="relative block cursor-pointer">
+                        <input name="starts_at" value="{{ old('starts_at', $formatDateInput($editVoucher?->starts_at)) }}"
+                            type="datetime-local" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                            data-datetime-input aria-label="Select start date and time">
+                        <span class="search-bar flex min-h-12 w-full items-center justify-between gap-3" data-datetime-display>
+                            <span>Select date and time</span>
+                            <svg class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M7 3v3m10-3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+                            </svg>
+                        </span>
+                    </label>
+                </div>
 
-                <label class="block">
+                <div class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Expires at (WIB)</span>
-                    <input name="expires_at" value="{{ old('expires_at', $formatDateInput($editVoucher?->expires_at)) }}"
-                        type="datetime-local" class="search-bar w-full">
-                    <span class="mt-2 block text-xs text-gray-500">The server rejects the voucher immediately after this time.</span>
-                </label>
+                    <label class="relative block cursor-pointer">
+                        <input name="expires_at" value="{{ old('expires_at', $formatDateInput($editVoucher?->expires_at)) }}"
+                            type="datetime-local" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                            data-datetime-input aria-label="Select expiry date and time">
+                        <span class="search-bar flex min-h-12 w-full items-center justify-between gap-3" data-datetime-display>
+                            <span>Select date and time</span>
+                            <svg class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M7 3v3m10-3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+                            </svg>
+                        </span>
+                    </label>
+                </div>
 
                 <label class="flex items-center gap-3 rounded-lg border border-[#27272A] bg-black/15 px-4 py-3">
                     <input type="checkbox" name="is_active" value="1"
@@ -192,7 +213,9 @@
                                 </td>
                                 <td class="p-4 text-gray-300">
                                     <div>{{ $voucher->usage_limit ?? 'Unlimited' }} total</div>
-                                    <div class="mt-1 text-xs text-gray-500">{{ $voucher->per_user_limit }} per account</div>
+                                    <div class="mt-1 text-xs text-gray-500">
+                                        {{ $voucher->per_user_limit > 0 ? $voucher->per_user_limit : 'Unlimited' }} per account
+                                    </div>
                                 </td>
                                 <td class="p-4 text-xs text-gray-400">
                                     <div>{{ $voucher->starts_at?->format('d M Y, H:i') ?? 'Immediately' }}</div>
@@ -262,3 +285,43 @@
         ])
     </div>
 @endsection
+
+@push('scripts')
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
+        document.querySelectorAll('[data-datetime-input]').forEach((input) => {
+            const display = input.parentElement.querySelector('[data-datetime-display] span');
+
+            const refreshDisplay = () => {
+                if (!input.value) {
+                    display.textContent = 'Select date and time';
+                    return;
+                }
+
+                const [date, time] = input.value.split('T');
+                const [year, month, day] = date.split('-').map(Number);
+                const [hour, minute] = time.split(':').map(Number);
+
+                display.textContent = new Date(year, month - 1, day, hour, minute).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+            };
+
+            input.addEventListener('change', refreshDisplay);
+            input.addEventListener('input', refreshDisplay);
+            input.addEventListener('click', () => {
+                if (typeof input.showPicker === 'function') {
+                    try {
+                        input.showPicker();
+                    } catch (error) {
+                        // The browser can still open its native picker normally.
+                    }
+                }
+            });
+            refreshDisplay();
+        });
+    </script>
+@endpush

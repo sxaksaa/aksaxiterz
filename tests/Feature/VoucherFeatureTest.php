@@ -243,7 +243,6 @@ class VoucherFeatureTest extends TestCase
                 'max_discount_usdc' => 0.25,
                 'minimum_purchase' => 45000,
                 'usage_limit' => 20,
-                'per_user_limit' => 1,
                 'is_active' => 1,
             ])
             ->assertRedirect(route('admin.vouchers.index'));
@@ -253,6 +252,7 @@ class VoucherFeatureTest extends TestCase
             'discount_percent' => 10,
             'max_discount' => 15000,
             'minimum_purchase' => 45000,
+            'per_user_limit' => 0,
         ]);
 
         $this->get(route('products.show', $product))

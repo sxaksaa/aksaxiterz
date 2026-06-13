@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedInteger('max_discount');
             $table->unsignedInteger('minimum_purchase')->default(20000);
             $table->unsignedInteger('usage_limit')->nullable();
-            $table->unsignedSmallInteger('per_user_limit')->default(2);
+            $table->unsignedSmallInteger('per_user_limit')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('expires_at')->nullable();
