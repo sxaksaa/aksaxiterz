@@ -74,6 +74,34 @@ class PendingOrderExpirationServiceTest extends TestCase
         $this->assertSame(1, LicenseStock::where('reserved_order_id', $qrisOrder->id)->reserved()->count());
     }
 
+    public function test_expired_qris_is_cancelled_at_provider_before_stock_is_released(): void
+    {
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.api_key' => 'test-key',
+            'services.pakasir.url' => 'https://app.pakasir.test',
+        ]);
+        Http::fake([
+            'https://app.pakasir.test/api/transactioncancel' => Http::response(['status' => 'success']),
+        ]);
+
+        [$qrisOrder] = $this->orders();
+        $qrisOrder->update([
+            'payment_payload' => [
+                'payment_number' => '000201010212',
+            ],
+        ]);
+        app(StockReservationService::class)->reserve($qrisOrder);
+
+        app(PendingOrderExpirationService::class)->expire();
+
+        $this->assertSame('cancelled', $qrisOrder->fresh()->status);
+        $this->assertSame('cancelled', $qrisOrder->fresh()->payment_payload['provider_status'] ?? null);
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $qrisOrder->id)->count());
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://app.pakasir.test/api/transactioncancel'
+            && $request['order_id'] === $qrisOrder->order_id);
+    }
+
     private function orders(): array
     {
         $user = User::factory()->create();

@@ -9,6 +9,7 @@ use App\Services\CheckoutLockService;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
+use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
@@ -26,6 +27,7 @@ class PaymentController extends Controller
         private readonly CheckoutLockService $checkoutLockService,
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
         private readonly PakasirOrderVerifier $pakasirOrderVerifier,
+        private readonly PendingOrderExpirationService $pendingOrderExpirationService,
         private readonly StockReservationService $stockReservationService
     ) {
         $this->paymentService = $paymentService;
@@ -189,6 +191,11 @@ class PaymentController extends Controller
                 'order_id' => $order->order_id,
                 'status' => $order->status,
             ], $order));
+        }
+
+        if ($order->status === 'pending' && $order->expired_at?->lte(now())) {
+            $this->pendingOrderExpirationService->expire((int) $order->user_id);
+            $order->refresh();
         }
 
         $result = $this->pakasirOrderVerifier->verify($order);

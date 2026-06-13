@@ -830,12 +830,20 @@
     }
 
     .qris-canvas-wrap {
-        @apply mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center rounded-xl border bg-white p-3;
+        @apply relative mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center overflow-hidden rounded-xl border bg-white p-3;
         border-color: rgba(216, 180, 254, 0.32);
     }
 
     .qris-canvas-wrap canvas {
         @apply h-full w-full;
+    }
+
+    .qris-expired-overlay {
+        @apply absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#111115]/95 px-6 text-center text-xs text-gray-400;
+    }
+
+    .qris-expired-overlay strong {
+        @apply text-base text-red-300;
     }
 
     .qris-detail-row {

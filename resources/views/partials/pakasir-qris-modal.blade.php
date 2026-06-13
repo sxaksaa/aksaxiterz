@@ -10,8 +10,12 @@
             <button type="button" class="qris-close-button" data-qris-close aria-label="Close QRIS checkout">x</button>
         </div>
 
-        <div class="qris-canvas-wrap mt-5">
+        <div id="aksaQrisCanvasWrap" class="qris-canvas-wrap mt-5">
             <canvas id="aksaQrisCanvas" width="256" height="256" aria-label="QRIS payment code"></canvas>
+            <div id="aksaQrisExpiredOverlay" class="qris-expired-overlay hidden">
+                <strong>QRIS Expired</strong>
+                <span>This payment code is being closed. Start a new checkout to pay.</span>
+            </div>
         </div>
 
         <div class="mt-5 grid gap-3 text-sm">

@@ -17,7 +17,7 @@ class ExpirePendingOrdersFromTraffic
 
     public function handle(Request $request, Closure $next): Response
     {
-        $interval = max(10, (int) config('services.payments.traffic_cleanup_seconds', 60));
+        $interval = max(10, (int) config('services.payments.traffic_cleanup_seconds', 30));
         $cacheStore = (string) config('services.payments.traffic_cleanup_cache_store', 'file');
 
         try {

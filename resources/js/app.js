@@ -30,6 +30,7 @@ const qrisState = {
     orderId: null,
     pollTimer: null,
     isChecking: false,
+    expiryHandled: false,
 };
 
 const cryptoState = {
@@ -194,11 +195,56 @@ function startQrisExpiryCountdown(value, remainingSeconds) {
 
     const update = () => {
         element.innerText = formatCountdown(deadline);
-        element.classList.toggle('text-red-300', element.innerText === 'Expired');
+        const expired = element.innerText === 'Expired';
+        element.classList.toggle('text-red-300', expired);
+
+        if (expired) {
+            handleQrisExpiry();
+        }
     };
 
     update();
     qrisExpiryCountdownTimer = setInterval(update, 1000);
+}
+
+async function handleQrisExpiry() {
+    if (qrisState.expiryHandled) return;
+
+    qrisState.expiryHandled = true;
+    document.getElementById('aksaQrisExpiredOverlay')?.classList.remove('hidden');
+
+    const checkButton = document.getElementById('aksaQrisCheck');
+
+    if (checkButton) {
+        checkButton.innerText = 'Check Final Status';
+    }
+
+    if (!qrisState.orderId) return;
+
+    qrisState.isChecking = true;
+
+    try {
+        const result = await syncPakasirOrder(qrisState.orderId);
+
+        if (result?.status === 'paid') {
+            stopQrisPolling();
+            showPaymentSuccess({
+                message: 'Your QRIS payment has been verified and your license is ready.',
+                licenseKey: result.license_key,
+                licenseKeys: result.license_keys,
+                orderId: result.order_id || qrisState.orderId,
+            });
+        } else if (result?.status && result.status !== 'pending') {
+            stopQrisPolling();
+            window.showAppToast?.('QRIS expired', 'The expired payment was closed. Start a new checkout to pay.', {
+                variant: 'warning',
+            });
+        }
+    } catch (error) {
+        // Polling will retry while Pakasir confirms the final invoice status.
+    } finally {
+        qrisState.isChecking = false;
+    }
 }
 
 window.syncAksaPakasirOrder = syncPakasirOrder;
@@ -282,11 +328,15 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     }
 
     qrisState.orderId = checkout.order_id || null;
+    qrisState.expiryHandled = false;
 
     document.getElementById('aksaQrisOrderId').innerText = checkout.order_id || '-';
     document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.amount);
     document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
     document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
+    document.getElementById('aksaQrisExpiredOverlay')?.classList.add('hidden');
+    const checkButton = document.getElementById('aksaQrisCheck');
+    if (checkButton) checkButton.innerText = 'Check Payment';
     startQrisExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     modal.classList.remove('hidden');
