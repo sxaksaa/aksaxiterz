@@ -204,28 +204,34 @@
                         <div class="badge">{{ $badge }}</div>
                     @endif
 
-                    <p class="text-sm mb-1">
+                    <p class="mb-1 text-sm font-semibold text-white">
                         {{ $packageName }}
                     </p>
 
-                    <p class="text-[#C084FC] font-semibold price-text" data-idr="Rp {{ number_format($p->price) }}"
+                    <p class="price-text text-lg font-semibold text-[#C084FC]" data-idr="Rp {{ number_format($p->price) }}"
                         data-usd="${{ rtrim(rtrim($p->price_usdt, '0'), '.') }}">
                         Rp {{ number_format($p->price) }}
                     </p>
 
                     @if (($saving['saving'] ?? 0) > 0)
-                        <p class="mt-2 text-xs font-semibold text-emerald-300">
-                            Save Rp {{ number_format($saving['saving']) }} vs daily package
-                        </p>
-                        <p class="mt-1 text-xs text-gray-500">
-                            Rp {{ number_format($saving['per_day']) }}/day · {{ $saving['percent'] }}% better value
-                        </p>
+                        <div class="package-saving">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-xs font-semibold text-emerald-300">
+                                    Save Rp {{ number_format($saving['saving']) }}
+                                </p>
+                                <span class="package-saving-badge">{{ $saving['percent'] }}% vs daily</span>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-400">
+                                Rp {{ number_format($saving['per_day']) }} per day
+                            </p>
+                        </div>
                     @elseif (($saving['per_day'] ?? null) !== null)
-                        <p class="mt-2 text-xs text-gray-500">Rp {{ number_format($saving['per_day']) }}/day</p>
+                        <p class="mt-3 text-xs text-gray-400">Rp {{ number_format($saving['per_day']) }} per day</p>
                     @endif
 
-                    <p class="mt-3 text-xs {{ $packageStock > 0 ? 'text-gray-400' : 'text-amber-300' }}">
-                        {{ $packageStock > 0 ? 'Auto delivery: ' . $packageStock . ' ready' : 'Manual via Discord' }}
+                    <p class="package-availability {{ $packageStock > 0 ? 'package-availability-ready' : 'package-availability-manual' }}">
+                        <span class="package-availability-dot" aria-hidden="true"></span>
+                        {{ $packageStock > 0 ? $packageStock . ' licenses ready · Instant delivery' : 'Manual order via Discord' }}
                     </p>
 
                     @if ($packageStock <= 0)

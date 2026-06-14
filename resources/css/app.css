@@ -446,6 +446,43 @@
         transform: translateY(-3px);
     }
 
+    .package-saving {
+        @apply mt-3 rounded-lg border px-3 py-2;
+        background: rgba(16, 185, 129, 0.07);
+        border-color: rgba(52, 211, 153, 0.2);
+    }
+
+    .package-saving-badge {
+        @apply shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold text-emerald-200;
+        background: rgba(16, 185, 129, 0.12);
+        border-color: rgba(52, 211, 153, 0.24);
+    }
+
+    .package-availability {
+        @apply mt-3 flex items-center gap-2 text-xs;
+    }
+
+    .package-availability-dot {
+        @apply h-1.5 w-1.5 shrink-0 rounded-full;
+    }
+
+    .package-availability-ready {
+        @apply text-gray-400;
+    }
+
+    .package-availability-ready .package-availability-dot {
+        @apply bg-emerald-400;
+        box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+    }
+
+    .package-availability-manual {
+        @apply text-amber-300;
+    }
+
+    .package-availability-manual .package-availability-dot {
+        @apply bg-amber-300;
+    }
+
     .license-card-selected {
         border-color: rgba(216, 180, 254, 0.8);
         background:

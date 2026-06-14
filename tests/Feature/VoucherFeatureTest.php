@@ -310,7 +310,8 @@ class VoucherFeatureTest extends TestCase
         $this->get(route('products.show', $product))
             ->assertOk()
             ->assertSee('Best Value')
-            ->assertSee('Save Rp 350,000 vs daily package')
+            ->assertSee('Save Rp 350,000')
+            ->assertSee('58% vs daily')
             ->assertSee('Enter voucher code')
             ->assertSee('Join our Discord server to get promo codes.');
     }
