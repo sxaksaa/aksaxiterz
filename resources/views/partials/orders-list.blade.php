@@ -17,6 +17,9 @@
             $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
                 ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
                 : null;
+            $cryptoSelfServiceVerifyEndsAt = $isDirectCrypto && $order->expired_at
+                ? $order->expired_at->copy()->addMinutes(max(0, (int) config('services.crypto_direct.self_service_verify_minutes', 60)))
+                : null;
             $isCryptoInvoiceActive = $isDirectCrypto &&
                 $order->status === 'pending' &&
                 (! $order->expired_at || $now->lt($order->expired_at));
@@ -24,7 +27,10 @@
                 in_array($order->status, ['pending', 'cancelled'], true) &&
                 $cryptoRecoveryEndsAt &&
                 $now->lt($cryptoRecoveryEndsAt);
-            $canSyncCrypto = $isCryptoInvoiceActive || $isCryptoRecoverable;
+            $canSelfServiceVerifyCrypto = $isCryptoRecoverable &&
+                $cryptoSelfServiceVerifyEndsAt &&
+                $now->lt($cryptoSelfServiceVerifyEndsAt);
+            $canSyncCrypto = $isCryptoInvoiceActive || $canSelfServiceVerifyCrypto;
             $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
             $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
@@ -220,6 +226,9 @@
                         $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
                             ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
                             : null;
+                        $cryptoSelfServiceVerifyEndsAt = $isDirectCrypto && $order->expired_at
+                            ? $order->expired_at->copy()->addMinutes(max(0, (int) config('services.crypto_direct.self_service_verify_minutes', 60)))
+                            : null;
                         $isCryptoInvoiceActive = $isDirectCrypto &&
                             $order->status === 'pending' &&
                             (! $order->expired_at || $now->lt($order->expired_at));
@@ -227,7 +236,10 @@
                             in_array($order->status, ['pending', 'cancelled'], true) &&
                             $cryptoRecoveryEndsAt &&
                             $now->lt($cryptoRecoveryEndsAt);
-                        $canSyncCrypto = $isCryptoInvoiceActive || $isCryptoRecoverable;
+                        $canSelfServiceVerifyCrypto = $isCryptoRecoverable &&
+                            $cryptoSelfServiceVerifyEndsAt &&
+                            $now->lt($cryptoSelfServiceVerifyEndsAt);
+                        $canSyncCrypto = $isCryptoInvoiceActive || $canSelfServiceVerifyCrypto;
                         $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));

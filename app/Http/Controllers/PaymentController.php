@@ -221,6 +221,14 @@ class PaymentController extends Controller
             ], $order));
         }
 
+        if ($this->isPastCryptoSelfServiceVerifyWindow($order)) {
+            return $this->syncPaymentResponse($request, [
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'Self-service verification for this crypto invoice has ended. Please contact support with the transaction receipt if payment was already sent.',
+            ], 410);
+        }
+
         $result = $this->directCryptoOrderVerifier->verify($order);
         $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
 
@@ -427,6 +435,17 @@ class PaymentController extends Controller
         }
 
         return max(0, (int) now()->diffInSeconds($order->expired_at, false));
+    }
+
+    private function isPastCryptoSelfServiceVerifyWindow(Order $order): bool
+    {
+        if (! $order->expired_at || $order->expired_at->isFuture()) {
+            return false;
+        }
+
+        $verifyMinutes = max(0, (int) config('services.crypto_direct.self_service_verify_minutes', 60));
+
+        return $order->expired_at->copy()->addMinutes($verifyMinutes)->lte(now());
     }
 
     private function retryCryptoNetwork(Order $order): string

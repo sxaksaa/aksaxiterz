@@ -37,6 +37,8 @@ const cryptoState = {
     orderId: null,
     pollTimer: null,
     isChecking: false,
+    expiryHandled: false,
+    token: 'USDT',
 };
 
 function csrfToken() {
@@ -312,11 +314,66 @@ function startCryptoExpiryCountdown(value, remainingSeconds) {
 
     const update = () => {
         element.innerText = formatCountdown(deadline);
-        element.classList.toggle('text-red-300', element.innerText === 'Expired');
+        const expired = element.innerText === 'Expired';
+        element.classList.toggle('text-red-300', expired);
+
+        if (expired) {
+            handleCryptoExpiry();
+        }
     };
 
     update();
-    cryptoExpiryCountdownTimer = setInterval(update, 1000);
+
+    if (!cryptoState.expiryHandled) {
+        cryptoExpiryCountdownTimer = setInterval(update, 1000);
+    }
+}
+
+function resetCryptoExpiryState() {
+    cryptoState.expiryHandled = false;
+    document.getElementById('aksaCryptoExpiredNotice')?.classList.add('hidden');
+    document.getElementById('aksaCryptoPaymentDetails')?.classList.remove('hidden');
+
+    ['aksaCryptoCopyAddress', 'aksaCryptoCopyAmount'].forEach((id) => {
+        const button = document.getElementById(id);
+
+        if (!button) return;
+
+        button.disabled = false;
+        button.innerText = 'Copy';
+        button.classList.remove('opacity-60', 'pointer-events-none');
+    });
+}
+
+function handleCryptoExpiry() {
+    if (cryptoState.expiryHandled) return;
+
+    cryptoState.expiryHandled = true;
+    stopCryptoExpiryCountdown();
+    document.getElementById('aksaCryptoExpiredNotice')?.classList.remove('hidden');
+    document.getElementById('aksaCryptoPaymentDetails')?.classList.add('hidden');
+
+    const title = document.getElementById('aksaCryptoTitle');
+
+    if (title) {
+        title.innerText = `${cryptoState.token} Payment Expired`;
+    }
+
+    ['aksaCryptoCopyAddress', 'aksaCryptoCopyAmount'].forEach((id) => {
+        const button = document.getElementById(id);
+
+        if (!button) return;
+
+        button.disabled = true;
+        button.dataset.copyValue = '';
+        button.classList.add('opacity-60', 'pointer-events-none');
+    });
+
+    const checkButton = document.getElementById('aksaCryptoCheck');
+
+    if (checkButton) {
+        checkButton.innerText = 'Verify Already Sent';
+    }
 }
 
 window.openAksaQrisModal = async function(checkout, options = {}) {
@@ -376,6 +433,8 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
 
     cryptoState.orderId = checkout.order_id || null;
     const token = (payment.token || 'USDT').toUpperCase();
+    cryptoState.token = token;
+    resetCryptoExpiryState();
     const title = document.getElementById('aksaCryptoTitle');
 
     if (title) {
@@ -387,7 +446,6 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
     document.getElementById('aksaCryptoAmount').innerText = formatCryptoAmount(payment.amount, token);
     document.getElementById('aksaCryptoAddress').innerText = payment.address || '-';
     document.getElementById('aksaCryptoContract').innerText = payment.contract || '-';
-    startCryptoExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     const copyAddress = document.getElementById('aksaCryptoCopyAddress');
     const copyAmount = document.getElementById('aksaCryptoCopyAmount');
@@ -410,6 +468,8 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
         checkButton.innerText = 'Check Payment';
         checkButton.classList.remove('opacity-60', 'pointer-events-none');
     }
+
+    startCryptoExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');

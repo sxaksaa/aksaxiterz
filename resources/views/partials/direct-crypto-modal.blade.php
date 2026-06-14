@@ -9,7 +9,17 @@
             <button type="button" class="qris-close-button" data-crypto-close aria-label="Close crypto checkout">x</button>
         </div>
 
-        <div class="mt-5 grid gap-3 text-sm">
+        <div id="aksaCryptoExpiredNotice" class="crypto-expired-notice mt-5 hidden" role="alert">
+            <p class="text-sm font-semibold text-red-200">Payment Window Expired</p>
+            <p class="mt-1 text-xs leading-5 text-gray-300">
+                Do not send a new payment to this invoice. Start a new checkout to pay.
+            </p>
+            <p class="mt-2 text-xs font-semibold leading-5 text-white">
+                Already sent it before expiry? Use Verify Already Sent below.
+            </p>
+        </div>
+
+        <div id="aksaCryptoPaymentDetails" class="mt-5 grid gap-3 text-sm">
             <div class="crypto-payment-warning">
                 <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
                 <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
@@ -48,6 +58,9 @@
                 <span>Token contract</span>
                 <span id="aksaCryptoContract" class="min-w-0 truncate text-right font-mono text-[11px] text-gray-500">-</span>
             </div>
+        </div>
+
+        <div class="mt-3 grid gap-3 text-sm">
             <div class="qris-detail-row">
                 <span>Order ID</span>
                 <span id="aksaCryptoOrderId" class="font-mono text-xs text-gray-300">-</span>

@@ -64,6 +64,7 @@ return [
         'expires_minutes' => (int) env('CRYPTO_DIRECT_EXPIRES_MINUTES', 10),
         'grace_minutes' => (int) env('CRYPTO_DIRECT_GRACE_MINUTES', 2),
         'recovery_hours' => (int) env('CRYPTO_DIRECT_RECOVERY_HOURS', 24),
+        'self_service_verify_minutes' => (int) env('CRYPTO_DIRECT_SELF_SERVICE_VERIFY_MINUTES', 60),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [
             'usdttrc20' => [

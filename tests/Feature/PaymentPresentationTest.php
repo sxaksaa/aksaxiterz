@@ -103,6 +103,25 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
     }
 
+    public function test_old_cancelled_crypto_order_hides_self_service_verify_before_backend_recovery_ends(): void
+    {
+        config([
+            'services.crypto_direct.recovery_hours' => 24,
+            'services.crypto_direct.self_service_verify_minutes' => 60,
+        ]);
+
+        $order = $this->fakeOrder([
+            'status' => 'cancelled',
+            'expired_at' => now()->subHours(2),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringNotContainsString('Verify Sent Payment', $html);
+        $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
+    }
+
     public function test_pakasir_orders_render_check_and_continue_actions(): void
     {
         $order = $this->fakeOrder([
