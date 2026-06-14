@@ -376,10 +376,10 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
 
     cryptoState.orderId = checkout.order_id || null;
     const token = (payment.token || 'USDT').toUpperCase();
-    const tokenLabel = document.getElementById('aksaCryptoTokenLabel');
+    const title = document.getElementById('aksaCryptoTitle');
 
-    if (tokenLabel) {
-        tokenLabel.innerText = `${token} Address`;
+    if (title) {
+        title.innerText = `${token} Payment`;
     }
 
     document.getElementById('aksaCryptoOrderId').innerText = checkout.order_id || '-';
@@ -391,7 +391,6 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
 
     const copyAddress = document.getElementById('aksaCryptoCopyAddress');
     const copyAmount = document.getElementById('aksaCryptoCopyAmount');
-    const acknowledgement = document.getElementById('aksaCryptoAcknowledge');
     const checkButton = document.getElementById('aksaCryptoCheck');
 
     if (copyAddress) {
@@ -406,13 +405,10 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
         copyAmount.dataset.copyMessage = `Paste the exact ${token} amount in your wallet.`;
     }
 
-    if (acknowledgement) {
-        acknowledgement.checked = false;
-    }
-
     if (checkButton) {
-        checkButton.disabled = true;
-        checkButton.classList.add('opacity-60', 'pointer-events-none');
+        checkButton.disabled = false;
+        checkButton.innerText = 'Check Payment';
+        checkButton.classList.remove('opacity-60', 'pointer-events-none');
     }
 
     modal.classList.remove('hidden');
@@ -683,15 +679,6 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !cryptoState.orderId) return;
 
-    const acknowledgement = document.getElementById('aksaCryptoAcknowledge');
-
-    if (acknowledgement && !acknowledgement.checked) {
-        window.showAppToast?.('Confirm first', 'Confirm that you sent the exact amount through the selected network.', {
-            variant: 'warning',
-        });
-        return;
-    }
-
     const originalText = button.innerText;
 
     button.disabled = true;
@@ -730,20 +717,6 @@ document.addEventListener('click', async (event) => {
         button.innerText = originalText || 'Check Payment';
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
-});
-
-document.addEventListener('change', (event) => {
-    const acknowledgement = event.target.closest('[data-crypto-ack]');
-
-    if (!acknowledgement) return;
-
-    const checkButton = document.getElementById('aksaCryptoCheck');
-
-    if (!checkButton) return;
-
-    checkButton.disabled = !acknowledgement.checked;
-    checkButton.classList.toggle('opacity-60', !acknowledgement.checked);
-    checkButton.classList.toggle('pointer-events-none', !acknowledgement.checked);
 });
 
 document.addEventListener('click', async (event) => {

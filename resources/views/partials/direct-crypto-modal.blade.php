@@ -4,13 +4,24 @@
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaCryptoTitle">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <p id="aksaCryptoTokenLabel" class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Stablecoin Address</p>
-                <h2 id="aksaCryptoTitle" class="mt-1 text-xl font-semibold text-white">Send Exact Amount</h2>
+                <h2 id="aksaCryptoTitle" class="text-xl font-semibold text-white">Crypto Payment</h2>
             </div>
             <button type="button" class="qris-close-button" data-crypto-close aria-label="Close crypto checkout">x</button>
         </div>
 
         <div class="mt-5 grid gap-3 text-sm">
+            <div class="crypto-payment-warning">
+                <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
+                <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
+                    Send exactly the amount shown below. Network/exchange fee is not included.
+                </p>
+                <p class="mt-1 text-xs leading-5 text-gray-300">
+                    The received token amount must match this invoice amount, or the order will stay pending.
+                </p>
+                <p class="mt-2 text-xs font-semibold leading-5 text-white">
+                    Use the selected network and keep your wallet receipt. If Binance shows Off-chain Transfer, keep that receipt too.
+                </p>
+            </div>
             <div class="qris-detail-row">
                 <span>Network</span>
                 <span id="aksaCryptoNetwork" class="font-semibold text-gray-200">-</span>
@@ -37,18 +48,6 @@
                 <span>Token contract</span>
                 <span id="aksaCryptoContract" class="min-w-0 truncate text-right font-mono text-[11px] text-gray-500">-</span>
             </div>
-            <div class="crypto-payment-warning">
-                <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
-                <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
-                    Send exactly the amount shown above. Network/exchange fee is not included.
-                </p>
-                <p class="mt-1 text-xs leading-5 text-gray-300">
-                    The received token amount must match this invoice amount, or the order will stay pending.
-                </p>
-                <p class="mt-2 text-xs font-semibold leading-5 text-white">
-                    Use the selected network and keep your wallet receipt. If Binance shows Off-chain Transfer, keep that receipt too.
-                </p>
-            </div>
             <div class="qris-detail-row">
                 <span>Order ID</span>
                 <span id="aksaCryptoOrderId" class="font-mono text-xs text-gray-300">-</span>
@@ -59,13 +58,8 @@
             </div>
         </div>
 
-        <label class="crypto-confirm-row mt-5">
-            <input type="checkbox" id="aksaCryptoAcknowledge" data-crypto-ack>
-            <span>I sent the exact amount to the address shown above.</span>
-        </label>
-
-        <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            <button type="button" id="aksaCryptoCheck" data-crypto-check class="order-action w-full opacity-60 pointer-events-none" disabled>
+        <div class="mt-5 grid gap-2 sm:grid-cols-2">
+            <button type="button" id="aksaCryptoCheck" data-crypto-check class="order-action w-full">
                 Check Payment
             </button>
             <a href="/orders" class="order-action w-full">
