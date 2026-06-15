@@ -19,6 +19,8 @@ class PaymentService
 
     private VoucherService $voucherService;
 
+    private ?array $lastBinanceRequestDiagnostics = null;
+
     private const ALLOWED_COINS = [
         'usdttrc20',
         'usdtbsc',
@@ -289,7 +291,7 @@ class PaymentService
                 $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
             }
 
-            if (! empty($binanceInspection['transfer'])) {
+            if ($binanceInspection !== null) {
                 return $binanceInspection;
             }
 
@@ -316,6 +318,7 @@ class PaymentService
             'transfer' => $binanceInspection['transfer'] ?? null,
             'mismatches' => array_slice($mismatches, 0, 5),
             'last_scanned_block' => $inspection['last_scanned_block'] ?? null,
+            'binance_diagnostics' => $binanceInspection['binance_diagnostics'] ?? null,
         ];
     }
 
@@ -520,7 +523,14 @@ class PaymentService
         }
 
         if (blank($fallback['api_key'] ?? null) || blank($fallback['api_secret'] ?? null)) {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+                'binance_diagnostics' => [
+                    'status' => 'missing_api_credentials',
+                    'returned_records' => 0,
+                ],
+            ];
         }
 
         $coin = strtolower((string) ($payload['network'] ?? ''));
@@ -552,11 +562,31 @@ class PaymentService
         ], $fallback);
 
         if (! is_array($deposits)) {
-            return null;
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+                'binance_diagnostics' => $this->lastBinanceRequestDiagnostics ?: [
+                    'status' => 'request_failed',
+                    'returned_records' => 0,
+                ],
+            ];
         }
+
+        $diagnostics = [
+            'status' => 'no_matching_deposit',
+            'returned_records' => count($deposits),
+            'expected_coin' => $token,
+            'expected_network' => $binanceNetwork,
+            'expected_amount' => $this->tokenUnitsToDecimal($requiredUnits, $decimals),
+            'expected_address_suffix' => $this->addressSuffix($address),
+            'rejections' => [],
+            'closest_record' => null,
+        ];
 
         foreach ($deposits as $deposit) {
             if (! is_array($deposit)) {
+                $this->incrementDiagnosticRejection($diagnostics, 'invalid_record');
+
                 continue;
             }
 
@@ -565,22 +595,64 @@ class PaymentService
             $value = $this->decimalToTokenUnits($deposit['amount'] ?? null, $decimals);
             $timestampMs = (int) (($deposit['completeTime'] ?? null) ?: ($deposit['insertTime'] ?? 0));
             $timestamp = (int) floor($timestampMs / 1000);
+            $record = [
+                'coin' => strtoupper((string) ($deposit['coin'] ?? '')),
+                'network' => $actualNetwork,
+                'status' => (int) ($deposit['status'] ?? -1),
+                'amount' => is_scalar($deposit['amount'] ?? null) ? (string) $deposit['amount'] : null,
+                'address_suffix' => $this->addressSuffix($actualAddress),
+                'reference' => (string) ($deposit['txId'] ?? $deposit['id'] ?? ''),
+                'confirmed_at' => $timestamp > 0 ? Carbon::createFromTimestamp($timestamp)->toIso8601String() : null,
+                'transfer_type' => isset($deposit['transferType']) ? (int) $deposit['transferType'] : null,
+                'wallet_type' => isset($deposit['walletType']) ? (int) $deposit['walletType'] : null,
+            ];
+
+            if (
+                $diagnostics['closest_record'] === null ||
+                ($value !== null && $this->decimalStringCompare($value, $requiredUnits) === 0)
+            ) {
+                $diagnostics['closest_record'] = $record;
+            }
 
             if ($timestamp <= 0) {
+                $this->incrementDiagnosticRejection($diagnostics, 'missing_timestamp');
+
                 continue;
             }
 
-            if (
-                strtoupper((string) ($deposit['coin'] ?? '')) !== $token ||
-                (int) ($deposit['status'] ?? -1) !== 1 ||
-                ! $this->sameBinanceDepositNetwork($coin, $binanceNetwork, $actualNetwork) ||
-                ! $this->sameCryptoAddress($address, $actualAddress) ||
-                $value === null
-            ) {
+            if ($record['coin'] !== $token) {
+                $this->incrementDiagnosticRejection($diagnostics, 'coin');
+
+                continue;
+            }
+
+            if ($record['status'] !== 1) {
+                $this->incrementDiagnosticRejection($diagnostics, 'status');
+
+                continue;
+            }
+
+            if (! $this->sameBinanceDepositNetwork($coin, $binanceNetwork, $actualNetwork)) {
+                $this->incrementDiagnosticRejection($diagnostics, 'network');
+
+                continue;
+            }
+
+            if (! $this->sameCryptoAddress($address, $actualAddress)) {
+                $this->incrementDiagnosticRejection($diagnostics, 'address');
+
+                continue;
+            }
+
+            if ($value === null) {
+                $this->incrementDiagnosticRejection($diagnostics, 'invalid_amount');
+
                 continue;
             }
 
             if ($createdAtTimestamp && $timestamp < ($createdAtTimestamp - 300)) {
+                $this->incrementDiagnosticRejection($diagnostics, 'before_order');
+
                 continue;
             }
 
@@ -601,13 +673,26 @@ class PaymentService
                 return [
                     'transfer' => $transfer,
                     'mismatches' => [],
+                    'binance_diagnostics' => [
+                        'status' => 'matched',
+                        'returned_records' => count($deposits),
+                        'matched_record' => $record,
+                    ],
                 ];
             }
+
+            $this->incrementDiagnosticRejection(
+                $diagnostics,
+                $this->decimalStringCompare($value, $requiredUnits) === 0
+                    ? 'reference_unavailable'
+                    : 'amount'
+            );
         }
 
         return [
             'transfer' => null,
             'mismatches' => [],
+            'binance_diagnostics' => $diagnostics,
         ];
     }
 
@@ -1033,6 +1118,18 @@ class PaymentService
         return array_values(array_unique(array_filter($aliases)));
     }
 
+    private function incrementDiagnosticRejection(array &$diagnostics, string $reason): void
+    {
+        $diagnostics['rejections'][$reason] = ((int) ($diagnostics['rejections'][$reason] ?? 0)) + 1;
+    }
+
+    private function addressSuffix(string $address): string
+    {
+        $address = trim($address);
+
+        return $address === '' ? '' : substr($address, -8);
+    }
+
     private function decimalToTokenUnits($amount, int $decimals = 18): ?string
     {
         if (! is_numeric($amount)) {
@@ -1152,6 +1249,8 @@ class PaymentService
 
     private function signedBinanceGet(string $path, array $params, array $config): ?array
     {
+        $this->lastBinanceRequestDiagnostics = null;
+
         $baseUrl = rtrim((string) ($config['base_url'] ?? 'https://api.binance.com'), '/');
         $apiKey = (string) ($config['api_key'] ?? '');
         $apiSecret = (string) ($config['api_secret'] ?? '');
@@ -1164,16 +1263,38 @@ class PaymentService
         $signature = hash_hmac('sha256', $query, $apiSecret);
         $url = $baseUrl.$path.'?'.$query.'&signature='.$signature;
 
-        $response = Http::withOptions($this->gatewayHttpOptions())
-            ->withHeaders([
-                'X-MBX-APIKEY' => $apiKey,
-            ])
-            ->timeout(20)
-            ->get($url);
+        try {
+            $response = Http::withOptions($this->gatewayHttpOptions())
+                ->withHeaders([
+                    'X-MBX-APIKEY' => $apiKey,
+                ])
+                ->timeout(20)
+                ->get($url);
+        } catch (\Exception $error) {
+            $this->lastBinanceRequestDiagnostics = [
+                'status' => 'connection_failed',
+                'returned_records' => 0,
+            ];
+
+            Log::warning('Binance deposit history verification connection failed', [
+                'path' => $path,
+                'error_type' => class_basename($error),
+            ]);
+
+            return null;
+        }
 
         $payload = $response->json();
 
         if (! $response->successful() || ! is_array($payload)) {
+            $this->lastBinanceRequestDiagnostics = [
+                'status' => 'request_failed',
+                'returned_records' => 0,
+                'http_status' => $response->status(),
+                'code' => is_array($payload) ? ($payload['code'] ?? null) : null,
+                'message' => is_array($payload) ? ($payload['msg'] ?? null) : null,
+            ];
+
             Log::warning('Binance deposit history verification request failed', [
                 'path' => $path,
                 'status' => $response->status(),
@@ -1183,6 +1304,11 @@ class PaymentService
 
             return null;
         }
+
+        $this->lastBinanceRequestDiagnostics = [
+            'status' => 'request_succeeded',
+            'returned_records' => count($payload),
+        ];
 
         return $payload;
     }

@@ -10,6 +10,8 @@
         $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
         $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
         $amountMismatch = is_array($payload['amount_mismatch'] ?? null) ? $payload['amount_mismatch'] : null;
+        $binanceDiagnostics = is_array($payload['binance_diagnostics'] ?? null) ? $payload['binance_diagnostics'] : null;
+        $binanceClosestRecord = is_array($binanceDiagnostics['closest_record'] ?? null) ? $binanceDiagnostics['closest_record'] : null;
         $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
         $createdAt = $order->created_at?->timezone(config('app.timezone'));
         $expiresAt = $order->expired_at?->timezone(config('app.timezone'));
@@ -217,6 +219,35 @@
                                 <span>Last checked</span>
                                 <span class="text-right text-gray-200">{{ ! empty($payload['last_checked_at']) ? \Carbon\Carbon::parse($payload['last_checked_at'])->timezone(config('app.timezone'))->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
                             </div>
+                            @if ($binanceDiagnostics)
+                                <div class="crypto-payment-warning">
+                                    <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Binance API Diagnosis</p>
+                                    <p class="mt-1 text-xs leading-5 text-gray-300">
+                                        {{ str_replace('_', ' ', ucfirst($binanceDiagnostics['status'] ?? 'unknown')) }}.
+                                        Records returned: {{ $binanceDiagnostics['returned_records'] ?? 0 }}.
+                                        @if (! empty($binanceDiagnostics['http_status']) || ! empty($binanceDiagnostics['code']))
+                                            HTTP {{ $binanceDiagnostics['http_status'] ?? '-' }}, code {{ $binanceDiagnostics['code'] ?? '-' }}.
+                                        @endif
+                                    </p>
+                                    @if (! empty($binanceDiagnostics['message']))
+                                        <p class="mt-1 text-xs leading-5 text-gray-400">{{ $binanceDiagnostics['message'] }}</p>
+                                    @endif
+                                    @if (! empty($binanceDiagnostics['rejections']))
+                                        <p class="mt-1 break-all font-mono text-[11px] text-[#F5D0FE]">
+                                            Rejected: {{ collect($binanceDiagnostics['rejections'])->map(fn ($count, $reason) => str_replace('_', ' ', $reason) . '=' . $count)->implode(', ') }}
+                                        </p>
+                                    @endif
+                                    @if ($binanceClosestRecord)
+                                        <p class="mt-1 break-all font-mono text-[11px] text-gray-400">
+                                            Closest: {{ $binanceClosestRecord['amount'] ?? '-' }} {{ $binanceClosestRecord['coin'] ?? '-' }},
+                                            {{ $binanceClosestRecord['network'] ?? '-' }},
+                                            address ...{{ $binanceClosestRecord['address_suffix'] ?? '-' }},
+                                            wallet {{ $binanceClosestRecord['wallet_type'] ?? '-' }},
+                                            {{ $binanceClosestRecord['reference'] ?? '-' }}
+                                        </p>
+                                    @endif
+                                </div>
+                            @endif
                             @if ($amountMismatch)
                                 <div class="crypto-payment-warning">
                                     <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Amount Mismatch</p>

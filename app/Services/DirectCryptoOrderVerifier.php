@@ -310,6 +310,10 @@ class DirectCryptoOrderVerifier
             $payload['last_scanned_block'] = max(0, (int) $inspection['last_scanned_block']);
         }
 
+        if (is_array($inspection['binance_diagnostics'] ?? null)) {
+            $payload['binance_diagnostics'] = $inspection['binance_diagnostics'];
+        }
+
         DB::transaction(function () use ($order, $payload): void {
             $lockedOrder = Order::whereKey($order->id)
                 ->lockForUpdate()

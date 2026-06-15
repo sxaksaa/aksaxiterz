@@ -679,6 +679,162 @@ class PaymentServiceTest extends TestCase
         Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'https://trongrid.test/'));
     }
 
+    public function test_direct_crypto_scanner_matches_recent_binance_off_chain_bsc_receipt_first(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
+            'services.crypto_direct.networks.usdtbsc.binance_network' => 'BSC',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.primary' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+            'services.binance.deposit_fallback.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([[
+                'id' => '381464465096',
+                'amount' => '6.00781300',
+                'coin' => 'USDT',
+                'network' => 'BSC',
+                'status' => 1,
+                'address' => '0x77b6ebebd76914112c6bd707c3578dbff4641619',
+                'txId' => 'Off-chain Transfer 381464465096',
+                'insertTime' => now()->subMinute()->timestamp * 1000,
+                'completeTime' => now()->subMinute()->timestamp * 1000,
+                'transferType' => 1,
+                'walletType' => 1,
+            ]], 200),
+            'https://bsc-rpc.test/*' => Http::response(['error' => 'should not be called'], 500),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-1ZOGZYH7IT',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDT',
+                'network' => 'usdtbsc',
+                'address' => '0x77b6ebebd76914112c6bd707c3578dbff4641619',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '6.007813',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('Off-chain Transfer 381464465096', $transfer['tx_hash'] ?? null);
+        $this->assertSame('usdtbsc', $transfer['network'] ?? null);
+        $this->assertSame('6.007813', $transfer['amount'] ?? null);
+        $this->assertSame('binance_deposit_history', $transfer['source'] ?? null);
+
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://binance.test/sapi/v1/capital/deposit/hisrec?'));
+        Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'https://bsc-rpc.test/'));
+    }
+
+    public function test_direct_crypto_scanner_reports_why_binance_record_did_not_match(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
+            'services.crypto_direct.networks.usdtbsc.binance_network' => 'BSC',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.primary' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+            'services.binance.deposit_fallback.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([[
+                'id' => '381464465096',
+                'amount' => '6.00781300',
+                'coin' => 'USDT',
+                'network' => 'ETH',
+                'status' => 1,
+                'address' => '0x77b6ebebd76914112c6bd707c3578dbff4641619',
+                'txId' => 'Off-chain Transfer 381464465096',
+                'insertTime' => now()->subMinute()->timestamp * 1000,
+                'completeTime' => now()->subMinute()->timestamp * 1000,
+                'transferType' => 1,
+                'walletType' => 1,
+            ]], 200),
+            'https://bsc-rpc.test/*' => Http::response(['error' => 'temporarily unavailable'], 503),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-BINANCE-DIAGNOSIS',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDT',
+                'network' => 'usdtbsc',
+                'address' => '0x77b6ebebd76914112c6bd707c3578dbff4641619',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '6.007813',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $inspection = (new PaymentService)->inspectDirectCryptoPayment($order);
+
+        $this->assertNull($inspection['transfer']);
+        $this->assertSame('no_matching_deposit', $inspection['binance_diagnostics']['status'] ?? null);
+        $this->assertSame(1, $inspection['binance_diagnostics']['returned_records'] ?? null);
+        $this->assertSame(1, $inspection['binance_diagnostics']['rejections']['network'] ?? null);
+        $this->assertSame(1, $inspection['binance_diagnostics']['closest_record']['wallet_type'] ?? null);
+        $this->assertSame('Off-chain Transfer 381464465096', $inspection['binance_diagnostics']['closest_record']['reference'] ?? null);
+    }
+
+    public function test_direct_crypto_scanner_reports_binance_api_rejection(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.primary' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([
+                'code' => -2015,
+                'msg' => 'Invalid API-key, IP, or permissions for action.',
+            ], 401),
+            'https://bsc-rpc.test/*' => Http::response(['error' => 'temporarily unavailable'], 503),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-BINANCE-API-DIAGNOSIS',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtbsc',
+                'address' => '0x77b6ebebd76914112c6bd707c3578dbff4641619',
+                'contract' => '0x55d398326f99059fF775485246999027B3197955',
+                'amount' => '6.007813',
+                'decimals' => 18,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $inspection = (new PaymentService)->inspectDirectCryptoPayment($order);
+
+        $this->assertNull($inspection['transfer']);
+        $this->assertSame('request_failed', $inspection['binance_diagnostics']['status'] ?? null);
+        $this->assertSame(401, $inspection['binance_diagnostics']['http_status'] ?? null);
+        $this->assertSame(-2015, $inspection['binance_diagnostics']['code'] ?? null);
+        $this->assertSame(
+            'Invalid API-key, IP, or permissions for action.',
+            $inspection['binance_diagnostics']['message'] ?? null
+        );
+    }
+
     private function fakeBscRpcTransfer(
         string $hash,
         string $units,
