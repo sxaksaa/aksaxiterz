@@ -253,6 +253,17 @@ class PaymentService
         return $this->inspectDirectCryptoPayment($order)['transfer'] ?? null;
     }
 
+    public function inspectDirectBinancePayment(Order $order): ?array
+    {
+        $payload = $order->payment_payload;
+
+        if (! is_array($payload) || ($payload['type'] ?? null) !== 'direct_crypto') {
+            return null;
+        }
+
+        return $this->inspectDirectBinanceDeposits($order, $payload);
+    }
+
     public function inspectDirectCryptoPayment(Order $order): array
     {
         $payload = $order->payment_payload;
