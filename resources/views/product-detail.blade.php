@@ -6,16 +6,29 @@
         $discordUrl = config('links.discord_url');
         $hasAutoDelivery = $stock > 0;
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
+        $formatUsdCompact = function ($amount) {
+            $amount = (float) $amount;
+            $formatted = abs($amount - round($amount)) < 0.005
+                ? number_format($amount, 0)
+                : number_format($amount, 2);
+
+            return '$'.$formatted;
+        };
         $packageSavings = $product->packages->mapWithKeys(function ($package) use ($dailyPackage) {
             $days = $package->durationDays();
             $comparisonPrice = $dailyPackage && $days ? ((int) $dailyPackage->price * $days) : 0;
             $saving = max(0, $comparisonPrice - (int) $package->price);
+            $comparisonPriceUsdt = $dailyPackage && $days ? ((float) $dailyPackage->price_usdt * $days) : 0;
+            $savingUsdt = max(0, $comparisonPriceUsdt - (float) $package->price_usdt);
 
             return [$package->id => [
                 'days' => $days,
                 'saving' => $saving,
+                'saving_usdt' => round($savingUsdt, 2),
                 'percent' => $comparisonPrice > 0 ? (int) round(($saving / $comparisonPrice) * 100) : 0,
+                'percent_usdt' => $comparisonPriceUsdt > 0 ? (int) round(($savingUsdt / $comparisonPriceUsdt) * 100) : 0,
                 'per_day' => $days ? (int) round($package->price / $days) : null,
+                'per_day_usdt' => $days ? round(((float) $package->price_usdt / $days), 2) : null,
             ]];
         });
         $bestValuePackageId = $packageSavings
@@ -33,12 +46,6 @@
                 <a href="/" class="text-sm text-[#C084FC] hover:text-white transition">Back to products</a>
                 <h1 class="text-3xl md:text-5xl font-bold mt-3 mb-3">{{ $product->name }}</h1>
                 <p class="text-gray-400 max-w-2xl">{{ $product->description }}</p>
-
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <span class="support-pill">{{ $hasAutoDelivery ? 'Auto delivery ready' : 'Manual order via Discord' }}</span>
-                    <span class="support-pill">Secure checkout</span>
-                    <span class="support-pill">Discord ready</span>
-                </div>
             </div>
 
             <div class="product-stat">
@@ -209,24 +216,34 @@
                     </p>
 
                     <p class="price-text text-lg font-semibold text-[#C084FC]" data-idr="Rp {{ number_format($p->price) }}"
-                        data-usd="${{ rtrim(rtrim($p->price_usdt, '0'), '.') }}">
+                        data-usd="{{ $formatUsdCompact($p->price_usdt) }}">
                         Rp {{ number_format($p->price) }}
                     </p>
 
                     @if (($saving['saving'] ?? 0) > 0)
                         <div class="package-saving">
                             <div class="flex items-center justify-between gap-2">
-                                <p class="text-xs font-semibold text-emerald-300">
+                                <p class="text-xs font-semibold text-emerald-300" data-currency-text
+                                    data-idr="Save Rp {{ number_format($saving['saving']) }}"
+                                    data-usd="Save {{ $formatUsdCompact($saving['saving_usdt']) }}">
                                     Save Rp {{ number_format($saving['saving']) }}
                                 </p>
-                                <span class="package-saving-badge">{{ $saving['percent'] }}% vs daily</span>
+                                <span class="package-saving-badge" data-currency-text
+                                    data-idr="{{ $saving['percent'] }}% vs daily"
+                                    data-usd="{{ $saving['percent_usdt'] }}% vs daily">{{ $saving['percent'] }}% vs daily</span>
                             </div>
-                            <p class="mt-1 text-xs text-gray-400">
+                            <p class="mt-1 text-xs text-gray-400" data-currency-text
+                                data-idr="Rp {{ number_format($saving['per_day']) }} per day"
+                                data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }} per day">
                                 Rp {{ number_format($saving['per_day']) }} per day
                             </p>
                         </div>
                     @elseif (($saving['per_day'] ?? null) !== null)
-                        <p class="mt-3 text-xs text-gray-400">Rp {{ number_format($saving['per_day']) }} per day</p>
+                        <p class="mt-3 text-xs text-gray-400" data-currency-text
+                            data-idr="Rp {{ number_format($saving['per_day']) }} per day"
+                            data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }} per day">
+                            Rp {{ number_format($saving['per_day']) }} per day
+                        </p>
                     @endif
 
                     <p class="package-availability {{ $packageStock > 0 ? 'package-availability-ready' : 'package-availability-manual' }}">
@@ -491,10 +508,10 @@
            PRICE SWITCH
         ========================= */
         function updateAllPrices() {
-            document.querySelectorAll('.price-text').forEach(el => {
-                el.innerText = selectedPayment === 'crypto' ?
-                    el.dataset.usd :
-                    el.dataset.idr;
+            const currency = selectedPayment === 'crypto' ? 'usd' : 'idr';
+
+            document.querySelectorAll('[data-idr][data-usd]').forEach(el => {
+                el.innerText = el.dataset[currency];
             });
         }
 

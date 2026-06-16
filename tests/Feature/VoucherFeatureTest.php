@@ -311,7 +311,10 @@ class VoucherFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('Best Value')
             ->assertSee('Save Rp 350,000')
+            ->assertSee('data-usd="Save $22.50"', false)
             ->assertSee('58% vs daily')
+            ->assertSee('data-usd="60% vs daily"', false)
+            ->assertSee('data-usd="$0.50 per day"', false)
             ->assertSee('Enter voucher code')
             ->assertSee('Join our Discord server to get promo codes.');
     }
