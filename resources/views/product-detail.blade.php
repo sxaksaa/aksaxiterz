@@ -127,7 +127,7 @@
                     class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                     <div class="font-semibold">Binance Pay</div>
-                    <span class="text-xs text-gray-400">Pay ID · Automatic verification</span>
+                    <span class="text-xs text-gray-400">Binance Pay ID & QR</span>
 
                 </div>
             @endif
@@ -136,7 +136,7 @@
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
                 <div class="font-semibold">Crypto</div>
-                <span class="text-xs text-gray-400">Stablecoin Address</span>
+                <span class="text-xs text-gray-400">Crypto Wallet Address</span>
 
             </div>
 
