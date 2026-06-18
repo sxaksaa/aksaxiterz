@@ -18,10 +18,6 @@
         </div>
 
         <div id="aksaBinancePayDetails">
-            <div id="aksaBinancePayQrWrap" class="qris-canvas-wrap mt-5 hidden">
-                <canvas id="aksaBinancePayCanvas" width="256" height="256" aria-label="Binance Pay receive code"></canvas>
-            </div>
-
             <div class="crypto-payment-warning mt-5">
                 <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
                 <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
@@ -30,6 +26,10 @@
                 <p class="mt-1 text-xs leading-5 text-gray-300">
                     Open Binance, choose Pay or Send, enter the Pay ID below, select the displayed token, and paste the exact amount.
                 </p>
+            </div>
+
+            <div id="aksaBinancePayQrWrap" class="qris-canvas-wrap mt-5 hidden">
+                <canvas id="aksaBinancePayCanvas" width="256" height="256" aria-label="Binance Pay receive code"></canvas>
             </div>
 
             <div class="mt-3 grid gap-3 text-sm">
