@@ -25,11 +25,12 @@ class VoucherService
         $baseUsdt = round(max(0, (float) ($package->price_usdt ?? 0)) * $quantity, 6);
         $paymentMethod = strtolower($paymentMethod);
 
-        if (! in_array($paymentMethod, ['pakasir', 'crypto'], true)) {
+        if (! in_array($paymentMethod, ['pakasir', 'crypto', 'binance_pay'], true)) {
             throw new VoucherException('Unsupported voucher payment method.');
         }
 
-        $token = $paymentMethod === 'crypto' ? $this->cryptoToken($coin) : null;
+        $usesStablecoin = in_array($paymentMethod, ['crypto', 'binance_pay'], true);
+        $token = $usesStablecoin ? $this->cryptoToken($coin) : null;
 
         if (blank($code) && ! $voucherId) {
             return $this->emptyQuote($baseIdr, $baseUsdt, $paymentMethod, $token, $quantity);
@@ -61,7 +62,7 @@ class VoucherService
             ? min(round($baseUsdt * ($voucher->discount_percent / 100), 6), $maxDiscountCrypto)
             : 0;
 
-        $selectedDiscount = $paymentMethod === 'crypto' ? $discountUsdt : $discountIdr;
+        $selectedDiscount = $usesStablecoin ? $discountUsdt : $discountIdr;
 
         if ($selectedDiscount <= 0) {
             throw new VoucherException('This voucher does not discount the selected package.');
@@ -90,7 +91,7 @@ class VoucherService
 
     public function checkoutPrice(array $quote, string $paymentMethod): float|int
     {
-        return $paymentMethod === 'crypto'
+        return in_array($paymentMethod, ['crypto', 'binance_pay'], true)
             ? (float) $quote['final_usdt']
             : (int) $quote['final_idr'];
     }

@@ -114,6 +114,48 @@ class PaymentServiceTest extends TestCase
         $this->assertNotSame($first, $second);
     }
 
+    public function test_binance_pay_history_uses_signed_personal_pay_endpoint(): void
+    {
+        config([
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+            'services.binance.pay.base_url' => 'https://binance.test',
+            'services.binance.pay.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([
+                'code' => '000000',
+                'message' => 'success',
+                'data' => [[
+                    'orderType' => 'C2C',
+                    'transactionId' => 'M_P_TEST',
+                    'transactionTime' => now()->getTimestampMs(),
+                    'amount' => '1.100123',
+                    'currency' => 'USDT',
+                ]],
+                'success' => true,
+            ]),
+        ]);
+
+        $history = (new PaymentService)->getBinancePayTransactions(
+            now()->subHour(),
+            now()->addMinute()
+        );
+
+        $this->assertSame('M_P_TEST', $history['transactions'][0]['transactionId'] ?? null);
+        $this->assertSame(1, $history['diagnostics']['returned_records'] ?? null);
+
+        Http::assertSent(function ($request): bool {
+            return str_starts_with($request->url(), 'https://binance.test/sapi/v1/pay/transactions?') &&
+                str_contains($request->url(), 'startTime=') &&
+                str_contains($request->url(), 'endTime=') &&
+                str_contains($request->url(), 'signature=') &&
+                ($request->header('X-MBX-APIKEY')[0] ?? null) === 'test-key';
+        });
+    }
+
     public function test_direct_bep20_scan_window_expands_with_order_age(): void
     {
         $order = new Order;

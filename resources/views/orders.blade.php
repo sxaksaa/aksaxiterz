@@ -48,6 +48,7 @@
     </div>
 
     @include('partials.pakasir-qris-modal')
+    @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
 
@@ -154,6 +155,29 @@
             return data;
         }
 
+        async function syncBinancePayOrder(orderId) {
+            if (!orderId) return null;
+
+            const response = await fetch(`/sync-binance-pay-order/${encodeURIComponent(orderId)}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok && response.status !== 202) {
+                const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+                error.status = response.status;
+                throw error;
+            }
+
+            return data;
+        }
+
         function openHostedPayment(paymentUrl) {
             const paymentTab = window.open(paymentUrl, '_blank');
 
@@ -187,6 +211,18 @@
 
             if (data.method === 'crypto' && data.crypto_payment) {
                 const opened = await window.openAksaCryptoModal?.(data, {
+                    startPolling: true,
+                });
+
+                if (!opened) {
+                    await refreshOrders();
+                }
+
+                return;
+            }
+
+            if (data.method === 'binance_pay' && data.binance_pay_payment) {
+                const opened = await window.openAksaBinancePayModal?.(data, {
                     startPolling: true,
                 });
 
@@ -317,6 +353,25 @@
             }
         });
 
+        document.addEventListener('click', async function(e) {
+            const button = e.target.closest('.open-binance-pay-button');
+            if (!button) return;
+
+            e.preventDefault();
+
+            let checkout = null;
+
+            try {
+                checkout = JSON.parse(button.dataset.binancePayCheckout || '{}');
+            } catch (error) {
+                checkout = null;
+            }
+
+            await window.openAksaBinancePayModal?.(checkout, {
+                startPolling: true,
+            });
+        });
+
         document.addEventListener('submit', async function(e) {
             const form = e.target.closest('.sync-pakasir-form');
             if (!form) return;
@@ -418,6 +473,57 @@
         });
 
         document.addEventListener('submit', async function(e) {
+            const form = e.target.closest('.sync-binance-pay-form');
+            if (!form) return;
+
+            e.preventDefault();
+
+            const button = form.querySelector('.sync-binance-pay-button');
+            const orderId = button?.dataset.orderId;
+            const originalText = button.innerText;
+
+            button.disabled = true;
+            button.innerText = 'Checking...';
+            button.classList.add('opacity-60', 'pointer-events-none');
+
+            window.showAppToast?.('Payment check', 'Checking your Binance Pay transfer.');
+
+            try {
+                const result = await syncBinancePayOrder(orderId);
+
+                if (result?.status === 'paid') {
+                    const deliveryPending = result?.delivery_pending === true;
+
+                    window.showAksaPaymentSuccess?.({
+                        message: result.message || 'Your Binance Pay transfer has been verified and your license is ready.',
+                        licenseKey: result.license_key,
+                        licenseKeys: result.license_keys,
+                        orderId: result.order_id || orderId,
+                        primaryUrl: deliveryPending ? '/orders' : undefined,
+                        primaryText: deliveryPending ? 'Open Orders' : undefined,
+                        copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                        redirectDelay: deliveryPending ? 8000 : undefined,
+                    });
+                    await refreshOrders();
+                    return;
+                }
+
+                window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
+                    variant: 'warning',
+                });
+                await refreshOrders();
+            } catch (error) {
+                window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+                    variant: 'error',
+                });
+            } finally {
+                button.disabled = false;
+                button.innerText = originalText || 'Check Payment';
+                button.classList.remove('opacity-60', 'pointer-events-none');
+            }
+        });
+
+        document.addEventListener('submit', async function(e) {
             const form = e.target.closest('.cancel-order-form');
             if (!form) return;
 
@@ -467,6 +573,7 @@
 
                 const qrisModalOpen = document.getElementById('aksaQrisModal')?.getAttribute('aria-hidden') === 'false';
                 const cryptoModalOpen = document.getElementById('aksaCryptoModal')?.getAttribute('aria-hidden') === 'false';
+                const binancePayModalOpen = document.getElementById('aksaBinancePayModal')?.getAttribute('aria-hidden') === 'false';
 
                 if (data.status === 'pending' && data.payment_method === 'pakasir' && data.order_id && !qrisModalOpen) {
                     const result = await syncPakasirOrder(data.order_id);
@@ -507,6 +614,32 @@
                             redirectDelay: deliveryPending ? 8000 : undefined,
                         }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
                             variant: 'success',
+                        });
+                        refreshOrders();
+                        return;
+                    }
+
+                    if (result?.status && result.status !== lastPolledStatus) {
+                        lastPolledStatus = result.status;
+                        refreshOrders();
+                    }
+                }
+
+                if (data.can_sync_binance_pay && data.payment_method === 'binance_pay' && data.order_id && !binancePayModalOpen) {
+                    const result = await syncBinancePayOrder(data.order_id);
+
+                    if (result?.status === 'paid') {
+                        const deliveryPending = result?.delivery_pending === true;
+
+                        window.showAksaPaymentSuccess?.({
+                            message: result.message || 'Your Binance Pay transfer has been verified and your license is ready.',
+                            licenseKey: result.license_key,
+                            licenseKeys: result.license_keys,
+                            orderId: result.order_id || data.order_id,
+                            primaryUrl: deliveryPending ? '/orders' : undefined,
+                            primaryText: deliveryPending ? 'Open Orders' : undefined,
+                            copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                            redirectDelay: deliveryPending ? 8000 : undefined,
                         });
                         refreshOrders();
                         return;

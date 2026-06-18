@@ -154,6 +154,35 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('Pay Again', $html);
     }
 
+    public function test_binance_pay_orders_render_pay_id_and_automatic_verification_actions(): void
+    {
+        $order = $this->fakeOrder([
+            'order_id' => 'ORDER-BINANCE-PAY',
+            'payment_method' => 'binance_pay',
+            'price' => 1.100123,
+            'payment_payload' => [
+                'type' => 'binance_pay_personal',
+                'token' => 'USDT',
+                'pay_id' => '123456789',
+                'qr_content' => '',
+                'amount' => '1.100123',
+                'base_amount' => '1.100000',
+                'unique_amount' => '0.000123',
+                'expires_at' => now()->addMinutes(10)->toIso8601String(),
+            ],
+            'expired_at' => now()->addMinutes(10),
+        ]);
+
+        $html = $this->renderOrders([$order]);
+
+        $this->assertStringContainsString('Binance Pay', $html);
+        $this->assertStringContainsString('View Binance Pay', $html);
+        $this->assertStringContainsString('data-binance-pay-checkout=', $html);
+        $this->assertStringContainsString('class="sync-binance-pay-form"', $html);
+        $this->assertStringContainsString('1.100123 USDT', $html);
+        $this->assertStringNotContainsString('USDT Address', $html);
+    }
+
     public function test_cancelled_orders_do_not_render_extra_payment_actions(): void
     {
         $order = $this->fakeOrder([

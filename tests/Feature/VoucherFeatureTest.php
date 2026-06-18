@@ -54,6 +54,28 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame('USDT', $cryptoQuote['token']);
     }
 
+    public function test_binance_pay_uses_usdt_voucher_price_and_cap(): void
+    {
+        [$user, , $package] = $this->makeCatalog(250000, 15);
+        $voucher = $this->makeVoucher();
+
+        $quote = app(VoucherService::class)->quote(
+            $package,
+            $user,
+            $voucher->code,
+            null,
+            null,
+            false,
+            'binance_pay',
+            'usdt'
+        );
+
+        $this->assertSame('USDT', $quote['token']);
+        $this->assertSame(0.25, $quote['discount_usdt']);
+        $this->assertSame(14.75, $quote['final_usdt']);
+        $this->assertSame(14.75, app(VoucherService::class)->checkoutPrice($quote, 'binance_pay'));
+    }
+
     public function test_quantity_uses_combined_subtotal_but_keeps_one_voucher_cap(): void
     {
         [$user, , $package] = $this->makeCatalog(100000, 6);
@@ -142,7 +164,7 @@ class VoucherFeatureTest extends TestCase
 
     public function test_preview_uses_selected_coin_cap_and_does_not_expose_voucher_id(): void
     {
-        [$user, , $package] = $this->makeCatalog(250000, 15);
+        [$user, , $package] = $this->makeCatalog(250000, 15, true);
         $this->makeVoucher([
             'max_discount_usdt' => 0.25,
             'max_discount_usdc' => 0.4,
@@ -272,6 +294,37 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame($voucher->id, $result['order']->voucher_id);
         $this->assertSame('14.750000', $result['crypto_payment']['base_amount']);
         $this->assertGreaterThan(14.75, (float) $result['order']->price);
+    }
+
+    public function test_binance_pay_invoice_uses_unique_usdt_amount_and_pay_id(): void
+    {
+        config([
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.pay_id' => '123456789',
+            'services.binance.pay.qr_content' => 'binance-pay-qr-content',
+            'services.binance.pay.token' => 'USDT',
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+            'services.binance.pay.expires_minutes' => 10,
+        ]);
+
+        [$user, $product, $package] = $this->makeCatalog(250000, 15, true);
+        $voucher = $this->makeVoucher();
+
+        $result = app(PaymentService::class)->createBinancePayPayment(
+            $user,
+            $product->id,
+            $package->id,
+            null,
+            $voucher->code
+        );
+
+        $this->assertSame('binance_pay', $result['order']->payment_method);
+        $this->assertSame('binance_pay_personal', $result['binance_pay_payment']['type']);
+        $this->assertSame('123456789', $result['binance_pay_payment']['pay_id']);
+        $this->assertSame('14.750000', $result['binance_pay_payment']['base_amount']);
+        $this->assertGreaterThan(14.75, (float) $result['binance_pay_payment']['amount']);
+        $this->assertNotNull($result['order']->payment_match_key);
     }
 
     public function test_admin_can_create_voucher_and_storefront_shows_package_savings(): void

@@ -60,7 +60,7 @@ class PaymentService
             $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'pakasir');
         }
 
-        $quantity = $this->checkoutQuantity($order ? (int) $order->quantity : $quantity);
+        $quantity = $this->checkoutQuantity($order ? max(1, (int) ($order->quantity ?: 1)) : $quantity);
         $stockCount = $this->availableStockCount($product, $package, $order);
 
         if ($stockCount < $quantity) {
@@ -195,7 +195,7 @@ class PaymentService
             $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'crypto');
         }
 
-        $quantity = $this->checkoutQuantity($order ? (int) $order->quantity : $quantity);
+        $quantity = $this->checkoutQuantity($order ? max(1, (int) ($order->quantity ?: 1)) : $quantity);
         $stockCount = $this->availableStockCount($product, $package, $order);
 
         if ($stockCount < $quantity) {
@@ -246,6 +246,126 @@ class PaymentService
 
             throw $e;
         }
+    }
+
+    public function createBinancePayPayment(
+        $user,
+        $productId,
+        $packageId,
+        ?Order $order = null,
+        ?string $voucherCode = null,
+        int $quantity = 1
+    ): array {
+        $this->ensureBinancePayConfigured();
+        $pay = config('services.binance.pay', []);
+        $token = strtoupper(trim((string) ($pay['token'] ?? 'USDT')));
+        $coin = strtolower($token);
+
+        if (! in_array($token, ['USDT', 'USDC'], true)) {
+            throw new \Exception('Unsupported Binance Pay token');
+        }
+
+        $product = Product::findOrFail($productId);
+        $package = Package::where('id', $packageId)
+            ->where('product_id', $productId)
+            ->firstOrFail();
+
+        if ($order) {
+            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'binance_pay');
+        }
+
+        $quantity = $this->checkoutQuantity($order ? max(1, (int) ($order->quantity ?: 1)) : $quantity);
+        $stockCount = $this->availableStockCount($product, $package, $order);
+
+        if ($stockCount < $quantity) {
+            throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
+        }
+
+        $expiresAt = now()->addMinutes(max(5, (int) ($pay['expires_minutes'] ?? 10)));
+        $order = $this->prepareOrder(
+            $user,
+            $product,
+            $package,
+            'binance_pay',
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $order?->order_id,
+            $coin,
+            $quantity
+        );
+        $baseAmount = (float) $order->price;
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $amount = $this->claimBinancePayAmount($order, $baseAmount, $token, (string) $pay['pay_id']);
+
+            $order->update([
+                'price' => $amount,
+                'payment_url' => null,
+                'payment_payload' => $this->normalizeBinancePayPayment(
+                    $order,
+                    $baseAmount,
+                    $amount,
+                    $expiresAt,
+                    $pay
+                ),
+                'expired_at' => $expiresAt,
+            ]);
+
+            $freshOrder = $order->fresh();
+            $this->stockReservationService->reserve($freshOrder);
+
+            return [
+                'payment_url' => null,
+                'binance_pay_payment' => $freshOrder->payment_payload,
+                'order' => $freshOrder,
+            ];
+        } catch (\Exception $e) {
+            Log::error('BINANCE PAY ERROR: '.$e->getMessage());
+            $this->cancelPendingOrder($order);
+
+            throw $e;
+        }
+    }
+
+    public function getBinancePayTransactions(Carbon $startAt, Carbon $endAt): array
+    {
+        $pay = config('services.binance.pay', []);
+
+        if (
+            ! is_array($pay) ||
+            ! ($pay['enabled'] ?? false) ||
+            blank($pay['api_key'] ?? null) ||
+            blank($pay['api_secret'] ?? null)
+        ) {
+            throw new \Exception('Binance Pay automatic verification is not configured');
+        }
+
+        $payload = $this->signedBinanceGet('/sapi/v1/pay/transactions', [
+            'startTime' => $startAt->copy()->utc()->getTimestampMs(),
+            'endTime' => $endAt->copy()->utc()->getTimestampMs(),
+            'limit' => 100,
+            'recvWindow' => max(1000, (int) ($pay['recv_window'] ?? 5000)),
+            'timestamp' => $this->millisecondsTimestamp(),
+        ], $pay);
+
+        if (
+            ! is_array($payload) ||
+            (string) ($payload['code'] ?? '') !== '000000' ||
+            ($payload['success'] ?? false) !== true ||
+            ! is_array($payload['data'] ?? null)
+        ) {
+            throw new \Exception('Unable to verify Binance Pay payment');
+        }
+
+        return [
+            'transactions' => $payload['data'],
+            'diagnostics' => [
+                'status' => 'request_succeeded',
+                'returned_records' => count($payload['data']),
+            ],
+        ];
     }
 
     public function findDirectCryptoTransfer(Order $order): ?array
@@ -804,6 +924,71 @@ class PaymentService
         throw new \Exception('No unique crypto amount is currently available');
     }
 
+    private function claimBinancePayAmount(Order $order, float $baseAmount, string $token, string $payId): float
+    {
+        $recoveryHours = max(1, (int) config('services.binance.pay.recovery_hours', 24));
+
+        Order::whereNotNull('payment_match_key')
+            ->where(function ($query) use ($recoveryHours): void {
+                $query->where('status', 'paid')
+                    ->orWhere(function ($expired) use ($recoveryHours): void {
+                        $expired->where('status', 'cancelled')
+                            ->where(function ($deadline) use ($recoveryHours): void {
+                                $deadline->where('expired_at', '<=', now()->subHours($recoveryHours))
+                                    ->orWhere(function ($missingExpiry) use ($recoveryHours): void {
+                                        $missingExpiry->whereNull('expired_at')
+                                            ->where('created_at', '<=', now()->subHours($recoveryHours + 1));
+                                    });
+                            });
+                    });
+            })
+            ->update(['payment_match_key' => null]);
+
+        $uniqueMax = max(1, min(9999, (int) config('services.binance.pay.unique_max', 9999)));
+
+        for ($attempt = 0; $attempt < $uniqueMax; $attempt++) {
+            $amount = $this->binancePayAmount($baseAmount, $order->order_id, $token, $attempt, $uniqueMax);
+            $matchKey = hash('sha256', implode('|', [
+                'binance_pay',
+                strtolower(trim($payId)),
+                strtolower($token),
+                number_format($amount, 6, '.', ''),
+            ]));
+
+            try {
+                $order->update([
+                    'price' => $amount,
+                    'payment_match_key' => $matchKey,
+                ]);
+
+                return $amount;
+            } catch (QueryException $error) {
+                if (! str_contains(strtolower($error->getMessage()), 'payment_match_key')) {
+                    throw $error;
+                }
+            }
+        }
+
+        throw new \Exception('No unique Binance Pay amount is currently available');
+    }
+
+    private function binancePayAmount(
+        float $baseAmount,
+        string $orderId,
+        string $token,
+        int $attempt,
+        int $uniqueMax
+    ): float {
+        if ($baseAmount <= 0) {
+            throw new \Exception('Invalid Binance Pay amount');
+        }
+
+        $hash = (int) sprintf('%u', crc32($orderId.'|binance-pay|'.$token));
+        $uniqueUnits = (($hash + max(0, $attempt)) % $uniqueMax) + 1;
+
+        return round($baseAmount + ($uniqueUnits / 1000000), 6);
+    }
+
     private function directCryptoMatchKey(array $network, string $coin, float $amount): string
     {
         return hash('sha256', implode('|', [
@@ -902,6 +1087,28 @@ class PaymentService
             'decimals' => (int) ($network['decimals'] ?? 6),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
+        ];
+    }
+
+    private function normalizeBinancePayPayment(
+        Order $order,
+        float $baseAmount,
+        float $amount,
+        Carbon $expiresAt,
+        array $pay
+    ): array {
+        return [
+            'type' => 'binance_pay_personal',
+            'token' => strtoupper(trim((string) ($pay['token'] ?? 'USDT'))),
+            'pay_id' => trim((string) ($pay['pay_id'] ?? '')),
+            'qr_content' => trim((string) ($pay['qr_content'] ?? '')),
+            'amount' => number_format($amount, 6, '.', ''),
+            'base_amount' => number_format($baseAmount, 6, '.', ''),
+            'quantity' => (int) $order->quantity,
+            'unique_amount' => number_format(max(0, $amount - $baseAmount), 6, '.', ''),
+            'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
+            'expires_at' => $expiresAt->toIso8601String(),
+            'scanner_status' => 'pending',
         ];
     }
 
@@ -1055,6 +1262,21 @@ class PaymentService
 
         if (str_ends_with($coin, 'bsc') && blank($network['rpc_url'] ?? null)) {
             throw new \Exception('Direct crypto checkout is not configured');
+        }
+    }
+
+    private function ensureBinancePayConfigured(): void
+    {
+        $pay = config('services.binance.pay', []);
+
+        if (
+            ! is_array($pay) ||
+            ! ($pay['enabled'] ?? false) ||
+            blank($pay['pay_id'] ?? null) ||
+            blank($pay['api_key'] ?? null) ||
+            blank($pay['api_secret'] ?? null)
+        ) {
+            throw new \Exception('Binance Pay checkout is not configured');
         }
     }
 

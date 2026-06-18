@@ -5,6 +5,7 @@ let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
 let qrisExpiryCountdownTimer = null;
 let cryptoExpiryCountdownTimer = null;
+let binancePayExpiryCountdownTimer = null;
 
 window.renderAksaQrCode = async function(target, value, options = {}) {
     const canvas = typeof target === 'string' ? document.querySelector(target) : target;
@@ -34,6 +35,14 @@ const qrisState = {
 };
 
 const cryptoState = {
+    orderId: null,
+    pollTimer: null,
+    isChecking: false,
+    expiryHandled: false,
+    token: 'USDT',
+};
+
+const binancePayState = {
     orderId: null,
     pollTimer: null,
     isChecking: false,
@@ -122,6 +131,29 @@ async function syncCryptoOrder(orderId) {
     if (!orderId) return null;
 
     const response = await fetch(`/sync-crypto-order/${encodeURIComponent(orderId)}`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && response.status !== 202) {
+        const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return data;
+}
+
+async function syncBinancePayOrder(orderId) {
+    if (!orderId) return null;
+
+    const response = await fetch(`/sync-binance-pay-order/${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -251,6 +283,7 @@ async function handleQrisExpiry() {
 
 window.syncAksaPakasirOrder = syncPakasirOrder;
 window.syncAksaCryptoOrder = syncCryptoOrder;
+window.syncAksaBinancePayOrder = syncBinancePayOrder;
 
 function stopCryptoPolling() {
     if (cryptoState.pollTimer) {
@@ -293,6 +326,53 @@ function startCryptoPolling(orderId) {
             stopCryptoPolling();
         } finally {
             cryptoState.isChecking = false;
+        }
+    }, 15000);
+}
+
+function stopBinancePayPolling() {
+    if (binancePayState.pollTimer) {
+        clearInterval(binancePayState.pollTimer);
+        binancePayState.pollTimer = null;
+    }
+
+    binancePayState.isChecking = false;
+}
+
+function startBinancePayPolling(orderId) {
+    stopBinancePayPolling();
+
+    binancePayState.pollTimer = setInterval(async () => {
+        if (binancePayState.isChecking || document.hidden) return;
+
+        binancePayState.isChecking = true;
+
+        try {
+            const result = await syncBinancePayOrder(orderId);
+
+            if (result?.status === 'paid') {
+                stopBinancePayPolling();
+                const deliveryPending = result?.delivery_pending === true;
+
+                showPaymentSuccess({
+                    message: result.message || 'Your Binance Pay transfer has been verified and your license is ready.',
+                    licenseKey: result.license_key,
+                    licenseKeys: result.license_keys,
+                    orderId: result.order_id || orderId,
+                    primaryUrl: deliveryPending ? '/orders' : undefined,
+                    primaryText: deliveryPending ? 'Open Orders' : undefined,
+                    copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                    redirectDelay: deliveryPending ? 8000 : undefined,
+                });
+            } else if (result?.status && !['pending', 'cancelled'].includes(result.status)) {
+                stopBinancePayPolling();
+            }
+        } catch (error) {
+            if (error.status === 410) {
+                stopBinancePayPolling();
+            }
+        } finally {
+            binancePayState.isChecking = false;
         }
     }, 15000);
 }
@@ -374,6 +454,38 @@ function handleCryptoExpiry() {
     if (checkButton) {
         checkButton.innerText = 'Verify Already Sent';
     }
+}
+
+function stopBinancePayExpiryCountdown() {
+    if (binancePayExpiryCountdownTimer) {
+        clearInterval(binancePayExpiryCountdownTimer);
+        binancePayExpiryCountdownTimer = null;
+    }
+}
+
+function startBinancePayExpiryCountdown(value, remainingSeconds) {
+    const element = document.getElementById('aksaBinancePayExpires');
+
+    if (!element) return;
+
+    stopBinancePayExpiryCountdown();
+    const deadline = countdownDeadline(value, remainingSeconds);
+
+    const update = () => {
+        element.innerText = formatCountdown(deadline);
+        const expired = element.innerText === 'Expired';
+        element.classList.toggle('text-red-300', expired);
+
+        if (expired && !binancePayState.expiryHandled) {
+            binancePayState.expiryHandled = true;
+            stopBinancePayExpiryCountdown();
+            document.getElementById('aksaBinancePayExpiredNotice')?.classList.remove('hidden');
+            document.getElementById('aksaBinancePayDetails')?.classList.add('hidden');
+        }
+    };
+
+    update();
+    binancePayExpiryCountdownTimer = setInterval(update, 1000);
 }
 
 window.openAksaQrisModal = async function(checkout, options = {}) {
@@ -494,6 +606,76 @@ window.closeAksaCryptoModal = function() {
     document.body.classList.remove('overflow-hidden');
 };
 
+window.openAksaBinancePayModal = async function(checkout, options = {}) {
+    const modal = document.getElementById('aksaBinancePayModal');
+    const payment = checkout?.binance_pay_payment;
+
+    if (!modal || !payment?.pay_id || !payment?.amount) {
+        return false;
+    }
+
+    binancePayState.orderId = checkout.order_id || null;
+    binancePayState.token = (payment.token || 'USDT').toUpperCase();
+    binancePayState.expiryHandled = false;
+
+    document.getElementById('aksaBinancePayExpiredNotice')?.classList.add('hidden');
+    document.getElementById('aksaBinancePayDetails')?.classList.remove('hidden');
+    document.getElementById('aksaBinancePayOrderId').innerText = checkout.order_id || '-';
+    document.getElementById('aksaBinancePayAmount').innerText = formatCryptoAmount(
+        payment.amount,
+        binancePayState.token
+    );
+    document.getElementById('aksaBinancePayId').innerText = payment.pay_id || '-';
+
+    const copyId = document.getElementById('aksaBinancePayCopyId');
+    const copyAmount = document.getElementById('aksaBinancePayCopyAmount');
+
+    if (copyId) {
+        copyId.dataset.copyValue = payment.pay_id || '';
+        copyId.dataset.copyTitle = 'Pay ID copied';
+        copyId.dataset.copyMessage = 'Paste it in Binance Pay or Send.';
+    }
+
+    if (copyAmount) {
+        copyAmount.dataset.copyValue = payment.amount || '';
+        copyAmount.dataset.copyTitle = 'Amount copied';
+        copyAmount.dataset.copyMessage = `Send the exact ${binancePayState.token} amount.`;
+    }
+
+    const qrWrap = document.getElementById('aksaBinancePayQrWrap');
+    qrWrap?.classList.toggle('hidden', !payment.qr_content);
+
+    if (payment.qr_content) {
+        await window.renderAksaQrCode('#aksaBinancePayCanvas', payment.qr_content, {
+            width: 280,
+        });
+    }
+
+    startBinancePayExpiryCountdown(payment.expired_at, payment.remaining_seconds);
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+
+    if (options.startPolling !== false && binancePayState.orderId) {
+        startBinancePayPolling(binancePayState.orderId);
+    }
+
+    return true;
+};
+
+window.closeAksaBinancePayModal = function() {
+    const modal = document.getElementById('aksaBinancePayModal');
+
+    if (!modal) return;
+
+    stopBinancePayPolling();
+    stopBinancePayExpiryCountdown();
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+};
+
 function licenseUrlForOrder(orderId) {
     if (!orderId) {
         return '/licenses';
@@ -523,6 +705,7 @@ function showPaymentSuccess(options = {}) {
 
     window.closeAksaQrisModal?.();
     window.closeAksaCryptoModal?.();
+    window.closeAksaBinancePayModal?.();
     clearTimeout(paymentSuccessRedirectTimer);
     clearInterval(paymentSuccessCountdownTimer);
 
@@ -690,6 +873,12 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-binance-pay-close]')) return;
+
+    window.closeAksaBinancePayModal?.();
+});
+
+document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-payment-success-close]')) return;
 
     window.closeAksaPaymentSuccessModal?.();
@@ -757,6 +946,50 @@ document.addEventListener('click', async (event) => {
                 licenseKey: result.license_key,
                 licenseKeys: result.license_keys,
                 orderId: result.order_id || cryptoState.orderId,
+                primaryUrl: deliveryPending ? '/orders' : undefined,
+                primaryText: deliveryPending ? 'Open Orders' : undefined,
+                copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
+                redirectDelay: deliveryPending ? 8000 : undefined,
+            });
+            return;
+        }
+
+        window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
+            variant: 'warning',
+        });
+    } catch (error) {
+        window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+            variant: 'error',
+        });
+    } finally {
+        button.disabled = false;
+        button.innerText = originalText || 'Check Payment';
+        button.classList.remove('opacity-60', 'pointer-events-none');
+    }
+});
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-binance-pay-check]');
+
+    if (!button || !binancePayState.orderId) return;
+
+    const originalText = button.innerText;
+    button.disabled = true;
+    button.innerText = 'Checking...';
+    button.classList.add('opacity-60', 'pointer-events-none');
+
+    try {
+        const result = await syncBinancePayOrder(binancePayState.orderId);
+
+        if (result?.status === 'paid') {
+            stopBinancePayPolling();
+            const deliveryPending = result?.delivery_pending === true;
+
+            showPaymentSuccess({
+                message: result.message || 'Your Binance Pay transfer has been verified and your license is ready.',
+                licenseKey: result.license_key,
+                licenseKeys: result.license_keys,
+                orderId: result.order_id || binancePayState.orderId,
                 primaryUrl: deliveryPending ? '/orders' : undefined,
                 primaryText: deliveryPending ? 'Open Orders' : undefined,
                 copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,

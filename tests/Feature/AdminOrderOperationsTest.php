@@ -160,14 +160,16 @@ class AdminOrderOperationsTest extends TestCase
     {
         [$admin, $order] = $this->makePendingOrder();
 
-        LicenseStock::create([
+        $olderStock = LicenseStock::create([
             'product_id' => $order->product_id,
             'package_id' => $order->package_id,
             'license_key' => 'OLDER-LICENSE-KEY',
             'is_sold' => false,
+        ]);
+        $olderStock->forceFill([
             'created_at' => now()->subMonths(2),
             'updated_at' => now()->subMonths(2),
-        ]);
+        ])->saveQuietly();
 
         $response = $this->actingAs($admin)
             ->post(route('admin.orders.mark-paid', $order));

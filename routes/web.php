@@ -206,9 +206,13 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1');
     Route::post('/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
         ->middleware('throttle:20,1');
+    Route::post('/sync-binance-pay-order/{orderId}', [PaymentController::class, 'syncBinancePayOrder'])
+        ->middleware('throttle:20,1');
 
     // Crypto
     Route::post('/pay-crypto/{id}', [PaymentController::class, 'payCrypto'])
+        ->middleware('throttle:20,1');
+    Route::post('/pay-binance/{id}', [PaymentController::class, 'payBinance'])
         ->middleware('throttle:20,1');
 
     // Check latest order for polling.
@@ -233,11 +237,14 @@ Route::middleware('auth')->group(function () {
                 'can_sync_crypto' => $order->payment_method === 'crypto' &&
                     $order->status === 'pending' &&
                     ! $order->expired_at,
+                'can_sync_binance_pay' => $order->payment_method === 'binance_pay' &&
+                    $order->status === 'pending',
             ]);
         }
 
         $remaining = Carbon::now()->diffInSeconds($order->expired_at, false);
         $cryptoGraceSeconds = max(0, (int) config('services.crypto_direct.grace_minutes', 2)) * 60;
+        $binancePayVerifySeconds = max(0, (int) config('services.binance.pay.self_service_verify_minutes', 60)) * 60;
 
         return response()->json([
             'status' => $order->status,
@@ -247,6 +254,9 @@ Route::middleware('auth')->group(function () {
             'can_sync_crypto' => $order->payment_method === 'crypto' &&
                 $order->status === 'pending' &&
                 $remaining > -$cryptoGraceSeconds,
+            'can_sync_binance_pay' => $order->payment_method === 'binance_pay' &&
+                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $remaining > -$binancePayVerifySeconds,
         ]);
     })->middleware('throttle:30,1');
 

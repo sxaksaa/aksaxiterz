@@ -5,6 +5,10 @@
         $stock = $product->available_license_stocks_count ?? 0;
         $discordUrl = config('links.discord_url');
         $hasAutoDelivery = $stock > 0;
+        $binancePayAvailable = (bool) config('services.binance.pay.enabled') &&
+            filled(config('services.binance.pay.pay_id')) &&
+            filled(config('services.binance.pay.api_key')) &&
+            filled(config('services.binance.pay.api_secret'));
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatUsdCompact = function ($amount) {
             $amount = (float) $amount;
@@ -107,7 +111,7 @@
                 <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
             </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8">
+        <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
 
             <div id="btnPakasir" data-payment-method="pakasir"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
@@ -116,6 +120,16 @@
                 <span class="text-xs text-gray-400">QRIS for Indonesia & Malaysia-supported wallets</span>
 
             </div>
+
+            @if ($binancePayAvailable)
+                <div id="btnBinancePay" data-payment-method="binance_pay"
+                    class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+
+                    <div class="font-semibold">Binance Pay</div>
+                    <span class="text-xs text-gray-400">Pay ID · Automatic verification</span>
+
+                </div>
+            @endif
 
             <div id="btnCrypto" data-payment-method="crypto"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
@@ -349,10 +363,20 @@
                 <input type="hidden" name="coin" id="crypto_coin">
                 <input type="hidden" name="voucher_code" id="crypto_voucher">
             </form>
+
+            @if ($binancePayAvailable)
+                <form id="binancePayForm" method="POST" action="/pay-binance/{{ $product->id }}" class="hidden">
+                    @csrf
+                    <input type="hidden" name="package_id" id="binance_pay_package">
+                    <input type="hidden" name="quantity" id="binance_pay_quantity" value="1">
+                    <input type="hidden" name="voucher_code" id="binance_pay_voucher">
+                </form>
+            @endif
         </div>
     </div>
 
     @include('partials.pakasir-qris-modal')
+    @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
 
@@ -375,6 +399,11 @@
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const binancePayToken = @json(strtolower((string) config('services.binance.pay.token', 'USDT')));
+
+        function usesStablecoinPrice(method = selectedPayment) {
+            return method === 'crypto' || method === 'binance_pay';
+        }
 
         @if ($paymentError)
             document.addEventListener('DOMContentLoaded', () => {
@@ -422,8 +451,14 @@
                 el.classList.remove('active');
             });
 
-            const target = type === 'crypto' ? 'btnCrypto' : 'btnPakasir';
+            const target = {
+                crypto: 'btnCrypto',
+                binance_pay: 'btnBinancePay',
+                pakasir: 'btnPakasir',
+            }[type];
             const el = document.getElementById(target);
+
+            if (!el) return;
 
             el.classList.add('active');
 
@@ -448,8 +483,11 @@
 
             showToast(
                 'Payment selected',
-                type === 'crypto' ? 'Direct stablecoin address is active. Choose a coin and network next.' :
-                'QRIS via Pakasir is active.',
+                type === 'crypto'
+                    ? 'Direct stablecoin address is active. Choose a coin and network next.'
+                    : (type === 'binance_pay'
+                        ? 'Binance Pay is active. No wallet network is required.'
+                        : 'QRIS via Pakasir is active.'),
                 null,
                 'success'
             );
@@ -492,7 +530,7 @@
             }
             showSummary();
 
-            const priceText = selectedPayment === 'crypto' ?
+            const priceText = usesStablecoinPrice() ?
                 `${formatUsd(usd)} + unique amount` :
                 `Rp ${Number(price).toLocaleString()}`;
 
@@ -508,7 +546,7 @@
            PRICE SWITCH
         ========================= */
         function updateAllPrices() {
-            const currency = selectedPayment === 'crypto' ? 'usd' : 'idr';
+            const currency = usesStablecoinPrice() ? 'usd' : 'idr';
 
             document.querySelectorAll('[data-idr][data-usd]').forEach(el => {
                 el.innerText = el.dataset[currency];
@@ -528,7 +566,7 @@
                 discount = voucherQuote ? `-${formatIdr(voucherQuote.discount_idr)}` : '-';
             }
 
-            if (selectedPayment === 'crypto') {
+            if (usesStablecoinPrice()) {
                 subtotal = formatUsd(subtotalUsd);
                 total = `${formatUsd(voucherQuote ? voucherQuote.final_usdt : subtotalUsd)} + unique amount`;
                 discount = voucherQuote ? `-${formatUsd(voucherQuote.discount_usdt)}` : '-';
@@ -577,6 +615,8 @@
             plusButton.disabled = !selectedPackageId || selectedPackageStock <= 0 || selectedQuantity >= maxQuantity;
             document.getElementById('pakasir_quantity').value = selectedQuantity;
             document.getElementById('crypto_quantity').value = selectedQuantity;
+            const binanceQuantity = document.getElementById('binance_pay_quantity');
+            if (binanceQuantity) binanceQuantity.value = selectedQuantity;
         }
 
         function changeQuantity(change) {
@@ -607,6 +647,8 @@
 
             if (selectedCoin) {
                 body.set('coin', selectedCoin);
+            } else if (selectedPayment === 'binance_pay') {
+                body.set('coin', binancePayToken);
             }
 
             const response = await fetch(@json(route('vouchers.preview')), {
@@ -645,7 +687,7 @@
         }
 
         function voucherAppliedMessage(quote) {
-            const saving = quote.payment_method === 'crypto'
+            const saving = usesStablecoinPrice(quote.payment_method)
                 ? `${formatUsd(quote.discount_usdt)} ${quote.token}`
                 : formatIdr(quote.discount_idr);
 
@@ -665,6 +707,8 @@
             appliedVoucherCode = null;
             document.getElementById('pakasir_voucher').value = '';
             document.getElementById('crypto_voucher').value = '';
+            const binanceVoucher = document.getElementById('binance_pay_voucher');
+            if (binanceVoucher) binanceVoucher.value = '';
             document.getElementById('voucherDiscountLabel').innerText = 'Voucher';
             document.getElementById('voucherDiscountRow').classList.add('hidden');
 
@@ -730,6 +774,8 @@
                 document.getElementById('voucherCode').value = appliedVoucherCode;
                 document.getElementById('pakasir_voucher').value = appliedVoucherCode;
                 document.getElementById('crypto_voucher').value = appliedVoucherCode;
+                const binanceVoucher = document.getElementById('binance_pay_voucher');
+                if (binanceVoucher) binanceVoucher.value = appliedVoucherCode;
                 document.getElementById('voucherDiscountLabel').innerText = `Voucher ${appliedVoucherCode}`;
                 setVoucherFeedback(voucherAppliedMessage(voucherQuote));
                 updatePrice();
@@ -777,6 +823,8 @@
                 voucherQuote = quote;
                 document.getElementById('pakasir_voucher').value = appliedVoucherCode;
                 document.getElementById('crypto_voucher').value = appliedVoucherCode;
+                const binanceVoucher = document.getElementById('binance_pay_voucher');
+                if (binanceVoucher) binanceVoucher.value = appliedVoucherCode;
                 setVoucherFeedback(voucherAppliedMessage(voucherQuote));
                 updatePrice();
             } catch (error) {
@@ -1004,6 +1052,41 @@
 
                     this.innerText = 'Payment Pending';
                     showToast('QRIS ready', 'Scan the QRIS code to complete your payment.', null, 'success');
+                } catch (error) {
+                    if (error.redirectUrl) {
+                        window.location.href = error.redirectUrl;
+                        return;
+                    }
+
+                    if (error.status === 401) {
+                        requireLogin();
+                        return;
+                    }
+
+                    showToast('Payment failed', error.message || 'Payment failed', null, 'error');
+                    resetPayButton();
+                }
+            }
+
+            if (selectedPayment === 'binance_pay') {
+                document.getElementById('binance_pay_package').value = selectedPackageId;
+                document.getElementById('binance_pay_quantity').value = selectedQuantity;
+
+                const form = document.getElementById('binancePayForm');
+
+                try {
+                    const data = await fetchPaymentJson(form);
+                    const opened = await window.openAksaBinancePayModal?.(data, {
+                        startPolling: true,
+                    });
+
+                    if (!opened) {
+                        window.location.href = '/orders';
+                        return;
+                    }
+
+                    this.innerText = 'Payment Pending';
+                    showToast('Binance Pay ready', 'Send the exact amount to the Pay ID shown.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
                         window.location.href = error.redirectUrl;

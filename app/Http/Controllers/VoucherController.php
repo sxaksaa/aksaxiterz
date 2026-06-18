@@ -15,14 +15,14 @@ class VoucherController extends Controller
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
-            'payment_method' => ['required', Rule::in(['pakasir', 'crypto'])],
+            'payment_method' => ['required', Rule::in(['pakasir', 'crypto', 'binance_pay'])],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'coin' => [
                 'nullable',
                 'string',
                 'max:20',
                 'required_if:payment_method,crypto',
-                Rule::in(array_keys(config('services.crypto_direct.networks', []))),
+                Rule::in(array_merge(['usdt', 'usdc'], array_keys(config('services.crypto_direct.networks', [])))),
             ],
         ]);
 

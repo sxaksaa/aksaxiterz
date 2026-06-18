@@ -122,10 +122,10 @@ class AdminProductCatalogTest extends TestCase
             'email' => 'admin@example.com',
         ]);
 
-        $category = Category::create([
-            'name' => 'PC',
-            'slug' => 'pc',
-        ]);
+        $category = Category::firstOrCreate(
+            ['slug' => 'pc'],
+            ['name' => 'PC']
+        );
 
         $product = Product::create([
             'category_id' => $category->id,

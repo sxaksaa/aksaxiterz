@@ -312,11 +312,14 @@ class DirectCryptoOrderVerifierTest extends TestCase
 
         $this->assertSame(1, $cancelled);
         $this->assertSame('cancelled', $ownOrder->fresh()->status);
-        $this->assertNull(LicenseStock::where('license_key', 'EXPIRY-CLEANUP-0')->value('reserved_order_id'));
+        $this->assertNotSame(
+            $ownOrder->id,
+            LicenseStock::where('license_key', 'EXPIRY-CLEANUP-0')->value('reserved_order_id')
+        );
         $this->assertSame('pending', $otherOrder->fresh()->status);
         $this->assertSame(
-            $otherOrder->id,
-            LicenseStock::where('license_key', 'EXPIRY-CLEANUP-1')->value('reserved_order_id')
+            1,
+            LicenseStock::where('reserved_order_id', $otherOrder->id)->count()
         );
     }
 

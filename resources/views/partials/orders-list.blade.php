@@ -9,10 +9,12 @@
             $isPaid = $order->status === 'paid';
             $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
             $isCrypto = $order->payment_method === 'crypto';
-            $isPakasir = ! $isCrypto;
+            $isBinancePay = $order->payment_method === 'binance_pay';
+            $isPakasir = ! $isCrypto && ! $isBinancePay;
             $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
             $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
             $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
+            $isBinancePayCheckout = $isBinancePay && ($cryptoPayload['type'] ?? null) === 'binance_pay_personal';
             $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
             $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
                 ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
@@ -31,14 +33,35 @@
                 $cryptoSelfServiceVerifyEndsAt &&
                 $now->lt($cryptoSelfServiceVerifyEndsAt);
             $canSyncCrypto = $isCryptoInvoiceActive || $canSelfServiceVerifyCrypto;
+            $binancePayRecoveryEndsAt = $isBinancePayCheckout && $order->expired_at
+                ? $order->expired_at->copy()->addHours(max(1, (int) config('services.binance.pay.recovery_hours', 24)))
+                : null;
+            $binancePaySelfServiceEndsAt = $isBinancePayCheckout && $order->expired_at
+                ? $order->expired_at->copy()->addMinutes(max(0, (int) config('services.binance.pay.self_service_verify_minutes', 60)))
+                : null;
+            $isBinancePayInvoiceActive = $isBinancePayCheckout &&
+                $order->status === 'pending' &&
+                (! $order->expired_at || $now->lt($order->expired_at));
+            $isBinancePayRecoverable = $isBinancePayCheckout &&
+                in_array($order->status, ['pending', 'cancelled'], true) &&
+                $binancePayRecoveryEndsAt &&
+                $now->lt($binancePayRecoveryEndsAt);
+            $canSyncBinancePay = $isBinancePayInvoiceActive || (
+                $isBinancePayRecoverable &&
+                $binancePaySelfServiceEndsAt &&
+                $now->lt($binancePaySelfServiceEndsAt)
+            );
             $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
-            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isCryptoInvoiceActive ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
-            $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
-            $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
+            $isAutoVerifying = $isCryptoInvoiceActive || $isBinancePayInvoiceActive;
+            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isAutoVerifying ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isAutoVerifying ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
+            $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
+            $methodClass = $isPakasir ? 'method-pill-pakasir' : '';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
-            $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
+            $priceLabel = ($isCrypto || $isBinancePay)
+                ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
+                : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
             $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
@@ -76,9 +99,26 @@
                     'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                 ],
             ];
+            $binancePayCheckout = [
+                'method' => 'binance_pay',
+                'order_id' => $order->order_id,
+                'binance_pay_payment' => [
+                    'token' => (string) ($cryptoPayload['token'] ?? 'USDT'),
+                    'pay_id' => (string) ($cryptoPayload['pay_id'] ?? ''),
+                    'qr_content' => (string) ($cryptoPayload['qr_content'] ?? ''),
+                    'amount' => (string) ($cryptoPayload['amount'] ?? $order->price),
+                    'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
+                    'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
+                    'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                    'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
+                ],
+            ];
+            $canOpenBinancePay = $isBinancePayInvoiceActive && filled($cryptoPayload['pay_id'] ?? null);
             $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
             $canCancel = $order->status === 'pending';
-            $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
+            $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
+                $canOpenBinancePay || $canSyncBinancePay ||
+                $canSyncPakasir || $canContinuePakasir || $canCancel;
         @endphp
 
         <article class="order-mobile-card motion-card">
@@ -92,7 +132,7 @@
                     @if ($hasCryptoMismatch)
                         <div class="mt-1 text-xs text-red-300">Contact support</div>
                     @endif
-                    @if ($isPending && ! $canSyncCrypto && $order->expired_at)
+                    @if ($isPending && ! $canSyncCrypto && ! $canSyncBinancePay && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
                             <span class="countdown animate-pulse text-yellow-400" data-remaining="{{ max(0, (int) now()->diffInSeconds($order->expired_at, false)) }}"></span>
                         </div>
@@ -142,11 +182,24 @@
                         </button>
                     @endif
 
+                    @if ($canOpenBinancePay)
+                        <button type="button" class="order-action open-binance-pay-button w-full" data-binance-pay-checkout='@json($binancePayCheckout)'>
+                            View Binance Pay
+                        </button>
+                    @endif
+
                     @if ($canSyncCrypto)
                         <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
                             @csrf
                             <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
                                 {{ $isCryptoInvoiceActive ? 'Verify Payment' : 'Verify Sent Payment' }}
+                            </button>
+                        </form>
+                    @elseif ($canSyncBinancePay)
+                        <form action="/sync-binance-pay-order/{{ $order->order_id }}" method="POST" class="sync-binance-pay-form">
+                            @csrf
+                            <button type="submit" class="order-action sync-binance-pay-button w-full" data-order-id="{{ $order->order_id }}">
+                                {{ $isBinancePayInvoiceActive ? 'Check Payment' : 'Verify Sent Payment' }}
                             </button>
                         </form>
                     @elseif ($canContinueCrypto)
@@ -218,10 +271,12 @@
                         $isPaid = $order->status === 'paid';
                         $paidDate = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
                         $isCrypto = $order->payment_method === 'crypto';
-                        $isPakasir = ! $isCrypto;
+                        $isBinancePay = $order->payment_method === 'binance_pay';
+                        $isPakasir = ! $isCrypto && ! $isBinancePay;
                         $cryptoPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
                         $isDirectCrypto = $isCrypto && ($cryptoPayload['type'] ?? null) === 'direct_crypto';
                         $cryptoToken = strtoupper((string) ($cryptoPayload['token'] ?? 'USDT'));
+                        $isBinancePayCheckout = $isBinancePay && ($cryptoPayload['type'] ?? null) === 'binance_pay_personal';
                         $hasCryptoMismatch = $isDirectCrypto && is_array($cryptoPayload['amount_mismatch'] ?? null);
                         $cryptoRecoveryEndsAt = $isDirectCrypto && $order->expired_at
                             ? $order->expired_at->copy()->addHours(max(1, (int) config('services.crypto_direct.recovery_hours', 24)))
@@ -240,14 +295,35 @@
                             $cryptoSelfServiceVerifyEndsAt &&
                             $now->lt($cryptoSelfServiceVerifyEndsAt);
                         $canSyncCrypto = $isCryptoInvoiceActive || $canSelfServiceVerifyCrypto;
+                        $binancePayRecoveryEndsAt = $isBinancePayCheckout && $order->expired_at
+                            ? $order->expired_at->copy()->addHours(max(1, (int) config('services.binance.pay.recovery_hours', 24)))
+                            : null;
+                        $binancePaySelfServiceEndsAt = $isBinancePayCheckout && $order->expired_at
+                            ? $order->expired_at->copy()->addMinutes(max(0, (int) config('services.binance.pay.self_service_verify_minutes', 60)))
+                            : null;
+                        $isBinancePayInvoiceActive = $isBinancePayCheckout &&
+                            $order->status === 'pending' &&
+                            (! $order->expired_at || $now->lt($order->expired_at));
+                        $isBinancePayRecoverable = $isBinancePayCheckout &&
+                            in_array($order->status, ['pending', 'cancelled'], true) &&
+                            $binancePayRecoveryEndsAt &&
+                            $now->lt($binancePayRecoveryEndsAt);
+                        $canSyncBinancePay = $isBinancePayInvoiceActive || (
+                            $isBinancePayRecoverable &&
+                            $binancePaySelfServiceEndsAt &&
+                            $now->lt($binancePaySelfServiceEndsAt)
+                        );
                         $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
-                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isCryptoInvoiceActive ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isCryptoInvoiceActive ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
-                        $methodLabel = $isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
-                        $methodClass = $isCrypto ? '' : 'method-pill-pakasir';
+                        $isAutoVerifying = $isCryptoInvoiceActive || $isBinancePayInvoiceActive;
+                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isAutoVerifying ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
+                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isAutoVerifying ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
+                        $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
+                        $methodClass = $isPakasir ? 'method-pill-pakasir' : '';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
-                        $priceLabel = $isCrypto ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price);
+                        $priceLabel = ($isCrypto || $isBinancePay)
+                            ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
+                            : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
                         $canSyncPakasir = $isPending && $isPakasir && (bool) $order->order_id;
@@ -285,9 +361,26 @@
                                 'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                             ],
                         ];
+                        $binancePayCheckout = [
+                            'method' => 'binance_pay',
+                            'order_id' => $order->order_id,
+                            'binance_pay_payment' => [
+                                'token' => (string) ($cryptoPayload['token'] ?? 'USDT'),
+                                'pay_id' => (string) ($cryptoPayload['pay_id'] ?? ''),
+                                'qr_content' => (string) ($cryptoPayload['qr_content'] ?? ''),
+                                'amount' => (string) ($cryptoPayload['amount'] ?? $order->price),
+                                'base_amount' => (string) ($cryptoPayload['base_amount'] ?? ''),
+                                'unique_amount' => (string) ($cryptoPayload['unique_amount'] ?? ''),
+                                'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($cryptoPayload['expires_at'] ?? ''),
+                                'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
+                            ],
+                        ];
+                        $canOpenBinancePay = $isBinancePayInvoiceActive && filled($cryptoPayload['pay_id'] ?? null);
                         $canOpenPakasirQris = $canContinuePakasir && filled($pakasirCheckout['pakasir_payment']['payment_number']);
                         $canCancel = $order->status === 'pending';
-                        $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto || $canSyncPakasir || $canContinuePakasir || $canCancel;
+                        $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
+                            $canOpenBinancePay || $canSyncBinancePay ||
+                            $canSyncPakasir || $canContinuePakasir || $canCancel;
                     @endphp
 
                     <tr class="orders-table-row">
@@ -319,7 +412,7 @@
                             @if ($hasCryptoMismatch)
                                 <div class="mt-1 text-xs text-red-300">Contact support</div>
                             @endif
-                            @if ($isPending && ! $canSyncCrypto && $order->expired_at)
+                            @if ($isPending && ! $canSyncCrypto && ! $canSyncBinancePay && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
                                     <span class="countdown animate-pulse text-yellow-400" data-remaining="{{ max(0, (int) now()->diffInSeconds($order->expired_at, false)) }}"></span>
                                 </div>
@@ -339,6 +432,18 @@
                                         @csrf
                                         <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
                                             {{ $isCryptoInvoiceActive ? 'Verify' : 'Verify Sent' }}
+                                        </button>
+                                    </form>
+                                @elseif ($canSyncBinancePay)
+                                    @if ($canOpenBinancePay)
+                                        <button type="button" class="order-action open-binance-pay-button" data-binance-pay-checkout='@json($binancePayCheckout)'>
+                                            Binance Pay
+                                        </button>
+                                    @endif
+                                    <form action="/sync-binance-pay-order/{{ $order->order_id }}" method="POST" class="sync-binance-pay-form inline">
+                                        @csrf
+                                        <button type="submit" class="order-action sync-binance-pay-button" data-order-id="{{ $order->order_id }}">
+                                            {{ $isBinancePayInvoiceActive ? 'Check' : 'Verify Sent' }}
                                         </button>
                                     </form>
                                 @elseif ($canContinueCrypto)

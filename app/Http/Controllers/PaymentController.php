@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
+use App\Services\BinancePayOrderVerifier;
 use App\Services\CheckoutLockService;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
@@ -25,6 +26,7 @@ class PaymentController extends Controller
     public function __construct(
         PaymentService $paymentService,
         private readonly CheckoutLockService $checkoutLockService,
+        private readonly BinancePayOrderVerifier $binancePayOrderVerifier,
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
         private readonly PakasirOrderVerifier $pakasirOrderVerifier,
         private readonly PendingOrderExpirationService $pendingOrderExpirationService,
@@ -52,7 +54,9 @@ class PaymentController extends Controller
                 return $this->pendingPaymentResponse($request, $pendingOrder);
             }
 
-            $paymentMethod = $oldOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
+            $paymentMethod = in_array($oldOrder->payment_method, ['crypto', 'binance_pay'], true)
+                ? $oldOrder->payment_method
+                : 'pakasir';
             $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {
@@ -73,10 +77,11 @@ class PaymentController extends Controller
                 'status' => 'pending',
                 'payment_method' => $paymentMethod,
                 'price' => $oldOrder->price,
-                'expired_at' => now()->addMinutes(max(1, (int) config(
-                    $paymentMethod === 'crypto' ? 'services.crypto_direct.expires_minutes' : 'services.pakasir.expires_minutes',
-                    $paymentMethod === 'crypto' ? 10 : 5
-                ))),
+                'expired_at' => now()->addMinutes(max(1, (int) match ($paymentMethod) {
+                    'crypto' => config('services.crypto_direct.expires_minutes', 10),
+                    'binance_pay' => config('services.binance.pay.expires_minutes', 10),
+                    default => config('services.pakasir.expires_minutes', 5),
+                })),
             ]);
 
             $oldOrder->update(['replaced_by' => $newOrder->id]);
@@ -96,6 +101,21 @@ class PaymentController extends Controller
                     }
 
                     return redirect($payment['payment_url']);
+                }
+
+                if ($newOrder->payment_method === 'binance_pay') {
+                    $payment = $this->paymentService->createBinancePayPayment(
+                        $user,
+                        $newOrder->product_id,
+                        $newOrder->package_id,
+                        $newOrder
+                    );
+
+                    if ($this->wantsPaymentJson($request)) {
+                        return response()->json($this->binancePayCheckoutPayload($payment['order']));
+                    }
+
+                    return redirect('/orders');
                 }
 
                 $payment = $this->paymentService->createCryptoPayment(
@@ -235,6 +255,37 @@ class PaymentController extends Controller
         return $this->syncPaymentResponse($request, $result, $status);
     }
 
+    public function syncBinancePayOrder(Request $request, string $orderId)
+    {
+        $order = Order::where('order_id', $orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($order->payment_method !== 'binance_pay') {
+            abort(404);
+        }
+
+        if ($order->status === 'paid') {
+            return $this->syncPaymentResponse($request, $this->withLicensePayload([
+                'order_id' => $order->order_id,
+                'status' => 'paid',
+            ], $order));
+        }
+
+        if ($this->isPastBinancePaySelfServiceVerifyWindow($order)) {
+            return $this->syncPaymentResponse($request, [
+                'order_id' => $order->order_id,
+                'status' => $order->status,
+                'message' => 'Self-service verification for this Binance Pay invoice has ended. Please contact support with the transaction receipt if payment was already sent.',
+            ], 410);
+        }
+
+        $result = $this->binancePayOrderVerifier->verify($order);
+        $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
+
+        return $this->syncPaymentResponse($request, $result, $status);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | PAKASIR CALLBACK
@@ -315,6 +366,49 @@ class PaymentController extends Controller
         });
     }
 
+    public function payBinance(Request $request, $productId)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'package_id' => 'required|exists:packages,id',
+            'quantity' => ['nullable', 'integer', 'min:1'],
+            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
+        ]);
+
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $productId) {
+            if ($pendingOrder = $this->activePendingOrder($user->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
+            }
+
+            if ($this->hasTooManyRecentOrders($user->id)) {
+                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
+            }
+
+            try {
+                $this->cancelPendingOrders($user->id);
+                $payment = $this->paymentService->createBinancePayPayment(
+                    $user,
+                    $productId,
+                    $request->package_id,
+                    null,
+                    $request->string('voucher_code')->toString() ?: null,
+                    $request->integer('quantity', 1)
+                );
+
+                if ($this->wantsPaymentJson($request)) {
+                    return response()->json($this->binancePayCheckoutPayload($payment['order']));
+                }
+
+                return redirect('/orders');
+            } catch (\Exception $e) {
+                Log::error('BINANCE PAY ERROR: '.$e->getMessage());
+
+                return $this->paymentErrorResponse($request, $e);
+            }
+        });
+    }
+
     public function cancelOrder(Request $request, $orderId)
     {
         $order = Order::whereKey($orderId)
@@ -353,6 +447,14 @@ class PaymentController extends Controller
             }
         }
 
+        if ($order->payment_method === 'binance_pay') {
+            $result = $this->binancePayOrderVerifier->verify($order);
+
+            if (($result['status'] ?? null) === 'paid') {
+                return $this->syncPaymentResponse($request, $result);
+            }
+        }
+
         return $this->cancelOrderResponse($request, $this->cancelPendingOrder($order));
     }
 
@@ -381,6 +483,17 @@ class PaymentController extends Controller
             'order_id' => $order->order_id,
             'quantity' => (int) $order->quantity,
             'crypto_payment' => $this->publicDirectCryptoPaymentPayload($order),
+        ];
+    }
+
+    private function binancePayCheckoutPayload(Order $order): array
+    {
+        return [
+            'method' => 'binance_pay',
+            'payment_url' => null,
+            'order_id' => $order->order_id,
+            'quantity' => (int) $order->quantity,
+            'binance_pay_payment' => $this->publicBinancePayPaymentPayload($order),
         ];
     }
 
@@ -428,6 +541,27 @@ class PaymentController extends Controller
         ];
     }
 
+    private function publicBinancePayPaymentPayload(Order $order): ?array
+    {
+        $payload = $order->payment_payload;
+
+        if (! is_array($payload) || ($payload['type'] ?? null) !== 'binance_pay_personal') {
+            return null;
+        }
+
+        return [
+            'token' => (string) ($payload['token'] ?? 'USDT'),
+            'pay_id' => (string) ($payload['pay_id'] ?? ''),
+            'qr_content' => (string) ($payload['qr_content'] ?? ''),
+            'amount' => (string) ($payload['amount'] ?? number_format((float) $order->price, 6, '.', '')),
+            'base_amount' => (string) ($payload['base_amount'] ?? ''),
+            'unique_amount' => (string) ($payload['unique_amount'] ?? ''),
+            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
+            'remaining_seconds' => $this->remainingSeconds($order),
+            'quantity' => (int) $order->quantity,
+        ];
+    }
+
     private function remainingSeconds(Order $order): int
     {
         if (! $order->expired_at) {
@@ -444,6 +578,17 @@ class PaymentController extends Controller
         }
 
         $verifyMinutes = max(0, (int) config('services.crypto_direct.self_service_verify_minutes', 60));
+
+        return $order->expired_at->copy()->addMinutes($verifyMinutes)->lte(now());
+    }
+
+    private function isPastBinancePaySelfServiceVerifyWindow(Order $order): bool
+    {
+        if (! $order->expired_at || $order->expired_at->isFuture()) {
+            return false;
+        }
+
+        $verifyMinutes = max(0, (int) config('services.binance.pay.self_service_verify_minutes', 60));
 
         return $order->expired_at->copy()->addMinutes($verifyMinutes)->lte(now());
     }
@@ -514,6 +659,14 @@ class PaymentController extends Controller
             ->get();
 
         foreach ($orders as $order) {
+            if ($order->payment_method === 'binance_pay') {
+                $result = $this->binancePayOrderVerifier->verify($order);
+
+                if (($result['status'] ?? null) === 'paid') {
+                    throw new \Exception('A previous payment was already completed');
+                }
+            }
+
             if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
                 $result = $this->pakasirOrderVerifier->verify($order);
 
@@ -551,6 +704,14 @@ class PaymentController extends Controller
 
     private function cancelBeforeReplacement(Order $order): bool
     {
+        if ($order->payment_method === 'binance_pay') {
+            $result = $this->binancePayOrderVerifier->verify($order);
+
+            if (($result['status'] ?? null) === 'paid') {
+                return false;
+            }
+        }
+
         if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
             $result = $this->pakasirOrderVerifier->verify($order);
 
@@ -683,8 +844,16 @@ class PaymentController extends Controller
             $message = 'Crypto checkout is not configured yet.';
         }
 
+        if ($message === 'Binance Pay checkout is not configured') {
+            $message = 'Binance Pay checkout is not configured yet.';
+        }
+
         if (
-            ! in_array($message, ['Crypto checkout is not configured yet.', 'Invalid crypto amount'], true) &&
+            ! in_array($message, [
+                'Crypto checkout is not configured yet.',
+                'Binance Pay checkout is not configured yet.',
+                'Invalid crypto amount',
+            ], true) &&
             $error instanceof \Exception &&
             ! $error instanceof VoucherException
         ) {

@@ -120,6 +120,22 @@ return [
             'base_url' => env('BINANCE_API_URL', 'https://api.binance.com'),
             'recv_window' => (int) env('BINANCE_RECV_WINDOW', 5000),
         ],
+        'pay' => [
+            'enabled' => (bool) env('BINANCE_PAY_ENABLED', false),
+            'pay_id' => env('BINANCE_PAY_ID'),
+            'qr_content' => env('BINANCE_PAY_QR_CONTENT'),
+            'token' => strtoupper((string) env('BINANCE_PAY_TOKEN', 'USDT')),
+            'expires_minutes' => (int) env('BINANCE_PAY_EXPIRES_MINUTES', 10),
+            'grace_minutes' => (int) env('BINANCE_PAY_GRACE_MINUTES', 2),
+            'recovery_hours' => (int) env('BINANCE_PAY_RECOVERY_HOURS', 24),
+            'self_service_verify_minutes' => (int) env('BINANCE_PAY_SELF_SERVICE_VERIFY_MINUTES', 60),
+            'scan_cooldown_seconds' => (int) env('BINANCE_PAY_SCAN_COOLDOWN_SECONDS', 20),
+            'unique_max' => (int) env('BINANCE_PAY_UNIQUE_MAX', 9999),
+            'api_key' => env('BINANCE_PAY_API_KEY') ?: env('BINANCE_API_KEY'),
+            'api_secret' => env('BINANCE_PAY_API_SECRET') ?: env('BINANCE_API_SECRET'),
+            'base_url' => env('BINANCE_API_URL', 'https://api.binance.com'),
+            'recv_window' => (int) env('BINANCE_RECV_WINDOW', 5000),
+        ],
     ],
 
 ];

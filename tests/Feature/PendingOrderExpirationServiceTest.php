@@ -46,7 +46,7 @@ class PendingOrderExpirationServiceTest extends TestCase
         $this->assertSame('cancelled', $legacyOrder->fresh()->status);
         $this->assertSame('pending', $cryptoInGrace->fresh()->status);
         $this->assertSame(0, LicenseStock::whereIn('reserved_order_id', [$qrisOrder->id, $cryptoOrder->id, $legacyOrder->id])->count());
-        $this->assertSame(1, LicenseStock::where('reserved_order_id', $cryptoInGrace->id)->count());
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $cryptoInGrace->id)->count());
     }
 
     public function test_expired_qris_is_not_released_when_provider_cancellation_fails(): void

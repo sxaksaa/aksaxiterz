@@ -78,6 +78,8 @@ class PayAgainIsolationTest extends TestCase
 
     public function test_new_checkout_is_blocked_while_crypto_order_is_within_grace_period(): void
     {
+        config(['services.crypto_direct.grace_minutes' => 15]);
+
         [$user, $order, $unrelatedOrder] = $this->pendingOrders();
         $unrelatedOrder->update(['status' => 'cancelled']);
         $order->update(['expired_at' => now()->subMinutes(5)]);

@@ -49,6 +49,7 @@ class PendingOrderExpirationService
             'cancelled' => 0,
             'pakasir' => 0,
             'crypto' => 0,
+            'binance_pay' => 0,
         ];
 
         foreach ($orders as $order) {
@@ -68,7 +69,11 @@ class PendingOrderExpirationService
                 $lockedOrder->update(['status' => 'cancelled']);
                 $this->stockReservationService->release($lockedOrder);
 
-                $method = $lockedOrder->payment_method === 'crypto' ? 'crypto' : 'pakasir';
+                $method = match ($lockedOrder->payment_method) {
+                    'crypto' => 'crypto',
+                    'binance_pay' => 'binance_pay',
+                    default => 'pakasir',
+                };
                 $summary['cancelled']++;
                 $summary[$method]++;
             });

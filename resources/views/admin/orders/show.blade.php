@@ -6,8 +6,14 @@
         $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
         $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
         $isDirectCrypto = $order->payment_method === 'crypto' && ($payload['type'] ?? null) === 'direct_crypto';
+        $isBinancePay = $order->payment_method === 'binance_pay' && ($payload['type'] ?? null) === 'binance_pay_personal';
         $cryptoToken = strtoupper((string) ($payload['token'] ?? 'USDT'));
-        $methodLabel = $order->payment_method === 'crypto' ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS';
+        $methodLabel = match ($order->payment_method) {
+            'binance_pay' => 'Binance Pay',
+            'crypto' => $isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto',
+            'pakasir' => 'QRIS',
+            default => ucfirst($order->payment_method ?: 'Legacy'),
+        };
         $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
         $amountMismatch = is_array($payload['amount_mismatch'] ?? null) ? $payload['amount_mismatch'] : null;
         $binanceDiagnostics = is_array($payload['binance_diagnostics'] ?? null) ? $payload['binance_diagnostics'] : null;
@@ -102,7 +108,7 @@
                     <div class="qris-detail-row">
                         <span>Amount</span>
                         <span class="font-semibold text-[#D8B4FE]">
-                            {{ $order->payment_method === 'crypto' ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price) }}
+                            {{ ($order->payment_method === 'crypto' || $isBinancePay) ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price) }}
                         </span>
                     </div>
                     <div class="qris-detail-row">
@@ -125,7 +131,7 @@
                             data-confirm="Mark this order as paid and deliver {{ $quantity }} license {{ $quantity === 1 ? 'key' : 'keys' }}?">
                             @csrf
                             <button class="order-action">
-                                {{ $isDirectCrypto ? 'Mark Paid Manually' : 'Mark Paid' }}
+                                {{ ($isDirectCrypto || $isBinancePay) ? 'Mark Paid Manually' : 'Mark Paid' }}
                             </button>
                         </form>
                     @endif
@@ -146,11 +152,11 @@
                     @endif
                 </div>
 
-                @if ($isDirectCrypto && ! $isPaid)
+                @if (($isDirectCrypto || $isBinancePay) && ! $isPaid)
                     <div class="crypto-payment-warning mt-5">
                         <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Manual Override</p>
                         <p class="mt-1 text-xs leading-5 text-gray-300">
-                            Use Mark Paid Manually only after checking the Binance deposit record yourself. This will deliver all license keys even if the scanner has not matched the exact on-chain amount.
+                            Use Mark Paid Manually only after checking the matching Binance transaction yourself. This will deliver all license keys even if the automatic scanner has not matched the payment.
                         </p>
                     </div>
                 @endif
@@ -183,7 +189,7 @@
 
                 <section class="product-section fade-up">
                     <div class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ $isDirectCrypto ? 'Crypto Scanner' : 'Provider' }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ ($isDirectCrypto || $isBinancePay) ? 'Payment Scanner' : 'Provider' }}</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Payment Data</h2>
                     </div>
 
@@ -259,6 +265,33 @@
                                     </p>
                                 </div>
                             @endif
+                        @elseif ($isBinancePay)
+                            <div class="qris-detail-row">
+                                <span>Scanner status</span>
+                                <span class="text-right font-semibold text-gray-200">
+                                    {{ str_replace('_', ' ', ucfirst($payload['scanner_status'] ?? 'waiting')) }}
+                                </span>
+                            </div>
+                            <div class="qris-detail-row qris-total-row">
+                                <span>Expected amount</span>
+                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Pay ID</span>
+                                <span class="text-right font-mono text-xs text-gray-200">{{ $payload['pay_id'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Matched transaction</span>
+                                <span class="max-w-[260px] truncate text-right font-mono text-xs text-gray-200">{{ $payload['transaction_id'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Payer</span>
+                                <span class="text-right text-gray-200">{{ $payload['payer_name'] ?? '-' }}</span>
+                            </div>
+                            <div class="qris-detail-row">
+                                <span>Last checked</span>
+                                <span class="text-right text-gray-200">{{ ! empty($payload['last_checked_at']) ? \Carbon\Carbon::parse($payload['last_checked_at'])->timezone(config('app.timezone'))->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
+                            </div>
                         @else
                             <div class="qris-detail-row">
                                 <span>Payment URL</span>

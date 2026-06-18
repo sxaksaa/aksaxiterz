@@ -2,6 +2,7 @@
 
 use App\Models\LicenseStock;
 use App\Models\Order;
+use App\Services\BinancePayOrderVerifier;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
@@ -104,6 +105,22 @@ Artisan::command('orders:scan-crypto {--limit=50 : Maximum pending crypto orders
 
     return self::SUCCESS;
 })->purpose('Scan pending direct stablecoin orders and fulfill exact on-chain matches');
+
+Artisan::command('orders:scan-binance-pay {--limit=100 : Maximum recent Binance Pay orders to scan}', function () {
+    $limit = max(1, (int) $this->option('limit'));
+    $summary = app(BinancePayOrderVerifier::class)->scanPending($limit);
+
+    $this->info('Binance Pay scan complete.');
+    $this->line("Checked: {$summary['checked']}");
+    $this->line("Paid: {$summary['paid']}");
+    $this->line("Still pending: {$summary['pending']}");
+
+    if ($summary['skipped'] ?? false) {
+        $this->line('Skipped provider request because another scan ran recently.');
+    }
+
+    return self::SUCCESS;
+})->purpose('Match personal Binance Pay transfers and fulfill exact-amount orders');
 
 Artisan::command('orders:diagnose-binance {orderId : Existing direct-crypto order ID}', function () {
     $order = Order::where('order_id', (string) $this->argument('orderId'))->first();
@@ -227,6 +244,7 @@ Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending o
     $this->line("Cancelled: {$summary['cancelled']}");
     $this->line("QRIS: {$summary['pakasir']}");
     $this->line("Crypto: {$summary['crypto']}");
+    $this->line("Binance Pay: {$summary['binance_pay']}");
 
     return self::SUCCESS;
 })->purpose('Cancel expired pending orders and release their reserved license stocks');
@@ -240,6 +258,10 @@ Schedule::command('orders:scan-pakasir --limit=100')
     ->withoutOverlapping();
 
 Schedule::command('orders:scan-crypto --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('orders:scan-binance-pay --limit=100')
     ->everyMinute()
     ->withoutOverlapping();
 

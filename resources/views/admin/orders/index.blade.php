@@ -80,6 +80,7 @@
                         <option value="">All methods</option>
                         <option value="pakasir" @selected(request('method') === 'pakasir')>QRIS</option>
                         <option value="crypto" @selected(request('method') === 'crypto')>Crypto</option>
+                        <option value="binance_pay" @selected(request('method') === 'binance_pay')>Binance Pay</option>
                     </select>
                 </label>
 
@@ -129,6 +130,7 @@
                                 $methodLabel = match ($order->payment_method) {
                                     'crypto' => 'Crypto',
                                     'pakasir' => 'QRIS',
+                                    'binance_pay' => 'Binance Pay',
                                     default => ucfirst($order->payment_method ?: 'Legacy'),
                                 };
                                 $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
@@ -198,6 +200,7 @@
                                 {{ match ($order->payment_method) {
                                     'crypto' => 'Crypto',
                                     'pakasir' => 'QRIS',
+                                    'binance_pay' => 'Binance Pay',
                                     default => ucfirst($order->payment_method ?: 'Legacy'),
                                 } }}
                             </span>
