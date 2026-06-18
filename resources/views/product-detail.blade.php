@@ -5,10 +5,11 @@
         $stock = $product->available_license_stocks_count ?? 0;
         $discordUrl = config('links.discord_url');
         $hasAutoDelivery = $stock > 0;
-        $binancePayAvailable = (bool) config('services.binance.pay.enabled') &&
+        $binancePayConfigured = (bool) config('services.binance.pay.enabled') &&
             filled(config('services.binance.pay.pay_id')) &&
             filled(config('services.binance.pay.api_key')) &&
             filled(config('services.binance.pay.api_secret'));
+        $binancePayAvailable = app()->environment('local') || $binancePayConfigured;
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatUsdCompact = function ($amount) {
             $amount = (float) $amount;
