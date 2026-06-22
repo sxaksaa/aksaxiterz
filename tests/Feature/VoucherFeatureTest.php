@@ -76,7 +76,7 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame(14.75, app(VoucherService::class)->checkoutPrice($quote, 'binance_pay'));
     }
 
-    public function test_quantity_uses_combined_subtotal_but_keeps_one_voucher_cap(): void
+    public function test_quantity_applies_the_voucher_cap_to_each_license(): void
     {
         [$user, , $package] = $this->makeCatalog(100000, 6);
         $voucher = $this->makeVoucher();
@@ -106,11 +106,14 @@ class VoucherFeatureTest extends TestCase
 
         $this->assertSame(3, $quote['quantity']);
         $this->assertSame(300000, $quote['base_idr']);
-        $this->assertSame(15000, $quote['discount_idr']);
-        $this->assertSame(285000, $quote['final_idr']);
+        $this->assertSame(30000, $quote['discount_idr']);
+        $this->assertSame(270000, $quote['final_idr']);
+        $this->assertSame('per_item', $quote['discount_cap_scope']);
+        $this->assertSame(3, $quote['discount_units']);
+        $this->assertSame(45000, $quote['max_discount_total']);
         $this->assertSame(18.0, $cryptoQuote['base_usdt']);
-        $this->assertSame(0.25, $cryptoQuote['discount_usdt']);
-        $this->assertSame(17.75, $cryptoQuote['final_usdt']);
+        $this->assertSame(0.75, $cryptoQuote['discount_usdt']);
+        $this->assertSame(17.25, $cryptoQuote['final_usdt']);
     }
 
     public function test_usdc_uses_its_own_discount_cap_and_expiry_is_returned(): void
@@ -379,6 +382,13 @@ class VoucherFeatureTest extends TestCase
             'price' => 250000,
             'price_usdt' => 15,
         ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.vouchers.index'))
+            ->assertOk()
+            ->assertSee('name="max_discount" value="10000"', false)
+            ->assertSee('name="max_discount_usdt" value="0.5"', false)
+            ->assertSee('name="max_discount_usdc" value="0.5"', false);
 
         $this->actingAs($admin)
             ->post(route('admin.vouchers.store'), [

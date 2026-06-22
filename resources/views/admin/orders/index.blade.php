@@ -147,10 +147,7 @@
                                     <div class="mt-1 max-w-[220px] truncate text-xs text-gray-500">{{ $order->user->email ?? '-' }}</div>
                                 </td>
                                 <td class="p-4">
-                                    <div class="font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
-                                    <div class="mt-1 text-xs text-gray-500">
-                                        {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
-                                    </div>
+                                    @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $methodLabel }}</td>
                                 <td class="p-4">
@@ -188,7 +185,9 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
-                            <div class="mt-1 text-sm font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
+                            <div class="mt-2">
+                                @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
+                            </div>
                             <div class="mt-1 truncate text-xs text-gray-500">{{ $order->user->email ?? '-' }}</div>
                         </div>
                         <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
@@ -205,8 +204,8 @@
                                 } }}
                             </span>
                         </div>
-                        <div>Package: <span class="font-semibold text-white">{{ $order->package->name ?? '-' }}</span></div>
-                        <div>Quantity: <span class="font-semibold text-white">{{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}</span></div>
+                        <div>Items: <span class="font-semibold text-white">{{ $order->item_count }} package(s)</span></div>
+                        <div>Quantity: <span class="font-semibold text-white">{{ $order->total_quantity }} {{ $order->total_quantity === 1 ? 'key' : 'keys' }}</span></div>
                         <div>Delivery:
                             <span class="font-semibold {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-white' }}">
                                 {{ $order->licenses_count }} / {{ $order->quantity }} delivered

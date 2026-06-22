@@ -1,0 +1,613 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CartItem;
+use App\Models\Category;
+use App\Models\LicenseStock;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Package;
+use App\Models\Product;
+use App\Models\User;
+use App\Models\Voucher;
+use App\Services\OrderFulfillmentService;
+use App\Services\PendingOrderExpirationService;
+use App\Services\StockReservationService;
+use App\Services\VoucherService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use PDO;
+use Tests\TestCase;
+
+class CartCheckoutFeatureTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        if (! in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+            $this->markTestSkipped('pdo_sqlite is required for cart checkout tests.');
+        }
+
+        parent::setUp();
+    }
+
+    public function test_customer_can_build_persistent_custom_bundle(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 20000, 1.25, 3);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 35000, 2.5, 2, $user);
+
+        $this->actingAs($user)
+            ->postJson(route('cart.items.store', $firstProduct), [
+                'package_id' => $firstPackage->id,
+                'quantity' => 2,
+            ])
+            ->assertOk()
+            ->assertJsonPath('cart_count', 2);
+
+        $this->actingAs($user)
+            ->postJson(route('cart.items.store', $secondProduct), [
+                'package_id' => $secondPackage->id,
+                'quantity' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('cart_count', 3);
+
+        $this->assertDatabaseCount('cart_items', 2);
+        $this->actingAs($user)
+            ->get(route('cart.index'))
+            ->assertOk()
+            ->assertSee('Aurora')
+            ->assertSee('Drip')
+            ->assertSee('Custom Bundle')
+            ->assertSee('Decrease Aurora quantity')
+            ->assertSee('Increase Aurora quantity')
+            ->assertDontSee('>Update<', false);
+    }
+
+    public function test_cart_checkout_creates_one_discounted_invoice_and_delivers_every_item(): void
+    {
+        config([
+            'services.pakasir.slug' => 'aksaxiterz',
+            'services.pakasir.api_key' => 'test-key',
+            'services.pakasir.url' => 'https://app.pakasir.test',
+            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
+        ]);
+
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 2);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        $voucher = Voucher::create([
+            'code' => 'BUNDLE10',
+            'discount_percent' => 10,
+            'max_discount' => 20000,
+            'max_discount_usdt' => 1,
+            'max_discount_usdc' => 1,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'is_active' => true,
+        ]);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 2,
+        ]);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $secondProduct->id,
+            'package_id' => $secondPackage->id,
+            'quantity' => 1,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.pakasir.test/api/transactioncreate/qris') {
+                return Http::response([
+                    'payment' => [
+                        'project' => 'aksaxiterz',
+                        'order_id' => $request['order_id'],
+                        'amount' => 180000,
+                        'fee' => 0,
+                        'total_payment' => 180000,
+                        'payment_method' => 'qris',
+                        'payment_number' => 'BUNDLE-QR',
+                        'expired_at' => now()->addMinutes(5)->toIso8601String(),
+                    ],
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $response = $this->actingAs($user)
+            ->postJson(route('cart.checkout'), [
+                'payment_method' => 'pakasir',
+                'voucher_code' => $voucher->code,
+                'price' => 1,
+                'discount_idr' => 999999999,
+                'product_id' => $secondProduct->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('method', 'pakasir')
+            ->assertJsonPath('quantity', 3);
+
+        $order = Order::where('order_id', $response->json('order_id'))->firstOrFail();
+        $this->assertSame(2, $order->items()->count());
+        $this->assertSame(3, $order->quantity);
+        $this->assertSame('180000.000000', $order->price);
+        $this->assertSame($voucher->id, $order->voucher_id);
+        $this->assertSame(3, LicenseStock::where('reserved_order_id', $order->id)->count());
+        $this->assertSame(0, CartItem::where('user_id', $user->id)->count());
+
+        app(OrderFulfillmentService::class)->fulfill($order);
+
+        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertSame(3, $order->licenses()->count());
+        $this->assertSame(2, $order->licenses()->where('product_id', $firstProduct->id)->count());
+        $this->assertSame(1, $order->licenses()->where('product_id', $secondProduct->id)->count());
+
+        $this->actingAs($user)
+            ->get('/orders')
+            ->assertOk()
+            ->assertSee('Aurora')
+            ->assertSee('Drip');
+        $this->actingAs($user)
+            ->get('/licenses?order='.$order->order_id)
+            ->assertOk()
+            ->assertSee('Aurora')
+            ->assertSee('Drip');
+
+        config(['admin.emails' => [$user->email]]);
+        $this->actingAs($user)
+            ->get(route('admin.orders.show', $order))
+            ->assertOk()
+            ->assertSee('Aurora')
+            ->assertSee('Drip');
+    }
+
+    public function test_bundle_voucher_cap_applies_to_each_license(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 200000, 10, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 200000, 10, 1, $user);
+        $voucher = Voucher::create([
+            'code' => 'PERPRODUCT',
+            'discount_percent' => 10,
+            'max_discount' => 15000,
+            'max_discount_usdt' => 0.5,
+            'max_discount_usdc' => 0.75,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'is_active' => true,
+        ]);
+
+        foreach ([[$firstProduct, $firstPackage], [$secondProduct, $secondPackage]] as [$product, $package]) {
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+        $qrisQuote = app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+        $usdcQuote = app(VoucherService::class)->quoteCart(
+            $items,
+            $user,
+            $voucher->code,
+            paymentMethod: 'crypto',
+            coin: 'usdcbsc'
+        );
+
+        $this->assertSame(30000, $qrisQuote['discount_idr']);
+        $this->assertSame(370000, $qrisQuote['final_idr']);
+        $this->assertSame('per_item', $qrisQuote['discount_cap_scope']);
+        $this->assertSame(2, $qrisQuote['discount_units']);
+        $this->assertSame(30000, $qrisQuote['max_discount_total']);
+        $this->assertSame(1.5, $usdcQuote['discount_usdt']);
+        $this->assertSame(18.5, $usdcQuote['final_usdt']);
+    }
+
+    public function test_bundle_calculates_each_quantity_from_its_own_unit_price(): void
+    {
+        [$user, $product, $firstPackage] = $this->catalogItem('Aurora', 100000, 5, 3);
+        $secondPackage = Package::create([
+            'product_id' => $product->id,
+            'name' => '90 Days',
+            'price' => 100000,
+            'price_usdt' => 5,
+        ]);
+        $voucher = Voucher::create([
+            'code' => 'NOSPLIT',
+            'discount_percent' => 10,
+            'max_discount' => 15000,
+            'max_discount_usdt' => 0.5,
+            'max_discount_usdc' => 0.5,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'is_active' => true,
+        ]);
+
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 2,
+        ]);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $secondPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+        $quote = app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+
+        $this->assertSame(300000, $quote['base_idr']);
+        $this->assertSame(30000, $quote['discount_idr']);
+        $this->assertSame(270000, $quote['final_idr']);
+        $this->assertSame(3, $quote['discount_units']);
+        $this->assertSame(45000, $quote['max_discount_total']);
+    }
+
+    public function test_bundle_voucher_matches_per_license_example(): void
+    {
+        [$user, $aurora, $auroraPackage] = $this->catalogItem('Aurora', 20000, 1.25, 1);
+        [, $drip, $dripPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        [, $fluoriteFf, $fluoriteFfPackage] = $this->catalogItem('Fluorite FF', 150000, 10, 1, $user);
+        [, $fluoriteMl, $fluoriteMlPackage] = $this->catalogItem('Fluorite ML', 150000, 10, 4, $user);
+        $voucher = Voucher::create([
+            'code' => 'PERLICENSE',
+            'discount_percent' => 10,
+            'max_discount' => 10000,
+            'max_discount_usdt' => 0.5,
+            'max_discount_usdc' => 0.5,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'is_active' => true,
+        ]);
+
+        foreach ([
+            [$aurora, $auroraPackage, 1],
+            [$drip, $dripPackage, 1],
+            [$fluoriteFf, $fluoriteFfPackage, 1],
+            [$fluoriteMl, $fluoriteMlPackage, 4],
+        ] as [$product, $package, $quantity]) {
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'quantity' => $quantity,
+            ]);
+        }
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+        $quote = app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+
+        $this->assertSame(870000, $quote['base_idr']);
+        $this->assertSame(62000, $quote['discount_idr']);
+        $this->assertSame(808000, $quote['final_idr']);
+        $this->assertSame(7, $quote['discount_units']);
+        $this->assertSame(70000, $quote['max_discount_total']);
+    }
+
+    public function test_cart_rejects_cross_account_changes_and_mismatched_packages(): void
+    {
+        [$owner, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 100000, 5, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 5, 1, $owner);
+        $attacker = User::factory()->create();
+        $item = CartItem::create([
+            'user_id' => $owner->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($attacker)
+            ->patchJson(route('cart.items.update', $item), ['quantity' => 2])
+            ->assertNotFound();
+        $this->actingAs($attacker)
+            ->deleteJson(route('cart.items.destroy', $item))
+            ->assertNotFound();
+        $this->assertDatabaseHas('cart_items', [
+            'id' => $item->id,
+            'user_id' => $owner->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson(route('cart.items.store', $firstProduct), [
+                'package_id' => $secondPackage->id,
+                'quantity' => 1,
+            ])
+            ->assertNotFound();
+        $this->assertDatabaseMissing('cart_items', [
+            'user_id' => $owner->id,
+            'product_id' => $secondProduct->id,
+            'package_id' => $secondPackage->id,
+        ]);
+    }
+
+    public function test_quantity_update_returns_authoritative_cart_totals_for_ajax(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 20000, 1.25, 4);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        $item = CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 1,
+        ]);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $secondProduct->id,
+            'package_id' => $secondPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('cart.items.update', $item), [
+                '_method' => 'PATCH',
+                'quantity' => 3,
+                'subtotal_idr' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('item.quantity', 3)
+            ->assertJsonPath('item.line_total_idr', 60000)
+            ->assertJsonPath('item.line_total_usdt', 3.75)
+            ->assertJsonPath('item.max_quantity', 4)
+            ->assertJsonPath('cart.distinct_items', 2)
+            ->assertJsonPath('cart.quantity', 4)
+            ->assertJsonPath('cart.subtotal_idr', 160000)
+            ->assertJsonPath('cart.subtotal_usdt', 9.75)
+            ->assertJsonCount(2, 'cart.item_limits');
+    }
+
+    public function test_multi_item_reservation_rolls_back_when_one_package_is_short(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 0, $user);
+        $order = Order::create([
+            'order_id' => 'ORDER-ATOMIC-CART',
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 2,
+            'status' => 'pending',
+            'payment_method' => 'pakasir',
+            'price' => 150000,
+            'expired_at' => now()->addMinutes(5),
+        ]);
+        $this->orderItem($order, $firstProduct, $firstPackage, 1);
+        $this->orderItem($order, $secondProduct, $secondPackage, 1);
+
+        try {
+            app(StockReservationService::class)->reserve($order);
+            $this->fail('The reservation should fail when one cart item has no stock.');
+        } catch (\Exception $error) {
+            $this->assertStringContainsString('every cart item', $error->getMessage());
+        }
+
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $order->id)->count());
+    }
+
+    public function test_binance_pay_and_direct_crypto_accept_the_whole_bundle_in_selected_usdc(): void
+    {
+        config([
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.pay_id' => '123456789',
+            'services.binance.pay.qr_content' => 'generic-binance-qr',
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+            'services.crypto_direct.networks.usdcbsc.address' => '0x1111111111111111111111111111111111111111',
+            'services.crypto_direct.networks.usdcbsc.contract' => '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
+            'services.crypto_direct.networks.usdcbsc.rpc_url' => 'https://bsc-rpc.test',
+        ]);
+
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 2);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 2, $user);
+        foreach ([[$firstProduct, $firstPackage], [$secondProduct, $secondPackage]] as [$product, $package]) {
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $binanceResponse = $this->actingAs($user)
+            ->postJson(route('cart.checkout'), [
+                'payment_method' => 'binance_pay',
+                'token' => 'usdc',
+            ])
+            ->assertOk()
+            ->assertJsonPath('binance_pay_payment.token', 'USDC')
+            ->assertJsonPath('binance_pay_payment.base_amount', '9.000000');
+        $binanceOrder = Order::where('order_id', $binanceResponse->json('order_id'))->firstOrFail();
+        $this->assertGreaterThan(9, (float) $binanceOrder->price);
+        $binanceOrder->update(['status' => 'cancelled']);
+        app(StockReservationService::class)->release($binanceOrder);
+
+        foreach ([[$firstProduct, $firstPackage], [$secondProduct, $secondPackage]] as [$product, $package]) {
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $cryptoResponse = $this->actingAs($user)
+            ->postJson(route('cart.checkout'), [
+                'payment_method' => 'crypto',
+                'coin' => 'usdcbsc',
+            ])
+            ->assertOk()
+            ->assertJsonPath('crypto_payment.token', 'USDC')
+            ->assertJsonPath('crypto_payment.base_amount', '9.000000');
+        $cryptoOrder = Order::where('order_id', $cryptoResponse->json('order_id'))->firstOrFail();
+        $this->assertSame(2, $cryptoOrder->items()->count());
+        $this->assertSame(2, LicenseStock::where('reserved_order_id', $cryptoOrder->id)->count());
+    }
+
+    public function test_cancelling_bundle_releases_every_reserved_key(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        $order = Order::create([
+            'order_id' => 'ORDER-CANCEL-BUNDLE',
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 2,
+            'status' => 'pending',
+            'payment_method' => 'crypto',
+            'price' => 9,
+            'expired_at' => now()->addMinutes(5),
+        ]);
+        $this->orderItem($order, $firstProduct, $firstPackage, 1);
+        $this->orderItem($order, $secondProduct, $secondPackage, 1);
+        app(StockReservationService::class)->reserve($order);
+        $this->assertSame(2, LicenseStock::where('reserved_order_id', $order->id)->count());
+
+        $this->actingAs($user)
+            ->postJson("/cancel-order/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('status', 'cancelled');
+
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $order->id)->count());
+    }
+
+    public function test_expired_bundle_releases_every_reserved_key(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        $order = Order::create([
+            'order_id' => 'ORDER-EXPIRED-BUNDLE',
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 2,
+            'status' => 'pending',
+            'payment_method' => 'crypto',
+            'price' => 9,
+            'expired_at' => now()->subMinutes(5),
+        ]);
+        $this->orderItem($order, $firstProduct, $firstPackage, 1);
+        $this->orderItem($order, $secondProduct, $secondPackage, 1);
+        app(StockReservationService::class)->reserve($order);
+
+        app(PendingOrderExpirationService::class)->expire($user->id);
+
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertSame(0, LicenseStock::where('reserved_order_id', $order->id)->count());
+    }
+
+    public function test_pay_again_recreates_the_original_bundle_not_the_current_cart(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtbsc.address' => '0x1111111111111111111111111111111111111111',
+            'services.crypto_direct.networks.usdtbsc.contract' => '0x55d398326f99059fF775485246999027B3197955',
+            'services.crypto_direct.networks.usdtbsc.rpc_url' => 'https://bsc-rpc.test',
+        ]);
+
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 2);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
+        $oldOrder = Order::create([
+            'order_id' => 'ORDER-OLD-BUNDLE',
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 3,
+            'status' => 'cancelled',
+            'payment_method' => 'crypto',
+            'price' => 12,
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtbsc',
+                'token' => 'USDT',
+            ],
+            'expired_at' => now()->subMinute(),
+        ]);
+        $this->orderItem($oldOrder, $firstProduct, $firstPackage, 2);
+        $this->orderItem($oldOrder, $secondProduct, $secondPackage, 1);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $firstProduct->id,
+            'package_id' => $firstPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/pay-again/{$oldOrder->id}")
+            ->assertOk();
+
+        $replacement = Order::where('order_id', $response->json('order_id'))->firstOrFail();
+        $expectedSignature = collect([
+            $firstPackage->id.':2',
+            $secondPackage->id.':1',
+        ])->sort()->implode('|');
+        $this->assertSame($expectedSignature, $replacement->items()->orderBy('package_id')->get()
+            ->map(fn ($item) => $item->package_id.':'.$item->quantity)
+            ->sort()
+            ->implode('|'));
+        $this->assertSame(1, CartItem::where('user_id', $user->id)->sum('quantity'));
+        $this->assertSame($replacement->id, $oldOrder->fresh()->replaced_by);
+    }
+
+    private function catalogItem(
+        string $name,
+        int $price,
+        float $priceUsdt,
+        int $stock,
+        ?User $user = null
+    ): array {
+        $user ??= User::factory()->create();
+        $category = Category::firstOrCreate(['slug' => 'cart-test'], ['name' => 'Cart Test']);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => $name,
+            'slug' => strtolower($name).'-'.uniqid(),
+            'status' => Product::STATUS_READY,
+            'description' => 'Cart checkout test product.',
+        ]);
+        $package = Package::create([
+            'product_id' => $product->id,
+            'name' => '30 Days',
+            'price' => $price,
+            'price_usdt' => $priceUsdt,
+        ]);
+
+        for ($index = 1; $index <= $stock; $index++) {
+            LicenseStock::create([
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'license_key' => strtoupper($name).'-KEY-'.$index.'-'.uniqid(),
+                'is_sold' => false,
+            ]);
+        }
+
+        return [$user, $product, $package];
+    }
+
+    private function orderItem(Order $order, Product $product, Package $package, int $quantity): OrderItem
+    {
+        return OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'product_name' => $product->name,
+            'package_name' => $package->name,
+            'quantity' => $quantity,
+            'unit_price_idr' => $package->price,
+            'unit_price_usdt' => $package->price_usdt,
+            'line_total_idr' => $package->price * $quantity,
+            'line_total_usdt' => $package->price_usdt * $quantity,
+        ]);
+    }
+}

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\VoucherController;
 use App\Models\Category;
@@ -189,6 +190,26 @@ Route::get('/product/{product}', function (string $product) {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/items/{product}', [CartController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('cart.items.store');
+    Route::patch('/cart/items/{cartItem}', [CartController::class, 'update'])
+        ->middleware('throttle:30,1')
+        ->name('cart.items.update');
+    Route::delete('/cart/items/{cartItem}', [CartController::class, 'destroy'])
+        ->middleware('throttle:30,1')
+        ->name('cart.items.destroy');
+    Route::delete('/cart', [CartController::class, 'clear'])
+        ->middleware('throttle:10,1')
+        ->name('cart.clear');
+    Route::post('/cart/voucher/preview', [CartController::class, 'previewVoucher'])
+        ->middleware('throttle:10,1')
+        ->name('cart.vouchers.preview');
+    Route::post('/cart/checkout', [PaymentController::class, 'checkoutCart'])
+        ->middleware('throttle:20,1')
+        ->name('cart.checkout');
+
     Route::post('/voucher/preview', [VoucherController::class, 'preview'])
         ->middleware('throttle:10,1')
         ->name('vouchers.preview');
@@ -262,7 +283,7 @@ Route::middleware('auth')->group(function () {
 
     // License
     Route::get('/licenses', function () {
-        $licenses = License::with('product')->where('user_id', auth()->id())->latest()->get();
+        $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
 
         return view('licenses', compact('licenses'));
     });
@@ -277,7 +298,7 @@ Route::middleware('auth')->group(function () {
             'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
         ];
 
-        $orders = Order::with(['product', 'package'])
+        $orders = Order::with(['product', 'package', 'items.product', 'items.package'])
             ->withCount('licenses')
             ->where('user_id', auth()->id())
             ->latest()
@@ -290,7 +311,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders-fragment', function (PendingOrderExpirationService $pendingOrderExpirationService) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
-        $orders = Order::with(['product', 'package'])
+        $orders = Order::with(['product', 'package', 'items.product', 'items.package'])
             ->withCount('licenses')
             ->where('user_id', auth()->id())
             ->latest()

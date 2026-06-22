@@ -357,14 +357,21 @@
                 <span id="totalPrice" class="font-semibold text-[#C084FC]">-</span>
             </div>
 
-            <button id="payMainBtn"
-                class="btn-main mt-4 w-full
-    {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
-                {{ $stock <= 0 ? 'disabled' : '' }}>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <button id="addToCartBtn" type="button"
+                    class="btn-footer-secondary min-h-12 w-full {{ $stock <= 0 ? 'cursor-not-allowed opacity-60' : '' }}"
+                    {{ $stock <= 0 ? 'disabled' : '' }}>
+                    {{ $stock <= 0 ? 'Unavailable' : 'Add to Cart' }}
+                </button>
+                <button id="payMainBtn"
+                    class="btn-main w-full
+        {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
+                    {{ $stock <= 0 ? 'disabled' : '' }}>
 
-                {{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
+                    {{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
 
-            </button>
+                </button>
+            </div>
             <!-- PAKASIR FORM -->
             <form id="pakasirForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
                 @csrf
@@ -419,6 +426,7 @@
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const addToCartUrl = @json(route('cart.items.store', $product, false));
         function usesStablecoinPrice(method = selectedPayment) {
             return method === 'crypto' || method === 'binance_pay';
         }
@@ -1060,6 +1068,62 @@
             if (event.key === 'Enter') {
                 event.preventDefault();
                 applyVoucher();
+            }
+        });
+
+        document.getElementById('addToCartBtn')?.addEventListener('click', async function() {
+            if (!isAuthenticated) {
+                requireLogin();
+                return;
+            }
+
+            if (!selectedPackageId) {
+                showToast('Select package', 'Select a package before adding it to your cart.', null, 'warning');
+                return;
+            }
+
+            if (selectedPackageStock < selectedQuantity) {
+                showToast('Not enough stock', 'The selected quantity is no longer available.', null, 'warning');
+                return;
+            }
+
+            const originalText = this.innerText;
+            this.disabled = true;
+            this.innerText = 'Adding...';
+            const body = new FormData();
+            body.set('package_id', selectedPackageId);
+            body.set('quantity', selectedQuantity);
+
+            try {
+                const response = await fetch(addToCartUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body,
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'The item could not be added to your cart.');
+                }
+
+                document.querySelectorAll('[data-cart-count]').forEach((badge) => {
+                    badge.innerText = data.cart_count;
+                    badge.classList.toggle('hidden', Number(data.cart_count) <= 0);
+                });
+                showToast('Added to cart', data.message, null, 'success');
+                this.innerText = 'Added';
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.disabled = false;
+                }, 900);
+            } catch (error) {
+                showToast('Cart not updated', error.message, null, 'error');
+                this.innerText = originalText;
+                this.disabled = false;
             }
         });
 

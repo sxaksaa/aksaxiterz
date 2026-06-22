@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\License;
 use App\Models\LicenseStock;
 use App\Models\Order;
-use App\Models\Package;
 use Illuminate\Support\Facades\DB;
 
 class OrderFulfillmentService
@@ -22,83 +21,81 @@ class OrderFulfillmentService
                 ->first() ?: $order;
 
             $this->cancelPendingReplacements($lockedOrder);
-            $quantity = max(1, (int) $lockedOrder->quantity);
             $existingLicenses = License::where('order_id', $lockedOrder->order_id)
                 ->oldest('id')
                 ->lockForUpdate()
                 ->get();
+            $items = $lockedOrder->lineItems();
+            $quantity = max(1, (int) $items->sum('quantity'));
+            $deliveryComplete = $items->every(function ($item) use ($existingLicenses): bool {
+                $deliveredForItem = $existingLicenses->filter(fn (License $license) => (
+                    (int) $license->order_item_id === (int) $item->id ||
+                    (
+                        ! $license->order_item_id &&
+                        (int) $license->product_id === (int) $item->product_id &&
+                        $license->duration === $item->package_name
+                    )
+                ))->count();
 
-            if ($existingLicenses->count() >= $quantity) {
+                return $deliveredForItem >= (int) $item->quantity;
+            });
+
+            if ($deliveryComplete && $existingLicenses->count() >= $quantity) {
                 $this->markPaidOrder($lockedOrder);
 
                 return $existingLicenses->first();
             }
 
-            $package = Package::findOrFail($lockedOrder->package_id);
-            $needed = $quantity - $existingLicenses->count();
-
-            $stocks = LicenseStock::where('reserved_order_id', $lockedOrder->id)
-                ->where('is_sold', false)
-                ->oldest('created_at')
-                ->oldest('id')
-                ->lockForUpdate()
-                ->limit($needed)
-                ->get();
-
-            if ($stocks->count() < $needed) {
-                $moreStocks = LicenseStock::where('product_id', $lockedOrder->product_id)
-                    ->where('package_id', $package->id)
-                    ->when($stocks->isNotEmpty(), fn ($query) => $query->whereKeyNot($stocks->modelKeys()))
-                    ->available()
-                    ->oldest('created_at')
-                    ->oldest('id')
-                    ->lockForUpdate()
-                    ->limit($needed - $stocks->count())
-                    ->get();
-                $stocks = $stocks->concat($moreStocks);
-            }
-
-            if ($stocks->count() < $needed) {
-                $this->releaseCompetingReservations($lockedOrder);
-
-                $moreStocks = LicenseStock::where('product_id', $lockedOrder->product_id)
-                    ->where('package_id', $package->id)
-                    ->when($stocks->isNotEmpty(), fn ($query) => $query->whereKeyNot($stocks->modelKeys()))
-                    ->available()
-                    ->oldest('created_at')
-                    ->oldest('id')
-                    ->lockForUpdate()
-                    ->limit($needed - $stocks->count())
-                    ->get();
-                $stocks = $stocks->concat($moreStocks);
-            }
-
-            if (
-                $stocks->count() < $needed ||
-                $stocks->contains(fn (LicenseStock $stock) => $stock->is_sold ||
-                    (int) $stock->product_id !== (int) $lockedOrder->product_id ||
-                    (int) $stock->package_id !== (int) $package->id)
-            ) {
-                throw new \Exception('No license stock available for this package');
-            }
-
             $delivered = $existingLicenses;
 
-            foreach ($stocks->take($needed) as $stock) {
-                $stock->update([
-                    'is_sold' => true,
-                    'reserved_order_id' => null,
-                    'reserved_until' => null,
-                    'sold_at' => now(),
-                ]);
+            foreach ($items as $item) {
+                $itemExisting = $existingLicenses->filter(fn (License $license) => (
+                    (int) $license->order_item_id === (int) $item->id ||
+                    (
+                        ! $license->order_item_id &&
+                        (int) $license->product_id === (int) $item->product_id &&
+                        $license->duration === $item->package_name
+                    )
+                ));
+                $needed = max(0, (int) $item->quantity - $itemExisting->count());
 
-                $delivered->push(License::create([
-                    'user_id' => $lockedOrder->user_id,
-                    'product_id' => $lockedOrder->product_id,
-                    'license_key' => $stock->license_key,
-                    'duration' => $package->name,
-                    'order_id' => $lockedOrder->order_id,
-                ]));
+                if ($needed <= 0) {
+                    continue;
+                }
+
+                $stocks = $this->stocksForItem($lockedOrder, $item, $needed);
+
+                if ($stocks->count() < $needed) {
+                    $this->releaseCompetingReservations($lockedOrder);
+                    $stocks = $this->stocksForItem($lockedOrder, $item, $needed);
+                }
+
+                if (
+                    $stocks->count() < $needed ||
+                    $stocks->contains(fn (LicenseStock $stock) => $stock->is_sold ||
+                        (int) $stock->product_id !== (int) $item->product_id ||
+                        (int) $stock->package_id !== (int) $item->package_id)
+                ) {
+                    throw new \Exception('No license stock available for this package');
+                }
+
+                foreach ($stocks->take($needed) as $stock) {
+                    $stock->update([
+                        'is_sold' => true,
+                        'reserved_order_id' => null,
+                        'reserved_until' => null,
+                        'sold_at' => now(),
+                    ]);
+
+                    $delivered->push(License::create([
+                        'user_id' => $lockedOrder->user_id,
+                        'product_id' => $item->product_id,
+                        'license_key' => $stock->license_key,
+                        'duration' => $item->package_name,
+                        'order_id' => $lockedOrder->order_id,
+                        'order_item_id' => $item->id,
+                    ]));
+                }
             }
 
             $this->markPaidOrder($lockedOrder);
@@ -137,8 +134,7 @@ class OrderFulfillmentService
             if (
                 ! $replacement ||
                 (int) $replacement->user_id !== (int) $order->user_id ||
-                (int) $replacement->product_id !== (int) $order->product_id ||
-                (int) $replacement->package_id !== (int) $order->package_id ||
+                $replacement->cartSignature() !== $order->cartSignature() ||
                 ! in_array($replacement->status, ['pending', 'cancelled'], true)
             ) {
                 break;
@@ -156,16 +152,28 @@ class OrderFulfillmentService
 
     private function releaseCompetingReservations(Order $order): void
     {
+        $pairs = $order->lineItems()
+            ->map(fn ($item) => [$item->product_id, $item->package_id])
+            ->unique(fn ($pair) => implode(':', $pair));
+        $reservedOrderIds = LicenseStock::query()
+            ->where('is_sold', false)
+            ->whereNotNull('reserved_order_id')
+            ->where(function ($query) use ($pairs): void {
+                foreach ($pairs as [$productId, $packageId]) {
+                    $query->orWhere(fn ($pair) => $pair
+                        ->where('product_id', $productId)
+                        ->where('package_id', $packageId));
+                }
+            })
+            ->pluck('reserved_order_id')
+            ->filter()
+            ->unique();
+
         $competitors = Order::query()
             ->where('user_id', $order->user_id)
-            ->where('product_id', $order->product_id)
-            ->where('package_id', $order->package_id)
             ->where('status', 'pending')
             ->whereKeyNot($order->id)
-            ->whereIn('id', LicenseStock::query()
-                ->select('reserved_order_id')
-                ->where('is_sold', false)
-                ->whereNotNull('reserved_order_id'))
+            ->whereIn('id', $reservedOrderIds)
             ->oldest('id')
             ->lockForUpdate()
             ->get();
@@ -182,5 +190,34 @@ class OrderFulfillmentService
             'status' => 'paid',
             'paid_at' => $order->paid_at ?: now(),
         ]);
+    }
+
+    private function stocksForItem(Order $order, $item, int $needed)
+    {
+        $stocks = LicenseStock::where('reserved_order_id', $order->id)
+            ->where('product_id', $item->product_id)
+            ->where('package_id', $item->package_id)
+            ->where('is_sold', false)
+            ->oldest('created_at')
+            ->oldest('id')
+            ->lockForUpdate()
+            ->limit($needed)
+            ->get();
+
+        if ($stocks->count() >= $needed) {
+            return $stocks;
+        }
+
+        $moreStocks = LicenseStock::where('product_id', $item->product_id)
+            ->where('package_id', $item->package_id)
+            ->when($stocks->isNotEmpty(), fn ($query) => $query->whereKeyNot($stocks->modelKeys()))
+            ->available()
+            ->oldest('created_at')
+            ->oldest('id')
+            ->lockForUpdate()
+            ->limit($needed - $stocks->count())
+            ->get();
+
+        return $stocks->concat($moreStocks);
     }
 }

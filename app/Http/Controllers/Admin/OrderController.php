@@ -21,7 +21,7 @@ class OrderController extends Controller
     {
         $this->pendingOrderExpirationService->expire(limit: 500);
 
-        $orders = Order::with(['user', 'product', 'package'])
+        $orders = Order::with(['user', 'product', 'package', 'items'])
             ->withCount('licenses')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->search;
@@ -32,7 +32,8 @@ class OrderController extends Controller
                             $userQuery->where('name', 'like', '%'.$search.'%')
                                 ->orWhere('email', 'like', '%'.$search.'%');
                         })
-                        ->orWhereHas('product', fn ($productQuery) => $productQuery->where('name', 'like', '%'.$search.'%'));
+                        ->orWhereHas('product', fn ($productQuery) => $productQuery->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('items', fn ($itemQuery) => $itemQuery->where('product_name', 'like', '%'.$search.'%'));
                 });
             })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
@@ -58,7 +59,7 @@ class OrderController extends Controller
     {
         $this->pendingOrderExpirationService->expire($order->user_id);
         $order->refresh();
-        $order->load(['user', 'product', 'package', 'licenses']);
+        $order->load(['user', 'product', 'package', 'items', 'licenses.orderItem']);
 
         return view('admin.orders.show', compact('order'));
     }

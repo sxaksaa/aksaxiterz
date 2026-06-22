@@ -8,6 +8,7 @@ use App\Models\Package;
 use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -333,6 +334,168 @@ class PaymentService
             $this->cancelPendingOrder($order);
 
             throw $e;
+        }
+    }
+
+    public function createCartPakasirPayment(
+        $user,
+        Collection $items,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
+        $this->ensurePakasirConfigured();
+        $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
+        $order = $this->prepareCartOrder($user, $items, 'pakasir', $order, $voucherCode, $localExpiresAt);
+        $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $payment = $this->createPakasirQrisTransaction($order);
+            $providerExpiresAt = $this->pakasirExpiredAt($payment['expired_at'] ?? null);
+            $expiresAt = $providerExpiresAt && $providerExpiresAt->lt($localExpiresAt)
+                ? $providerExpiresAt
+                : $localExpiresAt;
+
+            $payload = $this->normalizePakasirPayment($payment);
+            $payload['quantity'] = $order->total_quantity;
+            $payload['item_count'] = $order->item_count;
+
+            $order->update([
+                'payment_url' => $paymentUrl,
+                'payment_payload' => $payload,
+                'expired_at' => $expiresAt,
+            ]);
+            $this->stockReservationService->reserve($order->fresh());
+        } catch (\Exception $error) {
+            $this->cancelPendingOrder($order);
+
+            throw $error;
+        }
+
+        return [
+            'payment_url' => $paymentUrl,
+            'pakasir_payment' => $order->fresh()->payment_payload,
+            'order' => $order->fresh(['items']),
+        ];
+    }
+
+    public function createCartCryptoPayment(
+        $user,
+        Collection $items,
+        string $coin,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
+        $coin = strtolower($coin);
+
+        if (! in_array($coin, self::ALLOWED_COINS, true)) {
+            throw new \Exception('Invalid payment method');
+        }
+
+        $this->ensureDirectCryptoConfigured($coin);
+        $network = $this->directCryptoNetwork($coin);
+        $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 10)));
+        $order = $this->prepareCartOrder(
+            $user,
+            $items,
+            'crypto',
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $coin
+        );
+        $baseAmount = (float) $order->price;
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $amount = $this->claimDirectCryptoAmount($order, $network, $coin, $baseAmount);
+            $order->update([
+                'price' => $amount,
+                'payment_url' => null,
+                'payment_payload' => $this->normalizeDirectCryptoPayment(
+                    $order,
+                    $network,
+                    $coin,
+                    $baseAmount,
+                    $amount,
+                    $expiresAt
+                ),
+                'expired_at' => $expiresAt,
+            ]);
+            $freshOrder = $order->fresh(['items']);
+            $this->stockReservationService->reserve($freshOrder);
+
+            return [
+                'payment_url' => null,
+                'crypto_payment' => $freshOrder->payment_payload,
+                'order' => $freshOrder,
+            ];
+        } catch (\Exception $error) {
+            Log::error('CART CRYPTO ERROR: '.$error->getMessage());
+            $this->cancelPendingOrder($order);
+
+            throw $error;
+        }
+    }
+
+    public function createCartBinancePayPayment(
+        $user,
+        Collection $items,
+        string $selectedToken,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
+        $this->ensureBinancePayConfigured();
+        $pay = config('services.binance.pay', []);
+        $token = strtoupper(trim($selectedToken));
+
+        if (! in_array($token, ['USDT', 'USDC'], true)) {
+            throw new \Exception('Unsupported Binance Pay token');
+        }
+
+        $pay['token'] = $token;
+        $tokenQrContent = $pay['qr_contents'][$token] ?? null;
+        $pay['qr_content'] = filled($tokenQrContent) ? $tokenQrContent : ($pay['qr_content'] ?? null);
+        $expiresAt = now()->addMinutes(max(5, (int) ($pay['expires_minutes'] ?? 10)));
+        $order = $this->prepareCartOrder(
+            $user,
+            $items,
+            'binance_pay',
+            $order,
+            $voucherCode,
+            $expiresAt,
+            strtolower($token)
+        );
+        $baseAmount = (float) $order->price;
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $amount = $this->claimBinancePayAmount($order, $baseAmount, $token, (string) $pay['pay_id']);
+            $order->update([
+                'price' => $amount,
+                'payment_url' => null,
+                'payment_payload' => $this->normalizeBinancePayPayment(
+                    $order,
+                    $baseAmount,
+                    $amount,
+                    $expiresAt,
+                    $pay
+                ),
+                'expired_at' => $expiresAt,
+            ]);
+            $freshOrder = $order->fresh(['items']);
+            $this->stockReservationService->reserve($freshOrder);
+
+            return [
+                'payment_url' => null,
+                'binance_pay_payment' => $freshOrder->payment_payload,
+                'order' => $freshOrder,
+            ];
+        } catch (\Exception $error) {
+            Log::error('CART BINANCE PAY ERROR: '.$error->getMessage());
+            $this->cancelPendingOrder($order);
+
+            throw $error;
         }
     }
 
@@ -1062,19 +1225,118 @@ class PaymentService
 
             if ($order) {
                 $order->update($attributes);
-
-                return $order->fresh();
+                $preparedOrder = $order->fresh();
+            } else {
+                $preparedOrder = Order::create($attributes + [
+                    'order_id' => $orderId ?: 'ORDER-'.strtoupper(Str::random(10)),
+                    'product_id' => $product->id,
+                    'user_id' => $user->id,
+                    'status' => 'pending',
+                    'payment_method' => $paymentMethod,
+                    'package_id' => $package->id,
+                ]);
             }
 
-            return Order::create($attributes + [
-                'order_id' => $orderId ?: 'ORDER-'.strtoupper(Str::random(10)),
+            $this->syncOrderItems($preparedOrder, collect([(object) [
                 'product_id' => $product->id,
-                'user_id' => $user->id,
-                'status' => 'pending',
-                'payment_method' => $paymentMethod,
                 'package_id' => $package->id,
-            ]);
+                'product' => $product,
+                'package' => $package,
+                'quantity' => $quantity,
+            ]]));
+
+            return $preparedOrder->fresh(['items']);
         });
+    }
+
+    private function prepareCartOrder(
+        $user,
+        Collection $items,
+        string $paymentMethod,
+        ?Order $order,
+        ?string $voucherCode,
+        Carbon $expiresAt,
+        ?string $coin = null
+    ): Order {
+        if ($items->isEmpty()) {
+            throw new \Exception('Your cart is empty.');
+        }
+
+        return DB::transaction(function () use (
+            $user,
+            $items,
+            $paymentMethod,
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $coin
+        ): Order {
+            if ($order) {
+                $this->ensurePayableCartOrder($order, $user, $paymentMethod);
+            }
+
+            $quote = $this->voucherService->quoteCart(
+                $items,
+                $user,
+                $order?->voucher_id ? null : $voucherCode,
+                $order?->voucher_id,
+                $order?->id,
+                true,
+                $paymentMethod,
+                $coin
+            );
+            $firstItem = $items->first();
+            $quantity = max(1, (int) $items->sum(fn ($item) => max(1, (int) $item->quantity)));
+            $attributes = [
+                'product_id' => $firstItem->product_id,
+                'package_id' => $firstItem->package_id,
+                'price' => $this->voucherService->checkoutPrice($quote, $paymentMethod),
+                'voucher_id' => $quote['voucher_id'],
+                'expired_at' => $expiresAt,
+                'quantity' => $quantity,
+            ];
+
+            if ($order) {
+                $order->update($attributes);
+                $preparedOrder = $order->fresh();
+            } else {
+                $preparedOrder = Order::create($attributes + [
+                    'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
+                    'user_id' => $user->id,
+                    'status' => 'pending',
+                    'payment_method' => $paymentMethod,
+                ]);
+            }
+
+            $this->syncOrderItems($preparedOrder, $items);
+
+            return $preparedOrder->fresh(['items']);
+        });
+    }
+
+    private function syncOrderItems(Order $order, Collection $items): void
+    {
+        $order->items()->delete();
+
+        foreach ($items as $item) {
+            $product = $item->product ?? Product::findOrFail($item->product_id);
+            $package = $item->package ?? Package::findOrFail($item->package_id);
+            $quantity = max(1, (int) $item->quantity);
+            $unitIdr = max(0, (int) ($item->unit_price_idr ?? $package->price));
+            $unitUsdt = max(0, (float) ($item->unit_price_usdt ?? $package->price_usdt));
+
+            $order->items()->create([
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'product_name' => (string) ($item->product_name ?? $product->name),
+                'package_name' => (string) ($item->package_name ?? $package->name),
+                'quantity' => $quantity,
+                'unit_price_idr' => $unitIdr,
+                'unit_price_usdt' => number_format($unitUsdt, 6, '.', ''),
+                'line_total_idr' => $unitIdr * $quantity,
+                'line_total_usdt' => number_format($unitUsdt * $quantity, 6, '.', ''),
+            ]);
+        }
     }
 
     private function normalizeDirectCryptoPayment(Order $order, array $network, string $coin, float $baseAmount, float $amount, Carbon $expiresAt): array
@@ -1125,6 +1387,17 @@ class PaymentService
             (int) $order->user_id !== (int) $user->id ||
             (int) $order->product_id !== $productId ||
             (int) $order->package_id !== $packageId ||
+            $order->payment_method !== $method ||
+            $order->status !== 'pending'
+        ) {
+            throw new \Exception('Invalid order');
+        }
+    }
+
+    private function ensurePayableCartOrder(Order $order, $user, string $method): void
+    {
+        if (
+            (int) $order->user_id !== (int) $user->id ||
             $order->payment_method !== $method ||
             $order->status !== 'pending'
         ) {

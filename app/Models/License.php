@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Product;
 
 class License extends Model
 {
@@ -13,6 +12,7 @@ class License extends Model
         'license_key',
         'duration',
         'order_id',
+        'order_item_id',
     ];
 
     public function product()
@@ -28,5 +28,10 @@ class License extends Model
     public function order()
     {
         return $this->belongsTo(Order::class, 'order_id', 'order_id');
+    }
+
+    public function orderItem()
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 }

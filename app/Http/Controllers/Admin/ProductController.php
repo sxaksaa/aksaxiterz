@@ -117,7 +117,7 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        if (Order::where('product_id', $product->id)->exists()) {
+        if (Order::where('product_id', $product->id)->exists() || $product->orderItems()->exists()) {
             return back()->withErrors(['product' => 'Products with orders cannot be deleted. Rename or edit it instead.']);
         }
 
@@ -173,7 +173,7 @@ class ProductController extends Controller
 
     public function destroyPackage(Package $package)
     {
-        if ($package->orders()->exists()) {
+        if ($package->orders()->exists() || $package->orderItems()->exists()) {
             return back()->withErrors(['package' => 'Packages with orders cannot be deleted. Edit the price/name instead.']);
         }
 

@@ -20,6 +20,7 @@
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Vouchers</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Configure separate QRIS, USDT, and USDC discount caps, usage limits, and promo schedules.
+                        Each discount cap applies once per purchased license quantity.
                     </p>
                 </div>
             </div>
@@ -86,20 +87,20 @@
                 </label>
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount (IDR)</span>
-                    <input name="max_discount" value="{{ old('max_discount', $editVoucher->max_discount ?? 15000) }}"
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount per license (IDR)</span>
+                    <input name="max_discount" value="{{ old('max_discount', $editVoucher->max_discount ?? 10000) }}"
                         type="number" min="1" step="1" class="search-bar w-full" required>
                 </label>
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount (USDT)</span>
-                    <input name="max_discount_usdt" value="{{ old('max_discount_usdt', $editVoucher->max_discount_usdt ?? 0.25) }}"
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount per license (USDT)</span>
+                    <input name="max_discount_usdt" value="{{ old('max_discount_usdt', $editVoucher->max_discount_usdt ?? 0.5) }}"
                         type="number" min="0.000001" max="999999.999999" step="0.000001" class="search-bar w-full" required>
                 </label>
 
                 <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount (USDC)</span>
-                    <input name="max_discount_usdc" value="{{ old('max_discount_usdc', $editVoucher->max_discount_usdc ?? 0.25) }}"
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Maximum discount per license (USDC)</span>
+                    <input name="max_discount_usdc" value="{{ old('max_discount_usdc', $editVoucher->max_discount_usdc ?? 0.5) }}"
                         type="number" min="0.000001" max="999999.999999" step="0.000001" class="search-bar w-full" required>
                 </label>
 

@@ -43,6 +43,18 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
         <div class="flex items-center justify-end gap-3">
             @php $discordUrl = config('links.discord_url'); @endphp
 
+            @auth
+                <a href="{{ route('cart.index') }}"
+                    class="relative inline-flex min-h-10 items-center justify-center rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-[#9333EA]/60 hover:text-white"
+                    aria-label="Open cart with {{ $cartCount }} items">
+                    Cart
+                    <span data-cart-count
+                        class="{{ $cartCount > 0 ? '' : 'hidden' }} ml-2 rounded-full bg-[#9333EA] px-2 py-0.5 text-[10px] font-bold text-white">
+                        {{ $cartCount }}
+                    </span>
+                </a>
+            @endauth
+
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                 class="discord-nav-cta {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
                 <span>Discord</span>
@@ -155,6 +167,9 @@ transition-all duration-300 ease-out">
         <a href="/downloads" data-mobile-menu-link class="nav-item">Downloads</a>
 
         @auth
+            <a href="{{ route('cart.index') }}" data-mobile-menu-link class="nav-item">
+                Cart{{ $cartCount > 0 ? ' (' . $cartCount . ')' : '' }}
+            </a>
             <a href="/orders" data-mobile-menu-link class="nav-item">Orders</a>
             <a href="/licenses" data-mobile-menu-link class="nav-item">Licenses</a>
             @if (auth()->user()?->isAdmin())

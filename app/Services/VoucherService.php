@@ -6,6 +6,7 @@ use App\Exceptions\VoucherException;
 use App\Models\Package;
 use App\Models\User;
 use App\Models\Voucher;
+use Illuminate\Support\Collection;
 
 class VoucherService
 {
@@ -21,8 +22,84 @@ class VoucherService
         int $quantity = 1
     ): array {
         $quantity = max(1, $quantity);
-        $baseIdr = max(0, (int) $package->price) * $quantity;
-        $baseUsdt = round(max(0, (float) ($package->price_usdt ?? 0)) * $quantity, 6);
+        $unitIdr = max(0, (int) $package->price);
+        $unitUsdt = max(0, (float) ($package->price_usdt ?? 0));
+        $baseIdr = $unitIdr * $quantity;
+        $baseUsdt = round($unitUsdt * $quantity, 6);
+        $discountLines = collect([[
+            'unit_idr' => $unitIdr,
+            'unit_usdt' => $unitUsdt,
+            'quantity' => $quantity,
+        ]]);
+
+        return $this->quoteTotals(
+            $baseIdr,
+            $baseUsdt,
+            $user,
+            $code,
+            $voucherId,
+            $excludeOrderId,
+            $lock,
+            $paymentMethod,
+            $coin,
+            $quantity,
+            $discountLines
+        );
+    }
+
+    public function quoteCart(
+        Collection $items,
+        User $user,
+        ?string $code = null,
+        ?int $voucherId = null,
+        ?int $excludeOrderId = null,
+        bool $lock = false,
+        string $paymentMethod = 'pakasir',
+        ?string $coin = null
+    ): array {
+        $baseIdr = (int) $items->sum(fn ($item) => (
+            max(0, (int) ($item->unit_price_idr ?? $item->package?->price ?? 0)) *
+            max(1, (int) $item->quantity)
+        ));
+        $baseUsdt = round((float) $items->sum(fn ($item) => (
+            max(0, (float) ($item->unit_price_usdt ?? $item->package?->price_usdt ?? 0)) *
+            max(1, (int) $item->quantity)
+        )), 6);
+        $quantity = max(1, (int) $items->sum(fn ($item) => max(1, (int) $item->quantity)));
+        $discountLines = $items->map(fn ($item) => [
+            'unit_idr' => max(0, (int) ($item->unit_price_idr ?? $item->package?->price ?? 0)),
+            'unit_usdt' => max(0, (float) ($item->unit_price_usdt ?? $item->package?->price_usdt ?? 0)),
+            'quantity' => max(1, (int) $item->quantity),
+        ])->values();
+
+        return $this->quoteTotals(
+            $baseIdr,
+            $baseUsdt,
+            $user,
+            $code,
+            $voucherId,
+            $excludeOrderId,
+            $lock,
+            $paymentMethod,
+            $coin,
+            $quantity,
+            $discountLines
+        );
+    }
+
+    private function quoteTotals(
+        int $baseIdr,
+        float $baseUsdt,
+        User $user,
+        ?string $code,
+        ?int $voucherId,
+        ?int $excludeOrderId,
+        bool $lock,
+        string $paymentMethod,
+        ?string $coin,
+        int $quantity,
+        Collection $discountLines
+    ): array {
         $paymentMethod = strtolower($paymentMethod);
 
         if (! in_array($paymentMethod, ['pakasir', 'crypto', 'binance_pay'], true)) {
@@ -52,14 +129,20 @@ class VoucherService
 
         $this->ensureAvailable($voucher, $user, $baseIdr, $excludeOrderId);
 
-        $discountIdr = min(
-            intdiv($baseIdr * $voucher->discount_percent, 100),
-            $voucher->max_discount
-        );
-
         $maxDiscountCrypto = $token ? $this->cryptoMaxDiscount($voucher, $token) : 0;
+        $discountIdr = (int) $discountLines->sum(fn (array $line) => (
+            min(
+                intdiv($line['unit_idr'] * $voucher->discount_percent, 100),
+                $voucher->max_discount
+            ) * $line['quantity']
+        ));
         $discountUsdt = $token
-            ? min(round($baseUsdt * ($voucher->discount_percent / 100), 6), $maxDiscountCrypto)
+            ? round((float) $discountLines->sum(fn (array $line) => (
+                min(
+                    round($line['unit_usdt'] * ($voucher->discount_percent / 100), 6),
+                    $maxDiscountCrypto
+                ) * $line['quantity']
+            )), 6)
             : 0;
 
         $selectedDiscount = $usesStablecoin ? $discountUsdt : $discountIdr;
@@ -77,6 +160,10 @@ class VoucherService
             'discount_percent' => $voucher->discount_percent,
             'max_discount' => $voucher->max_discount,
             'max_discount_crypto' => $maxDiscountCrypto,
+            'discount_cap_scope' => 'per_item',
+            'discount_units' => $quantity,
+            'max_discount_total' => $voucher->max_discount * $quantity,
+            'max_discount_crypto_total' => round($maxDiscountCrypto * $quantity, 6),
             'minimum_purchase' => $voucher->minimum_purchase,
             'base_idr' => $baseIdr,
             'discount_idr' => $discountIdr,

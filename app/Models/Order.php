@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Order extends Model
 {
@@ -61,5 +62,60 @@ class Order extends Model
     public function licenses()
     {
         return $this->hasMany(License::class, 'order_id', 'order_id')->orderBy('id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class)->orderBy('id');
+    }
+
+    public function lineItems()
+    {
+        if ($this->relationLoaded('items') && $this->items->isNotEmpty()) {
+            return $this->items;
+        }
+
+        $items = Schema::hasTable('order_items') && $this->exists
+            ? $this->items()->get()
+            : collect();
+
+        if ($items->isNotEmpty()) {
+            return $items;
+        }
+
+        if (! $this->product_id || ! $this->package_id) {
+            return collect();
+        }
+
+        return collect([new OrderItem([
+            'order_id' => $this->id,
+            'product_id' => $this->product_id,
+            'package_id' => $this->package_id,
+            'product_name' => $this->product?->name ?? 'Product',
+            'package_name' => $this->package?->name ?? 'Package',
+            'quantity' => max(1, (int) $this->quantity),
+            'unit_price_idr' => (int) ($this->package?->price ?? 0),
+            'unit_price_usdt' => (float) ($this->package?->price_usdt ?? 0),
+            'line_total_idr' => (int) ($this->package?->price ?? 0) * max(1, (int) $this->quantity),
+            'line_total_usdt' => (float) ($this->package?->price_usdt ?? 0) * max(1, (int) $this->quantity),
+        ])]);
+    }
+
+    public function getItemCountAttribute(): int
+    {
+        return $this->lineItems()->count();
+    }
+
+    public function getTotalQuantityAttribute(): int
+    {
+        return max(1, (int) $this->lineItems()->sum('quantity'));
+    }
+
+    public function cartSignature(): string
+    {
+        return $this->lineItems()
+            ->map(fn (OrderItem $item) => $item->package_id.':'.$item->quantity)
+            ->sort()
+            ->implode('|');
     }
 }

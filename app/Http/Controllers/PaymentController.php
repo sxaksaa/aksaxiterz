@@ -6,6 +6,7 @@ use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
 use App\Services\BinancePayOrderVerifier;
+use App\Services\CartService;
 use App\Services\CheckoutLockService;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PakasirOrderVerifier;
@@ -30,7 +31,8 @@ class PaymentController extends Controller
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
         private readonly PakasirOrderVerifier $pakasirOrderVerifier,
         private readonly PendingOrderExpirationService $pendingOrderExpirationService,
-        private readonly StockReservationService $stockReservationService
+        private readonly StockReservationService $stockReservationService,
+        private readonly CartService $cartService
     ) {
         $this->paymentService = $paymentService;
     }
@@ -59,6 +61,8 @@ class PaymentController extends Controller
                 : 'pakasir';
             $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
             $binancePayToken = $this->retryBinancePayToken($oldOrder);
+            $retryItems = $oldOrder->items()->with(['product', 'package'])->get();
+            $hasStoredItems = $retryItems->isNotEmpty();
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {
                 return $this->paymentErrorResponse(
@@ -89,13 +93,14 @@ class PaymentController extends Controller
 
             try {
                 if ($newOrder->payment_method === 'pakasir') {
-
-                    $payment = $this->paymentService->createPakasirPayment(
-                        $user,
-                        $newOrder->product_id,
-                        $newOrder->package_id,
-                        $newOrder
-                    );
+                    $payment = $hasStoredItems
+                        ? $this->paymentService->createCartPakasirPayment($user, $retryItems, $newOrder)
+                        : $this->paymentService->createPakasirPayment(
+                            $user,
+                            $newOrder->product_id,
+                            $newOrder->package_id,
+                            $newOrder
+                        );
 
                     if ($this->wantsPaymentJson($request)) {
                         return response()->json($this->pakasirCheckoutPayload($payment['order']));
@@ -105,15 +110,22 @@ class PaymentController extends Controller
                 }
 
                 if ($newOrder->payment_method === 'binance_pay') {
-                    $payment = $this->paymentService->createBinancePayPayment(
-                        $user,
-                        $newOrder->product_id,
-                        $newOrder->package_id,
-                        $newOrder,
-                        null,
-                        (int) $newOrder->quantity,
-                        $binancePayToken
-                    );
+                    $payment = $hasStoredItems
+                        ? $this->paymentService->createCartBinancePayPayment(
+                            $user,
+                            $retryItems,
+                            $binancePayToken,
+                            $newOrder
+                        )
+                        : $this->paymentService->createBinancePayPayment(
+                            $user,
+                            $newOrder->product_id,
+                            $newOrder->package_id,
+                            $newOrder,
+                            null,
+                            (int) $newOrder->quantity,
+                            $binancePayToken
+                        );
 
                     if ($this->wantsPaymentJson($request)) {
                         return response()->json($this->binancePayCheckoutPayload($payment['order']));
@@ -122,13 +134,20 @@ class PaymentController extends Controller
                     return redirect('/orders');
                 }
 
-                $payment = $this->paymentService->createCryptoPayment(
-                    $user,
-                    $newOrder->product_id,
-                    $newOrder->package_id,
-                    $cryptoNetwork,
-                    $newOrder
-                );
+                $payment = $hasStoredItems
+                    ? $this->paymentService->createCartCryptoPayment(
+                        $user,
+                        $retryItems,
+                        $cryptoNetwork,
+                        $newOrder
+                    )
+                    : $this->paymentService->createCryptoPayment(
+                        $user,
+                        $newOrder->product_id,
+                        $newOrder->package_id,
+                        $cryptoNetwork,
+                        $newOrder
+                    );
 
                 if ($this->wantsPaymentJson($request)) {
                     return response()->json($this->cryptoCheckoutPayload($payment['order']));
@@ -411,6 +430,91 @@ class PaymentController extends Controller
                 Log::error('BINANCE PAY ERROR: '.$e->getMessage());
 
                 return $this->paymentErrorResponse($request, $e);
+            }
+        });
+    }
+
+    public function checkoutCart(Request $request)
+    {
+        $user = Auth::user();
+        $validated = $request->validate([
+            'payment_method' => ['required', Rule::in(['pakasir', 'crypto', 'binance_pay'])],
+            'coin' => [
+                'nullable',
+                'string',
+                'required_if:payment_method,crypto',
+                Rule::in(array_keys(config('services.crypto_direct.networks', []))),
+            ],
+            'token' => [
+                'nullable',
+                'string',
+                'required_if:payment_method,binance_pay',
+                Rule::in(['usdt', 'usdc']),
+            ],
+            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
+        ]);
+
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $validated) {
+            if ($pendingOrder = $this->activePendingOrder($user->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
+            }
+
+            if ($this->hasTooManyRecentOrders($user->id)) {
+                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
+            }
+
+            $items = $this->cartService->items($user);
+
+            try {
+                $this->cartService->validateForCheckout($items);
+                $this->cancelPendingOrders($user->id);
+                $voucherCode = $validated['voucher_code'] ?? null;
+
+                if ($validated['payment_method'] === 'pakasir') {
+                    $payment = $this->paymentService->createCartPakasirPayment(
+                        $user,
+                        $items,
+                        null,
+                        $voucherCode
+                    );
+                    $this->cartService->clear($user);
+
+                    return $this->wantsPaymentJson($request)
+                        ? response()->json($this->pakasirCheckoutPayload($payment['order']))
+                        : redirect($payment['payment_url']);
+                }
+
+                if ($validated['payment_method'] === 'binance_pay') {
+                    $payment = $this->paymentService->createCartBinancePayPayment(
+                        $user,
+                        $items,
+                        (string) $validated['token'],
+                        null,
+                        $voucherCode
+                    );
+                    $this->cartService->clear($user);
+
+                    return $this->wantsPaymentJson($request)
+                        ? response()->json($this->binancePayCheckoutPayload($payment['order']))
+                        : redirect('/orders');
+                }
+
+                $payment = $this->paymentService->createCartCryptoPayment(
+                    $user,
+                    $items,
+                    (string) $validated['coin'],
+                    null,
+                    $voucherCode
+                );
+                $this->cartService->clear($user);
+
+                return $this->wantsPaymentJson($request)
+                    ? response()->json($this->cryptoCheckoutPayload($payment['order']))
+                    : redirect('/orders');
+            } catch (\Exception $error) {
+                Log::error('CART CHECKOUT ERROR: '.$error->getMessage());
+
+                return $this->paymentErrorResponse($request, $error);
             }
         });
     }
@@ -870,6 +974,7 @@ class PaymentController extends Controller
                 'Binance Pay checkout is not configured yet.',
                 'Invalid crypto amount',
             ], true) &&
+            ! $this->isPublicCheckoutMessage($message) &&
             $error instanceof \Exception &&
             ! $error instanceof VoucherException
         ) {
@@ -896,6 +1001,18 @@ class PaymentController extends Controller
 
         return back()->withErrors([
             'payment' => $message,
+        ]);
+    }
+
+    private function isPublicCheckoutMessage(string $message): bool
+    {
+        return Str::startsWith($message, [
+            'Your cart',
+            'A product in your cart',
+            'This product is not ready',
+            'Only ',
+            'Automatic delivery does not have enough license stock',
+            'Select at least one license key',
         ]);
     }
 }

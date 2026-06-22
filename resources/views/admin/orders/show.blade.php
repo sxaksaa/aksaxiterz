@@ -94,15 +94,11 @@
                         <span class="break-all text-right text-gray-200">{{ $order->user->email ?? '-' }}</span>
                     </div>
                     <div class="qris-detail-row">
-                        <span>Product</span>
-                        <span class="text-right text-gray-200">{{ $order->product->name ?? '-' }}</span>
+                        <span>Bundle</span>
+                        <span class="text-right text-gray-200">{{ $order->item_count }} package(s)</span>
                     </div>
                     <div class="qris-detail-row">
-                        <span>Package</span>
-                        <span class="text-right text-gray-200">{{ $order->package->name ?? '-' }}</span>
-                    </div>
-                    <div class="qris-detail-row">
-                        <span>Quantity</span>
+                        <span>Total quantity</span>
                         <span class="text-right text-gray-200">{{ $quantity }} {{ $quantity === 1 ? 'key' : 'keys' }}</span>
                     </div>
                     <div class="qris-detail-row">
@@ -123,6 +119,11 @@
                         <span>Paid at</span>
                         <span class="text-right font-semibold text-[#D8B4FE]">{{ $paidAt ? $paidAt->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
                     </div>
+                </div>
+
+                <div class="mt-5">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-500">Order Items</p>
+                    @include('partials.order-items-summary', ['order' => $order])
                 </div>
 
                 <div class="mt-5 flex flex-wrap gap-2">

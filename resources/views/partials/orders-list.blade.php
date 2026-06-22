@@ -141,10 +141,7 @@
             </div>
 
             <div class="mt-4">
-                <h2 class="text-base font-semibold text-white">{{ $order->product->name ?? '-' }}</h2>
-                <p class="mt-1 text-sm text-gray-400">
-                    {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
-                </p>
+                @include('partials.order-items-summary', ['order' => $order])
             </div>
 
             <div class="mt-4 grid gap-3 rounded-xl border border-[#27272A] bg-black/20 p-4 text-sm">
@@ -389,10 +386,7 @@
                             <div class="mt-1 text-[10px] uppercase tracking-normal text-gray-500">Invoice</div>
                         </td>
                         <td class="p-4">
-                            <div class="font-semibold text-white">{{ $order->product->name ?? '-' }}</div>
-                            <div class="mt-1 text-xs text-gray-500">
-                                {{ $order->package->name ?? '-' }} - {{ $order->quantity }} {{ $order->quantity === 1 ? 'key' : 'keys' }}
-                            </div>
+                            @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
                         </td>
                         <td class="p-4">
                             <span class="method-pill {{ $methodClass }}">{{ $methodLabel }}</span>

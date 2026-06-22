@@ -12,8 +12,15 @@ class StockReservationService
     {
         return DB::transaction(function () use ($order): LicenseStock {
             $this->releaseExpiredReservations();
-            $quantity = max(1, (int) $order->quantity);
             $reservedUntil = $this->reservationUntil($order);
+            $requirements = $order->lineItems()
+                ->groupBy(fn ($item) => $item->product_id.':'.$item->package_id)
+                ->map(fn ($items) => [
+                    'product_id' => (int) $items->first()->product_id,
+                    'package_id' => (int) $items->first()->package_id,
+                    'quantity' => (int) $items->sum('quantity'),
+                ])
+                ->values();
 
             $existing = LicenseStock::where('reserved_order_id', $order->id)
                 ->where('is_sold', false)
@@ -21,47 +28,64 @@ class StockReservationService
                 ->oldest('id')
                 ->lockForUpdate()
                 ->get();
+            $keptIds = collect();
 
-            if ($existing->count() > $quantity) {
-                $existing->slice($quantity)->each->update([
+            foreach ($requirements as $requirement) {
+                $matching = $existing
+                    ->where('product_id', $requirement['product_id'])
+                    ->where('package_id', $requirement['package_id'])
+                    ->take($requirement['quantity']);
+                $keptIds = $keptIds->concat($matching->modelKeys());
+            }
+
+            $releaseIds = $existing->pluck('id')->diff($keptIds);
+
+            if ($releaseIds->isNotEmpty()) {
+                LicenseStock::whereKey($releaseIds)->update([
                     'reserved_order_id' => null,
                     'reserved_until' => null,
                 ]);
-                $existing = $existing->take($quantity);
             }
 
-            if ($existing->isNotEmpty()) {
-                LicenseStock::whereKey($existing->modelKeys())->update([
-                    'reserved_until' => $reservedUntil,
-                ]);
+            if ($keptIds->isNotEmpty()) {
+                LicenseStock::whereKey($keptIds)->update(['reserved_until' => $reservedUntil]);
             }
 
-            $needed = $quantity - $existing->count();
-            $newReservations = collect();
+            foreach ($requirements as $requirement) {
+                $keptForItem = $existing
+                    ->whereIn('id', $keptIds)
+                    ->where('product_id', $requirement['product_id'])
+                    ->where('package_id', $requirement['package_id'])
+                    ->count();
+                $needed = $requirement['quantity'] - $keptForItem;
 
-            if ($needed > 0) {
-                $newReservations = LicenseStock::query()
-                    ->where('product_id', $order->product_id)
-                    ->where('package_id', $order->package_id)
-                    ->when($existing->isNotEmpty(), fn ($query) => $query->whereKeyNot($existing->modelKeys()))
-                    ->available()
+                if ($needed <= 0) {
+                    continue;
+                }
+
+                $stocks = LicenseStock::query()
+                    ->where('product_id', $requirement['product_id'])
+                    ->where('package_id', $requirement['package_id'])
+                    ->where('is_sold', false)
+                    ->where(fn ($query) => $query->available())
                     ->oldest('created_at')
                     ->oldest('id')
                     ->lockForUpdate()
                     ->limit($needed)
                     ->get();
 
-                if ($newReservations->count() < $needed) {
-                    throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
+                if ($stocks->count() < $needed) {
+                    throw new \Exception('Automatic delivery does not have enough license stock for every cart item.');
                 }
 
-                LicenseStock::whereKey($newReservations->modelKeys())->update([
+                LicenseStock::whereKey($stocks->modelKeys())->update([
                     'reserved_order_id' => $order->id,
                     'reserved_until' => $reservedUntil,
                 ]);
+                $keptIds = $keptIds->concat($stocks->modelKeys());
             }
 
-            return $existing->first() ?: $newReservations->firstOrFail()->fresh();
+            return LicenseStock::whereKey($keptIds->first())->firstOrFail();
         });
     }
 
