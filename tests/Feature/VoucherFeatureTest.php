@@ -296,12 +296,13 @@ class VoucherFeatureTest extends TestCase
         $this->assertGreaterThan(14.75, (float) $result['order']->price);
     }
 
-    public function test_binance_pay_invoice_uses_unique_usdt_amount_and_pay_id(): void
+    public function test_binance_pay_invoice_uses_selected_usdc_token_cap_and_pay_id(): void
     {
         config([
             'services.binance.pay.enabled' => true,
             'services.binance.pay.pay_id' => '123456789',
             'services.binance.pay.qr_content' => 'binance-pay-qr-content',
+            'services.binance.pay.qr_contents.USDC' => 'binance-pay-usdc-qr-content',
             'services.binance.pay.token' => 'USDT',
             'services.binance.pay.api_key' => 'test-key',
             'services.binance.pay.api_secret' => 'test-secret',
@@ -309,27 +310,67 @@ class VoucherFeatureTest extends TestCase
         ]);
 
         [$user, $product, $package] = $this->makeCatalog(250000, 15, true);
-        $voucher = $this->makeVoucher();
+        $voucher = $this->makeVoucher(['max_discount_usdc' => 0.4]);
 
         $result = app(PaymentService::class)->createBinancePayPayment(
             $user,
             $product->id,
             $package->id,
             null,
-            $voucher->code
+            $voucher->code,
+            1,
+            'USDC'
         );
 
         $this->assertSame('binance_pay', $result['order']->payment_method);
         $this->assertSame('binance_pay_personal', $result['binance_pay_payment']['type']);
+        $this->assertSame('USDC', $result['binance_pay_payment']['token']);
         $this->assertSame('123456789', $result['binance_pay_payment']['pay_id']);
-        $this->assertSame('14.750000', $result['binance_pay_payment']['base_amount']);
-        $this->assertGreaterThan(14.75, (float) $result['binance_pay_payment']['amount']);
+        $this->assertSame('binance-pay-usdc-qr-content', $result['binance_pay_payment']['qr_content']);
+        $this->assertSame('14.600000', $result['binance_pay_payment']['base_amount']);
+        $this->assertGreaterThan(14.6, (float) $result['binance_pay_payment']['amount']);
         $this->assertNotNull($result['order']->payment_match_key);
+    }
+
+    public function test_binance_pay_checkout_requires_and_uses_selected_token(): void
+    {
+        config([
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.pay_id' => '123456789',
+            'services.binance.pay.qr_content' => 'binance-pay-any-coin-qr',
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+        ]);
+
+        [$user, $product, $package] = $this->makeCatalog(250000, 15, true);
+
+        $this->actingAs($user)
+            ->postJson("/pay-binance/{$product->id}", [
+                'package_id' => $package->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('token');
+
+        $this->actingAs($user)
+            ->postJson("/pay-binance/{$product->id}", [
+                'package_id' => $package->id,
+                'token' => 'usdc',
+            ])
+            ->assertOk()
+            ->assertJsonPath('method', 'binance_pay')
+            ->assertJsonPath('binance_pay_payment.token', 'USDC')
+            ->assertJsonPath('binance_pay_payment.qr_content', 'binance-pay-any-coin-qr');
     }
 
     public function test_admin_can_create_voucher_and_storefront_shows_package_savings(): void
     {
-        config(['admin.emails' => ['admin@example.com']]);
+        config([
+            'admin.emails' => ['admin@example.com'],
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.pay_id' => '123456789',
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+        ]);
         $admin = User::factory()->create(['email' => 'admin@example.com']);
         [, $product] = $this->makeCatalog(20000, 1.25);
         Package::create([
@@ -369,6 +410,9 @@ class VoucherFeatureTest extends TestCase
             ->assertSee('data-usd="60% vs daily"', false)
             ->assertSee('data-usd="$0.50 per day"', false)
             ->assertSee('Enter voucher code')
+            ->assertSee('data-binance-pay-token="usdt"', false)
+            ->assertSee('data-binance-pay-token="usdc"', false)
+            ->assertSee('name="token" id="binance_pay_token"', false)
             ->assertSee('Join our Discord server to get promo codes.');
     }
 

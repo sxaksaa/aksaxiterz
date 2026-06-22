@@ -21,7 +21,7 @@ class VoucherController extends Controller
                 'nullable',
                 'string',
                 'max:20',
-                'required_if:payment_method,crypto',
+                'required_if:payment_method,crypto,binance_pay',
                 Rule::in(array_merge(['usdt', 'usdc'], array_keys(config('services.crypto_direct.networks', [])))),
             ],
         ]);

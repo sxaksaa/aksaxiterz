@@ -142,6 +142,23 @@
 
         </div>
 
+        @if ($binancePayAvailable)
+            <div id="binancePayBox" class="hidden relative mb-6 fade-up z-10">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
+                <div class="grid grid-cols-2 gap-2" role="group" aria-label="Select Binance Pay coin">
+                    <button type="button" class="crypto-coin-option" data-binance-pay-token="usdt" aria-pressed="false">
+                        <span class="font-semibold text-white">USDT</span>
+                        <span class="text-xs text-gray-500">Tether</span>
+                    </button>
+                    <button type="button" class="crypto-coin-option" data-binance-pay-token="usdc" aria-pressed="false">
+                        <span class="font-semibold text-white">USDC</span>
+                        <span class="text-xs text-gray-500">USD Coin</span>
+                    </button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">Binance Pay transfer only. No blockchain network selection is needed.</p>
+            </div>
+        @endif
+
         <!-- CRYPTO -->
         <div id="cryptoBox" class="hidden relative mb-6 fade-up z-10">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -370,6 +387,7 @@
                     @csrf
                     <input type="hidden" name="package_id" id="binance_pay_package">
                     <input type="hidden" name="quantity" id="binance_pay_quantity" value="1">
+                    <input type="hidden" name="token" id="binance_pay_token">
                     <input type="hidden" name="voucher_code" id="binance_pay_voucher">
                 </form>
             @endif
@@ -387,6 +405,7 @@
         let selectedPayment = null;
         let selectedToken = null;
         let selectedCoin = null;
+        let selectedBinancePayToken = null;
         let selectedPrice = 0;
         let selectedUsd = 0;
         let selectedPackageStock = 0;
@@ -400,8 +419,6 @@
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const binancePayToken = @json(strtolower((string) config('services.binance.pay.token', 'USDT')));
-
         function usesStablecoinPrice(method = selectedPayment) {
             return method === 'crypto' || method === 'binance_pay';
         }
@@ -468,12 +485,18 @@
 
             document.getElementById('cryptoBox')
                 .classList.toggle('hidden', type !== 'crypto');
+            document.getElementById('binancePayBox')
+                ?.classList.toggle('hidden', type !== 'binance_pay');
 
             refreshNetworkAvailability();
             updateAllPrices();
             if (appliedVoucherCode && type === 'crypto' && !selectedCoin) {
                 voucherQuote = null;
                 setVoucherFeedback('Select a crypto coin and network to check this voucher.', 'loading');
+                updatePrice();
+            } else if (appliedVoucherCode && type === 'binance_pay' && !selectedBinancePayToken) {
+                voucherQuote = null;
+                setVoucherFeedback('Select USDT or USDC to check this voucher.', 'loading');
                 updatePrice();
             } else if (appliedVoucherCode) {
                 refreshVoucher();
@@ -487,7 +510,7 @@
                 type === 'crypto'
                     ? 'Direct stablecoin address is active. Choose a coin and network next.'
                     : (type === 'binance_pay'
-                        ? 'Binance Pay is active. No wallet network is required.'
+                        ? 'Binance Pay is active. Choose USDT or USDC next.'
                         : 'QRIS via Pakasir is active.'),
                 null,
                 'success'
@@ -640,6 +663,10 @@
                 throw new Error('Select a crypto coin and network before applying a voucher.');
             }
 
+            if (selectedPayment === 'binance_pay' && !selectedBinancePayToken) {
+                throw new Error('Select USDT or USDC before applying a voucher.');
+            }
+
             const body = new FormData();
             body.set('code', code);
             body.set('package_id', selectedPackageId);
@@ -649,7 +676,7 @@
             if (selectedCoin) {
                 body.set('coin', selectedCoin);
             } else if (selectedPayment === 'binance_pay') {
-                body.set('coin', binancePayToken);
+                body.set('coin', selectedBinancePayToken);
             }
 
             const response = await fetch(@json(route('vouchers.preview')), {
@@ -743,6 +770,11 @@
                 return;
             }
 
+            if (selectedPayment === 'binance_pay' && !selectedBinancePayToken) {
+                showToast('Select Binance Pay coin', 'Select USDT or USDC before applying a voucher.', null, 'warning');
+                return;
+            }
+
             const code = document.getElementById('voucherCode').value.trim().toUpperCase();
 
             if (!code) {
@@ -754,6 +786,7 @@
             const requestSequence = ++voucherRequestSequence;
             const paymentSnapshot = selectedPayment;
             const coinSnapshot = selectedCoin;
+            const binanceTokenSnapshot = selectedBinancePayToken;
             const quantitySnapshot = selectedQuantity;
             button.disabled = true;
             button.innerText = 'Checking...';
@@ -765,6 +798,7 @@
                     requestSequence !== voucherRequestSequence ||
                     paymentSnapshot !== selectedPayment ||
                     coinSnapshot !== selectedCoin ||
+                    binanceTokenSnapshot !== selectedBinancePayToken ||
                     quantitySnapshot !== selectedQuantity
                 ) {
                     return;
@@ -801,12 +835,20 @@
                 return;
             }
 
+            if (selectedPayment === 'binance_pay' && !selectedBinancePayToken) {
+                voucherQuote = null;
+                setVoucherFeedback('Select USDT or USDC to check this voucher.', 'loading');
+                updatePrice();
+                return;
+            }
+
             voucherQuote = null;
             setVoucherFeedback('Checking voucher for the selected package...', 'loading');
             updatePrice();
             const requestSequence = ++voucherRequestSequence;
             const paymentSnapshot = selectedPayment;
             const coinSnapshot = selectedCoin;
+            const binanceTokenSnapshot = selectedBinancePayToken;
             const quantitySnapshot = selectedQuantity;
 
             try {
@@ -816,6 +858,7 @@
                     requestSequence !== voucherRequestSequence ||
                     paymentSnapshot !== selectedPayment ||
                     coinSnapshot !== selectedCoin ||
+                    binanceTokenSnapshot !== selectedBinancePayToken ||
                     quantitySnapshot !== selectedQuantity
                 ) {
                     return;
@@ -897,6 +940,25 @@
             showToast('Network selected', `${selectedToken.toUpperCase()} on ${text}`, null, 'success');
         }
 
+        function selectBinancePayToken(token) {
+            selectedBinancePayToken = token;
+
+            document.querySelectorAll('[data-binance-pay-token]').forEach(option => {
+                const isActive = option.dataset.binancePayToken === token;
+                option.classList.toggle('active', isActive);
+                option.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+
+            const input = document.getElementById('binance_pay_token');
+            if (input) input.value = token;
+
+            if (appliedVoucherCode) {
+                refreshVoucher();
+            }
+
+            showToast('Binance Pay coin selected', `${token.toUpperCase()} selected.`, null, 'success');
+        }
+
         window.addEventListener('click', function(e) {
             if (!e.target.closest('#cryptoBox')) {
                 closeNetworkDropdown();
@@ -963,6 +1025,10 @@
             option.addEventListener('click', () => selectCryptoCoin(option.dataset.cryptoCoin));
         });
 
+        document.querySelectorAll('[data-binance-pay-token]').forEach((option) => {
+            option.addEventListener('click', () => selectBinancePayToken(option.dataset.binancePayToken));
+        });
+
         document.querySelector('[data-network-toggle]')?.addEventListener('click', toggleNetworkDropdown);
 
         document.querySelectorAll('[data-network-value]').forEach((item) => {
@@ -1027,6 +1093,11 @@
                 return;
             }
 
+            if (selectedPayment === 'binance_pay' && !selectedBinancePayToken) {
+                showToast('Complete Binance Pay selection', 'Select USDT or USDC first.', null, 'warning');
+                return;
+            }
+
             showToast('Checkout started', 'Preparing your payment.');
 
             this.innerText = "Processing...";
@@ -1072,6 +1143,7 @@
             if (selectedPayment === 'binance_pay') {
                 document.getElementById('binance_pay_package').value = selectedPackageId;
                 document.getElementById('binance_pay_quantity').value = selectedQuantity;
+                document.getElementById('binance_pay_token').value = selectedBinancePayToken;
 
                 const form = document.getElementById('binancePayForm');
 

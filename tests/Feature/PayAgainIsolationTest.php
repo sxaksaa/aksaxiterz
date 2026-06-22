@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\BinancePayOrderVerifier;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,48 @@ class PayAgainIsolationTest extends TestCase
         $this->assertNotNull($oldOrder->fresh()->replaced_by);
         $this->assertSame('cancelled', $unrelatedOrder->fresh()->status);
         $this->assertSame(3, Order::findOrFail($oldOrder->fresh()->replaced_by)->quantity);
+    }
+
+    public function test_pay_again_preserves_selected_binance_pay_token(): void
+    {
+        [$user, $oldOrder, $unrelatedOrder] = $this->pendingOrders();
+        $oldOrder->update([
+            'payment_method' => 'binance_pay',
+            'payment_payload' => [
+                'type' => 'binance_pay_personal',
+                'token' => 'USDC',
+                'pay_id' => '123456789',
+            ],
+        ]);
+        $unrelatedOrder->update([
+            'status' => 'cancelled',
+            'expired_at' => now()->subHour(),
+        ]);
+
+        $this->mock(BinancePayOrderVerifier::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('verify')
+                ->once()
+                ->andReturn(['status' => 'pending']);
+        });
+        $this->mock(PaymentService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('createBinancePayPayment')
+                ->once()
+                ->withArgs(fn ($user, $productId, $packageId, $order, $voucherCode, $quantity, $token): bool => (
+                    $order instanceof Order &&
+                    $voucherCode === null &&
+                    $quantity === 1 &&
+                    $token === 'USDC'
+                ))
+                ->andReturnUsing(fn ($user, $productId, $packageId, $order) => [
+                    'payment_url' => null,
+                    'binance_pay_payment' => null,
+                    'order' => $order,
+                ]);
+        });
+
+        $this->actingAs($user)
+            ->postJson("/pay-again/{$oldOrder->id}")
+            ->assertOk();
     }
 
     public function test_new_checkout_is_blocked_while_crypto_order_is_within_grace_period(): void

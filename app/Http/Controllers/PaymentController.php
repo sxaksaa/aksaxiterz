@@ -58,6 +58,7 @@ class PaymentController extends Controller
                 ? $oldOrder->payment_method
                 : 'pakasir';
             $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
+            $binancePayToken = $this->retryBinancePayToken($oldOrder);
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {
                 return $this->paymentErrorResponse(
@@ -108,7 +109,10 @@ class PaymentController extends Controller
                         $user,
                         $newOrder->product_id,
                         $newOrder->package_id,
-                        $newOrder
+                        $newOrder,
+                        null,
+                        (int) $newOrder->quantity,
+                        $binancePayToken
                     );
 
                     if ($this->wantsPaymentJson($request)) {
@@ -373,6 +377,7 @@ class PaymentController extends Controller
         $request->validate([
             'package_id' => 'required|exists:packages,id',
             'quantity' => ['nullable', 'integer', 'min:1'],
+            'token' => ['required', 'string', Rule::in(['usdt', 'usdc'])],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
 
@@ -393,7 +398,8 @@ class PaymentController extends Controller
                     $request->package_id,
                     null,
                     $request->string('voucher_code')->toString() ?: null,
-                    $request->integer('quantity', 1)
+                    $request->integer('quantity', 1),
+                    $request->string('token')->toString()
                 );
 
                 if ($this->wantsPaymentJson($request)) {
@@ -600,6 +606,16 @@ class PaymentController extends Controller
         $configuredNetworks = array_keys(config('services.crypto_direct.networks', []));
 
         return in_array($network, $configuredNetworks, true) ? $network : 'usdttrc20';
+    }
+
+    private function retryBinancePayToken(Order $order): string
+    {
+        $payload = $order->payment_payload;
+        $token = is_array($payload) ? strtoupper(trim((string) ($payload['token'] ?? ''))) : '';
+
+        return in_array($token, ['USDT', 'USDC'], true)
+            ? $token
+            : strtoupper((string) config('services.binance.pay.token', 'USDT'));
     }
 
     private function syncPaymentResponse(Request $request, array $payload, int $status = 200)

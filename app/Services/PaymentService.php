@@ -254,16 +254,23 @@ class PaymentService
         $packageId,
         ?Order $order = null,
         ?string $voucherCode = null,
-        int $quantity = 1
+        int $quantity = 1,
+        ?string $selectedToken = null
     ): array {
         $this->ensureBinancePayConfigured();
         $pay = config('services.binance.pay', []);
-        $token = strtoupper(trim((string) ($pay['token'] ?? 'USDT')));
+        $token = strtoupper(trim((string) ($selectedToken ?: ($pay['token'] ?? 'USDT'))));
         $coin = strtolower($token);
 
         if (! in_array($token, ['USDT', 'USDC'], true)) {
             throw new \Exception('Unsupported Binance Pay token');
         }
+
+        $pay['token'] = $token;
+        $tokenQrContent = $pay['qr_contents'][$token] ?? null;
+        $pay['qr_content'] = filled($tokenQrContent)
+            ? $tokenQrContent
+            : ($pay['qr_content'] ?? null);
 
         $product = Product::findOrFail($productId);
         $package = Package::where('id', $packageId)

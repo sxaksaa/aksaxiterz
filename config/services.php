@@ -124,6 +124,10 @@ return [
             'enabled' => (bool) env('BINANCE_PAY_ENABLED', false),
             'pay_id' => env('BINANCE_PAY_ID'),
             'qr_content' => env('BINANCE_PAY_QR_CONTENT'),
+            'qr_contents' => [
+                'USDT' => env('BINANCE_PAY_USDT_QR_CONTENT'),
+                'USDC' => env('BINANCE_PAY_USDC_QR_CONTENT'),
+            ],
             'token' => strtoupper((string) env('BINANCE_PAY_TOKEN', 'USDT')),
             'expires_minutes' => (int) env('BINANCE_PAY_EXPIRES_MINUTES', 10),
             'grace_minutes' => (int) env('BINANCE_PAY_GRACE_MINUTES', 2),
