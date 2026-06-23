@@ -60,9 +60,19 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function latestOrder()
+    {
+        return $this->hasOne(Order::class)->latestOfMany();
+    }
+
     public function licenses()
     {
         return $this->hasMany(License::class);
+    }
+
+    public function latestLicense()
+    {
+        return $this->hasOne(License::class)->latestOfMany();
     }
 
     public function cartItems()

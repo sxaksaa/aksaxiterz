@@ -64,19 +64,26 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[860px] text-sm">
+                <table class="w-full min-w-[1120px] text-sm">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
                         <tr>
                             <th class="p-4 text-left">User</th>
                             <th class="p-4 text-left">Email</th>
                             <th class="p-4 text-left">Role</th>
                             <th class="p-4 text-left">Orders</th>
+                            <th class="p-4 text-left">Last Order</th>
                             <th class="p-4 text-left">Licenses</th>
+                            <th class="p-4 text-left">Last License</th>
                             <th class="p-4 text-left">Joined</th>
+                            <th class="p-4 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($users as $user)
+                            @php
+                                $latestOrder = $user->latestOrder;
+                                $latestLicense = $user->latestLicense;
+                            @endphp
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="flex items-center gap-3">
@@ -99,13 +106,38 @@
                                         {{ $user->isAdmin() ? 'Admin' : 'Customer' }}
                                     </span>
                                 </td>
-                                <td class="p-4 font-semibold text-white">{{ $user->orders_count }}</td>
-                                <td class="p-4 font-semibold text-white">{{ $user->licenses_count }}</td>
+                                <td class="p-4">
+                                    <div class="font-semibold text-white">{{ $user->orders_count }} total</div>
+                                    <div class="mt-1 text-xs text-gray-500">{{ $user->paid_orders_count }} paid</div>
+                                </td>
+                                <td class="p-4">
+                                    @if ($latestOrder)
+                                        <div class="font-mono text-xs text-gray-300">{{ $latestOrder->order_id }}</div>
+                                        <div class="mt-1 text-xs text-gray-500">{{ ucfirst($latestOrder->status) }}</div>
+                                    @else
+                                        <span class="text-xs text-gray-500">No orders</span>
+                                    @endif
+                                </td>
+                                <td class="p-4">
+                                    <div class="font-semibold text-white">{{ $user->licenses_count }}</div>
+                                    <div class="mt-1 text-xs text-gray-500">delivered</div>
+                                </td>
+                                <td class="p-4">
+                                    @if ($latestLicense)
+                                        <div class="max-w-[200px] truncate font-semibold text-white">{{ $latestLicense->product->name ?? 'Product' }}</div>
+                                        <div class="mt-1 text-xs text-gray-500">{{ $latestLicense->orderItem?->package_name ?? $latestLicense->duration ?? '-' }}</div>
+                                    @else
+                                        <span class="text-xs text-gray-500">No licenses</span>
+                                    @endif
+                                </td>
                                 <td class="p-4 text-xs text-gray-400">{{ $user->created_at?->format('d M Y, H:i') ?? '-' }}</td>
+                                <td class="p-4 text-right">
+                                    <a href="{{ route('admin.users.show', $user) }}" class="order-action">Detail</a>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="p-8">
+                                <td colspan="9" class="p-8">
                                     <div class="empty-state">No users found</div>
                                 </td>
                             </tr>
@@ -129,10 +161,14 @@
                     </div>
 
                     <div class="mt-4 grid gap-2 text-sm text-gray-400">
-                        <div>Orders: <span class="font-semibold text-white">{{ $user->orders_count }}</span></div>
+                        <div>Orders: <span class="font-semibold text-white">{{ $user->orders_count }}</span> · {{ $user->paid_orders_count }} paid</div>
                         <div>Licenses: <span class="font-semibold text-white">{{ $user->licenses_count }}</span></div>
+                        <div>Latest order: <span class="font-semibold text-white">{{ $user->latestOrder?->order_id ?? '-' }}</span></div>
+                        <div>Latest license: <span class="font-semibold text-white">{{ $user->latestLicense?->product?->name ?? '-' }}</span></div>
                         <div>Joined: {{ $user->created_at?->format('d M Y, H:i') ?? '-' }}</div>
                     </div>
+
+                    <a href="{{ route('admin.users.show', $user) }}" class="order-action mt-4 w-full">Detail</a>
                 </article>
             @empty
                 <div class="empty-state">No users found</div>

@@ -355,6 +355,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('/orders/{order}/mark-paid', [OrderController::class, 'markPaid'])->name('orders.mark-paid');
         Route::post('/orders/{order}/resync-license', [OrderController::class, 'resyncLicense'])->name('orders.resync-license');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     });
 
 /*
