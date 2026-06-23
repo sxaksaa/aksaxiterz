@@ -386,6 +386,7 @@ class VoucherFeatureTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.vouchers.index'))
             ->assertOk()
+            ->assertSee('Required bundle packages')
             ->assertSee('name="max_discount" value="10000"', false)
             ->assertSee('name="max_discount_usdt" value="0.5"', false)
             ->assertSee('name="max_discount_usdc" value="0.5"', false);
@@ -424,6 +425,36 @@ class VoucherFeatureTest extends TestCase
             ->assertSee('data-binance-pay-token="usdc"', false)
             ->assertSee('name="token" id="binance_pay_token"', false)
             ->assertSee('Join our Discord server to get promo codes.');
+    }
+
+    public function test_admin_can_create_bundle_specific_voucher(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        [, , $firstPackage] = $this->makeCatalog(100000, 5);
+        [, , $secondPackage] = $this->makeCatalog(150000, 8);
+
+        $this->actingAs($admin)
+            ->post(route('admin.vouchers.store'), [
+                'code' => 'bundleab',
+                'discount_percent' => 10,
+                'max_discount' => 15000,
+                'max_discount_usdt' => 0.5,
+                'max_discount_usdc' => 0.5,
+                'minimum_purchase' => 0,
+                'usage_limit' => 20,
+                'per_user_limit' => 0,
+                'required_package_ids' => [$firstPackage->id, $secondPackage->id],
+                'is_active' => 1,
+            ])
+            ->assertRedirect(route('admin.vouchers.index'));
+
+        $voucher = Voucher::where('code', 'BUNDLEAB')->firstOrFail();
+
+        $this->assertEqualsCanonicalizing(
+            [$firstPackage->id, $secondPackage->id],
+            $voucher->requiredPackageIds()
+        );
     }
 
     private function makeVoucher(array $overrides = []): Voucher

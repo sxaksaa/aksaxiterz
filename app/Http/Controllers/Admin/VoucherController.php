@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Package;
 use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,6 +28,14 @@ class VoucherController extends Controller
         $editVoucher = $request->filled('edit')
             ? Voucher::find($request->integer('edit'))
             : null;
+        $availablePackages = Package::query()
+            ->with('product')
+            ->join('products', 'products.id', '=', 'packages.product_id')
+            ->orderBy('products.name')
+            ->orderBy('packages.name')
+            ->select('packages.*')
+            ->get();
+        $packagesById = $availablePackages->keyBy('id');
 
         $stats = [
             'total' => Voucher::count(),
@@ -37,7 +46,7 @@ class VoucherController extends Controller
             'paid_uses' => Order::whereNotNull('voucher_id')->where('status', 'paid')->count(),
         ];
 
-        return view('admin.vouchers.index', compact('vouchers', 'editVoucher', 'stats'));
+        return view('admin.vouchers.index', compact('vouchers', 'editVoucher', 'stats', 'availablePackages', 'packagesById'));
     }
 
     public function store(Request $request)
@@ -104,6 +113,8 @@ class VoucherController extends Controller
             'minimum_purchase' => ['required', 'integer', 'min:0', 'max:999999999'],
             'usage_limit' => ['nullable', 'integer', 'min:1', 'max:999999999'],
             'per_user_limit' => ['required', 'integer', 'min:0', 'max:9999'],
+            'required_package_ids' => ['nullable', 'array', 'max:10'],
+            'required_package_ids.*' => ['integer', 'distinct', 'exists:packages,id'],
             'is_active' => ['required', 'boolean'],
             'starts_at' => ['nullable', 'date'],
             'expires_at' => array_values(array_filter([
@@ -114,6 +125,12 @@ class VoucherController extends Controller
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $validated['required_package_ids'] = collect($validated['required_package_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all() ?: null;
 
         return $validated;
     }

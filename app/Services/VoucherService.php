@@ -27,6 +27,8 @@ class VoucherService
         $baseIdr = $unitIdr * $quantity;
         $baseUsdt = round($unitUsdt * $quantity, 6);
         $discountLines = collect([[
+            'product_id' => $package->product_id,
+            'package_id' => $package->id,
             'unit_idr' => $unitIdr,
             'unit_usdt' => $unitUsdt,
             'quantity' => $quantity,
@@ -67,6 +69,8 @@ class VoucherService
         )), 6);
         $quantity = max(1, (int) $items->sum(fn ($item) => max(1, (int) $item->quantity)));
         $discountLines = $items->map(fn ($item) => [
+            'product_id' => (int) $item->product_id,
+            'package_id' => (int) $item->package_id,
             'unit_idr' => max(0, (int) ($item->unit_price_idr ?? $item->package?->price ?? 0)),
             'unit_usdt' => max(0, (float) ($item->unit_price_usdt ?? $item->package?->price_usdt ?? 0)),
             'quantity' => max(1, (int) $item->quantity),
@@ -128,16 +132,18 @@ class VoucherService
         }
 
         $this->ensureAvailable($voucher, $user, $baseIdr, $excludeOrderId);
+        $eligibleDiscountLines = $this->eligibleDiscountLines($voucher, $discountLines);
+        $discountUnits = max(1, (int) $eligibleDiscountLines->sum(fn (array $line) => max(1, (int) $line['quantity'])));
 
         $maxDiscountCrypto = $token ? $this->cryptoMaxDiscount($voucher, $token) : 0;
-        $discountIdr = (int) $discountLines->sum(fn (array $line) => (
+        $discountIdr = (int) $eligibleDiscountLines->sum(fn (array $line) => (
             min(
                 intdiv($line['unit_idr'] * $voucher->discount_percent, 100),
                 $voucher->max_discount
             ) * $line['quantity']
         ));
         $discountUsdt = $token
-            ? round((float) $discountLines->sum(fn (array $line) => (
+            ? round((float) $eligibleDiscountLines->sum(fn (array $line) => (
                 min(
                     round($line['unit_usdt'] * ($voucher->discount_percent / 100), 6),
                     $maxDiscountCrypto
@@ -161,9 +167,10 @@ class VoucherService
             'max_discount' => $voucher->max_discount,
             'max_discount_crypto' => $maxDiscountCrypto,
             'discount_cap_scope' => 'per_item',
-            'discount_units' => $quantity,
-            'max_discount_total' => $voucher->max_discount * $quantity,
-            'max_discount_crypto_total' => round($maxDiscountCrypto * $quantity, 6),
+            'discount_units' => $discountUnits,
+            'max_discount_total' => $voucher->max_discount * $discountUnits,
+            'max_discount_crypto_total' => round($maxDiscountCrypto * $discountUnits, 6),
+            'required_package_ids' => $voucher->requiredPackageIds(),
             'minimum_purchase' => $voucher->minimum_purchase,
             'base_idr' => $baseIdr,
             'discount_idr' => $discountIdr,
@@ -222,6 +229,31 @@ class VoucherService
         ) {
             throw new VoucherException('You have already used this voucher.');
         }
+    }
+
+    private function eligibleDiscountLines(Voucher $voucher, Collection $discountLines): Collection
+    {
+        $requiredPackageIds = $voucher->requiredPackageIds();
+
+        if ($requiredPackageIds === []) {
+            return $discountLines;
+        }
+
+        $cartPackageIds = $discountLines
+            ->pluck('package_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+        $missingPackageIds = collect($requiredPackageIds)->diff($cartPackageIds);
+
+        if ($missingPackageIds->isNotEmpty()) {
+            throw new VoucherException('This voucher only applies to its selected bundle packages.');
+        }
+
+        return $discountLines
+            ->filter(fn (array $line) => in_array((int) $line['package_id'], $requiredPackageIds, true))
+            ->values();
     }
 
     private function cryptoToken(?string $coin): string

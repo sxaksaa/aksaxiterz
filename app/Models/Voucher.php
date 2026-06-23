@@ -15,6 +15,7 @@ class Voucher extends Model
         'minimum_purchase',
         'usage_limit',
         'per_user_limit',
+        'required_package_ids',
         'is_active',
         'starts_at',
         'expires_at',
@@ -28,6 +29,7 @@ class Voucher extends Model
         'minimum_purchase' => 'integer',
         'usage_limit' => 'integer',
         'per_user_limit' => 'integer',
+        'required_package_ids' => 'array',
         'is_active' => 'boolean',
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
@@ -36,6 +38,21 @@ class Voucher extends Model
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function requiredPackageIds(): array
+    {
+        return collect($this->required_package_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function hasBundleRequirement(): bool
+    {
+        return $this->requiredPackageIds() !== [];
     }
 
     public function availabilityStatus(): string

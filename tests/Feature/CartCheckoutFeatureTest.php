@@ -210,6 +210,59 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertSame(18.5, $usdcQuote['final_usdt']);
     }
 
+    public function test_bundle_voucher_requires_selected_packages_and_discounts_only_that_bundle(): void
+    {
+        [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 100000, 5, 1);
+        [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 5, 1, $user);
+        [, $thirdProduct, $thirdPackage] = $this->catalogItem('Fluorite', 300000, 15, 1, $user);
+        $voucher = Voucher::create([
+            'code' => 'AURORADRIP',
+            'discount_percent' => 10,
+            'max_discount' => 15000,
+            'max_discount_usdt' => 0.5,
+            'max_discount_usdc' => 0.5,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'required_package_ids' => [$firstPackage->id, $secondPackage->id],
+            'is_active' => true,
+        ]);
+
+        foreach ([[$firstProduct, $firstPackage], [$thirdProduct, $thirdPackage]] as [$product, $package]) {
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+
+        try {
+            app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+            $this->fail('The bundle voucher should reject carts without every required package.');
+        } catch (\App\Exceptions\VoucherException $error) {
+            $this->assertStringContainsString('selected bundle packages', $error->getMessage());
+        }
+
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $secondProduct->id,
+            'package_id' => $secondPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+        $quote = app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+
+        $this->assertSame(500000, $quote['base_idr']);
+        $this->assertSame(20000, $quote['discount_idr']);
+        $this->assertSame(480000, $quote['final_idr']);
+        $this->assertSame(2, $quote['discount_units']);
+        $this->assertEqualsCanonicalizing([$firstPackage->id, $secondPackage->id], $quote['required_package_ids']);
+    }
+
     public function test_bundle_calculates_each_quantity_from_its_own_unit_price(): void
     {
         [$user, $product, $firstPackage] = $this->catalogItem('Aurora', 100000, 5, 3);

@@ -10,6 +10,19 @@
         $formatCrypto = fn ($value, $token) => rtrim(rtrim(number_format((float) $value, 6, '.', ''), '0'), '.') . ' ' . $token;
         $formatDateInput = fn ($value) => $value?->format('Y-m-d\TH:i');
         $selectedActiveStatus = (string) old('is_active', $editVoucher ? (int) $editVoucher->is_active : 1);
+        $selectedRequiredPackageIds = collect(old('required_package_ids', $editVoucher?->requiredPackageIds() ?? []))
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $packageOptionLabel = fn ($package) => trim(($package->product?->name ?? 'Product') . ' - ' . $package->name);
+        $bundleLabel = function ($voucher) use ($packagesById, $packageOptionLabel) {
+            $names = collect($voucher->requiredPackageIds())
+                ->map(fn ($id) => $packagesById->get($id))
+                ->filter()
+                ->map(fn ($package) => $packageOptionLabel($package))
+                ->values();
+
+            return $names->isEmpty() ? 'General voucher' : 'Bundle: ' . $names->join(' + ');
+        };
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -19,7 +32,7 @@
                     <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Vouchers</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Configure separate QRIS, USDT, and USDC discount caps, usage limits, and promo schedules.
+                        Configure separate QRIS, USDT, and USDC discount caps, usage limits, bundle rules, and promo schedules.
                         Each discount cap applies once per purchased license quantity.
                     </p>
                 </div>
@@ -123,6 +136,18 @@
                         type="number" min="1" step="1" class="search-bar w-full" placeholder="Unlimited">
                 </label>
 
+                <label class="block md:col-span-2 xl:col-span-2">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Required bundle packages</span>
+                    <select name="required_package_ids[]" multiple class="search-bar min-h-32 w-full">
+                        @foreach ($availablePackages as $package)
+                            <option value="{{ $package->id }}" @selected(in_array((int) $package->id, $selectedRequiredPackageIds, true))>
+                                {{ $packageOptionLabel($package) }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <span class="mt-2 block text-xs text-gray-500">Leave empty for general vouchers.</span>
+                </label>
+
                 <div class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Starts at (WIB)</span>
                     <label class="relative block cursor-pointer">
@@ -204,6 +229,7 @@
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $voucher->code }}</div>
+                                    <div class="mt-1 text-xs text-gray-500">{{ $bundleLabel($voucher) }}</div>
                                 </td>
                                 <td class="p-4 text-gray-300">
                                     <div>{{ $voucher->discount_percent }}% up to {{ $formatIdr($voucher->max_discount) }} QRIS</div>
@@ -259,6 +285,7 @@
                         <div>
                             <div class="font-semibold text-white">{{ $voucher->code }}</div>
                             <div class="mt-1 text-xs text-[#C084FC]">{{ $voucher->discount_percent }}% up to {{ $formatIdr($voucher->max_discount) }}</div>
+                            <div class="mt-1 text-xs text-gray-500">{{ $bundleLabel($voucher) }}</div>
                             <div class="mt-1 text-xs text-gray-500">
                                 {{ $formatCrypto($voucher->max_discount_usdt, 'USDT') }} /
                                 {{ $formatCrypto($voucher->max_discount_usdc, 'USDC') }}
