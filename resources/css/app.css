@@ -1727,7 +1727,6 @@
             height: 1.75rem;
         }
 
-        .product-summary-card.checkout-summary-sticky,
         .product-section.checkout-summary-sticky {
             margin-inline: -0.25rem;
             border-radius: 1rem;

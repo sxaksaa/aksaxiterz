@@ -365,7 +365,7 @@
         </div>
         </div>
 
-        <div id="summaryBox" class="hidden product-summary-card checkout-summary-sticky fade-up">
+        <div id="summaryBox" class="hidden product-summary-card fade-up">
 
             <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Ready to pay</p>
