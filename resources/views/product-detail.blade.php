@@ -107,13 +107,6 @@
             </div>
         </div>
 
-        <x-ui.checkout-steps class="mb-6 fade-up" :steps="[
-            ['key' => 'payment', 'label' => 'Payment', 'caption' => 'Method & coin', 'icon' => 'credit-card', 'state' => 'is-current'],
-            ['key' => 'package', 'label' => 'Package', 'caption' => 'Duration & stock', 'icon' => 'package-plus'],
-            ['key' => 'voucher', 'label' => 'Voucher', 'caption' => 'Optional discount', 'icon' => 'ticket-percent'],
-            ['key' => 'pay', 'label' => 'Pay', 'caption' => 'Confirm invoice', 'icon' => 'receipt'],
-        ]" />
-
         <div class="product-section mb-6 fade-up">
             <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Checkout</p>
@@ -383,6 +376,11 @@
             </div>
 
             <div class="summary-row mb-2">
+                <span>Product</span>
+                <span>{{ $product->name }}</span>
+            </div>
+
+            <div class="summary-row mb-2">
                 <span>Package</span>
                 <span id="selectedPackage">-</span>
             </div>
@@ -545,42 +543,6 @@
             return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
         }
 
-        function setCheckoutStep(key, state) {
-            const step = document.querySelector(`[data-checkout-step="${key}"]`);
-            if (!step) return;
-
-            step.classList.remove('is-current', 'is-complete');
-            step.removeAttribute('aria-current');
-
-            if (state) {
-                step.classList.add(state);
-            }
-
-            if (state === 'is-current') {
-                step.setAttribute('aria-current', 'step');
-            }
-        }
-
-        function paymentSelectionComplete() {
-            if (selectedPayment === 'pakasir') return true;
-            if (selectedPayment === 'crypto') return Boolean(selectedCoin);
-            if (selectedPayment === 'binance_pay') return Boolean(selectedBinancePayToken);
-
-            return false;
-        }
-
-        function updateCheckoutSteps() {
-            const paymentReady = paymentSelectionComplete();
-            const packageReady = Boolean(selectedPackageId);
-            const voucherReady = Boolean(voucherQuote);
-            const checkoutReady = paymentReady && packageReady;
-
-            setCheckoutStep('payment', paymentReady ? 'is-complete' : 'is-current');
-            setCheckoutStep('package', packageReady ? 'is-complete' : (paymentReady ? 'is-current' : ''));
-            setCheckoutStep('voucher', voucherReady ? 'is-complete' : '');
-            setCheckoutStep('pay', checkoutReady ? 'is-current' : '');
-        }
-
         function requireLogin() {
             showToast('Login required', 'Please login with Google before checkout.', loginUrl, 'warning');
         }
@@ -649,7 +611,6 @@
                 updatePrice();
             }
             showSummary();
-            updateCheckoutSteps();
 
             showToast(
                 'Payment selected',
@@ -699,7 +660,6 @@
                 updatePrice();
             }
             showSummary();
-            updateCheckoutSteps();
 
             const priceText = usesStablecoinPrice() ?
                 `${formatUsd(usd)} + unique amount` :
@@ -747,7 +707,6 @@
             document.getElementById('totalPrice').innerText = total;
             document.getElementById('voucherDiscountAmount').innerText = discount;
             document.getElementById('voucherDiscountRow').classList.toggle('hidden', !voucherQuote);
-            updateCheckoutSteps();
         }
 
         function formatIdr(amount) {
@@ -1082,7 +1041,6 @@
                 updatePrice();
             }
 
-            updateCheckoutSteps();
             showToast('Coin selected', `${token.toUpperCase()} selected. Choose its network next.`, null, 'success');
         }
 
@@ -1096,7 +1054,6 @@
                 refreshVoucher();
             }
 
-            updateCheckoutSteps();
             showToast('Network selected', `${selectedToken.toUpperCase()} on ${text}`, null, 'success');
         }
 
@@ -1116,7 +1073,6 @@
                 refreshVoucher();
             }
 
-            updateCheckoutSteps();
             showToast('Binance Pay coin selected', `${token.toUpperCase()} selected.`, null, 'success');
         }
 
@@ -1135,7 +1091,6 @@
             if (selectedPackageId && selectedPayment) {
                 document.getElementById('summaryBox').classList.remove('hidden');
             }
-            updateCheckoutSteps();
         }
 
         async function fetchPaymentJson(form) {
@@ -1437,7 +1392,6 @@
                 if (!hasStock) {
                     btn.disabled = true
                     setButtonLabel(btn, 'Join Discord to Order')
-                    updateCheckoutSteps()
                     return
                 }
 
@@ -1445,9 +1399,6 @@
                 setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay')
                 btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             }
-            updateCheckoutSteps()
         });
-
-        updateCheckoutSteps();
     </script>
 @endsection
