@@ -32,6 +32,9 @@
 
         @if ($cartItems->isEmpty())
             <section class="empty-state fade-up">
+                <span class="empty-state-icon">
+                    <x-ui.icon name="shopping-cart" class="h-6 w-6" />
+                </span>
                 <h2 class="text-xl font-semibold text-white">Your cart is empty</h2>
                 <p class="mt-2 text-sm text-gray-400">Choose a product and package to start building a bundle.</p>
                 <a href="/" class="btn-main mt-5 inline-flex px-5 py-3">
@@ -40,6 +43,13 @@
                 </a>
             </section>
         @else
+            <x-ui.checkout-steps class="mb-6 fade-up" :steps="[
+                ['key' => 'cart', 'label' => 'Cart', 'caption' => 'Packages ready', 'icon' => 'shopping-cart', 'state' => 'is-complete'],
+                ['key' => 'payment', 'label' => 'Payment', 'caption' => 'Method & coin', 'icon' => 'credit-card', 'state' => 'is-current'],
+                ['key' => 'voucher', 'label' => 'Voucher', 'caption' => 'Optional discount', 'icon' => 'ticket-percent'],
+                ['key' => 'pay', 'label' => 'Pay', 'caption' => 'Confirm bundle', 'icon' => 'receipt'],
+            ]" />
+
             <div class="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
                 <section class="grid gap-4">
                     @foreach ($cartItems as $item)
@@ -99,10 +109,20 @@
                     @endforeach
                 </section>
 
-                <aside class="product-section fade-up lg:sticky lg:top-24">
+                <aside class="product-section checkout-summary-sticky fade-up lg:top-24">
                     <div class="mb-5">
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Bundle Checkout</p>
                         <h2 id="cartBundleCount" class="mt-1 text-xl font-semibold text-white">{{ $cartItems->count() }} packages · {{ $cartItems->sum('quantity') }} keys</h2>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <span class="support-pill">
+                                <x-ui.icon name="shield-check" class="h-4 w-4" />
+                                <span>Secure checkout</span>
+                            </span>
+                            <span class="support-pill">
+                                <x-ui.icon name="key-round" class="h-4 w-4" />
+                                <span>Instant delivery</span>
+                            </span>
+                        </div>
                     </div>
 
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Payment Method</p>
@@ -287,6 +307,39 @@
                     }
                 }
 
+                function setCheckoutStep(key, state) {
+                    const step = document.querySelector(`[data-checkout-step="${key}"]`);
+                    if (!step) return;
+
+                    step.classList.remove('is-current', 'is-complete');
+                    step.removeAttribute('aria-current');
+
+                    if (state) {
+                        step.classList.add(state);
+                    }
+
+                    if (state === 'is-current') {
+                        step.setAttribute('aria-current', 'step');
+                    }
+                }
+
+                function paymentSelectionComplete() {
+                    if (paymentMethod === 'pakasir') return true;
+                    if (paymentMethod === 'crypto') return Boolean(coin);
+                    if (paymentMethod === 'binance_pay') return Boolean(binanceToken);
+
+                    return false;
+                }
+
+                function updateCheckoutSteps() {
+                    const paymentReady = paymentSelectionComplete();
+
+                    setCheckoutStep('cart', 'is-complete');
+                    setCheckoutStep('payment', paymentReady ? 'is-complete' : 'is-current');
+                    setCheckoutStep('voucher', voucherQuote ? 'is-complete' : '');
+                    setCheckoutStep('pay', paymentReady ? 'is-current' : '');
+                }
+
                 function updateTotals() {
                     const stablecoin = paymentMethod === 'crypto' || paymentMethod === 'binance_pay';
                     const subtotal = stablecoin ? formatUsd(subtotalUsdt) : (paymentMethod === 'pakasir' ? formatIdr(subtotalIdr) : 'Select payment');
@@ -304,6 +357,7 @@
 
                     const button = document.getElementById('cartCheckoutButton');
                     setButtonLabel(button, paymentMethod ? 'Pay Bundle' : 'Choose Payment Method');
+                    updateCheckoutSteps();
                 }
 
                 function voucherFeedback(message, variant = 'success') {

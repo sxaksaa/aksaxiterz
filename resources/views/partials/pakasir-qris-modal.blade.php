@@ -3,9 +3,14 @@
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaQrisTitle">
         <div class="flex items-start justify-between gap-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">QRIS for Indonesia & Malaysia-supported wallets</p>
-                <h2 id="aksaQrisTitle" class="mt-1 text-xl font-semibold text-white">Scan to Pay</h2>
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="payment-card-icon mt-0.5">
+                    <x-ui.icon name="qr-code" class="h-5 w-5" />
+                </span>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">QRIS for Indonesia & Malaysia-supported wallets</p>
+                    <h2 id="aksaQrisTitle" class="mt-1 text-xl font-semibold text-white">Scan to Pay</h2>
+                </div>
             </div>
             <button type="button" class="qris-close-button" data-qris-close aria-label="Close QRIS checkout">x</button>
         </div>
@@ -33,7 +38,7 @@
             </div>
             <div class="qris-detail-row qris-total-row">
                 <span>Total payment</span>
-                <span id="aksaQrisAmount" class="font-semibold text-[#D8B4FE]">-</span>
+                <span id="aksaQrisAmount" class="qris-amount-value">-</span>
             </div>
             <div class="qris-detail-row">
                 <span>Time remaining</span>

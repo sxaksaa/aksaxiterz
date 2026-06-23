@@ -145,6 +145,7 @@
                 });
 
                 container.classList.add('product-container-loading');
+                container.innerHTML = productSkeletonHtml();
 
                 fetch(`${productEndpoint}?${params.toString()}`, {
                         headers: {
@@ -179,7 +180,40 @@
             }
 
             function emptyProductsHtml(message = 'No products match this filter yet.') {
-                return `<div class="empty-state sm:col-span-2 lg:col-span-3">${message}</div>`;
+                return `
+                    <div class="empty-state sm:col-span-2 lg:col-span-3">
+                        <span class="empty-state-icon">
+                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m21 8-9-5-9 5 9 5 9-5Z"></path>
+                                <path d="M3 8v8l9 5 9-5V8"></path>
+                                <path d="M12 13v8"></path>
+                            </svg>
+                        </span>
+                        <span class="empty-state-title">No products found</span>
+                        <p class="empty-state-copy">${escapeHtml(message)}</p>
+                    </div>
+                `;
+            }
+
+            function productSkeletonHtml() {
+                return Array.from({ length: 6 }, () => `
+                    <div class="skeleton-card">
+                        <span class="skeleton-line w-2/5"></span>
+                        <span class="skeleton-line mt-5 w-4/5"></span>
+                        <span class="skeleton-line mt-3 w-3/5"></span>
+                        <span class="skeleton-line mt-8 w-full"></span>
+                        <span class="skeleton-line mt-3 w-2/3"></span>
+                    </div>
+                `).join('');
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
             }
 
         });

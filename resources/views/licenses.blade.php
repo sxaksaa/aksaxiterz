@@ -155,7 +155,15 @@
 
             @empty
                 <div class="empty-state fade-up">
-                    No licenses yet
+                    <span class="empty-state-icon">
+                        <x-ui.icon name="key-round" class="h-6 w-6" />
+                    </span>
+                    <span class="empty-state-title">No licenses yet</span>
+                    <p class="empty-state-copy">Paid orders with delivered keys will appear here automatically.</p>
+                    <a href="/orders" class="btn-footer mt-5">
+                        <x-ui.icon name="receipt" class="h-4 w-4" />
+                        <span>Open Orders</span>
+                    </a>
                 </div>
             @endforelse
 

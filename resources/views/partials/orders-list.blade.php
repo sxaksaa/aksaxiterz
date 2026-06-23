@@ -171,6 +171,8 @@
                 @endif
             </div>
 
+            @include('partials.order-status-timeline', ['order' => $order])
+
             @if ($hasPaymentAction)
                 <div class="mt-4 flex flex-col gap-2">
                     @if ($canOpenCryptoAddress)
@@ -242,7 +244,13 @@
             @endif
         </article>
     @empty
-        <div class="empty-state">No orders yet</div>
+        <div class="empty-state">
+            <span class="empty-state-icon">
+                <x-ui.icon name="receipt" class="h-6 w-6" />
+            </span>
+            <span class="empty-state-title">No orders yet</span>
+            <p class="empty-state-copy">Your invoices and payment progress will appear here after checkout.</p>
+        </div>
     @endforelse
 </div>
 
@@ -420,6 +428,7 @@
                                     <span class="countdown animate-pulse text-yellow-400" data-remaining="{{ max(0, (int) now()->diffInSeconds($order->expired_at, false)) }}"></span>
                                 </div>
                             @endif
+                            @include('partials.order-status-timeline', ['order' => $order])
                         </td>
                         <td class="p-4 text-right">
                             <div class="inline-flex flex-wrap justify-end gap-2">
@@ -494,7 +503,13 @@
                 @empty
                     <tr>
                         <td colspan="7" class="p-8">
-                            <div class="empty-state">No orders yet</div>
+                            <div class="empty-state">
+                                <span class="empty-state-icon">
+                                    <x-ui.icon name="receipt" class="h-6 w-6" />
+                                </span>
+                                <span class="empty-state-title">No orders yet</span>
+                                <p class="empty-state-copy">Your invoices and payment progress will appear here after checkout.</p>
+                            </div>
                         </td>
                     </tr>
                 @endforelse

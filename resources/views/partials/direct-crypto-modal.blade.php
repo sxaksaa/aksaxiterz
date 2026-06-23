@@ -3,8 +3,14 @@
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaCryptoTitle">
         <div class="flex items-start justify-between gap-4">
-            <div>
-                <h2 id="aksaCryptoTitle" class="text-xl font-semibold text-white">Crypto Payment</h2>
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="payment-card-icon mt-0.5">
+                    <x-ui.icon name="wallet" class="h-5 w-5" />
+                </span>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Direct stablecoin address</p>
+                    <h2 id="aksaCryptoTitle" class="mt-1 text-xl font-semibold text-white">Crypto Payment</h2>
+                </div>
             </div>
             <button type="button" class="qris-close-button" data-crypto-close aria-label="Close crypto checkout">x</button>
         </div>
@@ -39,7 +45,7 @@
             <div class="qris-detail-row qris-total-row">
                 <span>Amount</span>
                 <div class="flex min-w-0 items-center gap-2">
-                    <span id="aksaCryptoAmount" class="font-mono text-xs font-semibold text-[#D8B4FE]">-</span>
+                    <span id="aksaCryptoAmount" class="qris-amount-value font-mono">-</span>
                     <button type="button" id="aksaCryptoCopyAmount" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
                         <x-ui.icon name="copy" class="h-3.5 w-3.5" />
                         <span data-button-label>Copy</span>

@@ -106,6 +106,8 @@
             if (ordersRefreshing) return;
 
             ordersRefreshing = true;
+            const ordersContent = document.getElementById('ordersContent');
+            ordersContent?.classList.add('content-is-refreshing');
 
             try {
                 const fragmentUrl = new URL('/orders-fragment', window.location.origin);
@@ -119,10 +121,13 @@
 
                 if (!response.ok) return;
 
-                document.getElementById('ordersContent').innerHTML = await response.text();
+                if (ordersContent) {
+                    ordersContent.innerHTML = await response.text();
+                }
                 updateCountdowns();
             } finally {
                 ordersRefreshing = false;
+                ordersContent?.classList.remove('content-is-refreshing');
             }
         }
 

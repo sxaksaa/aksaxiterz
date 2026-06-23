@@ -161,21 +161,28 @@
                                     <div class="mt-1 text-xs {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-gray-500' }}">
                                         {{ $order->licenses_count }} / {{ $order->quantity }} delivered
                                     </div>
+                                    @include('partials.order-status-timeline', ['order' => $order])
                                 </td>
                                 <td class="p-4 text-xs text-gray-300">
                                     {{ $paidAt ? $paidAt->format('d M Y, H:i:s') . ' WIB' : '-' }}
                                 </td>
                                 <td class="p-4 text-right">
-                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">
+                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action compact-action" title="Open order detail" aria-label="Open detail for {{ $order->order_id }}">
                                         <x-ui.icon name="eye" class="h-4 w-4" />
-                                        <span>Detail</span>
+                                        <span class="sr-only">Detail</span>
                                     </a>
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="7" class="p-8">
-                                    <div class="empty-state">No orders found</div>
+                                    <div class="empty-state">
+                                        <span class="empty-state-icon">
+                                            <x-ui.icon name="receipt" class="h-6 w-6" />
+                                        </span>
+                                        <span class="empty-state-title">No orders found</span>
+                                        <p class="empty-state-copy">Try a different search, status, method, or delivery filter.</p>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -201,6 +208,8 @@
                         </div>
                         <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
                     </div>
+
+                    @include('partials.order-status-timeline', ['order' => $order])
 
                     <div class="mt-4 grid gap-2 text-sm text-gray-400">
                         <div>Method:
@@ -228,7 +237,13 @@
                     </a>
                 </article>
             @empty
-                <div class="empty-state">No orders found</div>
+                <div class="empty-state">
+                    <span class="empty-state-icon">
+                        <x-ui.icon name="receipt" class="h-6 w-6" />
+                    </span>
+                    <span class="empty-state-title">No orders found</span>
+                    <p class="empty-state-copy">Try a different search, status, method, or delivery filter.</p>
+                </div>
             @endforelse
         </div>
 

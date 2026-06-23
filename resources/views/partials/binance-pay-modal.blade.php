@@ -41,7 +41,7 @@
                 <div class="qris-detail-row qris-total-row">
                     <span>Amount</span>
                     <div class="flex min-w-0 items-center gap-2">
-                        <span id="aksaBinancePayAmount" class="font-mono text-xs font-semibold text-[#D8B4FE]">-</span>
+                        <span id="aksaBinancePayAmount" class="qris-amount-value font-mono">-</span>
                         <button type="button" id="aksaBinancePayCopyAmount" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
                             <x-ui.icon name="copy" class="h-3.5 w-3.5" />
                             <span data-button-label>Copy</span>
