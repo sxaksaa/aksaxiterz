@@ -847,6 +847,204 @@ window.showAppToast = function(title, message = '', options = {}) {
     }, duration);
 };
 
+const customSelects = new WeakMap();
+
+function customSelectOptionLabel(option) {
+    return (option?.textContent || option?.label || option?.value || 'Select').trim();
+}
+
+function selectedCustomSelectOption(select) {
+    return select.selectedOptions?.[0] || select.options?.[select.selectedIndex] || select.querySelector('option');
+}
+
+function customSelectVisibleOptions(select) {
+    return Array.from(select.options || []).filter((option) => !option.hidden);
+}
+
+function closeCustomSelect(select) {
+    const state = customSelects.get(select);
+
+    if (!state) return;
+
+    state.wrapper.classList.remove('is-open');
+    state.panel.classList.add('hidden');
+    state.trigger.setAttribute('aria-expanded', 'false');
+
+    if (state.section) {
+        state.section.style.zIndex = state.previousSectionZIndex || '';
+        state.section.dataset.aksaSelectOpen = 'false';
+    }
+}
+
+function closeOtherCustomSelects(currentSelect = null) {
+    document.querySelectorAll('select[data-aksa-select-enhanced]').forEach((select) => {
+        if (select !== currentSelect) {
+            closeCustomSelect(select);
+        }
+    });
+}
+
+function refreshCustomSelect(select) {
+    const state = customSelects.get(select);
+
+    if (!state) return;
+
+    const selectedOption = selectedCustomSelectOption(select);
+
+    state.label.textContent = customSelectOptionLabel(selectedOption);
+    state.trigger.disabled = select.disabled;
+    state.panel.innerHTML = '';
+
+    const visibleOptions = customSelectVisibleOptions(select);
+
+    if (visibleOptions.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'aksa-select-option is-disabled';
+        empty.textContent = 'No options available';
+        state.panel.appendChild(empty);
+        return;
+    }
+
+    visibleOptions.forEach((option) => {
+        const button = document.createElement('button');
+        const check = document.createElement('span');
+        const isSelected = option.value === select.value;
+
+        button.type = 'button';
+        button.className = 'aksa-select-option';
+        button.disabled = option.disabled;
+        button.dataset.value = option.value;
+        button.setAttribute('role', 'option');
+        button.setAttribute('aria-selected', String(isSelected));
+
+        if (isSelected) {
+            button.classList.add('is-active');
+        }
+
+        if (option.disabled) {
+            button.classList.add('is-disabled');
+        }
+
+        button.append(document.createTextNode(customSelectOptionLabel(option)));
+        check.className = 'aksa-select-option-check';
+        button.appendChild(check);
+        button.addEventListener('click', () => {
+            if (option.disabled) return;
+
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            refreshCustomSelect(select);
+            closeCustomSelect(select);
+        });
+        state.panel.appendChild(button);
+    });
+}
+
+function enhanceCustomSelect(select) {
+    if (select.dataset.aksaSelectEnhanced || select.multiple) return;
+
+    const wrapper = document.createElement('div');
+    const trigger = document.createElement('button');
+    const label = document.createElement('span');
+    const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const chevronPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const panel = document.createElement('div');
+    const section = select.closest('.product-section');
+
+    select.dataset.aksaSelectEnhanced = 'true';
+    select.tabIndex = -1;
+
+    wrapper.className = 'aksa-select';
+    trigger.type = 'button';
+    trigger.className = 'aksa-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    label.className = 'aksa-select-label';
+    chevron.classList.add('aksa-select-chevron');
+    chevron.setAttribute('viewBox', '0 0 24 24');
+    chevron.setAttribute('fill', 'none');
+    chevron.setAttribute('stroke', 'currentColor');
+    chevron.setAttribute('stroke-width', '1.8');
+    chevron.setAttribute('aria-hidden', 'true');
+    chevronPath.setAttribute('stroke-linecap', 'round');
+    chevronPath.setAttribute('stroke-linejoin', 'round');
+    chevronPath.setAttribute('d', 'm6 9 6 6 6-6');
+    chevron.appendChild(chevronPath);
+    panel.className = 'aksa-select-panel hidden';
+    panel.setAttribute('role', 'listbox');
+    trigger.append(label, chevron);
+    wrapper.append(trigger, panel);
+    select.insertAdjacentElement('afterend', wrapper);
+
+    customSelects.set(select, {
+        wrapper,
+        trigger,
+        label,
+        panel,
+        section,
+        previousSectionZIndex: section?.style.zIndex || '',
+    });
+
+    trigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+
+        if (select.disabled) return;
+
+        const state = customSelects.get(select);
+        const isOpen = state.wrapper.classList.contains('is-open');
+
+        closeOtherCustomSelects(select);
+        state.wrapper.classList.toggle('is-open', !isOpen);
+        state.panel.classList.toggle('hidden', isOpen);
+        state.trigger.setAttribute('aria-expanded', String(!isOpen));
+
+        if (state.section) {
+            state.section.style.position = 'relative';
+            state.section.style.zIndex = isOpen ? state.previousSectionZIndex : '80';
+            state.section.dataset.aksaSelectOpen = String(!isOpen);
+        }
+    });
+
+    select.addEventListener('change', () => refreshCustomSelect(select));
+    select.addEventListener('aksa-select-refresh', () => refreshCustomSelect(select));
+
+    const observer = new MutationObserver(() => refreshCustomSelect(select));
+    observer.observe(select, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        characterData: true,
+    });
+
+    refreshCustomSelect(select);
+}
+
+function initializeCustomSelects(root = document) {
+    root.querySelectorAll('select.search-bar:not([data-native-select])').forEach(enhanceCustomSelect);
+}
+
+window.refreshAksaCustomSelects = function() {
+    document.querySelectorAll('select[data-aksa-select-enhanced]').forEach((select) => refreshCustomSelect(select));
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initializeCustomSelects());
+} else {
+    initializeCustomSelects();
+}
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('.aksa-select')) {
+        closeOtherCustomSelects();
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeOtherCustomSelects();
+    }
+});
+
 document.addEventListener('submit', (event) => {
     const form = event.target.closest('form[data-confirm]');
 

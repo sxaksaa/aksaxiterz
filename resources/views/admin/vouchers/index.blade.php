@@ -10,6 +10,7 @@
         $formatCrypto = fn ($value, $token) => rtrim(rtrim(number_format((float) $value, 6, '.', ''), '0'), '.') . ' ' . $token;
         $formatDateInput = fn ($value) => $value?->format('Y-m-d\TH:i');
         $selectedActiveStatus = (string) old('is_active', $editVoucher ? (int) $editVoucher->is_active : 1);
+        $selectedActiveLabel = $selectedActiveStatus === '0' ? 'Inactive' : 'Active';
         $packageOptionLabel = fn ($package) => trim(($package->product?->name ?? 'Product') . ' - ' . $package->name);
         $selectedRequiredPackageIds = collect(old('required_package_ids', $editVoucher?->requiredPackageIds() ?? []))
             ->map(fn ($id) => (int) $id)
@@ -302,13 +303,40 @@
                     </div>
                 </div>
 
-                <label class="block">
+                <div class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
-                    <select name="is_active" class="search-bar w-full" required>
-                        <option value="1" @selected($selectedActiveStatus === '1')>Active</option>
-                        <option value="0" @selected($selectedActiveStatus === '0')>Inactive</option>
-                    </select>
-                </label>
+                    <div class="relative" data-status-picker>
+                        <input type="hidden" name="is_active" value="{{ $selectedActiveStatus === '0' ? '0' : '1' }}"
+                            data-status-value>
+                        <button type="button"
+                            class="search-bar flex min-h-12 w-full items-center justify-between gap-3 text-left"
+                            data-status-toggle aria-expanded="false" aria-controls="voucherStatusPanel">
+                            <span data-status-label>{{ $selectedActiveLabel }}</span>
+                            <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" data-status-arrow
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+
+                        <div id="voucherStatusPanel"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] p-2 shadow-2xl"
+                            data-status-panel>
+                            <button type="button"
+                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white"
+                                data-status-option data-value="1" data-label="Active">
+                                <span>Active</span>
+                                <span class="hidden h-2 w-2 rounded-full bg-[#C084FC]" data-status-check></span>
+                            </button>
+                            <button type="button"
+                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white"
+                                data-status-option data-value="0" data-label="Inactive">
+                                <span>Inactive</span>
+                                <span class="hidden h-2 w-2 rounded-full bg-[#C084FC]" data-status-check></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="flex items-end">
                     <button class="btn-footer h-12">{{ $isEditing ? 'Save Voucher' : 'Create Voucher' }}</button>
@@ -684,6 +712,67 @@
             });
 
             checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refresh));
+
+            document.addEventListener('click', (event) => {
+                if (!picker.contains(event.target)) {
+                    close();
+                }
+            });
+
+            picker.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    close();
+                    toggle.focus();
+                }
+            });
+
+            refresh();
+        });
+
+        document.querySelectorAll('[data-status-picker]').forEach((picker) => {
+            const valueInput = picker.querySelector('[data-status-value]');
+            const toggle = picker.querySelector('[data-status-toggle]');
+            const label = picker.querySelector('[data-status-label]');
+            const panel = picker.querySelector('[data-status-panel]');
+            const arrow = picker.querySelector('[data-status-arrow]');
+            const options = Array.from(picker.querySelectorAll('[data-status-option]'));
+
+            const refresh = () => {
+                options.forEach((option) => {
+                    const isSelected = option.dataset.value === valueInput.value;
+
+                    option.classList.toggle('bg-[#9333EA]/15', isSelected);
+                    option.classList.toggle('text-white', isSelected);
+                    option.querySelector('[data-status-check]')?.classList.toggle('hidden', !isSelected);
+
+                    if (isSelected) {
+                        label.textContent = option.dataset.label;
+                    }
+                });
+            };
+
+            const close = () => {
+                panel.classList.add('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+                arrow.classList.remove('rotate-180');
+            };
+
+            toggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isOpen = !panel.classList.contains('hidden');
+
+                panel.classList.toggle('hidden', isOpen);
+                toggle.setAttribute('aria-expanded', String(!isOpen));
+                arrow.classList.toggle('rotate-180', !isOpen);
+            });
+
+            options.forEach((option) => {
+                option.addEventListener('click', () => {
+                    valueInput.value = option.dataset.value;
+                    refresh();
+                    close();
+                });
+            });
 
             document.addEventListener('click', (event) => {
                 if (!picker.contains(event.target)) {

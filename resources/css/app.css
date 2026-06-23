@@ -219,6 +219,120 @@
         @apply rounded-2xl;
     }
 
+    select.search-bar[data-aksa-select-enhanced] {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .aksa-select {
+        position: relative;
+        width: 100%;
+    }
+
+    .aksa-select-trigger {
+        @apply flex min-h-12 w-full items-center justify-between gap-3 rounded-[999px] border px-4 py-3 text-left text-white transition;
+        background: rgba(21, 21, 27, 0.9);
+        border-color: rgba(147, 51, 234, 0.72);
+        box-shadow:
+            0 0 0 3px rgba(147, 51, 234, 0.12),
+            0 12px 28px rgba(147, 51, 234, 0.08);
+    }
+
+    .aksa-select-trigger:focus,
+    .aksa-select-trigger:hover {
+        border-color: rgba(192, 132, 252, 0.95);
+        outline: none;
+        box-shadow:
+            0 0 0 4px rgba(147, 51, 234, 0.18),
+            0 16px 34px rgba(147, 51, 234, 0.14);
+    }
+
+    .aksa-select-trigger:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .aksa-select-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .aksa-select-chevron {
+        width: 1rem;
+        height: 1rem;
+        flex-shrink: 0;
+        color: #9ca3af;
+        transition: transform 0.15s ease;
+    }
+
+    .aksa-select.is-open .aksa-select-chevron {
+        transform: rotate(180deg);
+    }
+
+    .aksa-select-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        z-index: 70;
+        margin-top: 0.5rem;
+        max-height: 18rem;
+        overflow-y: auto;
+        border: 1px solid rgba(147, 51, 234, 0.34);
+        border-radius: 0.75rem;
+        background: #111115;
+        padding: 0.5rem;
+        box-shadow: 0 24px 52px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(147, 51, 234, 0.12);
+    }
+
+    .aksa-select-panel.hidden {
+        display: none;
+    }
+
+    .aksa-select-option {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-radius: 0.5rem;
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #d1d5db;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .aksa-select-option:hover,
+    .aksa-select-option.is-active {
+        background: rgba(147, 51, 234, 0.14);
+        color: #ffffff;
+    }
+
+    .aksa-select-option.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+    }
+
+    .aksa-select-option-check {
+        width: 0.5rem;
+        height: 0.5rem;
+        flex-shrink: 0;
+        border-radius: 999px;
+        background: #c084fc;
+        opacity: 0;
+    }
+
+    .aksa-select-option.is-active .aksa-select-option-check {
+        opacity: 1;
+    }
+
     .search-bar:focus,
     .search-bar:hover {
         border-color: rgba(192, 132, 252, 0.95);
