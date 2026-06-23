@@ -908,26 +908,29 @@
         /* =========================
            CRYPTO COIN & NETWORK
         ========================= */
+        function setNetworkDropdownState(isOpen) {
+            const box = document.getElementById('networkDropdown');
+            const toggle = document.querySelector('[data-network-toggle]');
+            const shell = document.getElementById('networkSelectShell');
+            const section = document.getElementById('cryptoBox')?.closest('.product-section');
+
+            networkDropdownOpen = isOpen;
+            box?.classList.toggle('hidden', !isOpen);
+            shell?.classList.toggle('is-open', isOpen);
+            section?.classList.toggle('is-select-open', isOpen);
+            toggle?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+
         function toggleNetworkDropdown(e) {
             e.stopPropagation();
 
             if (!selectedToken) return;
 
-            const box = document.getElementById('networkDropdown');
-            const toggle = document.querySelector('[data-network-toggle]');
-            const shell = document.getElementById('networkSelectShell');
-
-            networkDropdownOpen = !networkDropdownOpen;
-            box.classList.toggle('hidden', !networkDropdownOpen);
-            shell?.classList.toggle('is-open', networkDropdownOpen);
-            toggle?.setAttribute('aria-expanded', networkDropdownOpen ? 'true' : 'false');
+            setNetworkDropdownState(!networkDropdownOpen);
         }
 
         function closeNetworkDropdown() {
-            networkDropdownOpen = false;
-            document.getElementById('networkDropdown').classList.add('hidden');
-            document.getElementById('networkSelectShell')?.classList.remove('is-open');
-            document.querySelector('[data-network-toggle]')?.setAttribute('aria-expanded', 'false');
+            setNetworkDropdownState(false);
         }
 
         function selectCryptoCoin(token) {

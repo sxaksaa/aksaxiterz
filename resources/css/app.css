@@ -542,6 +542,12 @@
         box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
     }
 
+    .product-section.is-select-open {
+        position: relative;
+        z-index: 100;
+        overflow: visible;
+    }
+
     .checkout-card,
     .package-card,
     .license-card {
