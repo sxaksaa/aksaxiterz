@@ -67,6 +67,42 @@ class VoucherController extends Controller
             ->with('info', 'Voucher updated.');
     }
 
+    public function show(Voucher $voucher)
+    {
+        $voucher->loadCount([
+            'orders as active_uses_count' => fn ($query) => $query->where('status', '!=', 'cancelled'),
+            'orders as paid_uses_count' => fn ($query) => $query->where('status', 'paid'),
+        ]);
+
+        $summaryRows = $voucher->orders()
+            ->with(['items', 'product', 'package'])
+            ->oldest()
+            ->get()
+            ->map(fn (Order $order) => $this->usageRow($order));
+        $paidRows = $summaryRows->filter(fn (array $row) => $row['order']->status === 'paid');
+        $usageStats = [
+            'total_orders' => $summaryRows->count(),
+            'active_orders' => $summaryRows->filter(fn (array $row) => $row['order']->status !== 'cancelled')->count(),
+            'paid_orders' => $paidRows->count(),
+            'checkout_idr' => (int) $paidRows->where('currency_group', 'idr')->sum('subtotal_value'),
+            'final_idr' => (int) $paidRows->where('currency_group', 'idr')->sum('final_value'),
+            'discount_idr' => (int) $paidRows->where('currency_group', 'idr')->sum('discount_value'),
+            'checkout_crypto' => round((float) $paidRows->where('currency_group', 'crypto')->sum('subtotal_value'), 6),
+            'final_crypto' => round((float) $paidRows->where('currency_group', 'crypto')->sum('final_value'), 6),
+            'discount_crypto' => round((float) $paidRows->where('currency_group', 'crypto')->sum('discount_value'), 6),
+        ];
+
+        $usageRows = $voucher->orders()
+            ->with(['user', 'items', 'product', 'package'])
+            ->latest()
+            ->paginate(15);
+        $usageRows->setCollection(
+            $usageRows->getCollection()->map(fn (Order $order) => $this->usageRow($order))
+        );
+
+        return view('admin.vouchers.show', compact('voucher', 'usageRows', 'usageStats'));
+    }
+
     public function destroy(Voucher $voucher)
     {
         if ($voucher->orders()->exists()) {
@@ -133,5 +169,60 @@ class VoucherController extends Controller
             ->all() ?: null;
 
         return $validated;
+    }
+
+    private function usageRow(Order $order): array
+    {
+        $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
+        $items = $order->lineItems();
+        $subtotalIdr = (int) $items->sum(fn ($item) => (int) $item->line_total_idr);
+        $subtotalCrypto = round((float) $items->sum(fn ($item) => (float) $item->line_total_usdt), 6);
+        $isCrypto = in_array($order->payment_method, ['crypto', 'binance_pay'], true);
+        $methodLabel = match ($order->payment_method) {
+            'binance_pay' => 'Binance Pay',
+            'crypto' => 'Crypto',
+            'pakasir' => 'QRIS',
+            default => ucfirst($order->payment_method ?: 'Legacy'),
+        };
+        $itemLabels = $items
+            ->take(3)
+            ->map(fn ($item) => trim($item->product_name.' - '.$item->package_name).' x'.max(1, (int) $item->quantity))
+            ->values();
+
+        if ($items->count() > 3) {
+            $itemLabels->push('+'.($items->count() - 3).' more');
+        }
+
+        if ($isCrypto) {
+            $token = strtoupper((string) ($payload['token'] ?? 'USDT'));
+            $finalValue = round((float) ($payload['base_amount'] ?? $order->price), 6);
+            $paidValue = round((float) ($payload['amount'] ?? $order->price), 6);
+
+            return [
+                'order' => $order,
+                'method_label' => $methodLabel,
+                'currency_group' => 'crypto',
+                'currency' => $token,
+                'subtotal_value' => $subtotalCrypto,
+                'final_value' => $finalValue,
+                'paid_value' => $paidValue,
+                'discount_value' => max(0, round($subtotalCrypto - $finalValue, 6)),
+                'item_summary' => $itemLabels->implode(', '),
+            ];
+        }
+
+        $finalValue = (int) round((float) $order->price);
+
+        return [
+            'order' => $order,
+            'method_label' => $methodLabel,
+            'currency_group' => 'idr',
+            'currency' => 'IDR',
+            'subtotal_value' => $subtotalIdr,
+            'final_value' => $finalValue,
+            'paid_value' => (int) ($payload['total_payment'] ?? $payload['amount'] ?? $finalValue),
+            'discount_value' => max(0, $subtotalIdr - $finalValue),
+            'item_summary' => $itemLabels->implode(', '),
+        ];
     }
 }

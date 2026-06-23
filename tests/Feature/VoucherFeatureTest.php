@@ -6,6 +6,7 @@ use App\Exceptions\VoucherException;
 use App\Models\Category;
 use App\Models\LicenseStock;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
@@ -455,6 +456,92 @@ class VoucherFeatureTest extends TestCase
             [$firstPackage->id, $secondPackage->id],
             $voucher->requiredPackageIds()
         );
+    }
+
+    public function test_admin_can_view_voucher_usage_with_customer_totals_and_discount(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        [$customer, $product, $package] = $this->makeCatalog(100000, 5);
+        $voucher = $this->makeVoucher([
+            'code' => 'REPORT10',
+            'per_user_limit' => 0,
+            'minimum_purchase' => 0,
+        ]);
+        $qrisOrder = Order::create([
+            'order_id' => 'ORDER-VOUCHER-IDR',
+            'user_id' => $customer->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'voucher_id' => $voucher->id,
+            'status' => 'paid',
+            'payment_method' => 'pakasir',
+            'price' => 90000,
+            'paid_at' => now(),
+        ]);
+        OrderItem::create([
+            'order_id' => $qrisOrder->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'product_name' => $product->name,
+            'package_name' => $package->name,
+            'quantity' => 1,
+            'unit_price_idr' => 100000,
+            'unit_price_usdt' => 5,
+            'line_total_idr' => 100000,
+            'line_total_usdt' => 5,
+        ]);
+
+        $cryptoOrder = Order::create([
+            'order_id' => 'ORDER-VOUCHER-USDC',
+            'user_id' => $customer->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'voucher_id' => $voucher->id,
+            'status' => 'paid',
+            'payment_method' => 'crypto',
+            'price' => 4.501234,
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDC',
+                'base_amount' => '4.500000',
+                'amount' => '4.501234',
+            ],
+            'paid_at' => now(),
+        ]);
+        OrderItem::create([
+            'order_id' => $cryptoOrder->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'product_name' => $product->name,
+            'package_name' => $package->name,
+            'quantity' => 1,
+            'unit_price_idr' => 100000,
+            'unit_price_usdt' => 5,
+            'line_total_idr' => 100000,
+            'line_total_usdt' => 5,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.vouchers.show', $voucher))
+            ->assertOk()
+            ->assertSee('REPORT10')
+            ->assertSee($customer->email)
+            ->assertSee('ORDER-VOUCHER-IDR')
+            ->assertSee('ORDER-VOUCHER-USDC')
+            ->assertSee('Rp 100.000')
+            ->assertSee('Rp 90.000')
+            ->assertSee('Rp 10.000')
+            ->assertSee('5 USDC')
+            ->assertSee('4.5 USDC')
+            ->assertSee('0.5 USDC')
+            ->assertSee('Requested 4.501234 USDC');
+
+        $this->actingAs($admin)
+            ->get(route('admin.vouchers.index'))
+            ->assertOk()
+            ->assertSee(route('admin.vouchers.show', $voucher), false)
+            ->assertSee('Uses');
     }
 
     private function makeVoucher(array $overrides = []): Voucher

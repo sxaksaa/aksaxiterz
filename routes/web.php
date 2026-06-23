@@ -337,6 +337,7 @@ Route::middleware(['auth', 'admin'])
         Route::delete('/downloads/{download}', [DownloadController::class, 'destroy'])->name('downloads.destroy');
         Route::get('/vouchers', [AdminVoucherController::class, 'index'])->name('vouchers.index');
         Route::post('/vouchers', [AdminVoucherController::class, 'store'])->name('vouchers.store');
+        Route::get('/vouchers/{voucher}', [AdminVoucherController::class, 'show'])->name('vouchers.show');
         Route::patch('/vouchers/{voucher}', [AdminVoucherController::class, 'update'])->name('vouchers.update');
         Route::delete('/vouchers/{voucher}', [AdminVoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');

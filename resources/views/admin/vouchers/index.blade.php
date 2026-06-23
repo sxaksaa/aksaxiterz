@@ -10,10 +10,20 @@
         $formatCrypto = fn ($value, $token) => rtrim(rtrim(number_format((float) $value, 6, '.', ''), '0'), '.') . ' ' . $token;
         $formatDateInput = fn ($value) => $value?->format('Y-m-d\TH:i');
         $selectedActiveStatus = (string) old('is_active', $editVoucher ? (int) $editVoucher->is_active : 1);
+        $packageOptionLabel = fn ($package) => trim(($package->product?->name ?? 'Product') . ' - ' . $package->name);
         $selectedRequiredPackageIds = collect(old('required_package_ids', $editVoucher?->requiredPackageIds() ?? []))
             ->map(fn ($id) => (int) $id)
             ->all();
-        $packageOptionLabel = fn ($package) => trim(($package->product?->name ?? 'Product') . ' - ' . $package->name);
+        $selectedRequiredPackageNames = collect($selectedRequiredPackageIds)
+            ->map(fn ($id) => $packagesById->get($id))
+            ->filter()
+            ->map(fn ($package) => $packageOptionLabel($package))
+            ->values();
+        $bundlePickerLabel = $selectedRequiredPackageNames->isEmpty()
+            ? 'General voucher'
+            : ($selectedRequiredPackageNames->count() <= 2
+                ? $selectedRequiredPackageNames->join(' + ')
+                : $selectedRequiredPackageNames->count() . ' packages selected');
         $bundleLabel = function ($voucher) use ($packagesById, $packageOptionLabel) {
             $names = collect($voucher->requiredPackageIds())
                 ->map(fn ($id) => $packagesById->get($id))
@@ -136,17 +146,47 @@
                         type="number" min="1" step="1" class="search-bar w-full" placeholder="Unlimited">
                 </label>
 
-                <label class="block md:col-span-2 xl:col-span-2">
+                <div class="block md:col-span-2 xl:col-span-2">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Required bundle packages</span>
-                    <select name="required_package_ids[]" multiple class="search-bar min-h-32 w-full">
-                        @foreach ($availablePackages as $package)
-                            <option value="{{ $package->id }}" @selected(in_array((int) $package->id, $selectedRequiredPackageIds, true))>
-                                {{ $packageOptionLabel($package) }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <div class="relative" data-bundle-picker>
+                        <button type="button"
+                            class="search-bar flex min-h-12 w-full items-center justify-between gap-3 text-left"
+                            data-bundle-toggle aria-expanded="false" aria-controls="voucherBundlePackagePanel">
+                            <span class="min-w-0 truncate" data-bundle-label>{{ $bundlePickerLabel }}</span>
+                            <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" data-bundle-arrow
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+
+                        <div id="voucherBundlePackagePanel"
+                            class="absolute left-0 right-0 z-30 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] shadow-2xl"
+                            data-bundle-panel>
+                            <div class="max-h-64 overflow-y-auto p-2">
+                                @forelse ($availablePackages as $package)
+                                    @php($optionLabel = $packageOptionLabel($package))
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 text-sm text-gray-300 transition hover:bg-[#9333EA]/10">
+                                        <input type="checkbox" name="required_package_ids[]" value="{{ $package->id }}"
+                                            class="mt-1 h-4 w-4 rounded border-gray-600 bg-[#09090c]"
+                                            style="accent-color: #9333EA"
+                                            data-bundle-checkbox data-label="{{ $optionLabel }}"
+                                            @checked(in_array((int) $package->id, $selectedRequiredPackageIds, true))>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-white">{{ $optionLabel }}</span>
+                                            <span class="block text-xs text-gray-500">
+                                                {{ $formatIdr($package->price) }} / {{ $formatCrypto($package->price_usdt, 'USDT') }}
+                                            </span>
+                                        </span>
+                                    </label>
+                                @empty
+                                    <div class="px-3 py-2 text-sm text-gray-500">No packages available.</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
                     <span class="mt-2 block text-xs text-gray-500">Leave empty for general vouchers.</span>
-                </label>
+                </div>
 
                 <div class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Starts at (WIB)</span>
@@ -260,6 +300,7 @@
                                 </td>
                                 <td class="p-4 text-right">
                                     <div class="inline-flex gap-2">
+                                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">Uses</a>
                                         <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">Edit</a>
                                         <form action="{{ route('admin.vouchers.destroy', $voucher) }}" method="POST"
                                             data-confirm="Delete this unused voucher?">
@@ -299,6 +340,7 @@
                         Minimum {{ $formatIdr($voucher->minimum_purchase) }} · {{ $voucher->active_uses_count }} active uses
                     </div>
                     <div class="mt-4 flex gap-2">
+                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">Uses</a>
                         <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">Edit</a>
                         <form action="{{ route('admin.vouchers.destroy', $voucher) }}" method="POST" data-confirm="Delete this unused voucher?">
                             @csrf
@@ -356,6 +398,66 @@
                 }
             });
             refreshDisplay();
+        });
+
+        document.querySelectorAll('[data-bundle-picker]').forEach((picker) => {
+            const toggle = picker.querySelector('[data-bundle-toggle]');
+            const panel = picker.querySelector('[data-bundle-panel]');
+            const label = picker.querySelector('[data-bundle-label]');
+            const arrow = picker.querySelector('[data-bundle-arrow]');
+            const checkboxes = Array.from(picker.querySelectorAll('[data-bundle-checkbox]'));
+
+            const selectedText = () => {
+                const selected = checkboxes
+                    .filter((checkbox) => checkbox.checked)
+                    .map((checkbox) => checkbox.dataset.label);
+
+                if (selected.length === 0) {
+                    return 'General voucher';
+                }
+
+                if (selected.length <= 2) {
+                    return selected.join(' + ');
+                }
+
+                return `${selected.length} packages selected`;
+            };
+
+            const refresh = () => {
+                label.textContent = selectedText();
+            };
+
+            const close = () => {
+                panel.classList.add('hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+                arrow.classList.remove('rotate-180');
+            };
+
+            toggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isOpen = !panel.classList.contains('hidden');
+
+                panel.classList.toggle('hidden', isOpen);
+                toggle.setAttribute('aria-expanded', String(!isOpen));
+                arrow.classList.toggle('rotate-180', !isOpen);
+            });
+
+            checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refresh));
+
+            document.addEventListener('click', (event) => {
+                if (!picker.contains(event.target)) {
+                    close();
+                }
+            });
+
+            picker.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    close();
+                    toggle.focus();
+                }
+            });
+
+            refresh();
         });
     </script>
 @endpush
