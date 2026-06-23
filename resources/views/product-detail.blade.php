@@ -178,40 +178,53 @@
 
                 <div class="relative">
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Network</p>
-                    <button type="button" data-network-toggle
-                        class="search-bar flex min-h-16 w-full justify-between items-center text-left disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled aria-expanded="false">
-                        <span id="selectedNetworkText">Select coin first</span>
-                        <span id="networkArrow" class="crypto-dropdown-arrow transition-transform">v</span>
-                    </button>
-
-                    <div id="networkDropdown"
-                        class="hidden mt-2 w-full panel-card overflow-hidden">
-                        <button type="button"
-                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
-                            data-token="usdt" data-network-value="usdtbsc"
-                            data-network-text="BNB Smart Chain (BEP20)">
-                            <span class="font-bold text-white">BNB Smart Chain</span>
-                            <span class="crypto-network-badge">Recommended</span>
-                            <span class="ml-auto text-xs text-gray-500">BEP20</span>
+                    <div id="networkSelectShell" class="aksa-select crypto-network-select">
+                        <button type="button" data-network-toggle
+                            class="aksa-select-trigger crypto-network-trigger"
+                            disabled aria-expanded="false" aria-haspopup="listbox">
+                            <span id="selectedNetworkText" class="aksa-select-label">Select coin first</span>
+                            <svg id="networkArrow" class="aksa-select-chevron" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
                         </button>
 
-                        <button type="button"
-                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
-                            data-token="usdt" data-network-value="usdttrc20"
-                            data-network-text="Tron (TRC20)">
-                            <span class="font-bold text-white">Tron</span>
-                            <span class="ml-auto text-xs text-gray-500">TRC20</span>
-                        </button>
+                        <div id="networkDropdown" class="aksa-select-panel crypto-network-panel hidden" role="listbox">
+                            <button type="button"
+                                class="aksa-select-option crypto-network-option"
+                                data-token="usdt" data-network-value="usdtbsc"
+                                data-network-text="BNB Smart Chain (BEP20)" role="option" aria-selected="false">
+                                <span class="crypto-network-option-main">
+                                    <span class="crypto-network-option-title">BNB Smart Chain</span>
+                                    <span class="crypto-network-badge">Recommended</span>
+                                </span>
+                                <span class="crypto-network-option-meta">BEP20</span>
+                                <span class="aksa-select-option-check" aria-hidden="true"></span>
+                            </button>
 
-                        <button type="button"
-                            class="dropdown-item flex w-full flex-wrap items-center gap-2 text-left"
-                            data-token="usdc" data-network-value="usdcbsc"
-                            data-network-text="BNB Smart Chain (BEP20)">
-                            <span class="font-bold text-white">BNB Smart Chain</span>
-                            <span class="crypto-network-badge">Recommended</span>
-                            <span class="ml-auto text-xs text-gray-500">BEP20</span>
-                        </button>
+                            <button type="button"
+                                class="aksa-select-option crypto-network-option"
+                                data-token="usdt" data-network-value="usdttrc20"
+                                data-network-text="Tron (TRC20)" role="option" aria-selected="false">
+                                <span class="crypto-network-option-main">
+                                    <span class="crypto-network-option-title">Tron</span>
+                                </span>
+                                <span class="crypto-network-option-meta">TRC20</span>
+                                <span class="aksa-select-option-check" aria-hidden="true"></span>
+                            </button>
+
+                            <button type="button"
+                                class="aksa-select-option crypto-network-option"
+                                data-token="usdc" data-network-value="usdcbsc"
+                                data-network-text="BNB Smart Chain (BEP20)" role="option" aria-selected="false">
+                                <span class="crypto-network-option-main">
+                                    <span class="crypto-network-option-title">BNB Smart Chain</span>
+                                    <span class="crypto-network-badge">Recommended</span>
+                                </span>
+                                <span class="crypto-network-option-meta">BEP20</span>
+                                <span class="aksa-select-option-check" aria-hidden="true"></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -622,8 +635,14 @@
         }
 
         function refreshNetworkAvailability() {
-            document.querySelectorAll('.dropdown-item').forEach(item => {
-                item.classList.toggle('hidden', item.dataset.token !== selectedToken);
+            document.querySelectorAll('[data-network-value]').forEach(item => {
+                const isVisible = item.dataset.token === selectedToken;
+                const isActive = item.dataset.networkValue === selectedCoin;
+
+                item.classList.toggle('hidden', !isVisible);
+                item.classList.toggle('is-active', isVisible && isActive);
+                item.setAttribute('aria-selected', String(isVisible && isActive));
+                item.tabIndex = isVisible ? 0 : -1;
             });
         }
 
@@ -895,19 +914,19 @@
             if (!selectedToken) return;
 
             const box = document.getElementById('networkDropdown');
-            const arrow = document.getElementById('networkArrow');
             const toggle = document.querySelector('[data-network-toggle]');
+            const shell = document.getElementById('networkSelectShell');
 
             networkDropdownOpen = !networkDropdownOpen;
             box.classList.toggle('hidden', !networkDropdownOpen);
-            arrow.classList.toggle('is-open', networkDropdownOpen);
+            shell?.classList.toggle('is-open', networkDropdownOpen);
             toggle?.setAttribute('aria-expanded', networkDropdownOpen ? 'true' : 'false');
         }
 
         function closeNetworkDropdown() {
             networkDropdownOpen = false;
             document.getElementById('networkDropdown').classList.add('hidden');
-            document.getElementById('networkArrow').classList.remove('is-open');
+            document.getElementById('networkSelectShell')?.classList.remove('is-open');
             document.querySelector('[data-network-toggle]')?.setAttribute('aria-expanded', 'false');
         }
 
@@ -939,6 +958,7 @@
         function selectNetwork(value, text) {
             selectedCoin = value;
             document.getElementById('selectedNetworkText').innerText = text;
+            refreshNetworkAvailability();
             closeNetworkDropdown();
 
             if (appliedVoucherCode) {

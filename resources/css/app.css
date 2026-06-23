@@ -1144,6 +1144,53 @@
         color: #f5d0fe;
     }
 
+    .crypto-network-select {
+        z-index: 30;
+    }
+
+    .crypto-network-select.is-open {
+        z-index: 90;
+    }
+
+    .crypto-network-trigger {
+        min-height: 4rem;
+    }
+
+    .crypto-network-panel {
+        padding: 0.5rem;
+    }
+
+    .crypto-network-option {
+        min-height: 3rem;
+        align-items: center;
+        padding: 0.7rem 0.75rem;
+    }
+
+    .crypto-network-option-main {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .crypto-network-option-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+
+    .crypto-network-option-meta {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #71717a;
+    }
+
     .crypto-coin-option {
         @apply flex min-h-16 flex-col items-start justify-center rounded-lg border px-4 py-3 text-left transition;
         background: rgba(17, 17, 23, 0.72);
