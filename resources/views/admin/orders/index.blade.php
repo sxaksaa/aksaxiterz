@@ -93,7 +93,7 @@
                 </label>
 
                 <div class="flex gap-2">
-                    <button class="btn-footer h-12 md:hidden">Filter</button>
+                    <button type="submit" class="btn-footer h-12">Filter</button>
                     <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary h-12">Reset</a>
                 </div>
             </form>
@@ -227,21 +227,4 @@
         ])
     </div>
 
-    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
-        document.addEventListener('DOMContentLoaded', () => {
-            const form = document.getElementById('adminOrderFilterForm');
-
-            if (!form) return;
-
-            let searchTimeout;
-            form.querySelector('input[name="search"]')?.addEventListener('input', () => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => form.requestSubmit(), 450);
-            });
-
-            form.querySelectorAll('select').forEach((select) => {
-                select.addEventListener('change', () => form.requestSubmit());
-            });
-        });
-    </script>
 @endsection
