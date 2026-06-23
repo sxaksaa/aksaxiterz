@@ -76,7 +76,7 @@
             </div>
         @endif
 
-        <section class="product-section mb-6 fade-up">
+        <section class="product-section relative z-40 mb-6 overflow-visible fade-up">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
@@ -161,7 +161,7 @@
                         </button>
 
                         <div id="voucherBundlePackagePanel"
-                            class="absolute left-0 right-0 z-30 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] shadow-2xl"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] shadow-2xl"
                             data-bundle-panel>
                             <div class="max-h-64 overflow-y-auto p-2">
                                 @forelse ($availablePackages as $package)
@@ -236,7 +236,7 @@
             </form>
         </section>
 
-        <section class="product-section mb-6 fade-up">
+        <section class="product-section relative z-10 mb-6 fade-up">
             <form method="GET" action="{{ route('admin.vouchers.index') }}" class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search code</span>
