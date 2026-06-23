@@ -212,7 +212,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Product</span>
                     <select name="product_id" class="search-bar w-full" data-package-product-select
-                        data-package-target="stockFilterPackage" data-submit-on-change="true">
+                        data-package-target="stockFilterPackage">
                         <option value="">All products</option>
                         @foreach ($products as $product)
                             <option value="{{ $product->id }}" @selected((string) request('product_id') === (string) $product->id)>
@@ -250,7 +250,7 @@
                 </label>
 
                 <div class="flex gap-2 md:col-span-2 xl:col-span-1">
-                    <button class="btn-footer h-12 md:hidden">Filter</button>
+                    <button class="btn-footer h-12">Filter</button>
                     <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">Reset</a>
                 </div>
             </form>
@@ -469,11 +469,6 @@
                     syncPackageOptions(productSelect, packageSelect, {
                         clearPackage: true
                     });
-
-                    if (productSelect.dataset.submitOnChange === 'true' && form) {
-                        form.querySelector('input[name="page"]')?.remove();
-                        form.requestSubmit();
-                    }
                 });
             });
 
@@ -489,26 +484,8 @@
                 }, 350);
             }
 
-            if (!form) return;
-
-            let searchTimeout;
-            const submitFilters = () => {
-                const pageInput = form.querySelector('input[name="page"]');
-
-                if (pageInput) {
-                    pageInput.remove();
-                }
-
-                form.requestSubmit();
-            };
-
-            form.querySelectorAll('select[name="package_id"], select[name="status"]').forEach((select) => {
-                select.addEventListener('change', submitFilters);
-            });
-
-            form.querySelector('input[name="search"]')?.addEventListener('input', () => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(submitFilters, 450);
+            form?.addEventListener('submit', () => {
+                form.querySelector('input[name="page"]')?.remove();
             });
         });
     </script>
