@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\DownloadController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
@@ -36,7 +37,10 @@ use Laravel\Socialite\Two\InvalidStateException;
 Route::get('/', function (Request $request) {
     $categoryOrder = "CASE slug WHEN 'pc' THEN 1 WHEN 'mobile' THEN 2 WHEN 'android' THEN 3 WHEN 'ios' THEN 4 ELSE 99 END";
 
-    $categories = Category::whereIn('slug', ['pc', 'mobile', 'android', 'ios'])
+    $categories = Category::where(function ($query) {
+        $query->where('slug', 'mobile')
+            ->orWhereHas('products');
+    })
         ->orderByRaw($categoryOrder)
         ->orderBy('name')
         ->get();
@@ -335,6 +339,10 @@ Route::middleware(['auth', 'admin'])
         Route::post('/downloads', [DownloadController::class, 'store'])->name('downloads.store');
         Route::patch('/downloads/{download}', [DownloadController::class, 'update'])->name('downloads.update');
         Route::delete('/downloads/{download}', [DownloadController::class, 'destroy'])->name('downloads.destroy');
+        Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+        Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+        Route::patch('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
         Route::get('/vouchers', [AdminVoucherController::class, 'index'])->name('vouchers.index');
         Route::post('/vouchers', [AdminVoucherController::class, 'store'])->name('vouchers.store');
         Route::get('/vouchers/{voucher}', [AdminVoucherController::class, 'show'])->name('vouchers.show');

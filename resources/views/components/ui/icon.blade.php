@@ -7,6 +7,8 @@
 @php
     $icons = [
         'arrow-left' => '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+        'android' => '<path d="M7 10h10v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8Z"/><path d="M8 10a4 4 0 0 1 8 0"/><path d="m8 4 1.2 2"/><path d="m16 4-1.2 2"/><path d="M5 11v5"/><path d="M19 11v5"/><path d="M10 14h.01"/><path d="M14 14h.01"/>',
+        'apple' => '<path fill="currentColor" stroke="none" d="M16.54 12.1c-.03-2.03 1.66-3 1.74-3.05-.95-1.39-2.42-1.58-2.94-1.6-1.25-.13-2.44.74-3.07.74-.64 0-1.62-.72-2.67-.7-1.37.02-2.64.8-3.35 2.03-1.43 2.49-.37 6.17 1.03 8.19.68.99 1.49 2.1 2.56 2.06 1.03-.04 1.42-.67 2.66-.67 1.24 0 1.59.67 2.68.65 1.11-.02 1.81-1.01 2.49-2 .78-1.14 1.1-2.25 1.12-2.31-.02-.01-2.15-.82-2.18-3.34Z"/><path fill="currentColor" stroke="none" d="M14.53 6.13c.57-.69.95-1.64.85-2.59-.82.03-1.82.55-2.4 1.24-.53.62-.99 1.62-.87 2.57.91.07 1.84-.46 2.42-1.22Z"/>',
         'binance' => '<path fill="currentColor" stroke="none" d="m6.96 10.46 5.04-5.04 5.04 5.04 2.93-2.93L12 .56 4.03 7.53l2.93 2.93Z"/><path fill="currentColor" stroke="none" d="m.56 12 2.93-2.93L6.42 12l-2.93 2.93L.56 12Z"/><path fill="currentColor" stroke="none" d="m6.96 13.54 5.04 5.04 5.04-5.04 2.93 2.93L12 23.44l-7.97-6.97 2.93-2.93Z"/><path fill="currentColor" stroke="none" d="M17.58 12 20.51 9.07 23.44 12l-2.93 2.93L17.58 12Z"/><path fill="currentColor" stroke="none" d="m12 9.07 2.93 2.93L12 14.93 9.07 12 12 9.07Z"/>',
         'book-open' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         'box' => '<path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
@@ -27,6 +29,7 @@
         'key-round' => '<path d="M2 18v3h3l9.61-9.61"/><circle cx="16" cy="8" r="6"/><path d="m15 9 2-2"/>',
         'life-buoy' => '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
         'menu' => '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+        'monitor' => '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
         'log-in' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>',
         'log-out' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
         'package-plus' => '<path d="M16 16h6"/><path d="M19 13v6"/><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 4-2.22"/><path d="M12 13v8"/>',

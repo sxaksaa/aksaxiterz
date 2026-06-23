@@ -2,27 +2,57 @@
     @php
         $minPackage = $product->packages->sortBy('price')->first();
         $stock = $product->available_license_stocks_count ?? 0;
+        $durationDays = $minPackage?->durationDays();
+        $durationLabel = $durationDays
+            ? $durationDays . ' ' . \Illuminate\Support\Str::plural('day', $durationDays)
+            : 'Package';
+        $categoryName = $product->category->name ?? 'Product';
+        $categoryKey = strtolower(trim($categoryName));
+        $categoryIcon = match ($categoryKey) {
+            'pc', 'desktop', 'windows' => 'monitor',
+            'ios', 'iphone', 'ipad', 'macos' => 'apple',
+            'android' => 'android',
+            default => 'box',
+        };
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
     @endphp
 
-    <a href="{{ route('products.show', $product) }}" class="product-card fade-up p-5 flex min-h-56 flex-col">
+    <a href="{{ route('products.show', $product) }}" class="product-card product-card-storefront fade-up flex min-h-60 flex-col gap-4 p-5">
 
-        <div class="product-status-badge {{ $statusBadgeClass }}">{{ $product->status_label }}</div>
+        <div class="flex items-start justify-between gap-3">
+            <span class="product-category-pill">
+                <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
+                <span>{{ $categoryName }}</span>
+            </span>
 
-        <div class="text-xs text-gray-500 mb-4">{{ $product->category->name ?? 'Product' }}</div>
+            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">{{ $product->status_label }}</span>
+        </div>
 
-        <h2 class="text-xl font-semibold mb-2 pr-20">{{ $product->name }}</h2>
+        <div>
+            <h2 class="text-xl font-semibold text-white">{{ $product->name }}</h2>
 
-        <p class="text-gray-400 text-sm mb-6 line-clamp-3">
-            {{ $product->description }}
-        </p>
+            <p class="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">
+                {{ $product->description }}
+            </p>
+        </div>
+
+        <div class="product-card-facts">
+            <span class="product-card-fact">
+                <x-ui.icon name="calendar" class="h-4 w-4" />
+                <span>From {{ $durationLabel }}</span>
+            </span>
+            <span class="product-card-fact">
+                <x-ui.icon name="{{ $stock > 0 ? 'key-round' : 'discord' }}" class="h-4 w-4" />
+                <span>{{ $stock > 0 ? $stock . ' ready' : 'Manual order' }}</span>
+            </span>
+        </div>
 
         <div class="mt-auto flex items-end justify-between gap-4">
             <div>
                 <div class="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Start from</div>
-                <span class="price">
+                <span class="product-card-price">
                     @if ($minPackage)
                         Rp {{ number_format($minPackage->price) }} / ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
                     @else
@@ -31,14 +61,19 @@
                 </span>
             </div>
 
-            <span class="text-xs {{ $stock > 0 ? 'text-[#C084FC]' : 'text-amber-300' }}">
-                {{ $stock > 0 ? 'Auto delivery (' . $stock . ')' : 'Manual via Discord' }}
+            <span class="product-card-cta">
+                <x-ui.icon name="shopping-cart" class="h-4 w-4" />
+                <span>View</span>
             </span>
         </div>
 
     </a>
 @empty
     <div class="empty-state sm:col-span-2 lg:col-span-3">
-        No products match this filter yet.
+        <span class="empty-state-icon">
+            <x-ui.icon name="box" class="h-6 w-6" />
+        </span>
+        <span class="empty-state-title">No products found</span>
+        <p class="empty-state-copy">Try another keyword or category.</p>
     </div>
 @endforelse

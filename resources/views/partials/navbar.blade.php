@@ -112,6 +112,11 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                                     <x-ui.icon name="boxes" class="h-4 w-4 text-[#C084FC]" />
                                     <span>Admin Catalog</span>
                                 </a>
+                                <a href="{{ route('admin.categories.index') }}"
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="filter" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Categories</span>
+                                </a>
                                 <a href="{{ route('admin.downloads.index') }}"
                                     class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     <x-ui.icon name="download" class="h-4 w-4 text-[#C084FC]" />
@@ -208,6 +213,10 @@ transition-all duration-300 ease-out">
                 <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="boxes" class="nav-icon" />
                     <span>Admin Catalog</span>
+                </a>
+                <a href="{{ route('admin.categories.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="filter" class="nav-icon" />
+                    <span>Admin Categories</span>
                 </a>
                 <a href="{{ route('admin.downloads.index') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="download" class="nav-icon" />

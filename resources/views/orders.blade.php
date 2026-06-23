@@ -33,6 +33,21 @@
                     <div class="mt-1 text-xs text-gray-400">Waiting payment</div>
                 </div>
             </div>
+
+            <div class="order-help-strip mt-4">
+                <span>
+                    <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                    Auto checks run in the background
+                </span>
+                <span>
+                    <x-ui.icon name="copy" class="h-4 w-4" />
+                    Copy Order ID for support
+                </span>
+                <span>
+                    <x-ui.icon name="key-round" class="h-4 w-4" />
+                    Paid licenses appear in Licenses
+                </span>
+            </div>
         </section>
 
         @if (session('info'))
@@ -215,6 +230,29 @@
             window.location.href = paymentUrl;
         }
 
+        async function copyTextToClipboard(text) {
+            if (!text) return false;
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+
+            try {
+                return document.execCommand('copy');
+            } finally {
+                textarea.remove();
+            }
+        }
+
         async function handlePaymentResponse(data) {
             if (data.redirect_url) {
                 window.location.href = data.redirect_url;
@@ -392,6 +430,26 @@
             await window.openAksaBinancePayModal?.(checkout, {
                 startPolling: true,
             });
+        });
+
+        document.addEventListener('click', async function(e) {
+            const button = e.target.closest('[data-copy-order-id]');
+            if (!button) return;
+
+            e.preventDefault();
+
+            const orderId = button.dataset.copyOrderId || '';
+
+            try {
+                await copyTextToClipboard(orderId);
+                window.showAppToast?.('Order ID copied', 'Paste it when contacting support.', {
+                    variant: 'success',
+                });
+            } catch (error) {
+                window.showAppToast?.('Copy failed', 'Please select and copy the Order ID manually.', {
+                    variant: 'error',
+                });
+            }
         });
 
         document.addEventListener('submit', async function(e) {

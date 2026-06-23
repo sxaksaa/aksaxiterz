@@ -129,9 +129,9 @@
     .product-card:hover {
         box-shadow:
             0 0 0 1px rgba(147, 51, 234, 0.26),
-            0 26px 62px rgba(147, 51, 234, 0.22),
+            0 22px 52px rgba(147, 51, 234, 0.18),
             0 18px 38px rgba(0, 0, 0, 0.38);
-        transform: translateY(-7px) scale(1.04);
+        transform: translateY(-4px);
         z-index: 2;
     }
 
@@ -184,6 +184,76 @@
     .product-card:hover::after {
         opacity: 1;
         transform: translateX(520%) skewX(-18deg);
+    }
+
+    .product-card-storefront {
+        min-width: 0;
+    }
+
+    .product-category-pill,
+    .product-card-fact,
+    .product-card-cta {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.45rem;
+        border: 1px solid rgba(147, 51, 234, 0.24);
+        border-radius: 0.65rem;
+        background: rgba(147, 51, 234, 0.09);
+        color: #d8b4fe;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .product-category-pill {
+        max-width: 11rem;
+        padding: 0.42rem 0.55rem;
+    }
+
+    .product-category-pill span,
+    .product-card-fact span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .product-card-facts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .product-card-fact {
+        justify-content: flex-start;
+        padding: 0.6rem 0.65rem;
+        color: #d4d4d8;
+        background: rgba(9, 9, 12, 0.28);
+        border-color: rgba(63, 63, 70, 0.76);
+    }
+
+    .product-card-price {
+        color: #d8b4fe;
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.25;
+    }
+
+    .product-card-cta {
+        flex-shrink: 0;
+        padding: 0.55rem 0.7rem;
+        transition:
+            border-color 0.2s ease,
+            background-color 0.2s ease,
+            color 0.2s ease,
+            transform 0.2s ease;
+    }
+
+    .product-card:hover .product-card-cta {
+        border-color: rgba(216, 180, 254, 0.52);
+        background: rgba(147, 51, 234, 0.18);
+        color: #ffffff;
+        transform: translateX(2px);
     }
 
     .category-chip {
@@ -340,6 +410,11 @@
         box-shadow:
             0 0 0 4px rgba(147, 51, 234, 0.18),
             0 16px 34px rgba(147, 51, 234, 0.14);
+    }
+
+    :where(a, button, input, textarea, [role="button"]):focus-visible {
+        outline: 2px solid rgba(216, 180, 254, 0.78);
+        outline-offset: 3px;
     }
 
     .btn-main {
@@ -540,6 +615,44 @@
         transform: translateY(-2px);
     }
 
+    .product-stat-featured {
+        background:
+            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(9, 9, 12, 0.5)),
+            rgba(9, 9, 12, 0.38);
+        border-color: rgba(147, 51, 234, 0.4);
+    }
+
+    .product-hero-pill {
+        background: rgba(9, 9, 12, 0.34);
+    }
+
+    .product-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 0.6rem;
+    }
+
+    .product-meta-card {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.55rem;
+        border: 1px solid rgba(147, 51, 234, 0.22);
+        border-radius: 0.75rem;
+        background: rgba(9, 9, 12, 0.28);
+        padding: 0.7rem 0.8rem;
+        color: #d4d4d8;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .product-meta-card span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .product-section {
         @apply rounded-xl border p-5 md:p-6;
         background: rgba(21, 21, 27, 0.82);
@@ -569,6 +682,52 @@
             0 0 0 1px rgba(147, 51, 234, 0.12),
             0 18px 42px rgba(147, 51, 234, 0.12);
         transform: translateY(-3px);
+    }
+
+    .package-card-heading {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.7rem;
+    }
+
+    .package-card-icon {
+        display: inline-flex;
+        width: 2rem;
+        height: 2rem;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(147, 51, 234, 0.28);
+        border-radius: 0.65rem;
+        background: rgba(147, 51, 234, 0.12);
+        color: #c084fc;
+    }
+
+    .package-price-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .package-price {
+        color: #d8b4fe;
+        font-size: 1.25rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .package-per-day {
+        flex-shrink: 0;
+        border: 1px solid rgba(147, 51, 234, 0.24);
+        border-radius: 999px;
+        background: rgba(147, 51, 234, 0.1);
+        padding: 0.32rem 0.55rem;
+        color: #a1a1aa;
+        font-size: 0.72rem;
+        font-weight: 700;
     }
 
     .package-saving {
@@ -885,6 +1044,25 @@
         transform: translateY(-2px);
     }
 
+    .order-help-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
+
+    .order-help-strip span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border: 1px solid rgba(147, 51, 234, 0.24);
+        border-radius: 999px;
+        background: rgba(9, 9, 12, 0.28);
+        padding: 0.45rem 0.7rem;
+        color: #d4d4d8;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
     .order-mobile-card {
         @apply relative overflow-hidden rounded-xl border p-4 transition duration-300;
         background: rgba(21, 21, 27, 0.88);
@@ -968,6 +1146,12 @@
         transform: translateY(-1px);
     }
 
+    .order-action:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+        transform: none;
+    }
+
     .order-action.compact-action {
         min-width: 2.5rem;
         padding-inline: 0.65rem;
@@ -983,6 +1167,31 @@
         background: rgba(239, 68, 68, 0.16);
         border-color: rgba(252, 165, 165, 0.55);
         color: #ffffff;
+    }
+
+    .copy-order-button {
+        display: inline-flex;
+        width: 1.75rem;
+        height: 1.75rem;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(147, 51, 234, 0.26);
+        border-radius: 0.5rem;
+        background: rgba(147, 51, 234, 0.08);
+        color: #a78bfa;
+        transition:
+            border-color 0.2s ease,
+            background-color 0.2s ease,
+            color 0.2s ease,
+            transform 0.2s ease;
+    }
+
+    .copy-order-button:hover {
+        border-color: rgba(216, 180, 254, 0.52);
+        background: rgba(147, 51, 234, 0.16);
+        color: #ffffff;
+        transform: translateY(-1px);
     }
 
     .order-timeline {
@@ -1039,6 +1248,31 @@
         border-color: rgba(248, 113, 113, 0.22);
         color: #fca5a5;
         background: rgba(248, 113, 113, 0.07);
+    }
+
+    .order-reassurance {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        border: 1px solid rgba(147, 51, 234, 0.2);
+        border-radius: 0.75rem;
+        background: rgba(147, 51, 234, 0.07);
+        padding: 0.65rem 0.75rem;
+        color: #a1a1aa;
+        font-size: 0.75rem;
+        line-height: 1.4;
+    }
+
+    .order-reassurance svg {
+        flex-shrink: 0;
+        color: #c084fc;
+    }
+
+    .order-reassurance-compact {
+        max-width: 18rem;
+        padding: 0.5rem 0.6rem;
+        font-size: 0.7rem;
     }
 
     .empty-state {
@@ -1568,6 +1802,20 @@
         transform: rotate(45deg);
     }
 
+    .package.active::after {
+        top: auto;
+        bottom: 12px;
+    }
+
+    .package.active::before {
+        top: auto;
+        bottom: 16px;
+    }
+
+    .package.active .package-availability {
+        padding-right: 2rem;
+    }
+
     .card-hover {
         transition: all 0.25s ease;
     }
@@ -1610,9 +1858,29 @@
         animation-delay: 0.25s;
     }
 
+    @media (min-width: 640px) {
+        .product-meta-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
     @media (max-width: 639px) {
         .product-section {
             padding: 1rem;
+        }
+
+        .product-card:hover,
+        .card-glow:hover,
+        .glow-hover:hover,
+        .order-mobile-card:hover,
+        .checkout-card:hover,
+        .package-card:hover,
+        .license-card:hover {
+            transform: none;
+        }
+
+        .product-card-facts {
+            grid-template-columns: 1fr;
         }
 
         .qris-modal {

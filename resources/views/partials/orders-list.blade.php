@@ -119,13 +119,30 @@
             $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                 $canOpenBinancePay || $canSyncBinancePay ||
                 $canSyncPakasir || $canContinuePakasir || $canCancel;
+            $paymentHint = $isPaid
+                ? 'Payment confirmed. Open Licenses to view delivered keys.'
+                : ($hasCryptoMismatch
+                    ? 'Payment amount needs support review. Keep this Order ID ready.'
+                    : ($isPending
+                        ? 'Keep the invoice open and use Check Payment after sending payment.'
+                        : ($isExpired
+                            ? 'This invoice is closed. Start a new checkout when you are ready.'
+                            : 'This checkout was cancelled. No payment action is needed.')));
+            $paymentHintIcon = $isPaid
+                ? 'key-round'
+                : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
         @endphp
 
         <article class="order-mobile-card motion-card">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
-                    <div class="mt-1 truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                    <div class="mt-1 flex min-w-0 items-center gap-2">
+                        <span class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</span>
+                        <button type="button" class="copy-order-button" data-copy-order-id="{{ $order->order_id }}" aria-label="Copy order ID {{ $order->order_id }}">
+                            <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                        </button>
+                    </div>
                 </div>
                 <div class="text-right">
                     <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
@@ -173,9 +190,19 @@
 
             @include('partials.order-status-timeline', ['order' => $order])
 
-            @if ($hasPaymentAction)
+            <div class="order-reassurance">
+                <x-ui.icon :name="$paymentHintIcon" class="h-4 w-4" />
+                <span>{{ $paymentHint }}</span>
+            </div>
+
+            @if ($hasPaymentAction || $isPaid)
                 <div class="mt-4 flex flex-col gap-2">
-                    @if ($canOpenCryptoAddress)
+                    @if ($isPaid && ! $hasPaymentAction)
+                        <a href="/licenses" class="order-action w-full">
+                            <x-ui.icon name="key-round" class="h-4 w-4" />
+                            <span>Open Licenses</span>
+                        </a>
+                    @elseif ($canOpenCryptoAddress)
                         <button type="button" class="order-action open-crypto-address-button w-full" data-crypto-checkout='@json($cryptoCheckout)'>
                             <x-ui.icon name="wallet" class="h-4 w-4" />
                             <span>View Address</span>
@@ -395,11 +422,28 @@
                         $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                             $canOpenBinancePay || $canSyncBinancePay ||
                             $canSyncPakasir || $canContinuePakasir || $canCancel;
+                        $paymentHint = $isPaid
+                            ? 'Payment confirmed. Open Licenses to view delivered keys.'
+                            : ($hasCryptoMismatch
+                                ? 'Payment amount needs support review. Keep this Order ID ready.'
+                                : ($isPending
+                                    ? 'Keep the invoice open and use Check Payment after sending payment.'
+                                    : ($isExpired
+                                        ? 'This invoice is closed. Start a new checkout when you are ready.'
+                                        : 'This checkout was cancelled. No payment action is needed.')));
+                        $paymentHintIcon = $isPaid
+                            ? 'key-round'
+                            : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
                     @endphp
 
                     <tr class="orders-table-row">
                         <td class="p-4">
-                            <div class="max-w-[190px] truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                            <div class="flex max-w-[210px] items-center gap-2">
+                                <span class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</span>
+                                <button type="button" class="copy-order-button" data-copy-order-id="{{ $order->order_id }}" aria-label="Copy order ID {{ $order->order_id }}">
+                                    <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                                </button>
+                            </div>
                             <div class="mt-1 text-[10px] uppercase tracking-normal text-gray-500">Invoice</div>
                         </td>
                         <td class="p-4">
@@ -429,11 +473,22 @@
                                 </div>
                             @endif
                             @include('partials.order-status-timeline', ['order' => $order])
+                            <div class="order-reassurance order-reassurance-compact">
+                                <x-ui.icon :name="$paymentHintIcon" class="h-3.5 w-3.5" />
+                                <span>{{ $paymentHint }}</span>
+                            </div>
                         </td>
                         <td class="p-4 text-right">
                             <div class="inline-flex flex-wrap justify-end gap-2">
                                 @if (! $hasPaymentAction)
-                                    <span class="text-xs text-gray-600">-</span>
+                                    @if ($isPaid)
+                                        <a href="/licenses" class="order-action">
+                                            <x-ui.icon name="key-round" class="h-4 w-4" />
+                                            <span>Licenses</span>
+                                        </a>
+                                    @else
+                                        <span class="text-xs text-gray-600">-</span>
+                                    @endif
                                 @elseif ($canSyncCrypto)
                                     @if ($canOpenCryptoAddress)
                                         <button type="button" class="order-action open-crypto-address-button" data-crypto-checkout='@json($cryptoCheckout)'>

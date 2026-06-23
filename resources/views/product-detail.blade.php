@@ -10,6 +10,7 @@
             filled(config('services.binance.pay.api_key')) &&
             filled(config('services.binance.pay.api_secret'));
         $binancePayAvailable = app()->environment('local') || $binancePayConfigured;
+        $paymentMethodCount = $binancePayAvailable ? 3 : 2;
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatUsdCompact = function ($amount) {
             $amount = (float) $amount;
@@ -19,6 +20,20 @@
 
             return '$'.$formatted;
         };
+        $minPackage = $product->packages->sortBy('price')->first();
+        $packageCount = $product->packages->count();
+        $categoryName = $product->category?->name ?? 'Product';
+        $categoryKey = strtolower(trim($categoryName));
+        $categoryIcon = match ($categoryKey) {
+            'pc', 'desktop', 'windows' => 'monitor',
+            'ios', 'iphone', 'ipad', 'macos' => 'apple',
+            'android' => 'android',
+            default => 'box',
+        };
+        $startDurationDays = $minPackage?->durationDays();
+        $startDurationLabel = $startDurationDays
+            ? $startDurationDays . ' ' . \Illuminate\Support\Str::plural('day', $startDurationDays) . ' access'
+            : 'Duration access';
         $packageSavings = $product->packages->mapWithKeys(function ($package) use ($dailyPackage) {
             $days = $package->durationDays();
             $comparisonPrice = $dailyPackage && $days ? ((int) $dailyPackage->price * $days) : 0;
@@ -46,29 +61,64 @@
     <div id="content" class="page-shell py-6 md:py-10">
 
         <div class="product-hero mb-6 fade-up">
-            <div class="grid gap-5 md:grid-cols-[1fr_320px] md:items-end">
-            <div>
-                <a href="/" class="text-sm text-[#C084FC] hover:text-white transition">Back to products</a>
-                <h1 class="text-3xl md:text-5xl font-bold mt-3 mb-3">{{ $product->name }}</h1>
-                <p class="text-gray-400 max-w-2xl">{{ $product->description }}</p>
-            </div>
-
-            <div class="product-stat">
-                <div class="text-xs uppercase text-gray-500 mb-2">Availability</div>
-                <div class="flex items-end justify-between">
+            <div class="grid gap-5 md:grid-cols-[1fr_340px] md:items-stretch">
+                <div class="flex min-w-0 flex-col justify-between gap-5">
                     <div>
-                        <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-[#C084FC]' : 'text-amber-300' }}">
-                            {{ $hasAutoDelivery ? $stock : 'Manual' }}
+                        <a href="/" class="text-sm text-[#C084FC] transition hover:text-white">Back to products</a>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <span class="support-pill product-hero-pill">
+                                <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
+                                <span>{{ $categoryName }}</span>
+                            </span>
                         </div>
-                        <div class="text-sm text-gray-400">
-                            {{ $hasAutoDelivery ? 'license ready' : 'order via Discord' }}
-                        </div>
+                        <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
+                        <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">{{ $product->description }}</p>
                     </div>
-                    <div class="text-xs text-gray-500">
-                        {{ $hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order' }}
+
+                    <div class="product-meta-grid">
+                        <div class="product-meta-card">
+                            <x-ui.icon name="calendar" class="h-4 w-4 text-[#C084FC]" />
+                            <span>{{ $packageCount }} {{ \Illuminate\Support\Str::plural('package', $packageCount) }}</span>
+                        </div>
+                        <div class="product-meta-card">
+                            <x-ui.icon name="credit-card" class="h-4 w-4 text-[#C084FC]" />
+                            <span>{{ $paymentMethodCount }} payment methods</span>
+                        </div>
+                        <div class="product-meta-card">
+                            <x-ui.icon name="life-buoy" class="h-4 w-4 text-[#C084FC]" />
+                            <span>Setup support</span>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+                <div class="grid gap-3">
+                    <div class="product-stat product-stat-featured">
+                        <div class="text-xs uppercase text-gray-500">Starts from</div>
+                        <div class="mt-2 text-2xl font-bold text-[#D8B4FE]">
+                            {{ $minPackage ? 'Rp ' . number_format($minPackage->price) : '-' }}
+                        </div>
+                        <div class="mt-1 text-sm text-gray-400">
+                            {{ $minPackage ? $formatUsdCompact($minPackage->price_usdt) . ' · ' . $startDurationLabel : 'No package yet' }}
+                        </div>
+                    </div>
+
+                    <div class="product-stat">
+                        <div class="mb-2 text-xs uppercase text-gray-500">Availability</div>
+                        <div class="flex items-end justify-between gap-4">
+                            <div>
+                                <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-[#C084FC]' : 'text-amber-300' }}">
+                                    {{ $hasAutoDelivery ? $stock : 'Manual' }}
+                                </div>
+                                <div class="text-sm text-gray-400">
+                                    {{ $hasAutoDelivery ? 'license ready' : 'order via Discord' }}
+                                </div>
+                            </div>
+                            <div class="text-right text-xs text-gray-500">
+                                {{ $hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -304,14 +354,34 @@
                         <div class="badge">{{ $badge }}</div>
                     @endif
 
-                    <p class="mb-1 text-sm font-semibold text-white">
-                        {{ $packageName }}
-                    </p>
+                    <div class="package-card-heading">
+                        <span class="package-card-icon">
+                            <x-ui.icon name="calendar" class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0 pr-8">
+                            <p class="truncate text-sm font-semibold text-white">{{ $packageName }}</p>
+                            <p class="mt-0.5 text-xs text-gray-500">
+                                {{ ($saving['days'] ?? null) ? $saving['days'] . ' ' . \Illuminate\Support\Str::plural('day', $saving['days']) . ' access' : 'Duration access' }}
+                            </p>
+                        </div>
+                    </div>
 
-                    <p class="price-text text-lg font-semibold text-[#C084FC]" data-idr="Rp {{ number_format($p->price) }}"
-                        data-usd="{{ $formatUsdCompact($p->price_usdt) }}">
-                        Rp {{ number_format($p->price) }}
-                    </p>
+                    <div class="package-price-row">
+                        <div class="min-w-0">
+                            <div class="text-[10px] uppercase tracking-normal text-gray-500">Price</div>
+                            <p class="price-text package-price" data-idr="Rp {{ number_format($p->price) }}"
+                                data-usd="{{ $formatUsdCompact($p->price_usdt) }}">
+                                Rp {{ number_format($p->price) }}
+                            </p>
+                        </div>
+                        @if (($saving['per_day'] ?? null) !== null)
+                            <span class="package-per-day" data-currency-text
+                                data-idr="Rp {{ number_format($saving['per_day']) }}/day"
+                                data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }}/day">
+                                Rp {{ number_format($saving['per_day']) }}/day
+                            </span>
+                        @endif
+                    </div>
 
                     @if (($saving['saving'] ?? 0) > 0)
                         <div class="package-saving">
@@ -325,18 +395,7 @@
                                     data-idr="{{ $saving['percent'] }}% vs daily"
                                     data-usd="{{ $saving['percent_usdt'] }}% vs daily">{{ $saving['percent'] }}% vs daily</span>
                             </div>
-                            <p class="mt-1 text-xs text-gray-400" data-currency-text
-                                data-idr="Rp {{ number_format($saving['per_day']) }} per day"
-                                data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }} per day">
-                                Rp {{ number_format($saving['per_day']) }} per day
-                            </p>
                         </div>
-                    @elseif (($saving['per_day'] ?? null) !== null)
-                        <p class="mt-3 text-xs text-gray-400" data-currency-text
-                            data-idr="Rp {{ number_format($saving['per_day']) }} per day"
-                            data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }} per day">
-                            Rp {{ number_format($saving['per_day']) }} per day
-                        </p>
                     @endif
 
                     <p class="package-availability {{ $packageStock > 0 ? 'package-availability-ready' : 'package-availability-manual' }}">
