@@ -132,7 +132,8 @@
                             data-confirm="Mark this order as paid and deliver {{ $quantity }} license {{ $quantity === 1 ? 'key' : 'keys' }}?">
                             @csrf
                             <button class="order-action">
-                                {{ ($isDirectCrypto || $isBinancePay) ? 'Mark Paid Manually' : 'Mark Paid' }}
+                                <x-ui.icon name="check-circle" class="h-4 w-4" />
+                                <span>{{ ($isDirectCrypto || $isBinancePay) ? 'Mark Paid Manually' : 'Mark Paid' }}</span>
                             </button>
                         </form>
                     @endif
@@ -141,14 +142,16 @@
                         <form action="{{ route('admin.orders.resync-license', $order) }}" method="POST">
                             @csrf
                             <button class="order-action">
-                                Resync License
+                                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                <span>Resync License</span>
                             </button>
                         </form>
                     @endif
 
                     @if ($order->payment_url)
                         <a href="{{ $order->payment_url }}" target="_blank" rel="noopener noreferrer" class="order-action">
-                            Open Payment
+                            <x-ui.icon name="external-link" class="h-4 w-4" />
+                            <span>Open Payment</span>
                         </a>
                     @endif
                 </div>

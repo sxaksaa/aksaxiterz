@@ -142,7 +142,10 @@
                         placeholder="Put new license keys here&#10;One key per line" required>{{ old('license_keys') }}</textarea>
                 </label>
 
-                <button class="btn-footer h-12">Add Stock</button>
+                <button class="btn-footer h-12">
+                    <x-ui.icon name="package-plus" class="h-4 w-4" />
+                    <span>Add Stock</span>
+                </button>
             </form>
         </section>
 
@@ -194,8 +197,14 @@
                     </label>
 
                     <div class="flex gap-2">
-                        <button class="btn-footer h-12">Save</button>
-                        <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">Cancel</a>
+                        <button class="btn-footer h-12">
+                            <x-ui.icon name="save" class="h-4 w-4" />
+                            <span>Save</span>
+                        </button>
+                        <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">
+                            <x-ui.icon name="x" class="h-4 w-4" />
+                            <span>Cancel</span>
+                        </a>
                     </div>
                 </form>
             </section>
@@ -250,8 +259,14 @@
                 </label>
 
                 <div class="flex gap-2 md:col-span-2 xl:col-span-1">
-                    <button class="btn-footer h-12">Filter</button>
-                    <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="filter" class="h-4 w-4" />
+                        <span>Filter</span>
+                    </button>
+                    <a href="{{ route('admin.license-stocks.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                        <span>Reset</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -321,13 +336,19 @@
                                     @else
                                         <div class="inline-flex justify-end gap-2">
                                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"
-                                                class="order-action">Edit</a>
+                                                class="order-action">
+                                                <x-ui.icon name="edit-3" class="h-4 w-4" />
+                                                <span>Edit</span>
+                                            </a>
 
                                             <form action="{{ route('admin.license-stocks.destroy', $stock) }}" method="POST"
                                                 data-confirm="Delete this unsold license key?">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button class="order-action order-action-danger">Delete</button>
+                                                <button class="order-action order-action-danger">
+                                                    <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                                    <span>Delete</span>
+                                                </button>
                                             </form>
                                         </div>
                                     @endif
@@ -391,12 +412,18 @@
                             <span class="text-xs text-gray-500">Locked</span>
                         @else
                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"
-                                class="order-action">Edit</a>
+                                class="order-action">
+                                <x-ui.icon name="edit-3" class="h-4 w-4" />
+                                <span>Edit</span>
+                            </a>
                             <form action="{{ route('admin.license-stocks.destroy', $stock) }}" method="POST"
                                 data-confirm="Delete this unsold license key?">
                                 @csrf
                                 @method('DELETE')
-                                <button class="order-action order-action-danger">Delete</button>
+                                <button class="order-action order-action-danger">
+                                    <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                    <span>Delete</span>
+                                </button>
                             </form>
                         @endif
                     </div>

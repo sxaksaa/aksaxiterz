@@ -175,13 +175,15 @@
                 <div class="mt-4 flex flex-col gap-2">
                     @if ($canOpenCryptoAddress)
                         <button type="button" class="order-action open-crypto-address-button w-full" data-crypto-checkout='@json($cryptoCheckout)'>
-                            View Address
+                            <x-ui.icon name="wallet" class="h-4 w-4" />
+                            <span>View Address</span>
                         </button>
                     @endif
 
                     @if ($canOpenBinancePay)
                         <button type="button" class="order-action open-binance-pay-button w-full" data-binance-pay-checkout='@json($binancePayCheckout)'>
-                            View Binance Pay
+                            <x-ui.icon name="binance" class="h-4 w-4 text-[#F0B90B]" />
+                            <span>View Binance Pay</span>
                         </button>
                     @endif
 
@@ -189,34 +191,40 @@
                         <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form">
                             @csrf
                             <button type="submit" class="order-action sync-crypto-button w-full" data-order-id="{{ $order->order_id }}">
-                                {{ $isCryptoInvoiceActive ? 'Verify Payment' : 'Verify Sent Payment' }}
+                                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                <span data-button-label>{{ $isCryptoInvoiceActive ? 'Verify Payment' : 'Verify Sent Payment' }}</span>
                             </button>
                         </form>
                     @elseif ($canSyncBinancePay)
                         <form action="/sync-binance-pay-order/{{ $order->order_id }}" method="POST" class="sync-binance-pay-form">
                             @csrf
                             <button type="submit" class="order-action sync-binance-pay-button w-full" data-order-id="{{ $order->order_id }}">
-                                {{ $isBinancePayInvoiceActive ? 'Check Payment' : 'Verify Sent Payment' }}
+                                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                <span data-button-label>{{ $isBinancePayInvoiceActive ? 'Check Payment' : 'Verify Sent Payment' }}</span>
                             </button>
                         </form>
                     @elseif ($canContinueCrypto)
                         <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
-                            Continue Payment
+                            <x-ui.icon name="external-link" class="h-4 w-4" />
+                            <span>Continue Payment</span>
                         </a>
                     @elseif ($canSyncPakasir)
                         @if ($canOpenPakasirQris)
                             <button type="button" class="order-action open-pakasir-qris-button w-full" data-pakasir-checkout='@json($pakasirCheckout)'>
-                                View QRIS
+                                <x-ui.icon name="qr-code" class="h-4 w-4" />
+                                <span>View QRIS</span>
                             </button>
                         @elseif ($canContinuePakasir)
                             <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
-                                Open QRIS Page
+                                <x-ui.icon name="external-link" class="h-4 w-4" />
+                                <span>Open QRIS Page</span>
                             </a>
                         @endif
                         <form action="/sync-pakasir-order/{{ $order->order_id }}" method="POST" class="sync-pakasir-form">
                             @csrf
                             <button type="submit" class="order-action sync-pakasir-button w-full" data-order-id="{{ $order->order_id }}">
-                                Check Payment
+                                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                <span data-button-label>Check Payment</span>
                             </button>
                         </form>
                     @endif
@@ -225,7 +233,8 @@
                         <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form">
                             @csrf
                             <button type="submit" class="order-action order-action-danger cancel-order-button w-full">
-                                Cancel Order
+                                <x-ui.icon name="x" class="h-4 w-4" />
+                                <span data-button-label>Cancel Order</span>
                             </button>
                         </form>
                     @endif
@@ -419,45 +428,53 @@
                                 @elseif ($canSyncCrypto)
                                     @if ($canOpenCryptoAddress)
                                         <button type="button" class="order-action open-crypto-address-button" data-crypto-checkout='@json($cryptoCheckout)'>
-                                            Address
+                                            <x-ui.icon name="wallet" class="h-4 w-4" />
+                                            <span>Address</span>
                                         </button>
                                     @endif
                                     <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-crypto-button" data-order-id="{{ $order->order_id }}">
-                                            {{ $isCryptoInvoiceActive ? 'Verify' : 'Verify Sent' }}
+                                            <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                            <span data-button-label>{{ $isCryptoInvoiceActive ? 'Verify' : 'Verify Sent' }}</span>
                                         </button>
                                     </form>
                                 @elseif ($canSyncBinancePay)
                                     @if ($canOpenBinancePay)
                                         <button type="button" class="order-action open-binance-pay-button" data-binance-pay-checkout='@json($binancePayCheckout)'>
-                                            Binance Pay
+                                            <x-ui.icon name="binance" class="h-4 w-4 text-[#F0B90B]" />
+                                            <span>Binance Pay</span>
                                         </button>
                                     @endif
                                     <form action="/sync-binance-pay-order/{{ $order->order_id }}" method="POST" class="sync-binance-pay-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-binance-pay-button" data-order-id="{{ $order->order_id }}">
-                                            {{ $isBinancePayInvoiceActive ? 'Check' : 'Verify Sent' }}
+                                            <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                            <span data-button-label>{{ $isBinancePayInvoiceActive ? 'Check' : 'Verify Sent' }}</span>
                                         </button>
                                     </form>
                                 @elseif ($canContinueCrypto)
                                     <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
-                                        Continue
+                                        <x-ui.icon name="external-link" class="h-4 w-4" />
+                                        <span>Continue</span>
                                     </a>
                                 @elseif ($canSyncPakasir)
                                     @if ($canOpenPakasirQris)
                                         <button type="button" class="order-action open-pakasir-qris-button" data-pakasir-checkout='@json($pakasirCheckout)'>
-                                            QRIS
+                                            <x-ui.icon name="qr-code" class="h-4 w-4" />
+                                            <span>QRIS</span>
                                         </button>
                                     @elseif ($canContinuePakasir)
                                         <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
-                                            QRIS
+                                            <x-ui.icon name="external-link" class="h-4 w-4" />
+                                            <span>QRIS</span>
                                         </a>
                                     @endif
                                     <form action="/sync-pakasir-order/{{ $order->order_id }}" method="POST" class="sync-pakasir-form inline">
                                         @csrf
                                         <button type="submit" class="order-action sync-pakasir-button" data-order-id="{{ $order->order_id }}">
-                                            Check
+                                            <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                            <span data-button-label>Check</span>
                                         </button>
                                     </form>
                                 @endif
@@ -466,7 +483,8 @@
                                     <form action="/cancel-order/{{ $order->id }}" method="POST" class="cancel-order-form inline">
                                         @csrf
                                         <button type="submit" class="order-action order-action-danger cancel-order-button">
-                                            Cancel
+                                            <x-ui.icon name="x" class="h-4 w-4" />
+                                            <span data-button-label>Cancel</span>
                                         </button>
                                     </form>
                                 @endif

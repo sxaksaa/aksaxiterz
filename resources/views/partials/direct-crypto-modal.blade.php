@@ -41,7 +41,8 @@
                 <div class="flex min-w-0 items-center gap-2">
                     <span id="aksaCryptoAmount" class="font-mono text-xs font-semibold text-[#D8B4FE]">-</span>
                     <button type="button" id="aksaCryptoCopyAmount" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
-                        Copy
+                        <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                        <span data-button-label>Copy</span>
                     </button>
                 </div>
             </div>
@@ -50,7 +51,8 @@
                 <div class="flex min-w-0 items-center gap-2">
                     <span id="aksaCryptoAddress" class="truncate font-mono text-xs text-gray-300">-</span>
                     <button type="button" id="aksaCryptoCopyAddress" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
-                        Copy
+                        <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                        <span data-button-label>Copy</span>
                     </button>
                 </div>
             </div>
@@ -73,10 +75,12 @@
 
         <div class="mt-5 grid gap-2 sm:grid-cols-2">
             <button type="button" id="aksaCryptoCheck" data-crypto-check class="order-action w-full">
-                Check Payment
+                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                <span data-button-label>Check Payment</span>
             </button>
             <a href="/orders" class="order-action w-full">
-                Open Orders
+                <x-ui.icon name="receipt" class="h-4 w-4" />
+                <span>Open Orders</span>
             </a>
         </div>
     </section>

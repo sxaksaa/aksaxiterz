@@ -17,23 +17,28 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
         <div id="navMenu" class="relative hidden justify-self-center md:flex gap-8 lg:gap-10 text-sm">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
-                Products
+                <x-ui.icon name="box" class="nav-icon" />
+                <span>Products</span>
             </a>
 
             <a href="{{ route('guides.index') }}" class="nav-item {{ request()->is('guides*') ? 'active' : '' }}">
-                Guides
+                <x-ui.icon name="book-open" class="nav-icon" />
+                <span>Guides</span>
             </a>
 
             <a href="/downloads" class="nav-item {{ request()->is('downloads*') ? 'active' : '' }}">
-                Downloads
+                <x-ui.icon name="download" class="nav-icon" />
+                <span>Downloads</span>
             </a>
 
             @auth
                 <a href="/orders" class="nav-item {{ request()->is('orders*') ? 'active' : '' }}">
-                    Orders
+                    <x-ui.icon name="receipt" class="nav-icon" />
+                    <span>Orders</span>
                 </a>
                 <a href="/licenses" class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
-                    Licenses
+                    <x-ui.icon name="key-round" class="nav-icon" />
+                    <span>Licenses</span>
                 </a>
             @endauth
 
@@ -45,11 +50,12 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
             @auth
                 <a href="{{ route('cart.index') }}"
-                    class="relative inline-flex min-h-10 items-center justify-center rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-[#9333EA]/60 hover:text-white"
+                    class="relative inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-[#9333EA]/60 hover:text-white"
                     aria-label="Open cart with {{ $cartCount }} items">
-                    Cart
+                    <x-ui.icon name="shopping-cart" class="h-4 w-4 text-[#C084FC]" />
+                    <span>Cart</span>
                     <span data-cart-count
-                        class="{{ $cartCount > 0 ? '' : 'hidden' }} ml-2 rounded-full bg-[#9333EA] px-2 py-0.5 text-[10px] font-bold text-white">
+                        class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-[#9333EA] px-2 py-0.5 text-[10px] font-bold text-white">
                         {{ $cartCount }}
                     </span>
                 </a>
@@ -57,6 +63,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                 class="discord-nav-cta {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                <x-ui.icon name="discord" class="h-4 w-4" />
                 <span>Discord</span>
                 <span class="hidden rounded-md bg-white/[0.12] px-2 py-1 text-[10px] font-semibold text-white/90 lg:inline">
                     Support
@@ -64,8 +71,9 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
             </a>
 
             <!-- MOBILE MENU BUTTON -->
-            <button id="menuBtn" type="button" data-mobile-menu-toggle class="md:hidden text-white text-sm p-2">
-                Menu
+            <button id="menuBtn" type="button" data-mobile-menu-toggle class="inline-flex items-center gap-2 p-2 text-sm text-white md:hidden">
+                <x-ui.icon name="menu" class="h-5 w-5 text-[#C084FC]" />
+                <span data-button-label>Menu</span>
             </button>
 
             <!-- DESKTOP PROFILE -->
@@ -100,28 +108,34 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                         @if ($user->isAdmin())
                             <div class="border-b border-[#27272A]">
                                 <a href="{{ route('admin.products.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Catalog
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="boxes" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Catalog</span>
                                 </a>
                                 <a href="{{ route('admin.downloads.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Downloads
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="download" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Downloads</span>
                                 </a>
                                 <a href="{{ route('admin.orders.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Orders
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="receipt" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Orders</span>
                                 </a>
                                 <a href="{{ route('admin.license-stocks.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Stock
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="key-round" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Stock</span>
                                 </a>
                                 <a href="{{ route('admin.users.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Users
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="users" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Users</span>
                                 </a>
                                 <a href="{{ route('admin.vouchers.index') }}"
-                                    class="block px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    Admin Vouchers
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="ticket-percent" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Vouchers</span>
                                 </a>
                             </div>
                         @endif
@@ -129,8 +143,9 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                         <form action="/logout" method="POST">
                             @csrf
                             <button
-                                class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-[#9333EA]/10 transition">
-                                Logout
+                                class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-400 transition hover:bg-[#9333EA]/10">
+                                <x-ui.icon name="log-out" class="h-4 w-4" />
+                                <span>Logout</span>
                             </button>
                         </form>
 
@@ -138,8 +153,9 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
                 </div>
             @else
-                <a href="/auth/google" class="hidden md:block text-gray-400 hover:text-white transition">
-                    Login
+                <a href="/auth/google" class="hidden items-center gap-2 text-gray-400 transition hover:text-white md:inline-flex">
+                    <x-ui.icon name="log-in" class="h-4 w-4 text-[#C084FC]" />
+                    <span>Login</span>
                 </a>
             @endauth
 
@@ -162,29 +178,66 @@ transition-all duration-300 ease-out">
 
     <div class="flex flex-col gap-4 text-sm">
 
-        <a href="/" data-mobile-menu-link class="nav-item">Products</a>
-        <a href="{{ route('guides.index') }}" data-mobile-menu-link class="nav-item">Guides</a>
-        <a href="/downloads" data-mobile-menu-link class="nav-item">Downloads</a>
+        <a href="/" data-mobile-menu-link class="nav-item">
+            <x-ui.icon name="box" class="nav-icon" />
+            <span>Products</span>
+        </a>
+        <a href="{{ route('guides.index') }}" data-mobile-menu-link class="nav-item">
+            <x-ui.icon name="book-open" class="nav-icon" />
+            <span>Guides</span>
+        </a>
+        <a href="/downloads" data-mobile-menu-link class="nav-item">
+            <x-ui.icon name="download" class="nav-icon" />
+            <span>Downloads</span>
+        </a>
 
         @auth
             <a href="{{ route('cart.index') }}" data-mobile-menu-link class="nav-item">
-                Cart{{ $cartCount > 0 ? ' (' . $cartCount . ')' : '' }}
+                <x-ui.icon name="shopping-cart" class="nav-icon" />
+                <span>Cart{{ $cartCount > 0 ? ' (' . $cartCount . ')' : '' }}</span>
             </a>
-            <a href="/orders" data-mobile-menu-link class="nav-item">Orders</a>
-            <a href="/licenses" data-mobile-menu-link class="nav-item">Licenses</a>
+            <a href="/orders" data-mobile-menu-link class="nav-item">
+                <x-ui.icon name="receipt" class="nav-icon" />
+                <span>Orders</span>
+            </a>
+            <a href="/licenses" data-mobile-menu-link class="nav-item">
+                <x-ui.icon name="key-round" class="nav-icon" />
+                <span>Licenses</span>
+            </a>
             @if (auth()->user()?->isAdmin())
-                <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">Admin Catalog</a>
-                <a href="{{ route('admin.downloads.index') }}" data-mobile-menu-link class="nav-item">Admin Downloads</a>
-                <a href="{{ route('admin.orders.index') }}" data-mobile-menu-link class="nav-item">Admin Orders</a>
-                <a href="/admin/license-stocks" data-mobile-menu-link class="nav-item">Admin Stock</a>
-                <a href="{{ route('admin.users.index') }}" data-mobile-menu-link class="nav-item">Admin Users</a>
-                <a href="{{ route('admin.vouchers.index') }}" data-mobile-menu-link class="nav-item">Admin Vouchers</a>
+                <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="boxes" class="nav-icon" />
+                    <span>Admin Catalog</span>
+                </a>
+                <a href="{{ route('admin.downloads.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="download" class="nav-icon" />
+                    <span>Admin Downloads</span>
+                </a>
+                <a href="{{ route('admin.orders.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="receipt" class="nav-icon" />
+                    <span>Admin Orders</span>
+                </a>
+                <a href="/admin/license-stocks" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="key-round" class="nav-icon" />
+                    <span>Admin Stock</span>
+                </a>
+                <a href="{{ route('admin.users.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="users" class="nav-icon" />
+                    <span>Admin Users</span>
+                </a>
+                <a href="{{ route('admin.vouchers.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="ticket-percent" class="nav-icon" />
+                    <span>Admin Vouchers</span>
+                </a>
             @endif
 
             @php $discordUrl = config('links.discord_url'); @endphp
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                 class="mobile-discord-link {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                <span>Discord</span>
+                <span class="inline-flex items-center gap-2">
+                    <x-ui.icon name="discord" class="h-4 w-4" />
+                    <span>Discord</span>
+                </span>
                 <span class="text-xs text-[#C084FC]">Support</span>
             </a>
 
@@ -203,21 +256,26 @@ transition-all duration-300 ease-out">
 
             <form action="/logout" method="POST">
                 @csrf
-                <button class="text-red-400 text-left text-sm">
-                    Logout
+                <button class="inline-flex items-center gap-2 text-left text-sm text-red-400">
+                    <x-ui.icon name="log-out" class="h-4 w-4" />
+                    <span>Logout</span>
                 </button>
             </form>
         @endauth
 
         @guest
-            <a href="/auth/google" class="text-gray-400">
-                Login
+            <a href="/auth/google" class="nav-item">
+                <x-ui.icon name="log-in" class="nav-icon" />
+                <span>Login</span>
             </a>
 
             @php $discordUrl = config('links.discord_url'); @endphp
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                 class="mobile-discord-link {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                <span>Discord</span>
+                <span class="inline-flex items-center gap-2">
+                    <x-ui.icon name="discord" class="h-4 w-4" />
+                    <span>Discord</span>
+                </span>
                 <span class="text-xs text-[#C084FC]">Support</span>
             </a>
         @endguest
@@ -232,6 +290,19 @@ transition-all duration-300 ease-out">
 <script nonce="{{ request()->attributes->get('csp_nonce') }}">
     let mobileOpen = false;
 
+    function setNavButtonLabel(button, label) {
+        const labelTarget = button?.querySelector('[data-button-label]');
+
+        if (labelTarget) {
+            labelTarget.textContent = label;
+            return;
+        }
+
+        if (button) {
+            button.innerText = label;
+        }
+    }
+
     function openMobileMenu() {
         const menu = document.getElementById('mobileMenu');
         const btn = document.getElementById('menuBtn');
@@ -241,7 +312,7 @@ transition-all duration-300 ease-out">
         mobileOpen = true;
         menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
         menu.classList.add('opacity-100', 'translate-y-0');
-        btn.innerText = 'Close';
+        setNavButtonLabel(btn, 'Close');
     }
 
     function closeMobileMenu() {
@@ -253,7 +324,7 @@ transition-all duration-300 ease-out">
         mobileOpen = false;
         menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
         menu.classList.remove('opacity-100', 'translate-y-0');
-        btn.innerText = 'Menu';
+        setNavButtonLabel(btn, 'Menu');
     }
 
     document.querySelector('[data-mobile-menu-toggle]')?.addEventListener('click', (event) => {

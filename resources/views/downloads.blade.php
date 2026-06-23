@@ -38,7 +38,8 @@
                         @forelse ($links as $link)
                             <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer"
                                 class="inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition btn-main">
-                                {{ $link['label'] }}
+                                <x-ui.icon name="download" class="h-4 w-4" />
+                                <span>{{ $link['label'] }}</span>
                             </a>
                         @empty
                             <span

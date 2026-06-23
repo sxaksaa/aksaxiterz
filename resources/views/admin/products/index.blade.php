@@ -95,7 +95,10 @@
                 </label>
 
                 <div class="flex items-end">
-                    <button class="btn-footer h-12">Create Product</button>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="package-plus" class="h-4 w-4" />
+                        <span>Create Product</span>
+                    </button>
                 </div>
             </form>
         </section>
@@ -122,8 +125,14 @@
                 </label>
 
                 <div class="flex gap-2">
-                    <button type="submit" class="btn-footer h-12">Filter</button>
-                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                    <button type="submit" class="btn-footer h-12">
+                        <x-ui.icon name="filter" class="h-4 w-4" />
+                        <span>Filter</span>
+                    </button>
+                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                        <span>Reset</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -195,7 +204,10 @@
                                     </div>
                                 </td>
                                 <td class="p-4 text-right">
-                                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action">Edit</a>
+                                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action">
+                                        <x-ui.icon name="edit-3" class="h-4 w-4" />
+                                        <span>Edit</span>
+                                    </a>
                                 </td>
                             </tr>
                         @empty
@@ -241,7 +253,10 @@
                         @endforelse
                     </div>
 
-                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action mt-4 w-full">Edit</a>
+                    <a href="{{ route('admin.products.edit', $product) }}" class="order-action mt-4 w-full">
+                        <x-ui.icon name="edit-3" class="h-4 w-4" />
+                        <span>Edit</span>
+                    </a>
                 </article>
             @empty
                 <div class="empty-state">No products found</div>

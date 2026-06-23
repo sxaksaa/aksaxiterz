@@ -15,7 +15,10 @@
                     <form method="POST" action="{{ route('cart.clear') }}">
                         @csrf
                         @method('DELETE')
-                        <button class="btn-footer-secondary" type="submit">Clear Cart</button>
+                        <button class="btn-footer-secondary" type="submit">
+                            <x-ui.icon name="trash-2" class="h-4 w-4" />
+                            <span>Clear Cart</span>
+                        </button>
                     </form>
                 @endif
             </div>
@@ -31,7 +34,10 @@
             <section class="empty-state fade-up">
                 <h2 class="text-xl font-semibold text-white">Your cart is empty</h2>
                 <p class="mt-2 text-sm text-gray-400">Choose a product and package to start building a bundle.</p>
-                <a href="/" class="btn-main mt-5 inline-flex px-5 py-3">Browse Products</a>
+                <a href="/" class="btn-main mt-5 inline-flex px-5 py-3">
+                    <x-ui.icon name="box" class="h-4 w-4" />
+                    <span>Browse Products</span>
+                </a>
             </section>
         @else
             <div class="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
@@ -81,7 +87,10 @@
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="h-11 rounded-xl border border-red-500/30 px-3 text-sm text-red-300 transition hover:bg-red-500/10">
-                                            Remove
+                                            <span class="inline-flex items-center gap-2">
+                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                                <span>Remove</span>
+                                            </span>
                                         </button>
                                     </form>
                                 </div>
@@ -99,17 +108,32 @@
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Payment Method</p>
                     <div class="grid gap-2">
                         <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="pakasir">
-                            <span class="font-semibold text-white">QRIS</span>
+                            <span class="payment-card-heading">
+                                <span class="payment-card-icon">
+                                    <x-ui.icon name="qr-code" class="h-5 w-5" />
+                                </span>
+                                <span class="font-semibold text-white">QRIS</span>
+                            </span>
                             <span class="mt-1 block text-xs text-gray-400">Pay the bundle total in IDR</span>
                         </button>
                         @if ($binancePayAvailable)
                             <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="binance_pay">
-                                <span class="font-semibold text-white">Binance Pay</span>
+                                <span class="payment-card-heading">
+                                    <span class="payment-card-icon">
+                                        <x-ui.icon name="binance" class="h-5 w-5 text-[#F0B90B]" />
+                                    </span>
+                                    <span class="font-semibold text-white">Binance Pay</span>
+                                </span>
                                 <span class="mt-1 block text-xs text-gray-400">Choose USDT or USDC</span>
                             </button>
                         @endif
                         <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="crypto">
-                            <span class="font-semibold text-white">Crypto Address</span>
+                            <span class="payment-card-heading">
+                                <span class="payment-card-icon">
+                                    <x-ui.icon name="wallet" class="h-5 w-5" />
+                                </span>
+                                <span class="font-semibold text-white">Crypto Address</span>
+                            </span>
                             <span class="mt-1 block text-xs text-gray-400">One coin and network for the whole bundle</span>
                         </button>
                     </div>
@@ -118,8 +142,24 @@
                         <div id="cartBinanceTokens" class="mt-4 hidden">
                             <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Binance Pay Coin</p>
                             <div class="grid grid-cols-2 gap-2">
-                                <button type="button" class="crypto-coin-option" data-cart-binance-token="usdt">USDT</button>
-                                <button type="button" class="crypto-coin-option" data-cart-binance-token="usdc">USDC</button>
+                                <button type="button" class="crypto-coin-option" data-cart-binance-token="usdt">
+                                    <span class="crypto-coin-header">
+                                        <x-ui.icon name="tether" class="crypto-token-icon" />
+                                        <span class="crypto-token-copy">
+                                            <span class="crypto-token-title">USDT</span>
+                                            <span class="crypto-token-subtitle">Tether</span>
+                                        </span>
+                                    </span>
+                                </button>
+                                <button type="button" class="crypto-coin-option" data-cart-binance-token="usdc">
+                                    <span class="crypto-coin-header">
+                                        <x-ui.icon name="usdc" class="crypto-token-icon" />
+                                        <span class="crypto-token-copy">
+                                            <span class="crypto-token-title">USDC</span>
+                                            <span class="crypto-token-subtitle">USD Coin</span>
+                                        </span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
                     @endif
@@ -127,9 +167,33 @@
                     <div id="cartCryptoOptions" class="mt-4 hidden">
                         <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin & Network</p>
                         <div class="grid gap-2">
-                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdtbsc">USDT · BNB Smart Chain (BEP20)</button>
-                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdttrc20">USDT · Tron (TRC20)</button>
-                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdcbsc">USDC · BNB Smart Chain (BEP20)</button>
+                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdtbsc">
+                                <span class="crypto-coin-header">
+                                    <x-ui.icon name="tether" class="crypto-token-icon" />
+                                    <span class="crypto-token-copy">
+                                        <span class="crypto-token-title">USDT</span>
+                                        <span class="crypto-token-subtitle">BNB Smart Chain (BEP20)</span>
+                                    </span>
+                                </span>
+                            </button>
+                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdttrc20">
+                                <span class="crypto-coin-header">
+                                    <x-ui.icon name="tether" class="crypto-token-icon" />
+                                    <span class="crypto-token-copy">
+                                        <span class="crypto-token-title">USDT</span>
+                                        <span class="crypto-token-subtitle">Tron (TRC20)</span>
+                                    </span>
+                                </span>
+                            </button>
+                            <button type="button" class="crypto-coin-option text-left" data-cart-coin="usdcbsc">
+                                <span class="crypto-coin-header">
+                                    <x-ui.icon name="usdc" class="crypto-token-icon" />
+                                    <span class="crypto-token-copy">
+                                        <span class="crypto-token-title">USDC</span>
+                                        <span class="crypto-token-subtitle">BNB Smart Chain (BEP20)</span>
+                                    </span>
+                                </span>
+                            </button>
                         </div>
                     </div>
 
@@ -140,7 +204,10 @@
                         <div class="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
                             <input id="cartVoucherCode" class="search-bar min-w-0 uppercase" maxlength="50"
                                 placeholder="Enter voucher code" autocomplete="off">
-                            <button id="cartApplyVoucher" type="button" class="btn-footer h-12">Apply</button>
+                            <button id="cartApplyVoucher" type="button" class="btn-footer h-12">
+                                <x-ui.icon name="ticket-percent" class="h-4 w-4" />
+                                <span>Apply</span>
+                            </button>
                         </div>
                         <p id="cartVoucherFeedback" class="mt-2 hidden text-xs"></p>
                     </div>
@@ -159,7 +226,8 @@
                     </div>
 
                     <button id="cartCheckoutButton" type="button" class="btn-main mt-5 w-full">
-                        Choose Payment Method
+                        <x-ui.icon name="credit-card" class="h-4 w-4" />
+                        <span data-button-label>Choose Payment Method</span>
                     </button>
                     <p class="mt-3 text-xs leading-5 text-gray-500">
                         All cart items must still be available when checkout starts. One failed item cancels the whole invoice.
@@ -206,6 +274,19 @@
                     return null;
                 }
 
+                function setButtonLabel(button, label) {
+                    const labelTarget = button?.querySelector('[data-button-label]');
+
+                    if (labelTarget) {
+                        labelTarget.textContent = label;
+                        return;
+                    }
+
+                    if (button) {
+                        button.innerText = label;
+                    }
+                }
+
                 function updateTotals() {
                     const stablecoin = paymentMethod === 'crypto' || paymentMethod === 'binance_pay';
                     const subtotal = stablecoin ? formatUsd(subtotalUsdt) : (paymentMethod === 'pakasir' ? formatIdr(subtotalIdr) : 'Select payment');
@@ -222,7 +303,7 @@
                     document.getElementById('cartDiscountRow').classList.toggle('hidden', !voucherQuote);
 
                     const button = document.getElementById('cartCheckoutButton');
-                    button.innerText = paymentMethod ? 'Pay Bundle' : 'Choose Payment Method';
+                    setButtonLabel(button, paymentMethod ? 'Pay Bundle' : 'Choose Payment Method');
                 }
 
                 function voucherFeedback(message, variant = 'success') {
@@ -437,7 +518,7 @@
                     if (voucherCode && voucherQuote) body.set('voucher_code', voucherCode);
 
                     this.disabled = true;
-                    this.innerText = 'Preparing Bundle...';
+                    setButtonLabel(this, 'Preparing Bundle...');
 
                     try {
                         const response = await fetch(checkoutUrl, {
@@ -469,7 +550,7 @@
                             return;
                         }
 
-                        this.innerText = 'Payment Pending';
+                        setButtonLabel(this, 'Payment Pending');
                         showToast('Bundle invoice ready', 'Pay the exact amount shown to receive every license key.', 'success');
                     } catch (error) {
                         if (error.redirectUrl) {
@@ -479,7 +560,7 @@
 
                         showToast('Checkout failed', error.message, 'error');
                         this.disabled = false;
-                        this.innerText = 'Pay Bundle';
+                        setButtonLabel(this, 'Pay Bundle');
                     }
                 });
 

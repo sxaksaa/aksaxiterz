@@ -54,7 +54,10 @@
         </section>
 
         <div class="mb-4">
-            <a href="{{ route('admin.vouchers.index') }}" class="order-action">Back to Vouchers</a>
+            <a href="{{ route('admin.vouchers.index') }}" class="order-action">
+                <x-ui.icon name="arrow-left" class="h-4 w-4" />
+                <span>Back to Vouchers</span>
+            </a>
         </div>
 
         <div class="orders-table-wrap hidden md:block">
@@ -103,7 +106,10 @@
                                     <div class="mt-1">{{ $order->created_at?->timezone(config('app.timezone'))->format('H:i') ?? '-' }} WIB</div>
                                 </td>
                                 <td class="p-4 text-right">
-                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">Order</a>
+                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">
+                                        <x-ui.icon name="receipt" class="h-4 w-4" />
+                                        <span>Order</span>
+                                    </a>
                                 </td>
                             </tr>
                         @empty
@@ -143,7 +149,10 @@
                     <div class="mt-4 text-xs text-gray-500">{{ $row['method_label'] }} · Requested {{ $formatRowMoney($row, 'paid_value') }}</div>
                     <div class="mt-4 text-xs text-gray-400">{{ $row['item_summary'] ?: '-' }}</div>
                     <div class="mt-4">
-                        <a href="{{ route('admin.orders.show', $order) }}" class="order-action">Order</a>
+                        <a href="{{ route('admin.orders.show', $order) }}" class="order-action">
+                            <x-ui.icon name="receipt" class="h-4 w-4" />
+                            <span>Order</span>
+                        </a>
                     </div>
                 </article>
             @empty

@@ -55,12 +55,14 @@
                 <div class="flex flex-wrap gap-3">
                     <a href="/downloads"
                         class="inline-flex items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white">
-                        Download Tools
+                        <x-ui.icon name="download" class="h-4 w-4" />
+                        <span>Download Tools</span>
                     </a>
                     <a href="{{ $discordUrl ?: '#' }}"
                         @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                         class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        Join Discord
+                        <x-ui.icon name="discord" class="h-4 w-4" />
+                        <span>Join Discord</span>
                     </a>
                 </div>
             </div>
@@ -71,7 +73,10 @@
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Keys</p>
                 <h2 class="mt-1 text-2xl font-semibold text-white">Available licenses</h2>
             </div>
-            <a href="/downloads" class="btn-footer-secondary w-fit">Download Tools</a>
+            <a href="/downloads" class="btn-footer-secondary w-fit">
+                <x-ui.icon name="download" class="h-4 w-4" />
+                <span>Download Tools</span>
+            </a>
         </div>
 
         <div class="grid gap-4 md:gap-6">
@@ -140,7 +145,8 @@
 
                         <button type="button" data-copy-license="{{ $license->id }}"
                             class="order-action btn-press self-end sm:self-auto">
-                            Copy
+                            <x-ui.icon name="copy" class="h-4 w-4" />
+                            <span data-button-label>Copy</span>
                         </button>
 
                     </div>

@@ -43,7 +43,8 @@
 
         <div class="mt-5">
             <button type="button" id="aksaQrisCheck" data-qris-check class="order-action w-full">
-                Check Payment
+                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                <span data-button-label>Check Payment</span>
             </button>
         </div>
     </section>

@@ -59,7 +59,10 @@
         </section>
 
         <div class="mb-4">
-            <a href="{{ route('admin.users.index') }}" class="order-action">Back to Users</a>
+            <a href="{{ route('admin.users.index') }}" class="order-action">
+                <x-ui.icon name="arrow-left" class="h-4 w-4" />
+                <span>Back to Users</span>
+            </a>
         </div>
 
         <section class="product-section mb-6 fade-up">
@@ -114,7 +117,10 @@
                                     {{ $order->paid_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }}
                                 </td>
                                 <td class="p-4 text-right">
-                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">Order</a>
+                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">
+                                        <x-ui.icon name="receipt" class="h-4 w-4" />
+                                        <span>Order</span>
+                                    </a>
                                 </td>
                             </tr>
                         @empty
@@ -144,7 +150,10 @@
                             <div>Voucher: <span class="font-semibold text-white">{{ $order->voucher?->code ?? '-' }}</span></div>
                             <div>Delivery: <span class="font-semibold text-white">{{ $order->licenses_count }} / {{ $order->quantity }}</span></div>
                         </div>
-                        <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">Order</a>
+                        <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">
+                            <x-ui.icon name="receipt" class="h-4 w-4" />
+                            <span>Order</span>
+                        </a>
                     </article>
                 @empty
                     <div class="empty-state">This user has no orders yet.</div>

@@ -54,6 +54,23 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 
+function setButtonLabel(button, label) {
+    const labelTarget = button?.querySelector('[data-button-label]');
+
+    if (labelTarget) {
+        labelTarget.textContent = label;
+        return;
+    }
+
+    if (button) {
+        button.innerText = label;
+    }
+}
+
+function getButtonLabel(button) {
+    return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
+}
+
 function formatIdr(amount) {
     return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
 }
@@ -250,7 +267,7 @@ async function handleQrisExpiry() {
     const checkButton = document.getElementById('aksaQrisCheck');
 
     if (checkButton) {
-        checkButton.innerText = 'Check Final Status';
+        setButtonLabel(checkButton, 'Check Final Status');
     }
 
     if (!qrisState.orderId) return;
@@ -420,7 +437,7 @@ function resetCryptoExpiryState() {
         if (!button) return;
 
         button.disabled = false;
-        button.innerText = 'Copy';
+        setButtonLabel(button, 'Copy');
         button.classList.remove('opacity-60', 'pointer-events-none');
     });
 }
@@ -452,7 +469,7 @@ function handleCryptoExpiry() {
     const checkButton = document.getElementById('aksaCryptoCheck');
 
     if (checkButton) {
-        checkButton.innerText = 'Verify Already Sent';
+        setButtonLabel(checkButton, 'Verify Already Sent');
     }
 }
 
@@ -505,7 +522,7 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
     document.getElementById('aksaQrisExpiredOverlay')?.classList.add('hidden');
     const checkButton = document.getElementById('aksaQrisCheck');
-    if (checkButton) checkButton.innerText = 'Check Payment';
+    if (checkButton) setButtonLabel(checkButton, 'Check Payment');
     startQrisExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
     modal.classList.remove('hidden');
@@ -577,7 +594,7 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
 
     if (checkButton) {
         checkButton.disabled = false;
-        checkButton.innerText = 'Check Payment';
+        setButtonLabel(checkButton, 'Check Payment');
         checkButton.classList.remove('opacity-60', 'pointer-events-none');
     }
 
@@ -1087,10 +1104,10 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !qrisState.orderId) return;
 
-    const originalText = button.innerText;
+    const originalText = getButtonLabel(button);
 
     button.disabled = true;
-    button.innerText = 'Checking...';
+    setButtonLabel(button, 'Checking...');
     button.classList.add('opacity-60', 'pointer-events-none');
 
     try {
@@ -1116,7 +1133,7 @@ document.addEventListener('click', async (event) => {
         });
     } finally {
         button.disabled = false;
-        button.innerText = originalText || 'Check Payment';
+        setButtonLabel(button, originalText || 'Check Payment');
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
 });
@@ -1126,10 +1143,10 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !cryptoState.orderId) return;
 
-    const originalText = button.innerText;
+    const originalText = getButtonLabel(button);
 
     button.disabled = true;
-    button.innerText = 'Checking...';
+    setButtonLabel(button, 'Checking...');
     button.classList.add('opacity-60', 'pointer-events-none');
 
     try {
@@ -1161,7 +1178,7 @@ document.addEventListener('click', async (event) => {
         });
     } finally {
         button.disabled = false;
-        button.innerText = originalText || 'Check Payment';
+        setButtonLabel(button, originalText || 'Check Payment');
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
 });
@@ -1171,9 +1188,9 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !binancePayState.orderId) return;
 
-    const originalText = button.innerText;
+    const originalText = getButtonLabel(button);
     button.disabled = true;
-    button.innerText = 'Checking...';
+    setButtonLabel(button, 'Checking...');
     button.classList.add('opacity-60', 'pointer-events-none');
 
     try {
@@ -1205,7 +1222,7 @@ document.addEventListener('click', async (event) => {
         });
     } finally {
         button.disabled = false;
-        button.innerText = originalText || 'Check Payment';
+        setButtonLabel(button, originalText || 'Check Payment');
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
 });
@@ -1220,11 +1237,11 @@ document.addEventListener('click', async (event) => {
 
     if (!text) return;
 
-    const originalText = button.innerText;
+    const originalText = getButtonLabel(button);
 
     try {
         await navigator.clipboard.writeText(text);
-        button.innerText = 'Copied!';
+        setButtonLabel(button, 'Copied!');
         button.classList.add('text-green-400');
         window.showAppToast?.('License copied', 'The license key is ready to paste.', {
             variant: 'success',
@@ -1235,7 +1252,7 @@ document.addEventListener('click', async (event) => {
         });
     } finally {
         setTimeout(() => {
-            button.innerText = originalText || 'Copy';
+            setButtonLabel(button, originalText || 'Copy');
             button.classList.remove('text-green-400');
         }, 1200);
     }
@@ -1250,11 +1267,11 @@ document.addEventListener('click', async (event) => {
 
     if (!text) return;
 
-    const originalText = button.innerText;
+    const originalText = getButtonLabel(button);
 
     try {
         await navigator.clipboard.writeText(text);
-        button.innerText = 'Copied!';
+        setButtonLabel(button, 'Copied!');
         button.classList.add('text-green-400');
         window.showAppToast?.(
             button.dataset.copyTitle || 'Copied',
@@ -1268,7 +1285,7 @@ document.addEventListener('click', async (event) => {
         });
     } finally {
         setTimeout(() => {
-            button.innerText = originalText || 'Copy';
+            setButtonLabel(button, originalText || 'Copy');
             button.classList.remove('text-green-400');
         }, 1200);
     }

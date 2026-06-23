@@ -88,7 +88,10 @@
                     </h2>
                 </div>
                 @if ($isEditing)
-                    <a href="{{ route('admin.vouchers.index') }}" class="btn-footer-secondary">Cancel Edit</a>
+                    <a href="{{ route('admin.vouchers.index') }}" class="btn-footer-secondary">
+                        <x-ui.icon name="x" class="h-4 w-4" />
+                        <span>Cancel Edit</span>
+                    </a>
                 @endif
             </div>
 
@@ -339,7 +342,10 @@
                 </div>
 
                 <div class="flex items-end">
-                    <button class="btn-footer h-12">{{ $isEditing ? 'Save Voucher' : 'Create Voucher' }}</button>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="{{ $isEditing ? 'save' : 'ticket-percent' }}" class="h-4 w-4" />
+                        <span>{{ $isEditing ? 'Save Voucher' : 'Create Voucher' }}</span>
+                    </button>
                 </div>
             </form>
         </section>
@@ -352,8 +358,14 @@
                         placeholder="Enter voucher code">
                 </label>
                 <div class="flex gap-2">
-                    <button class="btn-footer h-12">Filter</button>
-                    <a href="{{ route('admin.vouchers.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="filter" class="h-4 w-4" />
+                        <span>Filter</span>
+                    </button>
+                    <a href="{{ route('admin.vouchers.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                        <span>Reset</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -408,13 +420,22 @@
                                 </td>
                                 <td class="p-4 text-right">
                                     <div class="inline-flex gap-2">
-                                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">Uses</a>
-                                        <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">Edit</a>
+                                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">
+                                            <x-ui.icon name="eye" class="h-4 w-4" />
+                                            <span>Uses</span>
+                                        </a>
+                                        <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">
+                                            <x-ui.icon name="edit-3" class="h-4 w-4" />
+                                            <span>Edit</span>
+                                        </a>
                                         <form action="{{ route('admin.vouchers.destroy', $voucher) }}" method="POST"
                                             data-confirm="Delete this unused voucher?">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="order-action order-action-danger">Delete</button>
+                                            <button class="order-action order-action-danger">
+                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </button>
                                         </form>
                                     </div>
                                 </td>
@@ -448,12 +469,21 @@
                         Minimum {{ $formatIdr($voucher->minimum_purchase) }} · {{ $voucher->active_uses_count }} active uses
                     </div>
                     <div class="mt-4 flex gap-2">
-                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">Uses</a>
-                        <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">Edit</a>
+                        <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">
+                            <x-ui.icon name="eye" class="h-4 w-4" />
+                            <span>Uses</span>
+                        </a>
+                        <a href="{{ route('admin.vouchers.index', ['edit' => $voucher->id]) }}" class="order-action">
+                            <x-ui.icon name="edit-3" class="h-4 w-4" />
+                            <span>Edit</span>
+                        </a>
                         <form action="{{ route('admin.vouchers.destroy', $voucher) }}" method="POST" data-confirm="Delete this unused voucher?">
                             @csrf
                             @method('DELETE')
-                            <button class="order-action order-action-danger">Delete</button>
+                            <button class="order-action order-action-danger">
+                                <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
                         </form>
                     </div>
                 </article>

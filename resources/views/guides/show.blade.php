@@ -6,7 +6,10 @@
             <div class="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end">
                 <div>
                     <div class="mb-3 flex flex-wrap items-center gap-2">
-                        <a href="{{ route('guides.index') }}" class="btn-footer-secondary">All Guides</a>
+                        <a href="{{ route('guides.index') }}" class="btn-footer-secondary">
+                            <x-ui.icon name="book-open" class="h-4 w-4" />
+                            <span>All Guides</span>
+                        </a>
                         <span class="support-pill">{{ $guide['category'] ?? 'Guide' }}</span>
                     </div>
 

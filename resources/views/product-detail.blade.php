@@ -94,12 +94,14 @@
                 <div class="flex flex-wrap gap-3">
                     <a href="/downloads"
                         class="inline-flex items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white">
-                        Downloads
+                        <x-ui.icon name="download" class="h-4 w-4" />
+                        <span>Downloads</span>
                     </a>
                     <a href="{{ $discordUrl ?: '#' }}"
                         @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
                         class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        Join Discord
+                        <x-ui.icon name="discord" class="h-4 w-4" />
+                        <span>Join Discord</span>
                     </a>
                 </div>
             </div>
@@ -117,7 +119,12 @@
             <div id="btnPakasir" data-payment-method="pakasir"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                <div class="font-semibold">QRIS</div>
+                <div class="payment-card-heading">
+                    <span class="payment-card-icon">
+                        <x-ui.icon name="qr-code" class="h-5 w-5" />
+                    </span>
+                    <div class="font-semibold">QRIS</div>
+                </div>
                 <span class="text-xs text-gray-400">QRIS for Indonesia & Malaysia-supported wallets</span>
 
             </div>
@@ -126,7 +133,12 @@
                 <div id="btnBinancePay" data-payment-method="binance_pay"
                     class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                    <div class="font-semibold">Binance Pay</div>
+                    <div class="payment-card-heading">
+                        <span class="payment-card-icon">
+                            <x-ui.icon name="binance" class="h-5 w-5 text-[#F0B90B]" />
+                        </span>
+                        <div class="font-semibold">Binance Pay</div>
+                    </div>
                     <span class="text-xs text-gray-400">Binance Pay ID & QR</span>
 
                 </div>
@@ -135,7 +147,12 @@
             <div id="btnCrypto" data-payment-method="crypto"
                 class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
 
-                <div class="font-semibold">Crypto</div>
+                <div class="payment-card-heading">
+                    <span class="payment-card-icon">
+                        <x-ui.icon name="wallet" class="h-5 w-5" />
+                    </span>
+                    <div class="font-semibold">Crypto</div>
+                </div>
                 <span class="text-xs text-gray-400">Crypto Wallet Address</span>
 
             </div>
@@ -147,12 +164,22 @@
                 <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
                 <div class="grid grid-cols-2 gap-2" role="group" aria-label="Select Binance Pay coin">
                     <button type="button" class="crypto-coin-option" data-binance-pay-token="usdt" aria-pressed="false">
-                        <span class="font-semibold text-white">USDT</span>
-                        <span class="text-xs text-gray-500">Tether</span>
+                        <span class="crypto-coin-header">
+                            <x-ui.icon name="tether" class="crypto-token-icon" />
+                            <span class="crypto-token-copy">
+                                <span class="crypto-token-title">USDT</span>
+                                <span class="crypto-token-subtitle">Tether</span>
+                            </span>
+                        </span>
                     </button>
                     <button type="button" class="crypto-coin-option" data-binance-pay-token="usdc" aria-pressed="false">
-                        <span class="font-semibold text-white">USDC</span>
-                        <span class="text-xs text-gray-500">USD Coin</span>
+                        <span class="crypto-coin-header">
+                            <x-ui.icon name="usdc" class="crypto-token-icon" />
+                            <span class="crypto-token-copy">
+                                <span class="crypto-token-title">USDC</span>
+                                <span class="crypto-token-subtitle">USD Coin</span>
+                            </span>
+                        </span>
                     </button>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">Binance Pay transfer only. No blockchain network selection is needed.</p>
@@ -166,12 +193,22 @@
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
                     <div class="grid grid-cols-2 gap-2" role="group" aria-label="Select crypto coin">
                         <button type="button" class="crypto-coin-option" data-crypto-coin="usdt" aria-pressed="false">
-                            <span class="font-semibold text-white">USDT</span>
-                            <span class="text-xs text-gray-500">Tether</span>
+                            <span class="crypto-coin-header">
+                                <x-ui.icon name="tether" class="crypto-token-icon" />
+                                <span class="crypto-token-copy">
+                                    <span class="crypto-token-title">USDT</span>
+                                    <span class="crypto-token-subtitle">Tether</span>
+                                </span>
+                            </span>
                         </button>
                         <button type="button" class="crypto-coin-option" data-crypto-coin="usdc" aria-pressed="false">
-                            <span class="font-semibold text-white">USDC</span>
-                            <span class="text-xs text-gray-500">USD Coin</span>
+                            <span class="crypto-coin-header">
+                                <x-ui.icon name="usdc" class="crypto-token-icon" />
+                                <span class="crypto-token-copy">
+                                    <span class="crypto-token-title">USDC</span>
+                                    <span class="crypto-token-subtitle">USD Coin</span>
+                                </span>
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -183,10 +220,7 @@
                             class="aksa-select-trigger crypto-network-trigger"
                             disabled aria-expanded="false" aria-haspopup="listbox">
                             <span id="selectedNetworkText" class="aksa-select-label">Select coin first</span>
-                            <svg id="networkArrow" class="aksa-select-chevron" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                            </svg>
+                            <x-ui.icon id="networkArrow" name="chevron-down" class="aksa-select-chevron" />
                         </button>
 
                         <div id="networkDropdown" class="aksa-select-panel crypto-network-panel hidden" role="listbox">
@@ -299,8 +333,9 @@
                     @if ($packageStock <= 0)
                         <button type="button"
                             data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
-                            class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
-                            Join Discord to Order
+                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
+                            <x-ui.icon name="discord" class="h-4 w-4" />
+                            <span>Join Discord to Order</span>
                         </button>
                     @endif
 
@@ -347,7 +382,10 @@
                 <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <input id="voucherCode" class="search-bar min-w-0 w-full uppercase" maxlength="50"
                         placeholder="Enter voucher code" autocomplete="off" spellcheck="false">
-                    <button id="applyVoucherBtn" type="button" class="btn-footer h-12">Apply</button>
+                    <button id="applyVoucherBtn" type="button" class="btn-footer h-12">
+                        <x-ui.icon name="ticket-percent" class="h-4 w-4" />
+                        <span data-button-label>Apply</span>
+                    </button>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
                     Want a voucher code?
@@ -374,14 +412,16 @@
                 <button id="addToCartBtn" type="button"
                     class="btn-footer-secondary min-h-12 w-full {{ $stock <= 0 ? 'cursor-not-allowed opacity-60' : '' }}"
                     {{ $stock <= 0 ? 'disabled' : '' }}>
-                    {{ $stock <= 0 ? 'Unavailable' : 'Add to Cart' }}
+                    <x-ui.icon name="shopping-cart" class="h-4 w-4" />
+                    <span data-button-label>{{ $stock <= 0 ? 'Unavailable' : 'Add to Cart' }}</span>
                 </button>
                 <button id="payMainBtn"
                     class="btn-main w-full
         {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
                     {{ $stock <= 0 ? 'disabled' : '' }}>
 
-                    {{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}
+                    <x-ui.icon name="{{ $stock <= 0 ? 'discord' : (auth()->check() ? 'credit-card' : 'log-in') }}" class="h-4 w-4" />
+                    <span data-button-label>{{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}</span>
 
                 </button>
             </div>
@@ -455,6 +495,23 @@
                 redirectAfter,
                 variant,
             });
+        }
+
+        function setButtonLabel(button, label) {
+            const labelTarget = button?.querySelector('[data-button-label]');
+
+            if (labelTarget) {
+                labelTarget.textContent = label;
+                return;
+            }
+
+            if (button) {
+                button.innerText = label;
+            }
+        }
+
+        function getButtonLabel(button) {
+            return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
         }
 
         function requireLogin() {
@@ -816,7 +873,7 @@
             const binanceTokenSnapshot = selectedBinancePayToken;
             const quantitySnapshot = selectedQuantity;
             button.disabled = true;
-            button.innerText = 'Checking...';
+            setButtonLabel(button, 'Checking...');
 
             try {
                 const quote = await requestVoucherQuote(code);
@@ -848,7 +905,7 @@
                 clearVoucher(error.message || 'Voucher could not be applied.');
             } finally {
                 button.disabled = false;
-                button.innerText = 'Apply';
+                setButtonLabel(button, 'Apply');
             }
         }
 
@@ -1041,7 +1098,7 @@
             if (!btn || !hasStock) return;
 
             btn.disabled = false;
-            btn.innerText = isAuthenticated ? 'Pay Now' : 'Login to Pay';
+            setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay');
             btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none');
         }
 
@@ -1110,9 +1167,9 @@
                 return;
             }
 
-            const originalText = this.innerText;
+            const originalText = getButtonLabel(this);
             this.disabled = true;
-            this.innerText = 'Adding...';
+            setButtonLabel(this, 'Adding...');
             const body = new FormData();
             body.set('package_id', selectedPackageId);
             body.set('quantity', selectedQuantity);
@@ -1138,14 +1195,14 @@
                     badge.classList.toggle('hidden', Number(data.cart_count) <= 0);
                 });
                 showToast('Added to cart', data.message, null, 'success');
-                this.innerText = 'Added';
+                setButtonLabel(this, 'Added');
                 setTimeout(() => {
-                    this.innerText = originalText;
+                    setButtonLabel(this, originalText);
                     this.disabled = false;
                 }, 900);
             } catch (error) {
                 showToast('Cart not updated', error.message, null, 'error');
-                this.innerText = originalText;
+                setButtonLabel(this, originalText);
                 this.disabled = false;
             }
         });
@@ -1187,7 +1244,7 @@
 
             showToast('Checkout started', 'Preparing your payment.');
 
-            this.innerText = "Processing...";
+            setButtonLabel(this, 'Processing...');
             this.classList.add('opacity-60')
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
@@ -1209,7 +1266,7 @@
                         return;
                     }
 
-                    this.innerText = 'Payment Pending';
+                    setButtonLabel(this, 'Payment Pending');
                     showToast('QRIS ready', 'Scan the QRIS code to complete your payment.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
@@ -1245,7 +1302,7 @@
                         return;
                     }
 
-                    this.innerText = 'Payment Pending';
+                    setButtonLabel(this, 'Payment Pending');
                     showToast('Binance Pay ready', 'Send the exact amount to the Pay ID shown.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
@@ -1281,7 +1338,7 @@
                         return;
                     }
 
-                    this.innerText = 'Payment Pending';
+                    setButtonLabel(this, 'Payment Pending');
                     showToast('Crypto address ready', 'Send the exact amount shown in the modal.', null, 'success');
                 } catch (error) {
                     if (error.redirectUrl) {
@@ -1305,12 +1362,12 @@
             if (btn) {
                 if (!hasStock) {
                     btn.disabled = true
-                    btn.innerText = "Join Discord to Order"
+                    setButtonLabel(btn, 'Join Discord to Order')
                     return
                 }
 
                 btn.disabled = false
-                btn.innerText = isAuthenticated ? "Pay Now" : "Login to Pay"
+                setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay')
                 btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             }
         });

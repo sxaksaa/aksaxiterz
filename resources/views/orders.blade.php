@@ -58,6 +58,23 @@
         let ordersRefreshing = false;
         let orderStatusPolling = false;
 
+        function setButtonLabel(button, label) {
+            const labelTarget = button?.querySelector('[data-button-label]');
+
+            if (labelTarget) {
+                labelTarget.textContent = label;
+                return;
+            }
+
+            if (button) {
+                button.innerText = label;
+            }
+        }
+
+        function getButtonLabel(button) {
+            return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
+        }
+
         async function fetchPaymentJson(url, formData) {
             const response = await fetch(url, {
                 method: 'POST',
@@ -276,11 +293,11 @@
             e.preventDefault();
 
             const button = form.querySelector('button[type="submit"]');
-            const originalText = button?.innerText;
+            const originalText = getButtonLabel(button);
 
             if (button) {
                 button.disabled = true;
-                button.innerText = 'Processing...';
+                setButtonLabel(button, 'Processing...');
                 button.classList.add('opacity-60', 'pointer-events-none');
             }
 
@@ -303,7 +320,7 @@
             } finally {
                 if (button) {
                     button.disabled = false;
-                    button.innerText = originalText || 'Pay Again';
+                    setButtonLabel(button, originalText || 'Pay Again');
                     button.classList.remove('opacity-60', 'pointer-events-none');
                 }
             }
@@ -380,10 +397,10 @@
 
             const button = form.querySelector('.sync-pakasir-button');
             const orderId = button?.dataset.orderId;
-            const originalText = button.innerText;
+            const originalText = getButtonLabel(button);
 
             button.disabled = true;
-            button.innerText = 'Checking...';
+            setButtonLabel(button, 'Checking...');
             button.classList.add('opacity-60', 'pointer-events-none');
 
             window.showAppToast?.('Payment check', 'Checking your QRIS payment via Pakasir.');
@@ -414,7 +431,7 @@
                 });
             } finally {
                 button.disabled = false;
-                button.innerText = originalText || 'Check Payment';
+                setButtonLabel(button, originalText || 'Check Payment');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
         });
@@ -427,10 +444,10 @@
 
             const button = form.querySelector('.sync-crypto-button');
             const orderId = button?.dataset.orderId;
-            const originalText = button.innerText;
+            const originalText = getButtonLabel(button);
 
             button.disabled = true;
-            button.innerText = 'Verifying...';
+            setButtonLabel(button, 'Verifying...');
             button.classList.add('opacity-60', 'pointer-events-none');
 
             window.showAppToast?.('Payment check', 'Scanning the selected crypto network.');
@@ -467,7 +484,7 @@
                 });
             } finally {
                 button.disabled = false;
-                button.innerText = originalText || 'Verify';
+                setButtonLabel(button, originalText || 'Verify');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
         });
@@ -480,10 +497,10 @@
 
             const button = form.querySelector('.sync-binance-pay-button');
             const orderId = button?.dataset.orderId;
-            const originalText = button.innerText;
+            const originalText = getButtonLabel(button);
 
             button.disabled = true;
-            button.innerText = 'Checking...';
+            setButtonLabel(button, 'Checking...');
             button.classList.add('opacity-60', 'pointer-events-none');
 
             window.showAppToast?.('Payment check', 'Checking your Binance Pay transfer.');
@@ -518,7 +535,7 @@
                 });
             } finally {
                 button.disabled = false;
-                button.innerText = originalText || 'Check Payment';
+                setButtonLabel(button, originalText || 'Check Payment');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
         });
@@ -530,11 +547,11 @@
             e.preventDefault();
 
             const button = form.querySelector('.cancel-order-button');
-            const originalText = button?.innerText;
+            const originalText = getButtonLabel(button);
 
             if (button) {
                 button.disabled = true;
-                button.innerText = 'Cancelling...';
+                setButtonLabel(button, 'Cancelling...');
                 button.classList.add('opacity-60', 'pointer-events-none');
             }
 
@@ -554,7 +571,7 @@
             } finally {
                 if (button) {
                     button.disabled = false;
-                    button.innerText = originalText || 'Cancel';
+                    setButtonLabel(button, originalText || 'Cancel');
                     button.classList.remove('opacity-60', 'pointer-events-none');
                 }
             }

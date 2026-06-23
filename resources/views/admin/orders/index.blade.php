@@ -93,8 +93,14 @@
                 </label>
 
                 <div class="flex gap-2">
-                    <button type="submit" class="btn-footer h-12">Filter</button>
-                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                    <button type="submit" class="btn-footer h-12">
+                        <x-ui.icon name="filter" class="h-4 w-4" />
+                        <span>Filter</span>
+                    </button>
+                    <a href="{{ route('admin.orders.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                        <span>Reset</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -160,7 +166,10 @@
                                     {{ $paidAt ? $paidAt->format('d M Y, H:i:s') . ' WIB' : '-' }}
                                 </td>
                                 <td class="p-4 text-right">
-                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">Detail</a>
+                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action">
+                                        <x-ui.icon name="eye" class="h-4 w-4" />
+                                        <span>Detail</span>
+                                    </a>
                                 </td>
                             </tr>
                         @empty
@@ -213,7 +222,10 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">Detail</a>
+                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">
+                        <x-ui.icon name="eye" class="h-4 w-4" />
+                        <span>Detail</span>
+                    </a>
                 </article>
             @empty
                 <div class="empty-state">No orders found</div>

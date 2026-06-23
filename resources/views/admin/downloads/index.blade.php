@@ -57,7 +57,10 @@
                 </div>
 
                 @if ($isEditing)
-                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary w-fit">Cancel Edit</a>
+                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary w-fit">
+                        <x-ui.icon name="x" class="h-4 w-4" />
+                        <span>Cancel Edit</span>
+                    </a>
                 @endif
             </div>
 
@@ -81,7 +84,10 @@
                 </label>
 
                 <div class="flex flex-wrap items-center gap-3 lg:col-span-2">
-                    <button class="btn-footer h-12">{{ $isEditing ? 'Save Download' : 'Add Download' }}</button>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="{{ $isEditing ? 'save' : 'download' }}" class="h-4 w-4" />
+                        <span>{{ $isEditing ? 'Save Download' : 'Add Download' }}</span>
+                    </button>
                 </div>
             </form>
         </section>
@@ -96,8 +102,14 @@
                 </label>
 
                 <div class="flex gap-2">
-                    <button class="btn-footer h-12">Filter</button>
-                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="filter" class="h-4 w-4" />
+                        <span>Filter</span>
+                    </button>
+                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                        <span>Reset</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -143,12 +155,18 @@
                                 <td class="p-4 text-right">
                                     <div class="inline-flex justify-end gap-2">
                                         <a href="{{ route('admin.downloads.index', array_merge(request()->query(), ['edit' => $download->id])) }}"
-                                            class="order-action">Edit</a>
+                                            class="order-action">
+                                            <x-ui.icon name="edit-3" class="h-4 w-4" />
+                                            <span>Edit</span>
+                                        </a>
                                         <form action="{{ route('admin.downloads.destroy', $download) }}" method="POST"
                                             data-confirm="Delete this download item?">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="order-action order-action-danger">Delete</button>
+                                            <button class="order-action order-action-danger">
+                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                                <span>Delete</span>
+                                            </button>
                                         </form>
                                     </div>
                                 </td>
@@ -176,12 +194,18 @@
 
                     <div class="mt-4 flex flex-wrap gap-2">
                         <a href="{{ route('admin.downloads.index', array_merge(request()->query(), ['edit' => $download->id])) }}"
-                            class="order-action">Edit</a>
+                            class="order-action">
+                            <x-ui.icon name="edit-3" class="h-4 w-4" />
+                            <span>Edit</span>
+                        </a>
                         <form action="{{ route('admin.downloads.destroy', $download) }}" method="POST"
                             data-confirm="Delete this download item?">
                             @csrf
                             @method('DELETE')
-                            <button class="order-action order-action-danger">Delete</button>
+                            <button class="order-action order-action-danger">
+                                <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
                         </form>
                     </div>
                 </article>

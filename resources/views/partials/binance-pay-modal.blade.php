@@ -3,9 +3,14 @@
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaBinancePayTitle">
         <div class="flex items-start justify-between gap-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Binance user-to-user payment</p>
-                <h2 id="aksaBinancePayTitle" class="mt-1 text-xl font-semibold text-white">Pay with Binance</h2>
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="payment-card-icon mt-0.5 text-[#F0B90B]">
+                    <x-ui.icon name="binance" class="h-5 w-5" />
+                </span>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Binance user-to-user payment</p>
+                    <h2 id="aksaBinancePayTitle" class="mt-1 text-xl font-semibold text-white">Pay with Binance</h2>
+                </div>
             </div>
             <button type="button" class="qris-close-button" data-binance-pay-close aria-label="Close Binance Pay checkout">x</button>
         </div>
@@ -38,7 +43,8 @@
                     <div class="flex min-w-0 items-center gap-2">
                         <span id="aksaBinancePayAmount" class="font-mono text-xs font-semibold text-[#D8B4FE]">-</span>
                         <button type="button" id="aksaBinancePayCopyAmount" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
-                            Copy
+                            <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                            <span data-button-label>Copy</span>
                         </button>
                     </div>
                 </div>
@@ -47,7 +53,8 @@
                     <div class="flex min-w-0 items-center gap-2">
                         <span id="aksaBinancePayId" class="truncate font-mono text-xs text-gray-300">-</span>
                         <button type="button" id="aksaBinancePayCopyId" class="order-action shrink-0 px-2 py-1 text-[11px]" data-copy-value="">
-                            Copy
+                            <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                            <span data-button-label>Copy</span>
                         </button>
                     </div>
                 </div>
@@ -64,10 +71,12 @@
 
         <div class="mt-5 grid gap-2 sm:grid-cols-2">
             <button type="button" id="aksaBinancePayCheck" data-binance-pay-check class="order-action w-full">
-                Check Payment
+                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                <span data-button-label>Check Payment</span>
             </button>
             <a href="/orders" class="order-action w-full">
-                Open Orders
+                <x-ui.icon name="receipt" class="h-4 w-4" />
+                <span>Open Orders</span>
             </a>
         </div>
     </section>

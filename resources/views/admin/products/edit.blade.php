@@ -97,8 +97,14 @@
                 </label>
 
                 <div class="flex flex-wrap items-end gap-2">
-                    <button class="btn-footer h-12">Save Product</button>
-                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary h-12">Cancel</a>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="save" class="h-4 w-4" />
+                        <span>Save Product</span>
+                    </button>
+                    <a href="{{ route('admin.products.index') }}" class="btn-footer-secondary h-12">
+                        <x-ui.icon name="x" class="h-4 w-4" />
+                        <span>Cancel</span>
+                    </a>
                 </div>
             </form>
         </section>
@@ -125,7 +131,10 @@
                 </label>
 
                 <div>
-                    <button class="btn-footer h-12">Save Important Note</button>
+                    <button class="btn-footer h-12">
+                        <x-ui.icon name="save" class="h-4 w-4" />
+                        <span>Save Important Note</span>
+                    </button>
                 </div>
             </form>
         </section>
@@ -155,7 +164,10 @@
                                     data-confirm="Delete this package?">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="order-action order-action-danger">Delete</button>
+                                    <button class="order-action order-action-danger">
+                                        <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                        <span>Delete</span>
+                                    </button>
                                 </form>
                             @else
                                 <span class="text-xs text-gray-500">Locked by stock/order history</span>
@@ -194,7 +206,10 @@
                                     min="0" max="999999.9999" step="0.0001" class="search-bar w-full">
                             </label>
 
-                            <button class="btn-footer h-12">Save</button>
+                            <button class="btn-footer h-12">
+                                <x-ui.icon name="save" class="h-4 w-4" />
+                                <span>Save</span>
+                            </button>
                         </form>
                     </div>
                 @empty
@@ -238,7 +253,10 @@
                         min="0" max="999999.9999" step="0.0001" class="search-bar w-full" placeholder="15">
                 </label>
 
-                <button class="btn-footer h-12">Add Package</button>
+                <button class="btn-footer h-12">
+                    <x-ui.icon name="package-plus" class="h-4 w-4" />
+                    <span>Add Package</span>
+                </button>
             </form>
         </section>
 
@@ -258,7 +276,8 @@
                     @method('DELETE')
                     <button class="order-action order-action-danger {{ $canDeleteProduct ? '' : 'cursor-not-allowed opacity-50' }}"
                         @disabled(! $canDeleteProduct)>
-                        Delete Product
+                        <x-ui.icon name="trash-2" class="h-4 w-4" />
+                        <span>Delete Product</span>
                     </button>
                 </form>
             </div>
