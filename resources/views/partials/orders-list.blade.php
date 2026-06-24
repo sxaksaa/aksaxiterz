@@ -2,7 +2,7 @@
     $now = now();
 @endphp
 
-<div class="space-y-4 md:hidden">
+<div class="space-y-4 lg:hidden">
     @forelse ($orders as $order)
         @php
             $orderDate = $order->created_at?->timezone(config('app.timezone'));
@@ -281,7 +281,7 @@
     @endforelse
 </div>
 
-<div class="orders-table-wrap hidden md:block">
+<div class="orders-table-wrap hidden lg:block">
     <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
         <div>
             <h2 class="text-sm font-semibold text-white">Recent Orders</h2>

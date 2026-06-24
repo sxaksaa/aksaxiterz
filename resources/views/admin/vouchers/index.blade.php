@@ -370,7 +370,7 @@
             </form>
         </section>
 
-        <div class="orders-table-wrap hidden md:block">
+        <div class="orders-table-wrap hidden lg:block">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1120px] text-sm">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
@@ -448,7 +448,7 @@
             </div>
         </div>
 
-        <div class="space-y-4 md:hidden">
+        <div class="space-y-4 lg:hidden">
             @forelse ($vouchers as $voucher)
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">

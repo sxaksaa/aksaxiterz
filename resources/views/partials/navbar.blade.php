@@ -4,7 +4,7 @@ bg-[#111115]/80 backdrop-blur-md
 border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
 
-    <div class="page-shell grid grid-cols-[auto_1fr_auto] items-center py-4 md:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
+    <div class="page-shell grid grid-cols-[auto_1fr_auto] items-center py-4 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
         <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
@@ -14,7 +14,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
         </a>
 
         <!-- MENU DESKTOP -->
-        <div id="navMenu" class="relative hidden justify-self-center md:flex gap-8 lg:gap-10 text-sm">
+        <div id="navMenu" class="relative hidden justify-self-center gap-8 text-sm 2xl:gap-10 xl:flex">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
                 <x-ui.icon name="box" class="nav-icon" />
@@ -71,7 +71,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
             </a>
 
             <!-- MOBILE MENU BUTTON -->
-            <button id="menuBtn" type="button" data-mobile-menu-toggle class="inline-flex items-center gap-2 p-2 text-sm text-white md:hidden">
+            <button id="menuBtn" type="button" data-mobile-menu-toggle class="inline-flex items-center gap-2 p-2 text-sm text-white xl:hidden">
                 <x-ui.icon name="menu" class="h-5 w-5 text-[#C084FC]" />
                 <span data-button-label>Menu</span>
             </button>
@@ -79,7 +79,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
             <!-- DESKTOP PROFILE -->
             @auth
                 @php $user = auth()->user(); @endphp
-                <div class="relative hidden md:block">
+                <div class="relative hidden xl:block">
 
                     <button type="button" data-profile-toggle
                         class="flex items-center gap-2 text-gray-300 hover:text-white transition">
@@ -163,7 +163,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
                 </div>
             @else
-                <a href="/auth/google" class="hidden items-center gap-2 text-gray-400 transition hover:text-white md:inline-flex">
+                <a href="/auth/google" class="hidden items-center gap-2 text-gray-400 transition hover:text-white xl:inline-flex">
                     <x-ui.icon name="log-in" class="h-4 w-4 text-[#C084FC]" />
                     <span>Login</span>
                 </a>
@@ -177,8 +177,8 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 </nav>
 
 <div id="mobileMenu"
-    class="md:hidden fixed top-[64px] left-0 w-full 
-    bg-[#111115]/95 border-b border-[#27272A] 
+    class="xl:hidden fixed top-[64px] left-0 w-full
+    bg-[#111115]/95 border-b border-[#27272A]
     px-6 py-4 z-40
     max-h-[calc(100vh-64px)] overflow-y-auto
 

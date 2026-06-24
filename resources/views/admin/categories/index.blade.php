@@ -123,7 +123,7 @@
             </form>
         </section>
 
-        <div class="orders-table-wrap hidden md:block">
+        <div class="orders-table-wrap hidden lg:block">
             <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
                 <div>
                     <h2 class="text-sm font-semibold text-white">Category Records</h2>
@@ -192,7 +192,7 @@
             </div>
         </div>
 
-        <div class="space-y-4 md:hidden">
+        <div class="space-y-4 lg:hidden">
             @forelse ($categories as $category)
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">

@@ -76,7 +76,7 @@
                 </span>
             </div>
 
-            <div class="hidden overflow-x-auto md:block">
+            <div class="hidden overflow-x-auto lg:block">
                 <table class="w-full min-w-[980px] text-sm">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
                         <tr>
@@ -134,7 +134,7 @@
                 </table>
             </div>
 
-            <div class="space-y-4 md:hidden">
+            <div class="space-y-4 lg:hidden">
                 @forelse ($orders as $order)
                     <article class="order-mobile-card motion-card">
                         <div class="flex items-start justify-between gap-3">
@@ -178,7 +178,7 @@
                 </span>
             </div>
 
-            <div class="hidden overflow-x-auto md:block">
+            <div class="hidden overflow-x-auto lg:block">
                 <table class="w-full min-w-[860px] text-sm">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
                         <tr>
@@ -219,7 +219,7 @@
                 </table>
             </div>
 
-            <div class="space-y-4 md:hidden">
+            <div class="space-y-4 lg:hidden">
                 @forelse ($licenses as $license)
                     <article class="order-mobile-card motion-card">
                         <div class="font-semibold text-white">{{ $license->product->name ?? '-' }}</div>
