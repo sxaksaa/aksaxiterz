@@ -738,6 +738,57 @@
         transform: translateY(-2px);
     }
 
+    .home-flow {
+        @apply rounded-xl border p-4 md:p-5;
+        background: rgba(21, 21, 27, 0.72);
+        border-color: rgba(63, 63, 70, 0.9);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+    }
+
+    .home-flow-grid {
+        @apply mt-5 grid gap-3 md:grid-cols-3;
+    }
+
+    .home-flow-step {
+        @apply relative flex min-w-0 gap-3 rounded-xl border p-4;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(147, 51, 234, 0.22);
+    }
+
+    .home-flow-step::after {
+        content: "";
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        width: 3.4rem;
+        height: 3.4rem;
+        border-radius: 999px;
+        background: rgba(147, 51, 234, 0.1);
+        filter: blur(18px);
+        opacity: 0.75;
+        pointer-events: none;
+    }
+
+    .home-flow-icon {
+        @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg;
+        background: rgba(147, 51, 234, 0.16);
+        border: 1px solid rgba(192, 132, 252, 0.3);
+        color: #d8b4fe;
+    }
+
+    .home-flow-index {
+        @apply absolute right-4 top-4 text-xs font-bold;
+        color: rgba(192, 132, 252, 0.42);
+    }
+
+    .home-flow-step h3 {
+        @apply pr-10 text-sm font-semibold text-white;
+    }
+
+    .home-flow-step p {
+        @apply mt-1 text-sm leading-6 text-gray-400;
+    }
+
     .home-stat {
         @apply rounded-xl border px-4 py-3 transition;
         background: rgba(21, 21, 27, 0.72);
@@ -808,33 +859,6 @@
 
     .product-hero-pill {
         background: rgba(9, 9, 12, 0.34);
-    }
-
-    .product-meta-grid {
-        display: grid;
-        grid-template-columns: repeat(1, minmax(0, 1fr));
-        gap: 0.6rem;
-    }
-
-    .product-meta-card {
-        display: flex;
-        min-width: 0;
-        align-items: center;
-        gap: 0.55rem;
-        border: 1px solid rgba(147, 51, 234, 0.22);
-        border-radius: 0.75rem;
-        background: rgba(9, 9, 12, 0.28);
-        padding: 0.7rem 0.8rem;
-        color: #d4d4d8;
-        font-size: 0.78rem;
-        font-weight: 600;
-    }
-
-    .product-meta-card span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     .product-section {
@@ -2225,12 +2249,6 @@
 
     .motion-card:nth-child(n + 6) {
         animation-delay: 0.25s;
-    }
-
-    @media (min-width: 640px) {
-        .product-meta-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
     }
 
     @media (max-width: 639px) {

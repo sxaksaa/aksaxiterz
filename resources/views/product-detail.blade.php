@@ -28,6 +28,9 @@
             'android' => 'android',
             default => 'box',
         };
+        $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
+            ? 'product-status-badge-updating'
+            : 'product-status-badge-ready';
         $startDurationDays = $minPackage?->durationDays();
         $startDurationLabel = $startDurationDays
             ? $startDurationDays . ' ' . \Illuminate\Support\Str::plural('day', $startDurationDays) . ' access'
@@ -68,24 +71,12 @@
                                 <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
                                 <span>{{ $categoryName }}</span>
                             </span>
+                            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                                {{ $product->status_label }}
+                            </span>
                         </div>
                         <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">{{ $product->description }}</p>
-                    </div>
-
-                    <div class="product-meta-grid">
-                        <div class="product-meta-card">
-                            <x-ui.icon name="shield-check" class="h-4 w-4 text-[#C084FC]" />
-                            <span>Secure checkout</span>
-                        </div>
-                        <div class="product-meta-card">
-                            <x-ui.icon name="key-round" class="h-4 w-4 text-[#C084FC]" />
-                            <span>Instant delivery</span>
-                        </div>
-                        <div class="product-meta-card">
-                            <x-ui.icon name="discord" class="h-4 w-4 text-[#C084FC]" />
-                            <span>Discord support</span>
-                        </div>
                     </div>
                 </div>
 
@@ -384,7 +375,7 @@
 
                     <p class="package-availability {{ $packageStock > 0 ? 'package-availability-ready' : 'package-availability-manual' }}">
                         <span class="package-availability-dot" aria-hidden="true"></span>
-                        {{ $packageStock > 0 ? $packageStock . ' licenses ready · Instant delivery' : 'Manual order via Discord' }}
+                        {{ $packageStock > 0 ? $packageStock . ' licenses ready' : 'Manual order via Discord' }}
                     </p>
 
                     @if ($packageStock <= 0)

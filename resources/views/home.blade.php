@@ -37,6 +37,52 @@
         </div>
     </section>
 
+    <section class="page-shell pb-6 md:pb-10">
+        <div class="home-flow fade-up">
+            <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">How it works</p>
+                    <h2 class="mt-1 text-2xl font-semibold text-white">Checkout in three steps</h2>
+                </div>
+            </div>
+
+            <div class="home-flow-grid">
+                <div class="home-flow-step">
+                    <span class="home-flow-index">01</span>
+                    <span class="home-flow-icon">
+                        <x-ui.icon name="shopping-cart" class="h-4 w-4" />
+                    </span>
+                    <div>
+                        <h3>Choose package</h3>
+                        <p>Select the product and duration that fits your setup.</p>
+                    </div>
+                </div>
+
+                <div class="home-flow-step">
+                    <span class="home-flow-index">02</span>
+                    <span class="home-flow-icon">
+                        <x-ui.icon name="credit-card" class="h-4 w-4" />
+                    </span>
+                    <div>
+                        <h3>Complete payment</h3>
+                        <p>Use QRIS, Binance Pay, or supported crypto checkout.</p>
+                    </div>
+                </div>
+
+                <div class="home-flow-step">
+                    <span class="home-flow-index">03</span>
+                    <span class="home-flow-icon">
+                        <x-ui.icon name="key-round" class="h-4 w-4" />
+                    </span>
+                    <div>
+                        <h3>Open license</h3>
+                        <p>Paid orders appear in Licenses after confirmation.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section id="products" class="page-shell pb-6 md:pb-10">
         @php
             $active = request('category');
