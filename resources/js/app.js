@@ -1035,7 +1035,7 @@ function initializeRecentPurchaseToast(root = document) {
     const timers = new Set();
     const closeButton = toast.querySelector('[data-recent-purchase-close]');
     let closed = false;
-    let index = Math.floor(Date.now() / 60000) % purchases.length;
+    let index = 0;
 
     const setTimer = (handler, delay) => {
         const timer = window.setTimeout(() => {
