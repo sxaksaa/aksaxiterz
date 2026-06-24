@@ -107,6 +107,11 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
                         @if ($user->isAdmin())
                             <div class="border-b border-[#27272A]">
+                                <a href="{{ route('admin.dashboard') }}"
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="home" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Dashboard</span>
+                                </a>
                                 <a href="{{ route('admin.products.index') }}"
                                     class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     <x-ui.icon name="boxes" class="h-4 w-4 text-[#C084FC]" />
@@ -210,6 +215,10 @@ transition-all duration-300 ease-out">
                 <span>Licenses</span>
             </a>
             @if (auth()->user()?->isAdmin())
+                <a href="{{ route('admin.dashboard') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="home" class="nav-icon" />
+                    <span>Admin Dashboard</span>
+                </a>
                 <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="boxes" class="nav-icon" />
                     <span>Admin Catalog</span>
@@ -295,93 +304,3 @@ transition-all duration-300 ease-out">
 </div>
 
 <div class="h-20"></div>
-
-<script nonce="{{ request()->attributes->get('csp_nonce') }}">
-    let mobileOpen = false;
-
-    function setNavButtonLabel(button, label) {
-        const labelTarget = button?.querySelector('[data-button-label]');
-
-        if (labelTarget) {
-            labelTarget.textContent = label;
-            return;
-        }
-
-        if (button) {
-            button.innerText = label;
-        }
-    }
-
-    function openMobileMenu() {
-        const menu = document.getElementById('mobileMenu');
-        const btn = document.getElementById('menuBtn');
-
-        if (!menu || !btn) return;
-
-        mobileOpen = true;
-        menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
-        menu.classList.add('opacity-100', 'translate-y-0');
-        setNavButtonLabel(btn, 'Close');
-    }
-
-    function closeMobileMenu() {
-        const menu = document.getElementById('mobileMenu');
-        const btn = document.getElementById('menuBtn');
-
-        if (!menu || !btn) return;
-
-        mobileOpen = false;
-        menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
-        menu.classList.remove('opacity-100', 'translate-y-0');
-        setNavButtonLabel(btn, 'Menu');
-    }
-
-    document.querySelector('[data-mobile-menu-toggle]')?.addEventListener('click', (event) => {
-        event.stopPropagation();
-
-        if (mobileOpen) {
-            closeMobileMenu();
-            return;
-        }
-
-        openMobileMenu();
-    });
-
-    document.querySelectorAll('[data-mobile-menu-link]').forEach((link) => {
-        link.addEventListener('click', closeMobileMenu);
-    });
-
-    /* CLICK OUTSIDE */
-    window.addEventListener('click', function(e) {
-
-        const menu = document.getElementById('mobileMenu');
-        const button = document.getElementById('menuBtn');
-
-        if (!menu.contains(e.target) && !button.contains(e.target)) {
-
-            closeMobileMenu();
-        }
-    });
-
-    /* DROPDOWN PROFILE */
-    document.querySelector('[data-profile-toggle]')?.addEventListener('click', (event) => {
-        event.stopPropagation();
-        document.getElementById('dropdown')?.classList.toggle('hidden');
-    });
-
-    /* HIDE NAVBAR ON SCROLL */
-    let lastScroll = 0;
-    const navbar = document.getElementById("navbar");
-
-    window.addEventListener("scroll", () => {
-        const currentScroll = window.pageYOffset;
-
-        if (currentScroll > lastScroll && currentScroll > 50) {
-            navbar.classList.add('nav-hidden');
-        } else {
-            navbar.classList.remove('nav-hidden');
-        }
-
-        lastScroll = currentScroll;
-    });
-</script>

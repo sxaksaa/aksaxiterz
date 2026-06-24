@@ -1044,11 +1044,624 @@ window.refreshAksaCustomSelects = function() {
     document.querySelectorAll('select[data-aksa-select-enhanced]').forEach((select) => refreshCustomSelect(select));
 };
 
+window.initializeAksaPageEnhancements = function(root = document) {
+    initializeCustomSelects(root);
+};
+
+let mobileMenuOpen = false;
+let lastNavbarScroll = window.pageYOffset || 0;
+let activeSoftNavigation = null;
+let activePageScriptCleanup = null;
+
+function navButton() {
+    return document.getElementById('menuBtn');
+}
+
+function mobileMenu() {
+    return document.getElementById('mobileMenu');
+}
+
+function setNavButtonLabel(button, label) {
+    setButtonLabel(button, label);
+}
+
+function openMobileMenu() {
+    const menu = mobileMenu();
+    const button = navButton();
+
+    if (!menu || !button) return;
+
+    mobileMenuOpen = true;
+    menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
+    menu.classList.add('opacity-100', 'translate-y-0');
+    setNavButtonLabel(button, 'Close');
+}
+
+function closeMobileMenu() {
+    const menu = mobileMenu();
+    const button = navButton();
+
+    if (!menu || !button) return;
+
+    mobileMenuOpen = false;
+    menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
+    menu.classList.remove('opacity-100', 'translate-y-0');
+    setNavButtonLabel(button, 'Menu');
+}
+
+function toggleProfileDropdown() {
+    document.getElementById('dropdown')?.classList.toggle('hidden');
+}
+
+function closeProfileDropdown() {
+    document.getElementById('dropdown')?.classList.add('hidden');
+}
+
+function updateNavbarOnScroll() {
+    const navbar = document.getElementById('navbar');
+
+    if (!navbar) return;
+
+    const currentScroll = window.pageYOffset;
+    navbar.classList.toggle('nav-hidden', currentScroll > lastNavbarScroll && currentScroll > 50);
+    lastNavbarScroll = currentScroll;
+}
+
+function pageContentShell() {
+    return document.querySelector('[data-aksa-page-content]');
+}
+
+function samePageHashNavigation(url) {
+    return url.origin === window.location.origin
+        && url.pathname === window.location.pathname
+        && url.search === window.location.search
+        && url.hash
+        && url.hash !== window.location.hash;
+}
+
+function shouldSoftNavigateLink(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if (link.dataset.noSoftNav !== undefined || link.closest('[data-no-soft-nav]')) return false;
+    if (link.hasAttribute('download')) return false;
+
+    const target = (link.getAttribute('target') || '').toLowerCase();
+
+    if (target && target !== '_self') return false;
+
+    const rawHref = link.getAttribute('href');
+
+    if (!rawHref || rawHref === '#' || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) return false;
+
+    const url = new URL(rawHref, window.location.href);
+
+    if (url.origin !== window.location.origin) return false;
+    if (samePageHashNavigation(url)) return false;
+    if (url.href === window.location.href) return false;
+
+    return ![
+        '/auth/',
+        '/logout',
+        '/process-order/',
+        '/pay-crypto/',
+        '/pay-binance/',
+        '/sync-',
+        '/cancel-order/',
+        '/pakasir-callback',
+    ].some((blockedPath) => url.pathname.startsWith(blockedPath));
+}
+
+function shouldSoftNavigateForm(form, event) {
+    if (!form || event.defaultPrevented) return false;
+    if (form.dataset.noSoftNav !== undefined || form.closest('[data-no-soft-nav]')) return false;
+
+    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+
+    return method === 'GET';
+}
+
+function formNavigationUrl(form, submitter = null) {
+    const url = new URL(form.getAttribute('action') || window.location.href, window.location.href);
+    const formData = new FormData(form);
+
+    if (submitter?.name && !formData.has(submitter.name)) {
+        formData.append(submitter.name, submitter.value || '');
+    }
+
+    url.search = '';
+    formData.forEach((value, key) => {
+        if (value instanceof File || value === '') return;
+        url.searchParams.append(key, value);
+    });
+
+    return url.href;
+}
+
+function withCleanupSignal(options, signal) {
+    if (options === undefined) return { signal };
+    if (typeof options === 'boolean') return { capture: options, signal };
+
+    return {
+        ...options,
+        signal,
+    };
+}
+
+function createTrackedPageRuntime() {
+    const controller = new AbortController();
+    const intervals = new Set();
+    const timeouts = new Set();
+
+    const trackedSetInterval = (handler, timeout, ...args) => {
+        const id = window.setInterval(handler, timeout, ...args);
+        intervals.add(id);
+
+        return id;
+    };
+
+    const trackedClearInterval = (id) => {
+        intervals.delete(id);
+        window.clearInterval(id);
+    };
+
+    const trackedSetTimeout = (handler, timeout, ...args) => {
+        const id = window.setTimeout(() => {
+            timeouts.delete(id);
+            handler(...args);
+        }, timeout);
+        timeouts.add(id);
+
+        return id;
+    };
+
+    const trackedClearTimeout = (id) => {
+        timeouts.delete(id);
+        window.clearTimeout(id);
+    };
+
+    const trackedDocument = new Proxy(document, {
+        get(target, property) {
+            if (property === 'addEventListener') {
+                return (type, listener, options) => {
+                    if (type === 'DOMContentLoaded' && target.readyState !== 'loading') {
+                        trackedSetTimeout(() => listener.call(target, new Event('DOMContentLoaded')), 0);
+                        return undefined;
+                    }
+
+                    return target.addEventListener(type, listener, withCleanupSignal(options, controller.signal));
+                };
+            }
+
+            const value = target[property];
+
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+        set(target, property, value) {
+            target[property] = value;
+            return true;
+        },
+    });
+
+    const trackedWindow = new Proxy(window, {
+        get(target, property) {
+            if (property === 'addEventListener') {
+                return (type, listener, options) => target.addEventListener(
+                    type,
+                    listener,
+                    withCleanupSignal(options, controller.signal),
+                );
+            }
+
+            if (property === 'setInterval') return trackedSetInterval;
+            if (property === 'clearInterval') return trackedClearInterval;
+            if (property === 'setTimeout') return trackedSetTimeout;
+            if (property === 'clearTimeout') return trackedClearTimeout;
+
+            const value = target[property];
+
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+        set(target, property, value) {
+            target[property] = value;
+            return true;
+        },
+    });
+
+    return {
+        document: trackedDocument,
+        window: trackedWindow,
+        setInterval: trackedSetInterval,
+        clearInterval: trackedClearInterval,
+        setTimeout: trackedSetTimeout,
+        clearTimeout: trackedClearTimeout,
+        cleanup() {
+            controller.abort();
+            intervals.forEach((id) => window.clearInterval(id));
+            timeouts.forEach((id) => window.clearTimeout(id));
+            intervals.clear();
+            timeouts.clear();
+        },
+    };
+}
+
+function cleanupSoftPageScripts() {
+    activePageScriptCleanup?.();
+    activePageScriptCleanup = null;
+}
+
+function runnableScript(script) {
+    if (script.src) return false;
+
+    const type = (script.getAttribute('type') || 'text/javascript').toLowerCase();
+
+    return ['text/javascript', 'application/javascript', 'module'].includes(type);
+}
+
+function executeSoftPageScripts(nextDocument) {
+    cleanupSoftPageScripts();
+
+    const scripts = [...nextDocument.body.querySelectorAll('script')].filter(runnableScript);
+
+    if (scripts.length === 0) return;
+
+    const runtime = createTrackedPageRuntime();
+    activePageScriptCleanup = runtime.cleanup;
+
+    scripts.forEach((script) => {
+        const code = script.textContent?.trim();
+
+        if (!code) return;
+
+        const runner = new Function(
+            'window',
+            'document',
+            'setInterval',
+            'clearInterval',
+            'setTimeout',
+            'clearTimeout',
+            code,
+        );
+
+        runner(
+            runtime.window,
+            runtime.document,
+            runtime.setInterval,
+            runtime.clearInterval,
+            runtime.setTimeout,
+            runtime.clearTimeout,
+        );
+    });
+}
+
+function replaceOptionalShell(selector, nextDocument) {
+    const current = document.querySelector(selector);
+    const next = nextDocument.querySelector(selector);
+
+    if (current && next) {
+        current.replaceWith(next);
+    }
+}
+
+function updateDocumentMeta(nextDocument) {
+    document.title = nextDocument.title || document.title;
+
+    const currentCsrf = document.querySelector('meta[name="csrf-token"]');
+    const nextCsrf = nextDocument.querySelector('meta[name="csrf-token"]');
+
+    if (currentCsrf && nextCsrf) {
+        currentCsrf.setAttribute('content', nextCsrf.getAttribute('content') || '');
+    }
+}
+
+function scrollAfterSoftNavigation(url) {
+    if (url.hash) {
+        document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView({ block: 'start' });
+        return;
+    }
+
+    window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function dashboardChartPointFromEvent(event) {
+    const target = event.target;
+
+    return target instanceof Element ? target.closest('[data-chart-point]') : null;
+}
+
+function setDashboardChartTooltipText(tooltip, selector, value) {
+    const element = tooltip.querySelector(selector);
+
+    if (element) {
+        element.textContent = value || '-';
+    }
+}
+
+function dashboardChartPointPosition(point, frame) {
+    const svg = point.ownerSVGElement;
+    const matrix = svg?.getScreenCTM?.();
+    const x = Number(point.dataset.x);
+    const y = Number(point.dataset.y);
+
+    if (svg && matrix && Number.isFinite(x) && Number.isFinite(y)) {
+        const svgPoint = svg.createSVGPoint();
+        svgPoint.x = x;
+        svgPoint.y = y;
+
+        const screenPoint = svgPoint.matrixTransform(matrix);
+        const frameRect = frame.getBoundingClientRect();
+
+        return {
+            left: screenPoint.x - frameRect.left,
+            top: screenPoint.y - frameRect.top,
+        };
+    }
+
+    const pointRect = point.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+
+    return {
+        left: pointRect.left + (pointRect.width / 2) - frameRect.left,
+        top: pointRect.top + (pointRect.height / 2) - frameRect.top,
+    };
+}
+
+function showDashboardChartTooltip(point) {
+    const frame = point.closest('[data-dashboard-chart]');
+    const tooltip = frame?.querySelector('[data-dashboard-chart-tooltip]');
+
+    if (!frame || !tooltip) return;
+
+    setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-title]', point.dataset.label || point.dataset.shortLabel);
+    setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-orders]', point.dataset.orders);
+    setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-idr]', point.dataset.idr);
+    setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-crypto]', point.dataset.crypto);
+
+    tooltip.classList.remove('is-below');
+    tooltip.setAttribute('aria-hidden', 'false');
+
+    const frameRect = frame.getBoundingClientRect();
+    const position = dashboardChartPointPosition(point, frame);
+    const tooltipWidth = tooltip.offsetWidth || 192;
+    const tooltipHeight = tooltip.offsetHeight || 110;
+    const minLeft = Math.min((tooltipWidth / 2) + 12, Math.max(12, frameRect.width / 2));
+    const maxLeft = Math.max(minLeft, frameRect.width - (tooltipWidth / 2) - 12);
+    const left = Math.min(maxLeft, Math.max(minLeft, position.left));
+    const top = Math.max(16, position.top);
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.toggle('is-below', top < tooltipHeight + 18);
+    tooltip.classList.add('is-visible');
+
+    if (tooltip.id) {
+        point.setAttribute('aria-describedby', tooltip.id);
+    }
+}
+
+function hideDashboardChartTooltip(point = null) {
+    const frame = point?.closest('[data-dashboard-chart]') || document.querySelector('[data-dashboard-chart]');
+    const tooltip = frame?.querySelector('[data-dashboard-chart-tooltip]');
+
+    if (!tooltip) return;
+
+    tooltip.classList.remove('is-visible');
+    tooltip.setAttribute('aria-hidden', 'true');
+    point?.removeAttribute('aria-describedby');
+}
+
+async function softNavigate(url, options = {}) {
+    const nextUrl = new URL(url, window.location.href);
+    const currentContent = pageContentShell();
+
+    if (!currentContent) {
+        window.location.href = nextUrl.href;
+        return;
+    }
+
+    activeSoftNavigation?.abort();
+
+    const controller = new AbortController();
+    activeSoftNavigation = controller;
+    const pendingLink = options.pendingLink || null;
+
+    window.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
+    document.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
+    currentContent.classList.remove('aksa-soft-nav-entered');
+    document.body.classList.add('aksa-soft-nav-active');
+    currentContent.setAttribute('aria-busy', 'true');
+    pendingLink?.classList.add('is-soft-nav-pending');
+
+    try {
+        const response = await fetch(nextUrl.href, {
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'text/html',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            signal: controller.signal,
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!response.ok || !contentType.includes('text/html')) {
+            throw new Error(`Soft navigation failed (${response.status})`);
+        }
+
+        if (response.redirected && new URL(response.url).origin !== window.location.origin) {
+            window.location.href = nextUrl.href;
+            return;
+        }
+
+        const html = await response.text();
+        const nextDocument = new DOMParser().parseFromString(html, 'text/html');
+        const nextContent = nextDocument.querySelector('[data-aksa-page-content]');
+
+        if (!nextContent) {
+            window.location.href = nextUrl.href;
+            return;
+        }
+
+        replaceOptionalShell('[data-aksa-nav-shell]', nextDocument);
+        replaceOptionalShell('[data-aksa-footer-shell]', nextDocument);
+        currentContent.replaceWith(nextContent);
+        updateDocumentMeta(nextDocument);
+
+        if (options.pushHistory !== false) {
+            window.history.pushState({ aksaSoftNavigation: true }, '', nextUrl.href);
+        }
+
+        executeSoftPageScripts(nextDocument);
+        initializeCustomSelects(nextContent);
+        closeMobileMenu();
+        closeProfileDropdown();
+        scrollAfterSoftNavigation(nextUrl);
+
+        requestAnimationFrame(() => {
+            nextContent.classList.add('aksa-soft-nav-entered');
+            window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 260);
+        });
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+
+        window.location.href = nextUrl.href;
+    } finally {
+        if (activeSoftNavigation === controller) {
+            activeSoftNavigation = null;
+            document.body.classList.remove('aksa-soft-nav-active');
+            pageContentShell()?.removeAttribute('aria-busy');
+        }
+
+        pendingLink?.classList.remove('is-soft-nav-pending');
+    }
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => initializeCustomSelects());
 } else {
     initializeCustomSelects();
 }
+
+document.addEventListener('click', (event) => {
+    const mobileToggle = event.target.closest('[data-mobile-menu-toggle]');
+
+    if (mobileToggle) {
+        event.stopPropagation();
+        mobileMenuOpen ? closeMobileMenu() : openMobileMenu();
+        return;
+    }
+
+    if (event.target.closest('[data-mobile-menu-link]')) {
+        closeMobileMenu();
+    }
+
+    const profileToggle = event.target.closest('[data-profile-toggle]');
+
+    if (profileToggle) {
+        event.stopPropagation();
+        toggleProfileDropdown();
+        return;
+    }
+
+    const menu = mobileMenu();
+    const button = navButton();
+
+    if (menu && button && !menu.contains(event.target) && !button.contains(event.target)) {
+        closeMobileMenu();
+    }
+
+    if (!event.target.closest('#dropdown') && !event.target.closest('[data-profile-toggle]')) {
+        closeProfileDropdown();
+    }
+});
+
+window.addEventListener('scroll', updateNavbarOnScroll, { passive: true });
+
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+
+    if (!shouldSoftNavigateLink(link, event)) return;
+
+    event.preventDefault();
+    softNavigate(new URL(link.getAttribute('href'), window.location.href).href, {
+        pendingLink: link,
+    });
+});
+
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('form');
+
+    if (!shouldSoftNavigateForm(form, event)) return;
+
+    event.preventDefault();
+    softNavigate(formNavigationUrl(form, event.submitter));
+});
+
+window.addEventListener('popstate', () => {
+    softNavigate(window.location.href, {
+        pushHistory: false,
+    });
+});
+
+document.addEventListener('pointerover', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (point) {
+        showDashboardChartTooltip(point);
+    }
+});
+
+document.addEventListener('pointermove', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (point) {
+        showDashboardChartTooltip(point);
+    }
+});
+
+document.addEventListener('pointerout', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (!point) return;
+
+    const nextPoint = event.relatedTarget instanceof Element
+        ? event.relatedTarget.closest('[data-chart-point]')
+        : null;
+
+    if (nextPoint !== point) {
+        hideDashboardChartTooltip(point);
+    }
+});
+
+document.addEventListener('focusin', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (point) {
+        showDashboardChartTooltip(point);
+    }
+});
+
+document.addEventListener('focusout', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (point) {
+        hideDashboardChartTooltip(point);
+    }
+});
+
+document.addEventListener('click', (event) => {
+    const point = dashboardChartPointFromEvent(event);
+
+    if (point) {
+        showDashboardChartTooltip(point);
+        return;
+    }
+
+    if (!event.target.closest('[data-dashboard-chart]')) {
+        hideDashboardChartTooltip();
+    }
+});
+
+document.addEventListener('aksa:before-page-swap', () => hideDashboardChartTooltip());
 
 document.addEventListener('click', (event) => {
     if (!event.target.closest('.aksa-select')) {
@@ -1059,6 +1672,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         closeOtherCustomSelects();
+        hideDashboardChartTooltip();
     }
 });
 

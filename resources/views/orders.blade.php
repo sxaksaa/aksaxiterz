@@ -72,6 +72,22 @@
         let lastPolledStatus = null;
         let ordersRefreshing = false;
         let orderStatusPolling = false;
+        const ordersPageController = new AbortController();
+        const ordersPageTimers = [];
+
+        function trackOrdersInterval(callback, delay) {
+            const timer = setInterval(callback, delay);
+            ordersPageTimers.push(timer);
+
+            return timer;
+        }
+
+        window.addEventListener('aksa:before-page-swap', () => {
+            ordersPageController.abort();
+            ordersPageTimers.forEach((timer) => clearInterval(timer));
+        }, {
+            once: true
+        });
 
         function setButtonLabel(button, label) {
             const labelTarget = button?.querySelector('[data-button-label]');
@@ -367,6 +383,8 @@
                     button.classList.remove('opacity-60', 'pointer-events-none');
                 }
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('click', async function(e) {
@@ -388,6 +406,8 @@
             if (!opened && checkout?.payment_url) {
                 openHostedPayment(checkout.payment_url);
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('click', async function(e) {
@@ -411,6 +431,8 @@
             if (!opened && checkout?.payment_url) {
                 openHostedPayment(checkout.payment_url);
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('click', async function(e) {
@@ -430,6 +452,8 @@
             await window.openAksaBinancePayModal?.(checkout, {
                 startPolling: true,
             });
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('click', async function(e) {
@@ -450,6 +474,8 @@
                     variant: 'error',
                 });
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('submit', async function(e) {
@@ -497,6 +523,8 @@
                 setButtonLabel(button, originalText || 'Check Payment');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('submit', async function(e) {
@@ -550,6 +578,8 @@
                 setButtonLabel(button, originalText || 'Verify');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('submit', async function(e) {
@@ -601,6 +631,8 @@
                 setButtonLabel(button, originalText || 'Check Payment');
                 button.classList.remove('opacity-60', 'pointer-events-none');
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
         document.addEventListener('submit', async function(e) {
@@ -638,9 +670,11 @@
                     button.classList.remove('opacity-60', 'pointer-events-none');
                 }
             }
+        }, {
+            signal: ordersPageController.signal
         });
 
-        setInterval(async () => {
+        trackOrdersInterval(async () => {
             if (orderStatusPolling || document.hidden) return;
 
             orderStatusPolling = true;
@@ -768,15 +802,19 @@
             });
         }
 
-        setInterval(updateCountdowns, 1000);
+        trackOrdersInterval(updateCountdowns, 1000);
 
         document.addEventListener('DOMContentLoaded', function() {
             showPaymentNoticeFromQuery();
             updateCountdowns();
+        }, {
+            signal: ordersPageController.signal
         });
 
         window.addEventListener('pageshow', function() {
             refreshOrders();
+        }, {
+            signal: ordersPageController.signal
         });
     </script>
 @endsection

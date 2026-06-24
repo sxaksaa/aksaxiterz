@@ -15,11 +15,17 @@
 
 <body class="text-white antialiased">
 
-    @include('partials.navbar')
+    <div data-aksa-nav-shell>
+        @include('partials.navbar')
+    </div>
 
-    @yield('content')
+    <main id="aksaPageContent" data-aksa-page-content>
+        @yield('content')
+    </main>
 
-    @include('partials.footer')
+    <div data-aksa-footer-shell>
+        @include('partials.footer')
+    </div>
 
     <div id="appToast" class="app-toast" data-variant="info" role="status" aria-live="polite">
         <div id="appToastTitle" class="app-toast-title">Notice</div>

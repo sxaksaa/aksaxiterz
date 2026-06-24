@@ -5,6 +5,11 @@
         $discordUrl = config('links.discord_url');
         $licenseCount = $licenses->count();
         $latestLicense = $licenses->first();
+        $orderStats = $orderStats ?? [
+            'total' => 0,
+            'paid' => 0,
+            'pending' => 0,
+        ];
         $selectedOrderId = request()->query('order');
         $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
         $renderedOrderAnchors = [];
@@ -23,10 +28,18 @@
                     </p>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 md:min-w-72">
+                <div class="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
                     <div class="license-stat">
                         <div class="text-xl font-semibold text-white">{{ $licenseCount }}</div>
                         <div class="mt-1 text-xs text-gray-400">Active licenses</div>
+                    </div>
+                    <div class="license-stat">
+                        <div class="text-xl font-semibold text-white">{{ $orderStats['paid'] }}</div>
+                        <div class="mt-1 text-xs text-gray-400">Paid orders</div>
+                    </div>
+                    <div class="license-stat">
+                        <div class="text-xl font-semibold text-white">{{ $orderStats['pending'] }}</div>
+                        <div class="mt-1 text-xs text-gray-400">Pending orders</div>
                     </div>
                     <div class="license-stat">
                         <div class="text-xl font-semibold text-white">

@@ -502,6 +502,14 @@
 
 @push('scripts')
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
+        const voucherAdminPageController = new AbortController();
+
+        window.addEventListener('aksa:before-page-swap', () => {
+            voucherAdminPageController.abort();
+        }, {
+            once: true
+        });
+
         document.querySelectorAll('[data-datetime-picker]').forEach((picker) => {
             const valueInput = picker.querySelector('[data-datetime-value]');
             const toggle = picker.querySelector('[data-datetime-toggle]');
@@ -690,6 +698,8 @@
                 if (!picker.contains(event.target)) {
                     close();
                 }
+            }, {
+                signal: voucherAdminPageController.signal
             });
             picker.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
@@ -747,6 +757,8 @@
                 if (!picker.contains(event.target)) {
                     close();
                 }
+            }, {
+                signal: voucherAdminPageController.signal
             });
 
             picker.addEventListener('keydown', (event) => {
@@ -808,6 +820,8 @@
                 if (!picker.contains(event.target)) {
                     close();
                 }
+            }, {
+                signal: voucherAdminPageController.signal
             });
 
             picker.addEventListener('keydown', (event) => {

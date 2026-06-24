@@ -376,9 +376,9 @@
                         </div>
                         @if (($saving['per_day'] ?? null) !== null)
                             <span class="package-per-day" data-currency-text
-                                data-idr="Rp {{ number_format($saving['per_day']) }}/day"
-                                data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }}/day">
-                                Rp {{ number_format($saving['per_day']) }}/day
+                                data-idr="Rp {{ number_format($saving['per_day']) }} per day"
+                                data-usd="{{ $formatUsdCompact($saving['per_day_usdt']) }} per day">
+                                Rp {{ number_format($saving['per_day']) }} per day
                             </span>
                         @endif
                     </div>
@@ -562,12 +562,20 @@
         let appliedVoucherCode = null;
         let voucherRequestSequence = 0;
         let networkDropdownOpen = false;
+        const productDetailPageController = new AbortController();
         const hasStock = @json($stock > 0);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const addToCartUrl = @json(route('cart.items.store', $product, false));
+
+        window.addEventListener('aksa:before-page-swap', () => {
+            productDetailPageController.abort();
+        }, {
+            once: true
+        });
+
         function usesStablecoinPrice(method = selectedPayment) {
             return method === 'crypto' || method === 'binance_pay';
         }
@@ -1139,6 +1147,8 @@
             if (!e.target.closest('#cryptoBox')) {
                 closeNetworkDropdown();
             }
+        }, {
+            signal: productDetailPageController.signal
         });
 
 
@@ -1458,6 +1468,8 @@
                 setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay')
                 btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             }
+        }, {
+            signal: productDetailPageController.signal
         });
     </script>
 @endsection

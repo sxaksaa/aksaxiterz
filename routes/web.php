@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DownloadController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
@@ -286,10 +287,17 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:30,1');
 
     // License
-    Route::get('/licenses', function () {
-        $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
+    Route::get('/licenses', function (PendingOrderExpirationService $pendingOrderExpirationService) {
+        $pendingOrderExpirationService->expire((int) auth()->id());
 
-        return view('licenses', compact('licenses'));
+        $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
+        $orderStats = [
+            'total' => Order::where('user_id', auth()->id())->count(),
+            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
+            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
+        ];
+
+        return view('licenses', compact('licenses', 'orderStats'));
     });
 
     // Orders
@@ -330,7 +338,7 @@ Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('/', fn () => redirect()->route('admin.license-stocks.index'))->name('dashboard');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/license-stocks', [LicenseStockController::class, 'index'])->name('license-stocks.index');
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');

@@ -32,7 +32,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['total'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Total keys</div>
@@ -49,10 +49,6 @@
                     <div class="text-xl font-semibold text-white">{{ $stats['sold'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Sold</div>
                 </div>
-                <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $stats['low_stock'] }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Low stock packages</div>
-                </div>
             </div>
         </section>
 
@@ -66,33 +62,6 @@
             <div class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 {{ $errors->first() }}
             </div>
-        @endif
-
-        @if ($lowStockPackages->isNotEmpty())
-            <section class="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h2 class="font-semibold text-amber-50">Low stock notice</h2>
-                        <p class="mt-1 text-xs text-amber-100/80">
-                            Packages with {{ $lowStockThreshold }} or fewer available keys need restocking.
-                        </p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2 lg:justify-end">
-                        @foreach ($lowStockPackages->take(6) as $package)
-                            <span class="rounded-lg border border-amber-300/30 bg-black/20 px-3 py-2 text-xs font-semibold">
-                                {{ $packageLabel($package) }}: {{ $package->available_license_stocks_count }} left
-                            </span>
-                        @endforeach
-
-                        @if ($lowStockPackages->count() > 6)
-                            <span class="rounded-lg border border-amber-300/30 bg-black/20 px-3 py-2 text-xs font-semibold">
-                                +{{ $lowStockPackages->count() - 6 }} more
-                            </span>
-                        @endif
-                    </div>
-                </div>
-            </section>
         @endif
 
         <section class="product-section mb-6 fade-up">
@@ -443,7 +412,6 @@
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('stockFilterForm');
-            const lowStockCount = @json($lowStockPackages->count());
             const syncPackageOptions = (productSelect, packageSelect, options = {}) => {
                 if (!productSelect || !packageSelect) return;
 
@@ -498,18 +466,6 @@
                     });
                 });
             });
-
-            if (lowStockCount > 0) {
-                window.setTimeout(() => {
-                    window.showAppToast?.(
-                        'Low stock',
-                        `${lowStockCount} package${lowStockCount === 1 ? '' : 's'} need restocking.`, {
-                            variant: 'warning',
-                            duration: 5000
-                        }
-                    );
-                }, 350);
-            }
 
             form?.addEventListener('submit', () => {
                 form.querySelector('input[name="page"]')?.remove();

@@ -33,22 +33,16 @@ class LicenseStockController extends Controller
 
         $products = Product::orderBy('name')->get();
         $packages = Package::with('product')
-            ->withCount('availableLicenseStocks')
             ->orderBy('product_id')
             ->orderBy('price')
             ->get();
         $editStock = $this->editableStock($request);
-        $lowStockThreshold = (int) config('admin.low_stock_threshold', 3);
-        $lowStockPackages = $packages
-            ->filter(fn ($package) => (int) $package->available_license_stocks_count <= $lowStockThreshold)
-            ->values();
 
         $stats = [
             'total' => LicenseStock::count(),
             'available' => LicenseStock::available()->count(),
             'reserved' => LicenseStock::reserved()->count(),
             'sold' => LicenseStock::where('is_sold', true)->count(),
-            'low_stock' => $lowStockPackages->count(),
         ];
 
         return view('admin.license-stocks.index', compact(
@@ -56,9 +50,7 @@ class LicenseStockController extends Controller
             'products',
             'packages',
             'editStock',
-            'stats',
-            'lowStockPackages',
-            'lowStockThreshold'
+            'stats'
         ));
     }
 
