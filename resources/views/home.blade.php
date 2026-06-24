@@ -98,6 +98,8 @@
         </div>
     </div>
 
+    @include('partials.recent-purchase-toast', ['recentPurchases' => $recentPurchases ?? collect()])
+
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
 

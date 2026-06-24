@@ -520,6 +520,7 @@
     @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
+    @include('partials.recent-purchase-toast', ['recentPurchases' => $recentPurchases ?? collect()])
 
     @php $paymentError = $errors->first('payment'); @endphp
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">

@@ -18,6 +18,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\PendingOrderExpirationService;
+use App\Support\RecentPurchaseFeed;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -70,8 +71,9 @@ Route::get('/', function (Request $request) {
     }
 
     $products = $query->get();
+    $recentPurchases = app(RecentPurchaseFeed::class)->storefront();
 
-    return view('home', compact('categories', 'products'));
+    return view('home', compact('categories', 'products', 'recentPurchases'));
 });
 
 $productsFragment = function (Request $request) {
@@ -190,7 +192,9 @@ Route::get('/product/{product}', function (string $product) {
         ->where('slug', $product)
         ->firstOrFail();
 
-    return view('product-detail', compact('product'));
+    $recentPurchases = app(RecentPurchaseFeed::class)->storefront($product);
+
+    return view('product-detail', compact('product', 'recentPurchases'));
 })->where('product', '[A-Za-z0-9-]+')->name('products.show');
 
 /*

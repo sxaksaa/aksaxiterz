@@ -6,6 +6,7 @@ let paymentSuccessCountdownTimer = null;
 let qrisExpiryCountdownTimer = null;
 let cryptoExpiryCountdownTimer = null;
 let binancePayExpiryCountdownTimer = null;
+let recentPurchaseToastCleanup = null;
 
 window.renderAksaQrCode = async function(target, value, options = {}) {
     const canvas = typeof target === 'string' ? document.querySelector(target) : target;
@@ -916,18 +917,23 @@ window.showAppToast = function(title, message = '', options = {}) {
 
     const variant = options.variant || 'info';
     const duration = Number(options.duration || 3400);
+    const redirectDelay = Number(options.redirectDelay || 900);
+    const visibleDuration = options.redirectAfter ? redirectDelay : duration;
 
     toast.dataset.variant = variant;
     toastTitle.innerText = title;
     toastMessage.innerText = message;
-    toast.classList.add('is-visible');
+    toast.style.setProperty('--app-toast-duration', `${visibleDuration}ms`);
+    toast.classList.remove('is-visible');
+    void toast.offsetWidth;
+    window.requestAnimationFrame(() => toast.classList.add('is-visible'));
 
     clearTimeout(appToastTimer);
 
     if (options.redirectAfter) {
         appToastTimer = setTimeout(() => {
             window.location.href = options.redirectAfter;
-        }, options.redirectDelay || 900);
+        }, redirectDelay);
         return;
     }
 
@@ -935,6 +941,147 @@ window.showAppToast = function(title, message = '', options = {}) {
         toast.classList.remove('is-visible');
     }, duration);
 };
+
+const RECENT_PURCHASE_SNOOZE_KEY = 'aksa_recent_purchase_snoozed_until';
+const RECENT_PURCHASE_VISIBLE_MS = 8200;
+const RECENT_PURCHASE_GAP_MS = 14500;
+const RECENT_PURCHASE_INITIAL_DELAY_MS = 1800;
+
+function clearRecentPurchaseToast() {
+    recentPurchaseToastCleanup?.();
+    recentPurchaseToastCleanup = null;
+}
+
+function recentPurchaseSnoozed() {
+    try {
+        return Number(window.localStorage.getItem(RECENT_PURCHASE_SNOOZE_KEY) || 0) > Date.now();
+    } catch (error) {
+        return false;
+    }
+}
+
+function snoozeRecentPurchaseToast() {
+    try {
+        window.localStorage.setItem(
+            RECENT_PURCHASE_SNOOZE_KEY,
+            String(Date.now() + (6 * 60 * 60 * 1000)),
+        );
+    } catch (error) {
+        // localStorage can be unavailable in private browsing; hiding still works for this page.
+    }
+}
+
+function parseRecentPurchaseData(toast) {
+    const template = toast?.querySelector('[data-recent-purchase-data]');
+    const raw = template?.innerHTML?.trim() || '[]';
+
+    try {
+        const purchases = JSON.parse(raw);
+
+        return Array.isArray(purchases)
+            ? purchases.filter((purchase) => purchase && purchase.product)
+            : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function setRecentPurchaseContent(toast, purchase) {
+    const buyer = toast.querySelector('[data-recent-purchase-buyer]');
+    const product = toast.querySelector('[data-recent-purchase-product]');
+    const packageName = toast.querySelector('[data-recent-purchase-package]');
+    const time = toast.querySelector('[data-recent-purchase-time]');
+    const quantity = Number(purchase.quantity || 1);
+    const packageLabel = quantity > 1
+        ? `${purchase.package || 'License'} x${quantity}`
+        : (purchase.package || 'License');
+
+    if (buyer) buyer.textContent = purchase.buyer || 'Customer';
+    if (product) product.textContent = purchase.product || 'Product';
+    if (packageName) packageName.textContent = packageLabel;
+    if (time) time.textContent = purchase.ago || 'recently';
+}
+
+function showRecentPurchaseToast(toast) {
+    toast.style.setProperty('--recent-purchase-duration', `${RECENT_PURCHASE_VISIBLE_MS}ms`);
+    toast.hidden = false;
+    toast.classList.remove('is-visible');
+    void toast.offsetWidth;
+    window.requestAnimationFrame(() => toast.classList.add('is-visible'));
+}
+
+function hideRecentPurchaseToast(toast) {
+    toast.classList.remove('is-visible');
+
+    window.setTimeout(() => {
+        if (!toast.classList.contains('is-visible')) {
+            toast.hidden = true;
+        }
+    }, 300);
+}
+
+function initializeRecentPurchaseToast(root = document) {
+    clearRecentPurchaseToast();
+
+    const toast = root.querySelector?.('[data-recent-purchase-toast]')
+        || document.querySelector('[data-recent-purchase-toast]');
+
+    if (!toast || recentPurchaseSnoozed()) return;
+
+    const purchases = parseRecentPurchaseData(toast);
+
+    if (purchases.length === 0) return;
+
+    const timers = new Set();
+    const closeButton = toast.querySelector('[data-recent-purchase-close]');
+    let closed = false;
+    let index = Math.floor(Date.now() / 60000) % purchases.length;
+
+    const setTimer = (handler, delay) => {
+        const timer = window.setTimeout(() => {
+            timers.delete(timer);
+            handler();
+        }, delay);
+        timers.add(timer);
+
+        return timer;
+    };
+
+    const clearTimers = () => {
+        timers.forEach((timer) => window.clearTimeout(timer));
+        timers.clear();
+    };
+
+    const cycle = () => {
+        if (closed) return;
+
+        setRecentPurchaseContent(toast, purchases[index]);
+        showRecentPurchaseToast(toast);
+
+        setTimer(() => {
+            hideRecentPurchaseToast(toast);
+            index = (index + 1) % purchases.length;
+            setTimer(cycle, RECENT_PURCHASE_GAP_MS);
+        }, RECENT_PURCHASE_VISIBLE_MS);
+    };
+
+    const close = () => {
+        closed = true;
+        snoozeRecentPurchaseToast();
+        clearTimers();
+        hideRecentPurchaseToast(toast);
+    };
+
+    closeButton?.addEventListener('click', close);
+    setTimer(cycle, RECENT_PURCHASE_INITIAL_DELAY_MS);
+
+    recentPurchaseToastCleanup = () => {
+        closed = true;
+        clearTimers();
+        closeButton?.removeEventListener('click', close);
+        toast.classList.remove('is-visible');
+    };
+}
 
 const customSelects = new WeakMap();
 
@@ -1604,6 +1751,7 @@ async function softNavigate(url, options = {}) {
 
         executeSoftPageScripts(nextDocument);
         initializeCustomSelects(nextContent);
+        initializeRecentPurchaseToast(nextContent);
         closeMobileMenu();
         closeProfileDropdown();
         scrollAfterSoftNavigation(nextUrl);
@@ -1627,10 +1775,15 @@ async function softNavigate(url, options = {}) {
     }
 }
 
+function initializeGlobalPageEnhancements(root = document) {
+    initializeCustomSelects(root);
+    initializeRecentPurchaseToast(root);
+}
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initializeCustomSelects());
+    document.addEventListener('DOMContentLoaded', () => initializeGlobalPageEnhancements());
 } else {
-    initializeCustomSelects();
+    initializeGlobalPageEnhancements();
 }
 
 document.addEventListener('click', (event) => {
@@ -1755,7 +1908,10 @@ document.addEventListener('click', (event) => {
     }
 });
 
-document.addEventListener('aksa:before-page-swap', () => hideDashboardChartTooltip());
+document.addEventListener('aksa:before-page-swap', () => {
+    hideDashboardChartTooltip();
+    clearRecentPurchaseToast();
+});
 
 document.addEventListener('click', (event) => {
     if (!event.target.closest('.aksa-select')) {

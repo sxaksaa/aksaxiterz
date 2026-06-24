@@ -1834,23 +1834,79 @@
     }
 
     .app-toast {
-        @apply fixed right-4 z-50 w-[calc(100vw-2rem)] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md transition-all duration-300 sm:right-6;
+        @apply fixed right-4 z-50 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md sm:right-6;
+        --app-toast-duration: 3400ms;
         bottom: 1.25rem;
-        transform: translateY(1rem);
+        isolation: isolate;
+        transform: translate3d(0.35rem, 0.85rem, 0) scale(0.97);
         opacity: 0;
         pointer-events: none;
-        background: rgba(21, 21, 27, 0.96);
+        background:
+            linear-gradient(135deg, rgba(37, 20, 54, 0.96), rgba(13, 13, 18, 0.96) 58%),
+            rgba(21, 21, 27, 0.96);
         border-color: rgba(147, 51, 234, 0.42);
         color: #d4d4d8;
         box-shadow:
-            0 20px 45px rgba(0, 0, 0, 0.34),
+            0 18px 42px rgba(0, 0, 0, 0.36),
             0 0 0 1px rgba(147, 51, 234, 0.1);
+        transition:
+            opacity 320ms ease,
+            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+            filter 320ms ease;
+        will-change: opacity, transform;
+    }
+
+    .app-toast::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        z-index: 0;
+        background:
+            linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.08) 38%, transparent 58%),
+            radial-gradient(circle at 92% 0%, rgba(192, 132, 252, 0.22), transparent 36%);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-35%);
+    }
+
+    .app-toast::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 2;
+        height: 2px;
+        background: linear-gradient(90deg, #7dd3fc, #c084fc, #f0abfc);
+        opacity: 0;
+        transform: scaleX(0);
+        transform-origin: left center;
+    }
+
+    .app-toast > * {
+        position: relative;
+        z-index: 1;
     }
 
     .app-toast.is-visible {
-        transform: translateY(0);
+        animation: appToastIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        transform: translate3d(0, 0, 0) scale(1);
         opacity: 1;
         pointer-events: auto;
+        filter: saturate(1.04);
+        box-shadow:
+            0 22px 52px rgba(0, 0, 0, 0.42),
+            0 0 0 1px rgba(192, 132, 252, 0.18),
+            0 0 34px rgba(147, 51, 234, 0.16);
+    }
+
+    .app-toast.is-visible::before {
+        animation: recentPurchaseSheen 980ms ease-out both;
+    }
+
+    .app-toast.is-visible::after {
+        animation: recentPurchaseProgress var(--app-toast-duration) linear forwards;
+        opacity: 0.9;
     }
 
     .app-toast-title {
@@ -1880,6 +1936,134 @@
 
     .app-toast[data-variant="error"] .app-toast-title {
         color: #fca5a5;
+    }
+
+    .recent-purchase-toast {
+        @apply fixed left-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm items-start gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md sm:left-6;
+        --recent-purchase-duration: 7600ms;
+        bottom: 1.25rem;
+        isolation: isolate;
+        transform: translate3d(-0.35rem, 0.85rem, 0) scale(0.97);
+        opacity: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(135deg, rgba(37, 20, 54, 0.96), rgba(13, 13, 18, 0.96) 58%),
+            rgba(21, 21, 27, 0.96);
+        border-color: rgba(192, 132, 252, 0.42);
+        color: #d4d4d8;
+        box-shadow:
+            0 18px 42px rgba(0, 0, 0, 0.36),
+            0 0 0 1px rgba(147, 51, 234, 0.1);
+        transition:
+            opacity 320ms ease,
+            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+            filter 320ms ease;
+        will-change: opacity, transform;
+    }
+
+    .recent-purchase-toast::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        z-index: 0;
+        background:
+            linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.08) 38%, transparent 58%),
+            radial-gradient(circle at 8% 0%, rgba(192, 132, 252, 0.22), transparent 36%);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-35%);
+    }
+
+    .recent-purchase-toast::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 2;
+        height: 2px;
+        background: linear-gradient(90deg, #7dd3fc, #c084fc, #f0abfc);
+        opacity: 0;
+        transform: scaleX(0);
+        transform-origin: left center;
+    }
+
+    .recent-purchase-toast > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .recent-purchase-toast.is-visible {
+        animation: recentPurchaseIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        opacity: 1;
+        pointer-events: auto;
+        filter: saturate(1.04);
+        transform: translate3d(0, 0, 0) scale(1);
+        box-shadow:
+            0 22px 52px rgba(0, 0, 0, 0.42),
+            0 0 0 1px rgba(192, 132, 252, 0.18),
+            0 0 34px rgba(147, 51, 234, 0.16);
+    }
+
+    .recent-purchase-toast.is-visible::before {
+        animation: recentPurchaseSheen 980ms ease-out both;
+    }
+
+    .recent-purchase-toast.is-visible::after {
+        animation: recentPurchaseProgress var(--recent-purchase-duration) linear forwards;
+        opacity: 0.9;
+    }
+
+    .recent-purchase-icon {
+        @apply mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg;
+        position: relative;
+        background: rgba(147, 51, 234, 0.18);
+        border: 1px solid rgba(192, 132, 252, 0.34);
+        color: #d8b4fe;
+    }
+
+    .recent-purchase-icon::after {
+        content: "";
+        position: absolute;
+        inset: 0.2rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(216, 180, 254, 0.46);
+        opacity: 0;
+        transform: scale(0.68);
+    }
+
+    .recent-purchase-toast.is-visible .recent-purchase-icon::after {
+        animation: recentPurchaseIconPing 1180ms ease-out 1;
+    }
+
+    .recent-purchase-eyebrow {
+        @apply text-[11px] font-semibold uppercase tracking-normal;
+        color: #c084fc;
+    }
+
+    .recent-purchase-title {
+        @apply mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs font-semibold text-gray-300;
+    }
+
+    .recent-purchase-title [data-recent-purchase-buyer] {
+        color: #ffffff;
+    }
+
+    .recent-purchase-product {
+        @apply mt-0.5 truncate text-sm font-bold text-white;
+    }
+
+    .recent-purchase-meta {
+        @apply mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-gray-400;
+    }
+
+    .recent-purchase-close {
+        @apply -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition hover:text-white;
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .recent-purchase-close:hover {
+        background: rgba(147, 51, 234, 0.16);
     }
 
     .price {
@@ -2137,6 +2321,78 @@
     100% {
         transform: translateX(100%);
         opacity: 0.2;
+    }
+}
+
+@keyframes recentPurchaseIn {
+    0% {
+        opacity: 0;
+        transform: translate3d(-0.45rem, 0.9rem, 0) scale(0.96);
+    }
+
+    62% {
+        opacity: 1;
+        transform: translate3d(0.08rem, -0.04rem, 0) scale(1.01);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes appToastIn {
+    0% {
+        opacity: 0;
+        transform: translate3d(0.45rem, 0.9rem, 0) scale(0.96);
+    }
+
+    62% {
+        opacity: 1;
+        transform: translate3d(-0.08rem, -0.04rem, 0) scale(1.01);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes recentPurchaseSheen {
+    0% {
+        opacity: 0;
+        transform: translateX(-45%);
+    }
+
+    42% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(42%);
+    }
+}
+
+@keyframes recentPurchaseProgress {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes recentPurchaseIconPing {
+    0% {
+        opacity: 0.8;
+        transform: scale(0.68);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.8);
     }
 }
 
