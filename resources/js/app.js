@@ -54,6 +54,81 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 
+function setCsrfToken(token) {
+    if (!token) return '';
+
+    let meta = document.querySelector('meta[name="csrf-token"]');
+
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'csrf-token');
+        document.head.appendChild(meta);
+    }
+
+    meta.setAttribute('content', token);
+    document.querySelectorAll('input[name="_token"]').forEach((input) => {
+        input.value = token;
+    });
+
+    return token;
+}
+
+async function refreshCsrfToken() {
+    const response = await fetch('/csrf-token', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('Your secure session expired. Refresh the page and try again.');
+    }
+
+    const data = await response.json().catch(() => ({}));
+    const token = data.token || '';
+
+    if (!token) {
+        throw new Error('Your secure session expired. Refresh the page and try again.');
+    }
+
+    return setCsrfToken(token);
+}
+
+window.aksaCsrfToken = csrfToken;
+window.setAksaCsrfToken = setCsrfToken;
+window.refreshAksaCsrfToken = refreshCsrfToken;
+
+window.aksaFetchWithCsrf = async function(url, options = {}) {
+    const requestOptions = {
+        ...options,
+        credentials: options.credentials || 'same-origin',
+    };
+    const requestHeaders = new Headers(requestOptions.headers || {});
+
+    requestHeaders.set('X-CSRF-TOKEN', csrfToken());
+    requestOptions.headers = requestHeaders;
+
+    let response = await fetch(url, requestOptions);
+
+    if (response.status !== 419) {
+        return response;
+    }
+
+    await refreshCsrfToken();
+    const retryHeaders = new Headers(options.headers || {});
+
+    retryHeaders.set('X-CSRF-TOKEN', csrfToken());
+
+    return fetch(url, {
+        ...options,
+        credentials: options.credentials || 'same-origin',
+        headers: retryHeaders,
+    });
+};
+
 function setButtonLabel(button, label) {
     const labelTarget = button?.querySelector('[data-button-label]');
 
@@ -124,12 +199,11 @@ function formatCryptoAmount(amount, token = 'USDT') {
 async function syncPakasirOrder(orderId) {
     if (!orderId) return null;
 
-    const response = await fetch(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
+    const response = await window.aksaFetchWithCsrf(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken(),
         },
     });
 
@@ -147,12 +221,11 @@ async function syncPakasirOrder(orderId) {
 async function syncCryptoOrder(orderId) {
     if (!orderId) return null;
 
-    const response = await fetch(`/sync-crypto-order/${encodeURIComponent(orderId)}`, {
+    const response = await window.aksaFetchWithCsrf(`/sync-crypto-order/${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken(),
         },
     });
 
@@ -170,12 +243,11 @@ async function syncCryptoOrder(orderId) {
 async function syncBinancePayOrder(orderId) {
     if (!orderId) return null;
 
-    const response = await fetch(`/sync-binance-pay-order/${encodeURIComponent(orderId)}`, {
+    const response = await window.aksaFetchWithCsrf(`/sync-binance-pay-order/${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken(),
         },
     });
 
@@ -1052,7 +1124,7 @@ let mobileMenuOpen = false;
 let lastNavbarScroll = window.pageYOffset || 0;
 let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
-const ENABLE_AKSA_SOFT_NAVIGATION = false;
+const ENABLE_AKSA_SAFE_SOFT_NAVIGATION = true;
 
 function navButton() {
     return document.getElementById('menuBtn');
@@ -1120,8 +1192,14 @@ function samePageHashNavigation(url) {
         && url.hash !== window.location.hash;
 }
 
+function linkAllowsSafeSoftNavigation(link, url) {
+    return link.dataset.dashboardRangeLink !== undefined
+        && window.location.pathname === '/admin'
+        && url.pathname === '/admin';
+}
+
 function shouldSoftNavigateLink(link, event) {
-    if (!ENABLE_AKSA_SOFT_NAVIGATION) return false;
+    if (!ENABLE_AKSA_SAFE_SOFT_NAVIGATION) return false;
     if (!link || event.defaultPrevented || event.button !== 0) return false;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
     if (link.dataset.noSoftNav !== undefined || link.closest('[data-no-soft-nav]')) return false;
@@ -1140,6 +1218,7 @@ function shouldSoftNavigateLink(link, event) {
     if (url.origin !== window.location.origin) return false;
     if (samePageHashNavigation(url)) return false;
     if (url.href === window.location.href) return false;
+    if (!linkAllowsSafeSoftNavigation(link, url)) return false;
 
     return ![
         '/auth/',
@@ -1154,9 +1233,10 @@ function shouldSoftNavigateLink(link, event) {
 }
 
 function shouldSoftNavigateForm(form, event) {
-    if (!ENABLE_AKSA_SOFT_NAVIGATION) return false;
+    if (!ENABLE_AKSA_SAFE_SOFT_NAVIGATION) return false;
     if (!form || event.defaultPrevented) return false;
     if (form.dataset.noSoftNav !== undefined || form.closest('[data-no-soft-nav]')) return false;
+    if (form.dataset.safeSoftNav === undefined) return false;
 
     const method = (form.getAttribute('method') || 'GET').toUpperCase();
 
@@ -1510,6 +1590,15 @@ async function softNavigate(url, options = {}) {
         updateDocumentMeta(nextDocument);
 
         if (options.pushHistory !== false) {
+            const currentState = window.history.state || {};
+
+            if (!currentState.aksaSoftNavigation) {
+                window.history.replaceState({
+                    ...currentState,
+                    aksaSoftNavigation: true,
+                }, '', window.location.href);
+            }
+
             window.history.pushState({ aksaSoftNavigation: true }, '', nextUrl.href);
         }
 
@@ -1599,8 +1688,8 @@ document.addEventListener('submit', (event) => {
     softNavigate(formNavigationUrl(form, event.submitter));
 });
 
-window.addEventListener('popstate', () => {
-    if (!ENABLE_AKSA_SOFT_NAVIGATION) return;
+window.addEventListener('popstate', (event) => {
+    if (!ENABLE_AKSA_SAFE_SOFT_NAVIGATION || !event.state?.aksaSoftNavigation) return;
 
     softNavigate(window.location.href, {
         pushHistory: false,

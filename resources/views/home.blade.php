@@ -38,7 +38,19 @@
     </section>
 
     <section id="products" class="page-shell pb-6 md:pb-10">
-        @php $active = request('category'); @endphp
+        @php
+            $active = request('category');
+            $categoryIcon = function (?string $slug, ?string $name = null) {
+                $key = strtolower(trim($slug ?: ($name ?? '')));
+
+                return match ($key) {
+                    'pc', 'desktop', 'windows' => 'monitor',
+                    'ios', 'iphone', 'ipad', 'macos' => 'apple',
+                    'android' => 'android',
+                    default => 'box',
+                };
+            };
+        @endphp
 
         <div class="home-toolbar fade-up">
             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
@@ -57,13 +69,15 @@
             <div class="mt-4 flex flex-wrap gap-2 md:gap-3">
                 <a href="#" data-category-filter data-category=""
                     class="category-chip {{ !$active ? 'active' : '' }}">
-                    All
+                    <x-ui.icon name="boxes" class="h-4 w-4" />
+                    <span>All</span>
                 </a>
 
                 @foreach ($categories as $category)
                     <a href="#" data-category-filter data-category="{{ $category->slug }}"
                         class="category-chip {{ $active == $category->slug ? 'active' : '' }}">
-                        {{ $category->name }}
+                        <x-ui.icon :name="$categoryIcon($category->slug, $category->name)" class="h-4 w-4" />
+                        <span>{{ $category->name }}</span>
                     </a>
                 @endforeach
             </div>

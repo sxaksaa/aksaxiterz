@@ -441,7 +441,7 @@
     }
 
     .category-chip {
-        @apply inline-flex items-center rounded-full border px-4 py-2 text-sm transition;
+        @apply inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition;
         background: rgba(21, 21, 27, 0.86);
         border-color: #27272a;
         color: #a1a1aa;

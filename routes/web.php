@@ -106,6 +106,10 @@ $productsFragment = function (Request $request) {
 Route::get('/products-fragment', $productsFragment)->name('products.fragment');
 Route::get('/api/products', $productsFragment);
 
+Route::get('/csrf-token', fn () => response()->json([
+    'token' => csrf_token(),
+]))->name('csrf-token');
+
 Route::get('/downloads', function () {
     $downloads = collect();
 

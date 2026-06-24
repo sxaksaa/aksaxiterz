@@ -10,7 +10,6 @@
             filled(config('services.binance.pay.api_key')) &&
             filled(config('services.binance.pay.api_secret'));
         $binancePayAvailable = app()->environment('local') || $binancePayConfigured;
-        $paymentMethodCount = $binancePayAvailable ? 3 : 2;
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatUsdCompact = function ($amount) {
             $amount = (float) $amount;
@@ -21,7 +20,6 @@
             return '$'.$formatted;
         };
         $minPackage = $product->packages->sortBy('price')->first();
-        $packageCount = $product->packages->count();
         $categoryName = $product->category?->name ?? 'Product';
         $categoryKey = strtolower(trim($categoryName));
         $categoryIcon = match ($categoryKey) {
@@ -77,16 +75,16 @@
 
                     <div class="product-meta-grid">
                         <div class="product-meta-card">
-                            <x-ui.icon name="calendar" class="h-4 w-4 text-[#C084FC]" />
-                            <span>{{ $packageCount }} {{ \Illuminate\Support\Str::plural('package', $packageCount) }}</span>
+                            <x-ui.icon name="shield-check" class="h-4 w-4 text-[#C084FC]" />
+                            <span>Secure checkout</span>
                         </div>
                         <div class="product-meta-card">
-                            <x-ui.icon name="credit-card" class="h-4 w-4 text-[#C084FC]" />
-                            <span>{{ $paymentMethodCount }} payment methods</span>
+                            <x-ui.icon name="key-round" class="h-4 w-4 text-[#C084FC]" />
+                            <span>Instant delivery</span>
                         </div>
                         <div class="product-meta-card">
-                            <x-ui.icon name="life-buoy" class="h-4 w-4 text-[#C084FC]" />
-                            <span>Setup support</span>
+                            <x-ui.icon name="discord" class="h-4 w-4 text-[#C084FC]" />
+                            <span>Discord support</span>
                         </div>
                     </div>
                 </div>
@@ -162,20 +160,6 @@
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Checkout</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Payment Method</h2>
                 <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <span class="support-pill">
-                        <x-ui.icon name="shield-check" class="h-4 w-4" />
-                        <span>Secure checkout</span>
-                    </span>
-                    <span class="support-pill">
-                        <x-ui.icon name="key-round" class="h-4 w-4" />
-                        <span>Instant delivery</span>
-                    </span>
-                    <span class="support-pill">
-                        <x-ui.icon name="discord" class="h-4 w-4" />
-                        <span>Discord support</span>
-                    </span>
-                </div>
             </div>
 
         <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
@@ -422,16 +406,6 @@
             <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Ready to pay</p>
                 <h3 class="mt-1 text-xl font-semibold text-white">Order Summary</h3>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <span class="support-pill">
-                        <x-ui.icon name="shield-check" class="h-4 w-4" />
-                        <span>Secure checkout</span>
-                    </span>
-                    <span class="support-pill">
-                        <x-ui.icon name="discord" class="h-4 w-4" />
-                        <span>Need help?</span>
-                    </span>
-                </div>
             </div>
 
             <div class="summary-row mb-2">
@@ -567,8 +541,40 @@
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        let csrfToken = window.aksaCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
         const addToCartUrl = @json(route('cart.items.store', $product, false));
+
+        function currentCsrfToken() {
+            csrfToken = window.aksaCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || csrfToken || '';
+
+            return csrfToken;
+        }
+
+        async function fetchWithCsrf(url, options = {}) {
+            if (window.aksaFetchWithCsrf) {
+                const response = await window.aksaFetchWithCsrf(url, options);
+                currentCsrfToken();
+
+                return response;
+            }
+
+            const headers = new Headers(options.headers || {});
+            headers.set('X-CSRF-TOKEN', currentCsrfToken());
+
+            return fetch(url, {
+                ...options,
+                credentials: options.credentials || 'same-origin',
+                headers,
+            });
+        }
+
+        function checkoutSessionMessage(data = {}) {
+            const message = data.message || '';
+
+            return message && !message.toLowerCase().includes('csrf token mismatch') ?
+                message :
+                'Your secure checkout session expired. Please try again.';
+        }
 
         window.addEventListener('aksa:before-page-swap', () => {
             productDetailPageController.abort();
@@ -859,18 +865,21 @@
                 body.set('coin', selectedBinancePayToken);
             }
 
-            const response = await fetch(@json(route('vouchers.preview')), {
+            const response = await fetchWithCsrf(@json(route('vouchers.preview')), {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrfToken,
                 },
                 body,
             });
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
+                if (response.status === 419) {
+                    throw new Error(checkoutSessionMessage(data));
+                }
+
                 throw new Error(data.message || 'Voucher could not be applied.');
             }
 
@@ -1163,12 +1172,11 @@
         }
 
         async function fetchPaymentJson(form) {
-            const response = await fetch(form.action, {
+            const response = await fetchWithCsrf(form.action, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrfToken,
                 },
                 body: new FormData(form),
             });
@@ -1177,11 +1185,13 @@
 
             if (!response.ok) {
                 const isTooManyAttempts = response.status === 429;
-                const message = response.status === 401 ?
+                const message = response.status === 419 ?
+                    checkoutSessionMessage(data) :
+                    (response.status === 401 ?
                     'Please login with Google before checkout.' :
                     (isTooManyAttempts ?
                         (data.message || 'Too many payment attempts. Cancel unfinished payments from Orders first.') :
-                        (data.message || 'Payment failed'));
+                        (data.message || 'Payment failed')));
                 const error = new Error(message);
                 error.status = response.status;
                 error.redirectUrl = data.redirect_url || (isTooManyAttempts ? '/orders?payment_notice=too-many-attempts' : null);
@@ -1273,18 +1283,21 @@
             body.set('quantity', selectedQuantity);
 
             try {
-                const response = await fetch(addToCartUrl, {
+                const response = await fetchWithCsrf(addToCartUrl, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': csrfToken,
                     },
                     body,
                 });
                 const data = await response.json().catch(() => ({}));
 
                 if (!response.ok) {
+                    if (response.status === 419) {
+                        throw new Error(checkoutSessionMessage(data));
+                    }
+
                     throw new Error(data.message || 'The item could not be added to your cart.');
                 }
 

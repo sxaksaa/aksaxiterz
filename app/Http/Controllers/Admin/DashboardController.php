@@ -23,7 +23,7 @@ class DashboardController extends Controller
 
         $now = now();
         $rangeOptions = $this->rangeOptions();
-        $activeRange = $this->normalizeRange((string) $request->query('range', '7'));
+        $activeRange = $this->normalizeRange((string) $request->query('range', 'daily'));
 
         $paidOrders = Order::query()
             ->with(['items', 'product', 'package'])
@@ -133,43 +133,64 @@ class DashboardController extends Controller
     private function rangeOptions(): array
     {
         return [
-            '1' => ['label' => 'Today', 'short' => '1D'],
-            '7' => ['label' => '7 Days', 'short' => '7D'],
-            '30' => ['label' => '30 Days', 'short' => '30D'],
-            'all' => ['label' => 'Lifetime', 'short' => 'All'],
+            'hourly' => ['label' => 'Hourly', 'short' => 'Hour'],
+            'daily' => ['label' => 'Daily', 'short' => 'Day'],
+            'weekly' => ['label' => 'Weekly', 'short' => 'Week'],
+            'monthly' => ['label' => 'Monthly', 'short' => 'Month'],
+            'lifetime' => ['label' => 'Lifetime', 'short' => 'All'],
         ];
     }
 
     private function normalizeRange(string $range): string
     {
-        return array_key_exists($range, $this->rangeOptions()) ? $range : '7';
+        $aliases = [
+            '1' => 'hourly',
+            'today' => 'hourly',
+            '7' => 'daily',
+            '30' => 'weekly',
+            'all' => 'lifetime',
+        ];
+        $range = $aliases[$range] ?? $range;
+
+        return array_key_exists($range, $this->rangeOptions()) ? $range : 'daily';
     }
 
     private function rangeMeta(string $range, $now, $firstPaidDate): array
     {
-        if ($range === '1') {
+        if ($range === 'hourly') {
             $from = $now->copy()->startOfDay();
 
             return [
                 'range' => $range,
-                'label' => 'Today',
+                'label' => 'Hourly',
                 'from' => $from,
-                'description' => $from->format('d M Y'),
+                'description' => $from->format('d M Y').' by hour',
             ];
         }
 
-        if ($range === '30') {
-            $from = $now->copy()->subDays(29)->startOfDay();
+        if ($range === 'weekly') {
+            $from = $now->copy()->subWeeks(7)->startOfWeek();
 
             return [
                 'range' => $range,
-                'label' => 'Last 30 days',
+                'label' => 'Weekly',
                 'from' => $from,
-                'description' => $from->format('d M Y').' - '.$now->format('d M Y'),
+                'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by week',
             ];
         }
 
-        if ($range === 'all') {
+        if ($range === 'monthly') {
+            $from = $now->copy()->subMonths(11)->startOfMonth();
+
+            return [
+                'range' => $range,
+                'label' => 'Monthly',
+                'from' => $from,
+                'description' => $from->format('M Y').' - '.$now->format('M Y').' by month',
+            ];
+        }
+
+        if ($range === 'lifetime') {
             return [
                 'range' => $range,
                 'label' => 'Lifetime',
@@ -183,10 +204,10 @@ class DashboardController extends Controller
         $from = $now->copy()->subDays(6)->startOfDay();
 
         return [
-            'range' => '7',
-            'label' => 'Last 7 days',
+            'range' => 'daily',
+            'label' => 'Daily',
             'from' => $from,
-            'description' => $from->format('d M Y').' - '.$now->format('d M Y'),
+            'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by day',
         ];
     }
 
@@ -226,14 +247,29 @@ class DashboardController extends Controller
 
     private function salesTrend(Collection $orders, string $range, $from, $now, $firstPaidDate): array
     {
-        $useMonthlyBuckets = $range === 'all' && $firstPaidDate && $firstPaidDate->diffInDays($now) > 45;
-        $bucketFormat = $useMonthlyBuckets ? 'Y-m' : 'Y-m-d';
-        $labelFormat = $useMonthlyBuckets ? 'M y' : 'd M';
-        $shortLabelFormat = $useMonthlyBuckets ? 'M' : 'd M';
+        $bucketMode = match ($range) {
+            'hourly' => 'hour',
+            'weekly' => 'week',
+            'monthly' => 'month',
+            'lifetime' => $firstPaidDate && $firstPaidDate->diffInDays($now) <= 45 ? 'day' : 'month',
+            default => 'day',
+        };
+        $bucketFormat = match (true) {
+            $bucketMode === 'hour' => 'Y-m-d-H',
+            $bucketMode === 'week' => 'o-W',
+            $bucketMode === 'month' => 'Y-m',
+            default => 'Y-m-d',
+        };
 
-        if ($useMonthlyBuckets) {
-            $start = $firstPaidDate->copy()->startOfMonth();
-        } elseif ($range === 'all' && $firstPaidDate) {
+        if ($bucketMode === 'hour') {
+            $start = ($from ?: $now->copy()->startOfDay())->copy()->startOfDay();
+        } elseif ($bucketMode === 'week') {
+            $start = ($from ?: $now->copy()->subWeeks(7)->startOfWeek())->copy()->startOfWeek();
+        } elseif ($bucketMode === 'month') {
+            $start = $range === 'lifetime' && $firstPaidDate
+                ? $firstPaidDate->copy()->startOfMonth()
+                : ($from ?: $now->copy()->subMonths(11)->startOfMonth())->copy()->startOfMonth();
+        } elseif ($range === 'lifetime' && $firstPaidDate) {
             $start = $firstPaidDate->copy()->startOfDay();
         } else {
             $start = ($from ?: $now->copy()->subDays(6)->startOfDay())->copy();
@@ -241,20 +277,32 @@ class DashboardController extends Controller
 
         $buckets = [];
         $cursor = $start->copy();
-        $end = $useMonthlyBuckets ? $now->copy()->startOfMonth() : $now->copy()->startOfDay();
+        $end = match (true) {
+            $bucketMode === 'hour' => $now->copy()->endOfDay()->startOfHour(),
+            $bucketMode === 'week' => $now->copy()->startOfWeek(),
+            $bucketMode === 'month' => $now->copy()->startOfMonth(),
+            default => $now->copy()->startOfDay(),
+        };
 
         while ($cursor->lte($end)) {
             $key = $cursor->format($bucketFormat);
+            [$label, $shortLabel] = $this->bucketLabels($cursor, $bucketMode);
+
             $buckets[$key] = [
                 'key' => $key,
-                'label' => $cursor->format($labelFormat),
-                'short_label' => $cursor->format($shortLabelFormat),
+                'label' => $label,
+                'short_label' => $shortLabel,
                 'orders' => 0,
                 'idr_revenue' => 0,
                 'crypto_revenue' => 0.0,
             ];
 
-            $useMonthlyBuckets ? $cursor->addMonth() : $cursor->addDay();
+            match (true) {
+                $bucketMode === 'hour' => $cursor->addHour(),
+                $bucketMode === 'week' => $cursor->addWeek(),
+                $bucketMode === 'month' => $cursor->addMonth(),
+                default => $cursor->addDay(),
+            };
         }
 
         foreach ($orders as $order) {
@@ -264,7 +312,12 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $key = $date->format($bucketFormat);
+            $key = match ($bucketMode) {
+                'hour' => $date->copy()->startOfHour()->format($bucketFormat),
+                'week' => $date->copy()->startOfWeek()->format($bucketFormat),
+                'month' => $date->copy()->startOfMonth()->format($bucketFormat),
+                default => $date->format($bucketFormat),
+            };
 
             if (! isset($buckets[$key])) {
                 continue;
@@ -282,13 +335,36 @@ class DashboardController extends Controller
         $points = collect($buckets)->values();
 
         return [
-            'bucket' => $useMonthlyBuckets ? 'month' : 'day',
+            'bucket' => $bucketMode,
             'points' => $points,
             'label_step' => max(1, (int) ceil(max(1, $points->count()) / 6)),
             'max_orders' => max(1, (int) $points->max('orders')),
             'max_idr_revenue' => max(1, (int) $points->max('idr_revenue')),
             'max_crypto_revenue' => max(1, (float) $points->max('crypto_revenue')),
         ];
+    }
+
+    private function bucketLabels($date, string $bucketMode): array
+    {
+        if ($bucketMode === 'hour') {
+            return [$date->format('d M H:00'), $date->format('H:00')];
+        }
+
+        if ($bucketMode === 'week') {
+            $start = $date->copy()->startOfWeek();
+            $end = $date->copy()->endOfWeek();
+
+            return [
+                $start->format('d M').' - '.$end->format('d M'),
+                'W'.$start->isoWeek(),
+            ];
+        }
+
+        if ($bucketMode === 'month') {
+            return [$date->format('M Y'), $date->format('M')];
+        }
+
+        return [$date->format('d M'), $date->format('d M')];
     }
 
     private function topProducts(Collection $orders): Collection

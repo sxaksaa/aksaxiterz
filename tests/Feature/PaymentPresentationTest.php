@@ -10,6 +10,17 @@ use Tests\TestCase;
 
 class PaymentPresentationTest extends TestCase
 {
+    public function test_csrf_token_endpoint_returns_current_token(): void
+    {
+        $this->get(route('csrf-token'))
+            ->assertOk()
+            ->assertJsonStructure(['token'])
+            ->assertJson(fn ($json) => $json
+                ->whereType('token', 'string')
+                ->etc()
+            );
+    }
+
     public function test_direct_crypto_orders_render_address_and_verify_actions(): void
     {
         $order = $this->fakeOrder([
