@@ -1052,6 +1052,7 @@ let mobileMenuOpen = false;
 let lastNavbarScroll = window.pageYOffset || 0;
 let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
+const ENABLE_AKSA_SOFT_NAVIGATION = false;
 
 function navButton() {
     return document.getElementById('menuBtn');
@@ -1120,6 +1121,7 @@ function samePageHashNavigation(url) {
 }
 
 function shouldSoftNavigateLink(link, event) {
+    if (!ENABLE_AKSA_SOFT_NAVIGATION) return false;
     if (!link || event.defaultPrevented || event.button !== 0) return false;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
     if (link.dataset.noSoftNav !== undefined || link.closest('[data-no-soft-nav]')) return false;
@@ -1152,6 +1154,7 @@ function shouldSoftNavigateLink(link, event) {
 }
 
 function shouldSoftNavigateForm(form, event) {
+    if (!ENABLE_AKSA_SOFT_NAVIGATION) return false;
     if (!form || event.defaultPrevented) return false;
     if (form.dataset.noSoftNav !== undefined || form.closest('[data-no-soft-nav]')) return false;
 
@@ -1597,6 +1600,8 @@ document.addEventListener('submit', (event) => {
 });
 
 window.addEventListener('popstate', () => {
+    if (!ENABLE_AKSA_SOFT_NAVIGATION) return;
+
     softNavigate(window.location.href, {
         pushHistory: false,
     });
