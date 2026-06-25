@@ -153,6 +153,38 @@ return [
             ],
         ],
 
+        'faq' => [
+            'title' => 'FAQ',
+            'eyebrow' => 'Help Center',
+            'summary' => 'Quick answers about checkout, payment confirmation, license delivery, and setup support.',
+            'sections' => [
+                [
+                    'title' => 'Where will my license appear?',
+                    'body' => [
+                        'After payment is confirmed, your license is saved in the My Licenses page on the same account you used for checkout.',
+                    ],
+                ],
+                [
+                    'title' => 'How long does payment confirmation take?',
+                    'body' => [
+                        'Most payments are checked automatically. Crypto and Binance Pay can take a few minutes depending on provider updates and network confirmation.',
+                    ],
+                ],
+                [
+                    'title' => 'What if the order is still pending?',
+                    'body' => [
+                        'Open the Orders page and use Check Payment when available. If the order still stays pending, send the order ID to Discord support.',
+                    ],
+                ],
+                [
+                    'title' => 'Can I get setup or reset help?',
+                    'body' => [
+                        'Yes. Use Downloads for setup files and contact Discord support for setup guidance or eligible license reset requests.',
+                    ],
+                ],
+            ],
+        ],
+
         'contact' => [
             'title' => 'Contact and Support',
             'eyebrow' => 'Support',

@@ -17,6 +17,8 @@
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
+        $salesBadgeLabel = $product->sales_badge_label;
+        $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
     @endphp
 
     <a href="{{ route('products.show', $product) }}" class="product-card product-card-storefront fade-up flex min-h-60 flex-col gap-4 p-5">
@@ -31,7 +33,16 @@
         </div>
 
         <div>
-            <h2 class="text-xl font-semibold text-white">{{ $product->name }}</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-xl font-semibold text-white">{{ $product->name }}</h2>
+
+                @if ($salesBadgeLabel)
+                    <span class="sales-signal-badge sales-signal-badge-{{ $salesBadgeVariant }}">
+                        <x-ui.icon name="sparkles" class="h-3.5 w-3.5" />
+                        <span>{{ $salesBadgeLabel }}</span>
+                    </span>
+                @endif
+            </div>
 
             <p class="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">
                 {{ $product->description }}

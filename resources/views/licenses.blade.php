@@ -13,6 +13,8 @@
         $selectedOrderId = request()->query('order');
         $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
         $renderedOrderAnchors = [];
+        $renderedReviewPrompts = [];
+        $reviewLookup = $reviewLookup ?? collect();
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -103,6 +105,12 @@
                         : 'license-' . $license->id;
                     $isSelectedLicense = $selectedOrderId !== '' && $licenseOrderId !== '' && hash_equals($selectedOrderId, $licenseOrderId);
                     $renderedOrderAnchors[$licenseOrderId] = true;
+                    $reviewKey = $license->product_id . '|' . $licenseOrderId;
+                    $existingReview = $reviewLookup->get($reviewKey);
+                    $canRenderReviewPrompt = $licenseOrderId !== ''
+                        && $license->product_id
+                        && ! isset($renderedReviewPrompts[$reviewKey]);
+                    $renderedReviewPrompts[$reviewKey] = true;
                 @endphp
 
                 <div id="{{ $licenseAnchor }}" class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedLicense ? 'license-card-selected' : '' }}">
@@ -163,6 +171,64 @@
                         </button>
 
                     </div>
+
+                    @if ($canRenderReviewPrompt)
+                        <div class="review-prompt">
+                            @if ($existingReview && $existingReview->status !== \App\Models\ProductReview::STATUS_REJECTED)
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <div class="text-sm font-semibold text-white">Review submitted</div>
+                                        <p class="mt-1 text-xs text-gray-400">
+                                            Status: {{ \App\Models\ProductReview::statusOptions()[$existingReview->status] ?? $existingReview->status }}
+                                        </p>
+                                    </div>
+                                    <span class="support-pill">{{ $existingReview->rating }}/5</span>
+                                </div>
+                            @else
+                                <details>
+                                    <summary>
+                                        <span>Leave a review</span>
+                                        <span class="text-xs text-gray-500">Only approved reviews appear publicly.</span>
+                                    </summary>
+
+                                    @if ($existingReview?->status === \App\Models\ProductReview::STATUS_REJECTED)
+                                        <p class="mt-3 text-xs text-amber-200">Your previous review was not approved. You can update and send it again.</p>
+                                    @endif
+
+                                    <form action="{{ route('reviews.store') }}" method="POST" class="mt-4 grid gap-3">
+                                        @csrf
+                                        <input type="hidden" name="product_id" value="{{ $license->product_id }}">
+                                        <input type="hidden" name="order_id" value="{{ $licenseOrderId }}">
+
+                                        <div class="grid gap-3 sm:grid-cols-[150px_1fr]">
+                                            <label class="block">
+                                                <span class="mb-2 block text-xs font-semibold text-gray-400">Rating</span>
+                                                <select name="rating" class="search-bar w-full" required>
+                                                    @for ($rating = 5; $rating >= 1; $rating--)
+                                                        <option value="{{ $rating }}" @selected((int) old('rating', $existingReview->rating ?? 5) === $rating)>
+                                                            {{ $rating }}/5
+                                                        </option>
+                                                    @endfor
+                                                </select>
+                                            </label>
+
+                                            <label class="block">
+                                                <span class="mb-2 block text-xs font-semibold text-gray-400">Feedback</span>
+                                                <textarea name="body" rows="3" class="search-bar min-h-24 w-full resize-y"
+                                                    maxlength="420" required
+                                                    placeholder="Share what helped you after buying this product.">{{ old('body', $existingReview->body ?? '') }}</textarea>
+                                            </label>
+                                        </div>
+
+                                        <button class="btn-footer w-fit">
+                                            <x-ui.icon name="sparkles" class="h-4 w-4" />
+                                            <span>Submit Review</span>
+                                        </button>
+                                    </form>
+                                </details>
+                            @endif
+                        </div>
+                    @endif
 
                 </div>
 

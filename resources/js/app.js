@@ -1110,6 +1110,11 @@ function closeCustomSelect(select) {
         state.section.style.zIndex = state.previousSectionZIndex || '';
         state.section.dataset.aksaSelectOpen = 'false';
     }
+
+    if (state.overflowSurface) {
+        state.overflowSurface.classList.remove('is-select-open');
+        state.overflowSurface.style.zIndex = state.previousOverflowSurfaceZIndex || '';
+    }
 }
 
 function closeOtherCustomSelects(currentSelect = null) {
@@ -1186,6 +1191,7 @@ function enhanceCustomSelect(select) {
     const chevronPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     const panel = document.createElement('div');
     const section = select.closest('.product-section');
+    const overflowSurface = select.closest('.license-card, .order-mobile-card');
 
     select.dataset.aksaSelectEnhanced = 'true';
     select.tabIndex = -1;
@@ -1219,6 +1225,8 @@ function enhanceCustomSelect(select) {
         panel,
         section,
         previousSectionZIndex: section?.style.zIndex || '',
+        overflowSurface,
+        previousOverflowSurfaceZIndex: overflowSurface?.style.zIndex || '',
     });
 
     trigger.addEventListener('click', (event) => {
@@ -1238,6 +1246,11 @@ function enhanceCustomSelect(select) {
             state.section.style.position = 'relative';
             state.section.style.zIndex = isOpen ? state.previousSectionZIndex : '80';
             state.section.dataset.aksaSelectOpen = String(!isOpen);
+        }
+
+        if (state.overflowSurface) {
+            state.overflowSurface.classList.toggle('is-select-open', !isOpen);
+            state.overflowSurface.style.zIndex = isOpen ? state.previousOverflowSurfaceZIndex : '90';
         }
     });
 

@@ -9,6 +9,7 @@
             'terms' => ['label' => 'Terms', 'url' => '/terms'],
             'privacy' => ['label' => 'Privacy', 'url' => '/privacy'],
             'refund-policy' => ['label' => 'Refund Policy', 'url' => '/refund-policy'],
+            'faq' => ['label' => 'FAQ', 'url' => '/faq'],
             'contact' => ['label' => 'Contact', 'url' => '/contact'],
         ];
     @endphp

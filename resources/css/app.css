@@ -394,6 +394,31 @@
         padding: 0.42rem 0.55rem;
     }
 
+    .sales-signal-badge {
+        @apply inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold;
+        letter-spacing: 0;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .sales-signal-badge span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sales-signal-badge-best {
+        background: rgba(245, 158, 11, 0.14);
+        border-color: rgba(251, 191, 36, 0.42);
+        color: #fcd34d;
+    }
+
+    .sales-signal-badge-popular {
+        background: rgba(34, 211, 238, 0.12);
+        border-color: rgba(125, 211, 252, 0.38);
+        color: #7dd3fc;
+    }
+
     .product-category-pill span,
     .product-card-fact span {
         min-width: 0;
@@ -527,6 +552,10 @@
 
     .aksa-select.is-open .aksa-select-chevron {
         transform: rotate(180deg);
+    }
+
+    .aksa-select.is-open {
+        z-index: 75;
     }
 
     .aksa-select-panel {
@@ -874,6 +903,49 @@
         overflow: visible;
     }
 
+    .review-grid {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .review-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .review-card {
+        @apply rounded-xl border p-4;
+        background: rgba(9, 9, 12, 0.42);
+        border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .review-card:hover {
+        background: rgba(147, 51, 234, 0.08);
+        border-color: rgba(147, 51, 234, 0.38);
+    }
+
+    .review-prompt summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .review-card {
+        min-height: 10rem;
+        transition:
+            border-color 180ms ease,
+            background 180ms ease,
+            transform 180ms ease;
+    }
+
+    .review-card:hover {
+        transform: translateY(-1px);
+    }
+
+    .review-rating {
+        @apply inline-flex shrink-0 items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-bold;
+        background: rgba(147, 51, 234, 0.13);
+        border-color: rgba(147, 51, 234, 0.34);
+        color: #d8b4fe;
+    }
+
     .checkout-card,
     .package-card,
     .license-card {
@@ -890,6 +962,11 @@
             0 0 0 1px rgba(147, 51, 234, 0.12),
             0 18px 42px rgba(147, 51, 234, 0.12);
         transform: translateY(-3px);
+    }
+
+    .license-card.is-select-open,
+    .order-mobile-card.is-select-open {
+        overflow: visible;
     }
 
     .package-card-heading {
@@ -1030,6 +1107,20 @@
         @apply rounded-xl border px-3 py-3 sm:px-4;
         background: rgba(9, 9, 12, 0.38);
         border-color: rgba(63, 63, 70, 0.9);
+    }
+
+    .review-prompt {
+        @apply mt-4 rounded-xl border p-4;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(147, 51, 234, 0.24);
+    }
+
+    .review-prompt summary {
+        @apply flex cursor-pointer list-none flex-col gap-1 text-sm font-semibold text-white sm:flex-row sm:items-center sm:justify-between;
+    }
+
+    .review-prompt details[open] summary {
+        color: #d8b4fe;
     }
 
     .mobile-discord-link {

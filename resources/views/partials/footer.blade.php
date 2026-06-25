@@ -52,6 +52,7 @@
                     <a href="/terms" class="footer-link">Terms</a>
                     <a href="/privacy" class="footer-link">Privacy Policy</a>
                     <a href="/refund-policy" class="footer-link">Refund Policy</a>
+                    <a href="/faq" class="footer-link">FAQ</a>
                     <a href="/contact" class="footer-link">Contact</a>
                 </div>
             </div>

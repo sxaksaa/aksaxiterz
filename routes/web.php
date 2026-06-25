@@ -6,18 +6,22 @@ use App\Http\Controllers\Admin\DownloadController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\ProductReviewController as AdminProductReviewController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VoucherController;
 use App\Models\Category;
 use App\Models\DownloadItem;
 use App\Models\License;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductReview;
 use App\Models\User;
 use App\Services\PendingOrderExpirationService;
+use App\Support\ProductSalesSignals;
 use App\Support\RecentPurchaseFeed;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -70,7 +74,7 @@ Route::get('/', function (Request $request) {
         $query->where('name', 'like', '%'.$request->search.'%');
     }
 
-    $products = $query->get();
+    $products = app(ProductSalesSignals::class)->apply($query->get());
     $recentPurchases = app(RecentPurchaseFeed::class)->storefront();
 
     return view('home', compact('categories', 'products', 'recentPurchases'));
@@ -100,7 +104,7 @@ $productsFragment = function (Request $request) {
         }
     }
 
-    $products = $query->get();
+    $products = app(ProductSalesSignals::class)->apply($query->get());
 
     return view('partials.product-card', compact('products'));
 };
@@ -176,6 +180,7 @@ $legalPage = function (string $slug) {
 Route::get('/terms', fn () => $legalPage('terms'))->name('terms');
 Route::get('/privacy', fn () => $legalPage('privacy'))->name('privacy');
 Route::get('/refund-policy', fn () => $legalPage('refund-policy'))->name('refund-policy');
+Route::get('/faq', fn () => $legalPage('faq'))->name('faq');
 Route::get('/contact', fn () => $legalPage('contact'))->name('contact');
 
 /*
@@ -192,9 +197,18 @@ Route::get('/product/{product}', function (string $product) {
         ->where('slug', $product)
         ->firstOrFail();
 
-    $recentPurchases = app(RecentPurchaseFeed::class)->storefront($product);
+    app(ProductSalesSignals::class)->apply(collect([$product]));
 
-    return view('product-detail', compact('product', 'recentPurchases'));
+    $recentPurchases = app(RecentPurchaseFeed::class)->storefront($product);
+    $approvedReviews = ProductReview::with('user')
+        ->where('product_id', $product->id)
+        ->where('status', ProductReview::STATUS_APPROVED)
+        ->latest('approved_at')
+        ->latest('id')
+        ->take(6)
+        ->get();
+
+    return view('product-detail', compact('product', 'recentPurchases', 'approvedReviews'));
 })->where('product', '[A-Za-z0-9-]+')->name('products.show');
 
 /*
@@ -226,6 +240,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/voucher/preview', [VoucherController::class, 'preview'])
         ->middleware('throttle:10,1')
         ->name('vouchers.preview');
+    Route::post('/reviews', [ProductReviewController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('reviews.store');
 
     // Pay again
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain'])
@@ -299,13 +316,18 @@ Route::middleware('auth')->group(function () {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
         $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
+        $reviewLookup = ProductReview::with('order')
+            ->where('user_id', auth()->id())
+            ->get()
+            ->filter(fn (ProductReview $review) => filled($review->order?->order_id))
+            ->keyBy(fn (ProductReview $review) => $review->product_id.'|'.$review->order->order_id);
         $orderStats = [
             'total' => Order::where('user_id', auth()->id())->count(),
             'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
             'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
         ];
 
-        return view('licenses', compact('licenses', 'orderStats'));
+        return view('licenses', compact('licenses', 'orderStats', 'reviewLookup'));
     });
 
     // Orders
@@ -378,6 +400,8 @@ Route::middleware(['auth', 'admin'])
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/mark-paid', [OrderController::class, 'markPaid'])->name('orders.mark-paid');
         Route::post('/orders/{order}/resync-license', [OrderController::class, 'resyncLicense'])->name('orders.resync-license');
+        Route::get('/reviews', [AdminProductReviewController::class, 'index'])->name('reviews.index');
+        Route::patch('/reviews/{productReview}', [AdminProductReviewController::class, 'update'])->name('reviews.update');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     });

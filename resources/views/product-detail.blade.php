@@ -31,6 +31,8 @@
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
+        $salesBadgeLabel = $product->sales_badge_label;
+        $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
         $startDurationDays = $minPackage?->durationDays();
         $startDurationLabel = $startDurationDays
             ? $startDurationDays . ' ' . \Illuminate\Support\Str::plural('day', $startDurationDays) . ' access'
@@ -57,6 +59,24 @@
             ->sortByDesc('percent')
             ->keys()
             ->first();
+        $maskReviewName = function (?string $value) {
+            $name = trim((string) $value);
+
+            if (str_contains($name, '@')) {
+                $name = \Illuminate\Support\Str::before($name, '@');
+            }
+
+            $first = \Illuminate\Support\Str::of($name)->explode(' ')->filter()->first() ?: 'Customer';
+            $first = (string) $first;
+
+            if (\Illuminate\Support\Str::length($first) <= 1) {
+                return \Illuminate\Support\Str::upper($first) . '***';
+            }
+
+            return \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($first, 0, 1))
+                . str_repeat('*', min(6, max(3, \Illuminate\Support\Str::length($first) - 2)))
+                . \Illuminate\Support\Str::substr($first, -1);
+        };
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10">
@@ -74,6 +94,12 @@
                             <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
                                 {{ $product->status_label }}
                             </span>
+                            @if ($salesBadgeLabel)
+                                <span class="sales-signal-badge sales-signal-badge-{{ $salesBadgeVariant }}">
+                                    <x-ui.icon name="sparkles" class="h-3.5 w-3.5" />
+                                    <span>{{ $salesBadgeLabel }}</span>
+                                </span>
+                            @endif
                         </div>
                         <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">{{ $product->description }}</p>
@@ -118,6 +144,37 @@
                     <h3 class="mt-1 text-xl font-semibold text-white">Important Note</h3>
                 </div>
                 <p class="max-w-4xl whitespace-pre-line text-sm leading-6 text-gray-300">{{ $product->important_note }}</p>
+            </div>
+        @endif
+
+        @if (($approvedReviews ?? collect())->isNotEmpty())
+            <div class="product-section mb-6 fade-up">
+                <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Customer reviews</p>
+                        <h2 class="mt-1 text-xl font-semibold text-white">Approved buyer feedback</h2>
+                    </div>
+                    <span class="support-pill">{{ $approvedReviews->count() }} shown</span>
+                </div>
+
+                <div class="review-grid">
+                    @foreach ($approvedReviews as $review)
+                        <article class="review-card">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <div class="text-sm font-semibold text-white">
+                                        {{ $maskReviewName($review->user?->name ?: $review->user?->email) }}
+                                    </div>
+                                    <div class="mt-1 text-xs text-gray-500">
+                                        {{ $review->approved_at?->format('d M Y') ?? $review->created_at->format('d M Y') }}
+                                    </div>
+                                </div>
+                                <span class="review-rating">{{ $review->rating }}/5</span>
+                            </div>
+                            <p class="mt-3 text-sm leading-6 text-gray-300">{{ $review->body }}</p>
+                        </article>
+                    @endforeach
+                </div>
             </div>
         @endif
 
