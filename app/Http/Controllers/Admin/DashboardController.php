@@ -24,50 +24,55 @@ class DashboardController extends Controller
         $now = now();
         $rangeOptions = $this->rangeOptions();
         $activeRange = $this->normalizeRange((string) $request->query('range', 'daily'));
+        $paymentMethodOptions = $this->paymentMethodOptions();
+        $activePaymentMethod = $this->normalizePaymentMethod((string) $request->query('method', 'all'));
+        $paymentMethodMeta = $paymentMethodOptions[$activePaymentMethod];
 
         $paidOrders = Order::query()
             ->with(['items', 'product', 'package'])
             ->where('status', 'paid')
             ->get(['id', 'order_id', 'product_id', 'package_id', 'status', 'payment_method', 'price', 'quantity', 'payment_payload', 'paid_at', 'created_at']);
 
-        $firstPaidDate = $paidOrders
+        $methodPaidOrders = $this->filterOrdersByPaymentMethod($paidOrders, $activePaymentMethod);
+
+        $firstPaidDate = $methodPaidOrders
             ->map(fn (Order $order) => $this->paidDate($order))
             ->filter()
             ->sortBy(fn ($date) => $date->timestamp)
             ->first();
 
         $rangeMeta = $this->rangeMeta($activeRange, $now, $firstPaidDate);
-        $filteredPaidOrders = $this->filterOrdersByRange($paidOrders, $rangeMeta['from']);
+        $filteredPaidOrders = $this->filterOrdersByRange($methodPaidOrders, $rangeMeta['from']);
         $selectedStats = $this->periodStats($filteredPaidOrders);
-        $salesTrend = $this->salesTrend($filteredPaidOrders, $activeRange, $rangeMeta['from'], $now, $firstPaidDate);
+        $salesTrend = $this->salesTrend($filteredPaidOrders, $activeRange, $rangeMeta['from'], $now, $firstPaidDate, $activePaymentMethod);
 
         $metricCards = [
             [
                 'label' => 'IDR Revenue',
                 'value' => $selectedStats['idr_revenue'],
                 'format' => 'idr',
-                'caption' => $rangeMeta['label'],
+                'caption' => $rangeMeta['label'].' · '.$paymentMethodMeta['label'],
                 'icon' => 'circle-dollar-sign',
             ],
             [
                 'label' => 'Crypto Revenue',
                 'value' => $selectedStats['crypto_revenue'],
                 'format' => 'crypto',
-                'caption' => $rangeMeta['label'],
+                'caption' => $rangeMeta['label'].' · '.$paymentMethodMeta['label'],
                 'icon' => 'wallet',
             ],
             [
                 'label' => 'Paid Orders',
                 'value' => $selectedStats['orders'],
                 'format' => 'count',
-                'caption' => $rangeMeta['label'],
+                'caption' => $rangeMeta['label'].' · '.$paymentMethodMeta['label'],
                 'icon' => 'receipt',
             ],
             [
                 'label' => 'Licenses Sold',
                 'value' => $selectedStats['licenses'],
                 'format' => 'count',
-                'caption' => $rangeMeta['label'],
+                'caption' => $rangeMeta['label'].' · '.$paymentMethodMeta['label'],
                 'icon' => 'key-round',
             ],
         ];
@@ -95,16 +100,16 @@ class DashboardController extends Controller
         ];
 
         $orderStats = [
-            'pending' => $this->ordersInRange($rangeMeta['from'])->where('status', 'pending')->count(),
-            'paid' => $this->ordersInRange($rangeMeta['from'])->where('status', 'paid')->count(),
-            'cancelled' => $this->ordersInRange($rangeMeta['from'])->where('status', 'cancelled')->count(),
-            'delivery_issues' => $this->deliveryIssueCount($rangeMeta['from']),
+            'pending' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'pending')->count(),
+            'paid' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'paid')->count(),
+            'cancelled' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'cancelled')->count(),
+            'delivery_issues' => $this->deliveryIssueCount($rangeMeta['from'], $activePaymentMethod),
         ];
 
         $topProducts = $this->topProducts($filteredPaidOrders);
         $paymentSplit = $this->paymentSplit($filteredPaidOrders);
 
-        $recentOrders = $this->ordersInRange($rangeMeta['from'])
+        $recentOrders = $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)
             ->with(['user', 'product', 'package', 'items'])
             ->withCount('licenses')
             ->latest()
@@ -115,7 +120,10 @@ class DashboardController extends Controller
 
         return view('admin.dashboard.index', compact(
             'activeRange',
+            'activePaymentMethod',
             'rangeOptions',
+            'paymentMethodOptions',
+            'paymentMethodMeta',
             'rangeMeta',
             'metricCards',
             'selectedStats',
@@ -141,6 +149,16 @@ class DashboardController extends Controller
         ];
     }
 
+    private function paymentMethodOptions(): array
+    {
+        return [
+            'all' => ['label' => 'All payments', 'short' => 'All'],
+            'pakasir' => ['label' => 'QRIS', 'short' => 'QRIS'],
+            'binance_pay' => ['label' => 'Binance Pay', 'short' => 'Binance'],
+            'crypto' => ['label' => 'Crypto', 'short' => 'Crypto'],
+        ];
+    }
+
     private function normalizeRange(string $range): string
     {
         $aliases = [
@@ -155,8 +173,15 @@ class DashboardController extends Controller
         return array_key_exists($range, $this->rangeOptions()) ? $range : 'daily';
     }
 
+    private function normalizePaymentMethod(string $method): string
+    {
+        return array_key_exists($method, $this->paymentMethodOptions()) ? $method : 'all';
+    }
+
     private function rangeMeta(string $range, $now, $firstPaidDate): array
     {
+        $timezoneLabel = $this->timezoneLabel();
+
         if ($range === 'hourly') {
             $from = $now->copy()->startOfDay();
 
@@ -164,7 +189,7 @@ class DashboardController extends Controller
                 'range' => $range,
                 'label' => 'Hourly',
                 'from' => $from,
-                'description' => $from->format('d M Y').' by hour',
+                'description' => $from->format('d M Y').' by paid hour ('.$timezoneLabel.')',
             ];
         }
 
@@ -175,7 +200,7 @@ class DashboardController extends Controller
                 'range' => $range,
                 'label' => 'Weekly',
                 'from' => $from,
-                'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by week',
+                'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by paid week ('.$timezoneLabel.')',
             ];
         }
 
@@ -186,7 +211,7 @@ class DashboardController extends Controller
                 'range' => $range,
                 'label' => 'Monthly',
                 'from' => $from,
-                'description' => $from->format('M Y').' - '.$now->format('M Y').' by month',
+                'description' => $from->format('M Y').' - '.$now->format('M Y').' by paid month ('.$timezoneLabel.')',
             ];
         }
 
@@ -196,7 +221,7 @@ class DashboardController extends Controller
                 'label' => 'Lifetime',
                 'from' => null,
                 'description' => $firstPaidDate
-                    ? 'Since '.$firstPaidDate->format('d M Y')
+                    ? 'Since '.$firstPaidDate->format('d M Y').' by paid date ('.$timezoneLabel.')'
                     : 'No paid orders yet',
             ];
         }
@@ -207,7 +232,7 @@ class DashboardController extends Controller
             'range' => 'daily',
             'label' => 'Daily',
             'from' => $from,
-            'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by day',
+            'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by paid day ('.$timezoneLabel.')',
         ];
     }
 
@@ -223,6 +248,17 @@ class DashboardController extends Controller
 
                 return $date && $date->gte($from);
             })
+            ->values();
+    }
+
+    private function filterOrdersByPaymentMethod(Collection $orders, string $method): Collection
+    {
+        if ($method === 'all') {
+            return $orders->values();
+        }
+
+        return $orders
+            ->filter(fn (Order $order): bool => $order->payment_method === $method)
             ->values();
     }
 
@@ -245,7 +281,7 @@ class DashboardController extends Controller
         ];
     }
 
-    private function salesTrend(Collection $orders, string $range, $from, $now, $firstPaidDate): array
+    private function salesTrend(Collection $orders, string $range, $from, $now, $firstPaidDate, string $paymentMethod): array
     {
         $bucketMode = match ($range) {
             'hourly' => 'hour',
@@ -293,6 +329,7 @@ class DashboardController extends Controller
                 'label' => $label,
                 'short_label' => $shortLabel,
                 'orders' => 0,
+                'line_revenue' => 0.0,
                 'idr_revenue' => 0,
                 'crypto_revenue' => 0.0,
             ];
@@ -324,6 +361,7 @@ class DashboardController extends Controller
             }
 
             $buckets[$key]['orders']++;
+            $buckets[$key]['line_revenue'] += $this->chartLineValue($order, $paymentMethod);
 
             if ($this->isCryptoOrder($order)) {
                 $buckets[$key]['crypto_revenue'] += $this->cryptoAmount($order);
@@ -338,7 +376,10 @@ class DashboardController extends Controller
             'bucket' => $bucketMode,
             'points' => $points,
             'label_step' => max(1, (int) ceil(max(1, $points->count()) / 6)),
+            'line_label' => $this->chartLineLabel($paymentMethod),
+            'line_format' => $this->chartLineFormat($paymentMethod),
             'max_orders' => max(1, (int) $points->max('orders')),
+            'max_line_revenue' => max(1, (float) $points->max('line_revenue')),
             'max_idr_revenue' => max(1, (int) $points->max('idr_revenue')),
             'max_crypto_revenue' => max(1, (float) $points->max('crypto_revenue')),
         ];
@@ -418,9 +459,10 @@ class DashboardController extends Controller
         ]]);
     }
 
-    private function ordersInRange($from)
+    private function ordersInRange($from, string $paymentMethod = 'all')
     {
         return Order::query()
+            ->when($paymentMethod !== 'all', fn ($query) => $query->where('payment_method', $paymentMethod))
             ->when($from, fn ($query) => $query->where(function ($query) use ($from) {
                 $query
                     ->where('created_at', '>=', $from)
@@ -428,9 +470,9 @@ class DashboardController extends Controller
             }));
     }
 
-    private function deliveryIssueCount($from = null): int
+    private function deliveryIssueCount($from = null, string $paymentMethod = 'all'): int
     {
-        return $this->ordersInRange($from)
+        return $this->ordersInRange($from, $paymentMethod)
             ->where('status', 'paid')
             ->whereRaw(
                 '(SELECT COUNT(*) FROM licenses WHERE licenses.order_id = orders.order_id) < COALESCE(orders.quantity, 1)'
@@ -440,7 +482,53 @@ class DashboardController extends Controller
 
     private function paidDate(Order $order)
     {
-        return $order->paid_at ?: $order->created_at;
+        $date = $order->paid_at ?: $order->created_at;
+
+        return $date?->copy()->timezone(config('app.timezone'));
+    }
+
+    private function timezoneLabel(): string
+    {
+        return now()->timezone(config('app.timezone'))->format('T') ?: (string) config('app.timezone');
+    }
+
+    private function chartLineLabel(string $paymentMethod): string
+    {
+        return match ($paymentMethod) {
+            'pakasir' => 'QRIS IDR revenue',
+            'binance_pay' => 'Binance Pay crypto revenue',
+            'crypto' => 'Crypto revenue',
+            default => 'All order value',
+        };
+    }
+
+    private function chartLineFormat(string $paymentMethod): string
+    {
+        return in_array($paymentMethod, ['crypto', 'binance_pay'], true) ? 'crypto' : 'idr';
+    }
+
+    private function chartLineValue(Order $order, string $paymentMethod): float
+    {
+        if ($paymentMethod === 'all') {
+            return (float) $this->orderIdrValue($order);
+        }
+
+        if ($this->isCryptoOrder($order)) {
+            return $this->cryptoAmount($order);
+        }
+
+        return (float) ($order->price ?? 0);
+    }
+
+    private function orderIdrValue(Order $order): int
+    {
+        $items = $this->orderItems($order);
+
+        if ($items->isNotEmpty()) {
+            return (int) $items->sum(fn ($item) => (int) ($item->line_total_idr ?? 0));
+        }
+
+        return $this->isCryptoOrder($order) ? 0 : (int) round((float) ($order->price ?? 0));
     }
 
     private function isCryptoOrder(Order $order): bool

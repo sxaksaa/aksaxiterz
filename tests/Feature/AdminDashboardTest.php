@@ -50,7 +50,7 @@ class AdminDashboardTest extends TestCase
             'price_usdt' => 1.10,
         ]);
 
-        Order::create([
+        $order = Order::create([
             'order_id' => 'ORDER-HOURLY-DASH',
             'user_id' => $buyer->id,
             'product_id' => $product->id,
@@ -59,10 +59,32 @@ class AdminDashboardTest extends TestCase
             'payment_method' => 'pakasir',
             'price' => 10000,
             'quantity' => 1,
+        ]);
+        $order->forceFill([
             'paid_at' => Carbon::parse('2026-06-24 13:15:00'),
             'created_at' => Carbon::parse('2026-06-24 13:10:00'),
             'updated_at' => Carbon::parse('2026-06-24 13:15:00'),
+        ])->save();
+
+        $binanceOrder = Order::create([
+            'order_id' => 'ORDER-BINANCE-DASH',
+            'user_id' => $buyer->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'status' => 'paid',
+            'payment_method' => 'binance_pay',
+            'price' => 1.10,
+            'quantity' => 1,
+            'payment_payload' => [
+                'base_amount' => '1.100000',
+                'final_amount' => '1.100000',
+            ],
         ]);
+        $binanceOrder->forceFill([
+            'paid_at' => Carbon::parse('2026-06-24 09:45:00'),
+            'created_at' => Carbon::parse('2026-06-24 09:40:00'),
+            'updated_at' => Carbon::parse('2026-06-24 09:45:00'),
+        ])->save();
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => '1']))
@@ -72,11 +94,27 @@ class AdminDashboardTest extends TestCase
             ->assertSee('Weekly')
             ->assertSee('Monthly')
             ->assertSee('Lifetime')
-            ->assertSee('24 Jun 2026 by hour')
+            ->assertSee('24 Jun 2026 by paid hour (WIB)')
+            ->assertSee('All payments')
+            ->assertSee('QRIS')
+            ->assertSee('Binance')
+            ->assertSee('Crypto')
+            ->assertSee('All order value line')
             ->assertSee('00:00')
+            ->assertSee('09:00')
             ->assertSee('13:00')
             ->assertSee('23:00')
-            ->assertSee('ORDER-HOURLY-DASH');
+            ->assertSee('Created: 24 Jun 2026, 13:10 WIB')
+            ->assertSee('Paid: 24 Jun 2026, 13:15 WIB')
+            ->assertSee('ORDER-HOURLY-DASH')
+            ->assertSee('ORDER-BINANCE-DASH');
+
+        $this->actingAs($admin)
+            ->get(route('admin.dashboard', ['range' => '1', 'method' => 'binance_pay']))
+            ->assertOk()
+            ->assertSee('Binance Pay crypto revenue line')
+            ->assertSee('ORDER-BINANCE-DASH')
+            ->assertDontSee('ORDER-HOURLY-DASH');
     }
 
     public function test_weekly_and_monthly_ranges_use_matching_chart_buckets(): void
@@ -104,7 +142,7 @@ class AdminDashboardTest extends TestCase
             'price_usdt' => 3.00,
         ]);
 
-        Order::create([
+        $order = Order::create([
             'order_id' => 'ORDER-WEEKLY-DASH',
             'user_id' => $buyer->id,
             'product_id' => $product->id,
@@ -113,22 +151,24 @@ class AdminDashboardTest extends TestCase
             'payment_method' => 'pakasir',
             'price' => 30000,
             'quantity' => 1,
+        ]);
+        $order->forceFill([
             'paid_at' => Carbon::parse('2026-06-10 10:00:00'),
             'created_at' => Carbon::parse('2026-06-10 09:55:00'),
             'updated_at' => Carbon::parse('2026-06-10 10:00:00'),
-        ]);
+        ])->save();
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => 'weekly']))
             ->assertOk()
-            ->assertSee('04 May 2026 - 24 Jun 2026 by week')
+            ->assertSee('04 May 2026 - 24 Jun 2026 by paid week (WIB)')
             ->assertSee('08 Jun - 14 Jun')
             ->assertSee('ORDER-WEEKLY-DASH');
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => 'monthly']))
             ->assertOk()
-            ->assertSee('Jul 2025 - Jun 2026 by month')
+            ->assertSee('Jul 2025 - Jun 2026 by paid month (WIB)')
             ->assertSee('Jun 2026')
             ->assertSee('ORDER-WEEKLY-DASH');
     }

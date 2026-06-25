@@ -4,6 +4,9 @@
     @php
         $formatIdr = fn ($amount) => 'Rp ' . number_format((int) round($amount), 0, ',', '.');
         $formatCrypto = fn ($amount) => '$' . number_format((float) $amount, 2);
+        $formatLineRevenue = fn ($amount) => $salesTrend['line_format'] === 'crypto'
+            ? $formatCrypto($amount)
+            : $formatIdr($amount);
         $formatMetric = function (array $card) use ($formatIdr, $formatCrypto) {
             return match ($card['format']) {
                 'idr' => $formatIdr($card['value']),
@@ -40,6 +43,18 @@
         $curvePoints = [];
         $labelStep = $salesTrend['label_step'];
         $hasSales = ($selectedStats['orders'] ?? 0) > 0;
+        $dashboardUrl = function (array $overrides = []) use ($activeRange, $activePaymentMethod) {
+            $query = array_merge([
+                'range' => $activeRange,
+                'method' => $activePaymentMethod,
+            ], $overrides);
+
+            if (($query['method'] ?? 'all') === 'all') {
+                unset($query['method']);
+            }
+
+            return route('admin.dashboard', $query);
+        };
     @endphp
 
     <div class="page-shell py-6 md:py-10" aria-live="polite">
@@ -55,7 +70,7 @@
 
                 <div class="flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-[#27272A] bg-black/20 p-1">
                     @foreach ($rangeOptions as $rangeKey => $range)
-                        <a href="{{ route('admin.dashboard', ['range' => $rangeKey]) }}"
+                        <a href="{{ $dashboardUrl(['range' => $rangeKey]) }}"
                             data-dashboard-range-link
                             aria-current="{{ (string) $activeRange === (string) $rangeKey ? 'page' : 'false' }}"
                             class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition {{ (string) $activeRange === (string) $rangeKey ? 'bg-[#9333EA] text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
@@ -94,13 +109,26 @@
                         <p class="mt-1 text-sm text-gray-400">{{ $rangeMeta['description'] }}</p>
                     </div>
 
-                    <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                        <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
-                            Revenue line
-                        </span>
-                        <span class="rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-2 text-[#BAE6FD]">
-                            Order bars
-                        </span>
+                    <div class="flex flex-col gap-2 sm:items-end">
+                        <div class="flex flex-wrap gap-2 text-xs font-semibold sm:justify-end">
+                            <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
+                                {{ $salesTrend['line_label'] }} line
+                            </span>
+                            <span class="rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-2 text-[#BAE6FD]">
+                                Order bars
+                            </span>
+                        </div>
+
+                        <div class="flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-[#27272A] bg-black/20 p-1 text-xs font-semibold">
+                            @foreach ($paymentMethodOptions as $methodKey => $method)
+                                <a href="{{ $dashboardUrl(['method' => $methodKey]) }}"
+                                    data-dashboard-range-link
+                                    aria-current="{{ (string) $activePaymentMethod === (string) $methodKey ? 'page' : 'false' }}"
+                                    class="inline-flex min-h-9 items-center justify-center rounded-lg px-3 transition {{ (string) $activePaymentMethod === (string) $methodKey ? 'bg-[#9333EA] text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
+                                    {{ $method['short'] }}
+                                </a>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
 
@@ -111,6 +139,10 @@
                         <div class="dashboard-chart-tooltip-row">
                             <span>Orders</span>
                             <strong data-chart-tooltip-orders></strong>
+                        </div>
+                        <div class="dashboard-chart-tooltip-row">
+                            <span>{{ $salesTrend['line_label'] }}</span>
+                            <strong data-chart-tooltip-line></strong>
                         </div>
                         <div class="dashboard-chart-tooltip-row">
                             <span>IDR Revenue</span>
@@ -147,19 +179,21 @@
                                     ? max(5, ($point['orders'] / $salesTrend['max_orders']) * $plotHeight)
                                     : 2;
                                 $barY = $chartBottom - $orderHeight;
-                                $revenueY = $chartBottom - (($point['idr_revenue'] / $salesTrend['max_idr_revenue']) * $plotHeight);
+                                $revenueY = $chartBottom - (($point['line_revenue'] / $salesTrend['max_line_revenue']) * $plotHeight);
+                                $formattedLine = $formatLineRevenue($point['line_revenue']);
                                 $formattedIdr = $formatIdr($point['idr_revenue']);
                                 $formattedCrypto = $formatCrypto($point['crypto_revenue']);
+                                $hasPointActivity = $point['orders'] > 0 || $point['line_revenue'] > 0;
                                 $curvePoints[] = [
                                     'x' => round($x, 2),
                                     'y' => round($revenueY, 2),
                                 ];
-                                $showLabel = $pointIndex === 0 || $pointIndex === $pointCount - 1 || $pointIndex % $labelStep === 0;
+                                $showLabel = $hasPointActivity || $pointIndex === 0 || $pointIndex === $pointCount - 1 || $pointIndex % $labelStep === 0;
                             @endphp
 
                             <rect x="{{ $x - ($barWidth / 2) }}" y="{{ $barY }}" width="{{ $barWidth }}" height="{{ $orderHeight }}"
                                 rx="4" fill="#38BDF8" opacity="{{ $point['orders'] > 0 ? '0.34' : '0.12' }}">
-                                <title>{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $formattedIdr }}, {{ $formattedCrypto }}</title>
+                                <title>{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $salesTrend['line_label'] }} {{ $formattedLine }}, {{ $formattedIdr }}, {{ $formattedCrypto }}</title>
                             </rect>
 
                             @if ($showLabel)
@@ -204,35 +238,38 @@
                                 stroke-linecap="round" stroke-linejoin="round" />
 
                             @foreach ($chartPoints as $pointIndex => $point)
-                                @php
-                                    $x = $xForIndex($pointIndex);
-                                    $revenueY = $chartBottom - (($point['idr_revenue'] / $salesTrend['max_idr_revenue']) * $plotHeight);
-                                @endphp
-                                <circle cx="{{ $x }}" cy="{{ $revenueY }}" r="{{ $point['idr_revenue'] > 0 ? '4' : '2.5' }}"
-                                    fill="#D8B4FE" stroke="#111115" stroke-width="2">
-                                    <title>{{ $point['label'] }}: {{ $formatIdr($point['idr_revenue']) }} IDR revenue</title>
-                                </circle>
+                                @if ($point['line_revenue'] > 0)
+                                    @php
+                                        $x = $xForIndex($pointIndex);
+                                        $revenueY = $chartBottom - (($point['line_revenue'] / $salesTrend['max_line_revenue']) * $plotHeight);
+                                    @endphp
+                                    <circle cx="{{ $x }}" cy="{{ $revenueY }}" r="4"
+                                        fill="#D8B4FE" stroke="#111115" stroke-width="2">
+                                        <title>{{ $point['label'] }}: {{ $formatLineRevenue($point['line_revenue']) }} {{ $salesTrend['line_label'] }}</title>
+                                    </circle>
+                                @endif
                             @endforeach
                         @endif
 
                         @foreach ($chartPoints as $pointIndex => $point)
                             @php
                                 $x = $xForIndex($pointIndex);
-                                $revenueY = $chartBottom - (($point['idr_revenue'] / $salesTrend['max_idr_revenue']) * $plotHeight);
+                                $revenueY = $chartBottom - (($point['line_revenue'] / $salesTrend['max_line_revenue']) * $plotHeight);
                                 $previousX = $pointIndex > 0 ? $xForIndex($pointIndex - 1) : $chartPadX;
                                 $nextX = $pointIndex < $pointCount - 1 ? $xForIndex($pointIndex + 1) : $chartWidth - $chartPadX;
                                 $hitLeft = $pointCount === 1 ? max($chartPadX, $x - 64) : (($previousX + $x) / 2);
                                 $hitRight = $pointCount === 1 ? min($chartWidth - $chartPadX, $x + 64) : (($x + $nextX) / 2);
                                 $hitWidth = max(34, $hitRight - $hitLeft);
+                                $formattedLine = $formatLineRevenue($point['line_revenue']);
                                 $formattedIdr = $formatIdr($point['idr_revenue']);
                                 $formattedCrypto = $formatCrypto($point['crypto_revenue']);
                             @endphp
                             <rect x="{{ round($hitLeft, 2) }}" y="{{ $chartTop - 14 }}" width="{{ round($hitWidth, 2) }}"
                                 height="{{ $plotHeight + 48 }}" rx="8" class="dashboard-chart-hit" tabindex="0"
                                 data-chart-point data-label="{{ $point['label'] }}" data-short-label="{{ $point['short_label'] }}"
-                                data-orders="{{ number_format((int) $point['orders']) }}" data-idr="{{ $formattedIdr }}"
+                                data-orders="{{ number_format((int) $point['orders']) }}" data-line="{{ $formattedLine }}" data-idr="{{ $formattedIdr }}"
                                 data-crypto="{{ $formattedCrypto }}" data-x="{{ round($x, 2) }}" data-y="{{ round($revenueY, 2) }}"
-                                aria-label="{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $formattedIdr }} IDR revenue, {{ $formattedCrypto }} crypto revenue"></rect>
+                                aria-label="{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $salesTrend['line_label'] }} {{ $formattedLine }}, {{ $formattedIdr }} IDR revenue, {{ $formattedCrypto }} crypto revenue"></rect>
                         @endforeach
                         </svg>
                     </div>
@@ -428,8 +465,13 @@
                                 <td class="p-4">
                                     <div class="font-mono text-xs font-semibold text-gray-300">{{ $order->order_id }}</div>
                                     <div class="mt-1 text-xs text-gray-500">
-                                        {{ $order->created_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }} WIB
+                                        Created: {{ $order->created_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }} WIB
                                     </div>
+                                    @if ($order->paid_at)
+                                        <div class="mt-1 text-xs text-gray-500">
+                                            Paid: {{ $order->paid_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }} WIB
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $order->user->name ?? '-' }}</div>

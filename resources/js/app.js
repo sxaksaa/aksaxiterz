@@ -1656,6 +1656,7 @@ function showDashboardChartTooltip(point) {
 
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-title]', point.dataset.label || point.dataset.shortLabel);
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-orders]', point.dataset.orders);
+    setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-line]', point.dataset.line);
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-idr]', point.dataset.idr);
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-crypto]', point.dataset.crypto);
 
