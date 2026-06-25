@@ -75,11 +75,6 @@ class User extends Authenticatable
         return $this->hasOne(License::class)->latestOfMany();
     }
 
-    public function productReviews()
-    {
-        return $this->hasMany(ProductReview::class);
-    }
-
     public function cartItems()
     {
         return $this->hasMany(CartItem::class);

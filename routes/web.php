@@ -6,20 +6,18 @@ use App\Http\Controllers\Admin\DownloadController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
-use App\Http\Controllers\Admin\ProductReviewController as AdminProductReviewController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VoucherController;
 use App\Models\Category;
 use App\Models\DownloadItem;
 use App\Models\License;
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\ProductReview;
 use App\Models\User;
+use App\Models\Voucher as VoucherModel;
 use App\Services\PendingOrderExpirationService;
 use App\Support\ProductSalesSignals;
 use App\Support\RecentPurchaseFeed;
@@ -40,7 +38,32 @@ use Laravel\Socialite\Two\InvalidStateException;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function (Request $request) {
+$activePromoVoucher = function (?Product $product = null) {
+    $vouchers = VoucherModel::query()
+        ->withCount([
+            'orders as active_uses_count' => fn ($query) => $query->where('status', '!=', 'cancelled'),
+        ])
+        ->where('is_active', true)
+        ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+        ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+        ->orderByDesc('discount_percent')
+        ->orderByDesc('max_discount')
+        ->get();
+
+    if ($product) {
+        $packageIds = $product->packages->pluck('id')->map(fn ($id) => (int) $id);
+
+        $vouchers = $vouchers->filter(function (VoucherModel $voucher) use ($packageIds): bool {
+            $requiredPackageIds = $voucher->requiredPackageIds();
+
+            return $requiredPackageIds === [] || $packageIds->intersect($requiredPackageIds)->isNotEmpty();
+        });
+    }
+
+    return $vouchers->first(fn (VoucherModel $voucher) => $voucher->availabilityStatus() === 'active');
+};
+
+Route::get('/', function (Request $request) use ($activePromoVoucher) {
     $categoryOrder = "CASE slug WHEN 'pc' THEN 1 WHEN 'mobile' THEN 2 WHEN 'android' THEN 3 WHEN 'ios' THEN 4 ELSE 99 END";
 
     $categories = Category::where(function ($query) {
@@ -76,8 +99,9 @@ Route::get('/', function (Request $request) {
 
     $products = app(ProductSalesSignals::class)->apply($query->get());
     $recentPurchases = app(RecentPurchaseFeed::class)->storefront();
+    $promoVoucher = $activePromoVoucher();
 
-    return view('home', compact('categories', 'products', 'recentPurchases'));
+    return view('home', compact('categories', 'products', 'recentPurchases', 'promoVoucher'));
 });
 
 $productsFragment = function (Request $request) {
@@ -188,7 +212,7 @@ Route::get('/contact', fn () => $legalPage('contact'))->name('contact');
 | PRODUCT DETAIL
 |--------------------------------------------------------------------------
 */
-Route::get('/product/{product}', function (string $product) {
+Route::get('/product/{product}', function (string $product) use ($activePromoVoucher) {
     $product = Product::with([
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
@@ -200,15 +224,9 @@ Route::get('/product/{product}', function (string $product) {
     app(ProductSalesSignals::class)->apply(collect([$product]));
 
     $recentPurchases = app(RecentPurchaseFeed::class)->storefront($product);
-    $approvedReviews = ProductReview::with('user')
-        ->where('product_id', $product->id)
-        ->where('status', ProductReview::STATUS_APPROVED)
-        ->latest('approved_at')
-        ->latest('id')
-        ->take(6)
-        ->get();
+    $promoVoucher = $activePromoVoucher($product);
 
-    return view('product-detail', compact('product', 'recentPurchases', 'approvedReviews'));
+    return view('product-detail', compact('product', 'recentPurchases', 'promoVoucher'));
 })->where('product', '[A-Za-z0-9-]+')->name('products.show');
 
 /*
@@ -240,10 +258,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/voucher/preview', [VoucherController::class, 'preview'])
         ->middleware('throttle:10,1')
         ->name('vouchers.preview');
-    Route::post('/reviews', [ProductReviewController::class, 'store'])
-        ->middleware('throttle:10,1')
-        ->name('reviews.store');
-
     // Pay again
     Route::post('/pay-again/{id}', [PaymentController::class, 'payAgain'])
         ->middleware('throttle:10,1');
@@ -316,18 +330,14 @@ Route::middleware('auth')->group(function () {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
         $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
-        $reviewLookup = ProductReview::with('order')
-            ->where('user_id', auth()->id())
-            ->get()
-            ->filter(fn (ProductReview $review) => filled($review->order?->order_id))
-            ->keyBy(fn (ProductReview $review) => $review->product_id.'|'.$review->order->order_id);
+
         $orderStats = [
             'total' => Order::where('user_id', auth()->id())->count(),
             'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
             'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
         ];
 
-        return view('licenses', compact('licenses', 'orderStats', 'reviewLookup'));
+        return view('licenses', compact('licenses', 'orderStats'));
     });
 
     // Orders
@@ -400,8 +410,6 @@ Route::middleware(['auth', 'admin'])
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('/orders/{order}/mark-paid', [OrderController::class, 'markPaid'])->name('orders.mark-paid');
         Route::post('/orders/{order}/resync-license', [OrderController::class, 'resyncLicense'])->name('orders.resync-license');
-        Route::get('/reviews', [AdminProductReviewController::class, 'index'])->name('reviews.index');
-        Route::patch('/reviews/{productReview}', [AdminProductReviewController::class, 'update'])->name('reviews.update');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     });

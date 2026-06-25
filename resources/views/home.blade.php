@@ -26,7 +26,7 @@
                     </div>
                     <div class="home-panel">
                         <div class="text-xl font-semibold text-white">2000+ Members</div>
-                        <div class="mt-1 text-xs text-gray-400">Active community on Discord.</div>
+                        <div class="mt-1 text-xs text-gray-400">Member vouchers, restock alerts, and setup help.</div>
                     </div>
                     <div class="home-panel">
                         <div class="text-xl font-semibold text-white">Since 2024</div>
@@ -36,6 +36,12 @@
             </div>
         </div>
     </section>
+
+    @if ($promoVoucher ?? null)
+        <section class="page-shell pb-6">
+            @include('partials.promo-banner', ['promoVoucher' => $promoVoucher])
+        </section>
+    @endif
 
     <section class="page-shell pb-6 md:pb-10">
         <div class="home-flow fade-up">

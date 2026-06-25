@@ -17,6 +17,9 @@
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
+        $isUpdating = $product->status === \App\Models\Product::STATUS_UPDATING;
+        $availabilityIcon = $isUpdating ? 'discord' : ($stock > 0 ? 'key-round' : 'discord');
+        $availabilityLabel = $isUpdating ? 'Update alerts in Discord' : ($stock > 0 ? $stock . ' ready' : 'Manual order');
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
     @endphp
@@ -55,8 +58,8 @@
                 <span>From {{ $durationLabel }}</span>
             </span>
             <span class="product-card-fact">
-                <x-ui.icon name="{{ $stock > 0 ? 'key-round' : 'discord' }}" class="h-4 w-4" />
-                <span>{{ $stock > 0 ? $stock . ' ready' : 'Manual order' }}</span>
+                <x-ui.icon :name="$availabilityIcon" class="h-4 w-4" />
+                <span>{{ $availabilityLabel }}</span>
             </span>
         </div>
 

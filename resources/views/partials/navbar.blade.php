@@ -46,7 +46,9 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
         <!-- RIGHT -->
         <div class="flex items-center justify-end gap-3">
-            @php $discordUrl = config('links.discord_url'); @endphp
+            @php
+                $discordUrl = config('links.discord_url');
+            @endphp
 
             @auth
                 <a href="{{ route('cart.index') }}"
@@ -131,11 +133,6 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                                     class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     <x-ui.icon name="receipt" class="h-4 w-4 text-[#C084FC]" />
                                     <span>Admin Orders</span>
-                                </a>
-                                <a href="{{ route('admin.reviews.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="sparkles" class="h-4 w-4 text-[#C084FC]" />
-                                    <span>Admin Reviews</span>
                                 </a>
                                 <a href="{{ route('admin.license-stocks.index') }}"
                                     class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
@@ -239,10 +236,6 @@ transition-all duration-300 ease-out">
                 <a href="{{ route('admin.orders.index') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="receipt" class="nav-icon" />
                     <span>Admin Orders</span>
-                </a>
-                <a href="{{ route('admin.reviews.index') }}" data-mobile-menu-link class="nav-item">
-                    <x-ui.icon name="sparkles" class="nav-icon" />
-                    <span>Admin Reviews</span>
                 </a>
                 <a href="/admin/license-stocks" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="key-round" class="nav-icon" />

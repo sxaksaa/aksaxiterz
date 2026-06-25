@@ -31,6 +31,7 @@
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
+        $needsUpdateAlerts = $product->status === \App\Models\Product::STATUS_UPDATING;
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
         $startDurationDays = $minPackage?->durationDays();
@@ -59,24 +60,6 @@
             ->sortByDesc('percent')
             ->keys()
             ->first();
-        $maskReviewName = function (?string $value) {
-            $name = trim((string) $value);
-
-            if (str_contains($name, '@')) {
-                $name = \Illuminate\Support\Str::before($name, '@');
-            }
-
-            $first = \Illuminate\Support\Str::of($name)->explode(' ')->filter()->first() ?: 'Customer';
-            $first = (string) $first;
-
-            if (\Illuminate\Support\Str::length($first) <= 1) {
-                return \Illuminate\Support\Str::upper($first) . '***';
-            }
-
-            return \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($first, 0, 1))
-                . str_repeat('*', min(6, max(3, \Illuminate\Support\Str::length($first) - 2)))
-                . \Illuminate\Support\Str::substr($first, -1);
-        };
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10">
@@ -125,17 +108,22 @@
                                     {{ $hasAutoDelivery ? $stock : 'Manual' }}
                                 </div>
                                 <div class="text-sm text-gray-400">
-                                    {{ $hasAutoDelivery ? 'license ready' : 'order via Discord' }}
+                                    {{ $needsUpdateAlerts ? 'update alerts on Discord' : ($hasAutoDelivery ? 'license ready' : 'order via Discord') }}
                                 </div>
                             </div>
                             <div class="text-right text-xs text-gray-500">
-                                {{ $hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order' }}
+                                {{ $needsUpdateAlerts ? 'Join Discord for update alerts' : ($hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order') }}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        @include('partials.promo-banner', [
+            'promoVoucher' => $promoVoucher ?? null,
+            'promoClass' => 'mb-6 fade-up',
+        ])
 
         @if (filled($product->important_note))
             <div class="product-section mb-6 fade-up">
@@ -147,43 +135,12 @@
             </div>
         @endif
 
-        @if (($approvedReviews ?? collect())->isNotEmpty())
-            <div class="product-section mb-6 fade-up">
-                <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Customer reviews</p>
-                        <h2 class="mt-1 text-xl font-semibold text-white">Approved buyer feedback</h2>
-                    </div>
-                    <span class="support-pill">{{ $approvedReviews->count() }} shown</span>
-                </div>
-
-                <div class="review-grid">
-                    @foreach ($approvedReviews as $review)
-                        <article class="review-card">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <div class="text-sm font-semibold text-white">
-                                        {{ $maskReviewName($review->user?->name ?: $review->user?->email) }}
-                                    </div>
-                                    <div class="mt-1 text-xs text-gray-500">
-                                        {{ $review->approved_at?->format('d M Y') ?? $review->created_at->format('d M Y') }}
-                                    </div>
-                                </div>
-                                <span class="review-rating">{{ $review->rating }}/5</span>
-                            </div>
-                            <p class="mt-3 text-sm leading-6 text-gray-300">{{ $review->body }}</p>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
         <div class="discord-mini-panel mb-8 fade-up">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-sm font-semibold text-white">Need help before checkout?</h2>
                     <p class="mt-1 text-sm text-gray-400">
-                        Join Discord for manual orders, setup guidance, license resets, and checkout help.
+                        Join Discord for member vouchers, restock alerts, setup guidance, license resets, and checkout help.
                     </p>
                 </div>
 
@@ -203,7 +160,7 @@
             </div>
         </div>
 
-        <div class="product-section mb-6 fade-up">
+        <div id="checkout" class="product-section mb-6 scroll-mt-28 fade-up">
             <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Checkout</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Payment Method</h2>
