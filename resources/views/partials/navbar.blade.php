@@ -114,6 +114,11 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                                     <x-ui.icon name="home" class="h-4 w-4 text-[#C084FC]" />
                                     <span>Admin Dashboard</span>
                                 </a>
+                                <a href="{{ route('admin.activity.index') }}"
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
+                                    <x-ui.icon name="activity" class="h-4 w-4 text-[#C084FC]" />
+                                    <span>Admin Activity</span>
+                                </a>
                                 <a href="{{ route('admin.products.index') }}"
                                     class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
                                     <x-ui.icon name="boxes" class="h-4 w-4 text-[#C084FC]" />
@@ -220,6 +225,10 @@ transition-all duration-300 ease-out">
                 <a href="{{ route('admin.dashboard') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="home" class="nav-icon" />
                     <span>Admin Dashboard</span>
+                </a>
+                <a href="{{ route('admin.activity.index') }}" data-mobile-menu-link class="nav-item">
+                    <x-ui.icon name="activity" class="nav-icon" />
+                    <span>Admin Activity</span>
                 </a>
                 <a href="{{ route('admin.products.index') }}" data-mobile-menu-link class="nav-item">
                     <x-ui.icon name="boxes" class="nav-icon" />

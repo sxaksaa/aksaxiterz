@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceCanonicalUrl;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\ExpirePendingOrdersFromTraffic;
+use App\Http\Middleware\LogAdminActivity;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'admin' => EnsureAdmin::class,
+            'admin.activity' => LogAdminActivity::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

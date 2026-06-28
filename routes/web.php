@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DownloadController;
@@ -377,11 +378,12 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:30,1');
 });
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'admin', 'admin.activity'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/activity', [ActivityLogController::class, 'index'])->name('activity.index');
         Route::get('/license-stocks', [LicenseStockController::class, 'index'])->name('license-stocks.index');
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');
