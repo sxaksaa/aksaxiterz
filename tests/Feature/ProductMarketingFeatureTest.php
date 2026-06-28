@@ -31,7 +31,15 @@ class ProductMarketingFeatureTest extends TestCase
         [$bestSeller, $bestSellerPackage] = $this->productWithPackage('Aurora Best', 'aurora-best', '30 Days');
         [$popular, $popularPackage] = $this->productWithPackage('Aurora Popular', 'aurora-popular', '7 Days');
         [$updating] = $this->productWithPackage('Aurora Updating', 'aurora-updating', '1 Day');
+        [$hidden, $hiddenPackage] = $this->productWithPackage('Aurora Hidden', 'aurora-hidden', '30 Days');
         $updating->update(['status' => Product::STATUS_UPDATING]);
+        $hidden->update(['is_visible' => false]);
+
+        $this->createPaidOrder($hidden, $hiddenPackage, [
+            'order_id' => 'ORDER-HIDDEN-RECENT',
+            'quantity' => 50,
+            'paid_at' => now()->subMinute(),
+        ]);
 
         $this->createPaidOrder($bestSeller, $bestSellerPackage, [
             'order_id' => 'ORDER-BEST-OLD',
@@ -68,6 +76,7 @@ class ProductMarketingFeatureTest extends TestCase
             ->assertSee('Aurora Popular')
             ->assertSee('Popular')
             ->assertSee('Aurora Updating')
+            ->assertDontSee('Aurora Hidden')
             ->assertSee('Update alerts in Discord');
 
         $this->get(route('products.show', $bestSeller))

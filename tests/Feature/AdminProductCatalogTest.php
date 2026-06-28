@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
 use Tests\TestCase;
@@ -84,6 +86,62 @@ class AdminProductCatalogTest extends TestCase
         $this->get(route('products.show', $product))
             ->assertOk()
             ->assertDontSee('Important Note');
+    }
+
+    public function test_admin_can_hide_product_from_storefront_and_purchase_paths(): void
+    {
+        [$admin, $product, $package, $category] = $this->makeCatalogProduct();
+        $buyer = User::factory()->create();
+
+        LicenseStock::create([
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'license_key' => 'HIDDEN-PRODUCT-STOCK',
+            'is_sold' => false,
+        ]);
+
+        CartItem::create([
+            'user_id' => $buyer->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->patch(route('admin.products.update', $product), [
+            'category_id' => $category->id,
+            'name' => $product->name,
+            'description' => $product->description,
+            'status' => Product::STATUS_READY,
+            'is_visible' => '0',
+        ]);
+
+        $response->assertRedirect(route('admin.products.edit', $product));
+        $this->assertFalse($product->fresh()->is_visible);
+        $this->assertDatabaseMissing('cart_items', ['user_id' => $buyer->id, 'product_id' => $product->id]);
+
+        $this->get('/')->assertOk()->assertDontSee($product->name);
+        $this->get(route('products.fragment'))->assertOk()->assertDontSee($product->name);
+        $this->get(route('products.show', $product))->assertNotFound();
+
+        $this->actingAs($buyer)
+            ->postJson(route('cart.items.store', $product), [
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'This product is not available for purchase.');
+
+        $this->postJson(route('vouchers.preview'), [
+            'code' => 'HIDDEN10',
+            'package_id' => $package->id,
+            'payment_method' => 'pakasir',
+            'quantity' => 1,
+        ])->assertNotFound();
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('This product is not available for purchase.');
+
+        app(PaymentService::class)->createPakasirPayment($buyer, $product->id, $package->id);
     }
 
     public function test_admin_cannot_delete_product_with_order_or_stock_history(): void

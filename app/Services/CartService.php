@@ -128,6 +128,10 @@ class CartService
             throw new \Exception('The selected package does not belong to this product.');
         }
 
+        if (! $product->is_visible) {
+            throw new \Exception('This product is not available for purchase.');
+        }
+
         if ($product->status !== Product::STATUS_READY) {
             throw new \Exception('This product is not ready for automatic checkout.');
         }

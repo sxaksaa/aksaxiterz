@@ -44,6 +44,9 @@ class ProductController extends Controller
             ->when($request->filled('category_id'), function ($query) use ($request) {
                 $query->where('category_id', $request->integer('category_id'));
             })
+            ->when(in_array($request->input('visibility'), ['visible', 'hidden'], true), function ($query) use ($request) {
+                $query->where('is_visible', $request->input('visibility') === 'visible');
+            })
             ->orderBy('name')
             ->paginate(10)
             ->withQueryString();
@@ -71,6 +74,7 @@ class ProductController extends Controller
             'name' => $validated['name'],
             'slug' => $slug,
             'status' => $validated['status'] ?? Product::STATUS_READY,
+            'is_visible' => (bool) ($validated['is_visible'] ?? true),
             'description' => $validated['description'],
         ]);
 
@@ -101,14 +105,23 @@ class ProductController extends Controller
     {
         $validated = $this->validateProduct($request, $product);
         $slug = $this->uniqueSlug(null, $validated['name'], $product);
+        $wasVisible = (bool) $product->is_visible;
+        $isVisible = array_key_exists('is_visible', $validated)
+            ? (bool) $validated['is_visible']
+            : $wasVisible;
 
         $product->update([
             'category_id' => $validated['category_id'],
             'name' => $validated['name'],
             'slug' => $slug,
             'status' => $validated['status'],
+            'is_visible' => $isVisible,
             'description' => $validated['description'],
         ]);
+
+        if ($wasVisible && ! $isVisible) {
+            $product->cartItems()->delete();
+        }
 
         return redirect()
             ->route('admin.products.edit', $product->fresh())
@@ -201,6 +214,7 @@ class ProductController extends Controller
             ],
             'description' => ['required', 'string', 'max:1000'],
             'status' => ['required', 'string', Rule::in(array_keys(Product::statusOptions()))],
+            'is_visible' => ['sometimes', 'boolean'],
         ]);
     }
 

@@ -26,7 +26,8 @@ class VoucherController extends Controller
             ],
         ]);
 
-        $package = Package::findOrFail($validated['package_id']);
+        $package = Package::with('product')->findOrFail($validated['package_id']);
+        abort_unless($package->product?->is_visible, 404);
         $quantity = (int) ($validated['quantity'] ?? 1);
 
         if ($quantity > $package->availableLicenseStocks()->count()) {

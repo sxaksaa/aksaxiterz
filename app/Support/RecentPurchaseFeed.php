@@ -36,6 +36,10 @@ class RecentPurchaseFeed
     {
         return $order->lineItems()
             ->filter(function (OrderItem $item) use ($filterProduct) {
+                if ($item->product && ! $item->product->is_visible) {
+                    return false;
+                }
+
                 return ! $filterProduct || (int) $item->product_id === (int) $filterProduct->id;
             })
             ->map(function (OrderItem $item) use ($order) {

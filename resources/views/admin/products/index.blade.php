@@ -88,13 +88,21 @@
                     </select>
                 </label>
 
-                <label class="block lg:row-span-2">
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Visibility</span>
+                    <select name="is_visible" class="search-bar w-full" required>
+                        <option value="1" @selected((string) old('is_visible', '1') === '1')>Public</option>
+                        <option value="0" @selected((string) old('is_visible', '1') === '0')>Hidden</option>
+                    </select>
+                </label>
+
+                <label class="block lg:col-span-2">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Description</span>
                     <textarea name="description" rows="4" class="search-bar min-h-28 w-full resize-y"
                         placeholder="Short public product description" required>{{ old('description') }}</textarea>
                 </label>
 
-                <div class="flex items-end">
+                <div class="flex items-end lg:col-span-2">
                     <button class="btn-footer h-12">
                         <x-ui.icon name="package-plus" class="h-4 w-4" />
                         <span>Create Product</span>
@@ -105,7 +113,7 @@
 
         <section class="product-section mb-6 fade-up">
             <form id="catalogFilterForm" method="GET" action="{{ route('admin.products.index') }}"
-                class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_0.75fr_auto]">
+                class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_0.7fr_0.55fr_auto]">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
                     <input name="search" value="{{ request('search') }}" class="search-bar w-full"
@@ -121,6 +129,15 @@
                                 {{ $category->name }}
                             </option>
                         @endforeach
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Visibility</span>
+                    <select name="visibility" class="search-bar w-full">
+                        <option value="">All products</option>
+                        <option value="visible" @selected(request('visibility') === 'visible')>Public</option>
+                        <option value="hidden" @selected(request('visibility') === 'hidden')>Hidden</option>
                     </select>
                 </label>
 
@@ -176,9 +193,16 @@
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $product->category->name ?? '-' }}</td>
                                 <td class="p-4">
-                                    <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
-                                        {{ $product->status_label }}
-                                    </span>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                                            {{ $product->status_label }}
+                                        </span>
+                                        @unless ($product->is_visible)
+                                            <span class="inline-flex items-center rounded-lg border border-gray-600/50 bg-gray-500/10 px-2.5 py-1 text-xs font-semibold text-gray-300">
+                                                Hidden
+                                            </span>
+                                        @endunless
+                                    </div>
                                 </td>
                                 <td class="p-4">
                                     <div class="grid gap-2">
@@ -235,9 +259,16 @@
                             <div class="font-semibold text-white">{{ $product->name }}</div>
                             <div class="mt-1 text-xs text-gray-400">{{ $product->category->name ?? '-' }}</div>
                         </div>
-                        <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
-                            {{ $product->status_label }}
-                        </span>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                                {{ $product->status_label }}
+                            </span>
+                            @unless ($product->is_visible)
+                                <span class="inline-flex items-center rounded-lg border border-gray-600/50 bg-gray-500/10 px-2.5 py-1 text-xs font-semibold text-gray-300">
+                                    Hidden
+                                </span>
+                            @endunless
+                        </div>
                     </div>
 
                     <div class="mt-4 grid gap-2 text-sm">

@@ -50,7 +50,9 @@ class ProductSalesSignals
     {
         return OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('orders.status', 'paid')
+            ->where('products.is_visible', true)
             ->when($from, function ($query) use ($from) {
                 $query->where(function ($query) use ($from) {
                     $query->where('orders.paid_at', '>=', $from)

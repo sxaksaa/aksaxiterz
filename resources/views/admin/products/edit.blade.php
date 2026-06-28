@@ -90,13 +90,21 @@
                     </select>
                 </label>
 
-                <label class="block lg:row-span-2">
+                <label class="block">
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Visibility</span>
+                    <select name="is_visible" class="search-bar w-full" required>
+                        <option value="1" @selected((string) old('is_visible', $product->is_visible ? '1' : '0') === '1')>Public</option>
+                        <option value="0" @selected((string) old('is_visible', $product->is_visible ? '1' : '0') === '0')>Hidden</option>
+                    </select>
+                </label>
+
+                <label class="block lg:col-span-2">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Description</span>
                     <textarea name="description" rows="4" class="search-bar min-h-28 w-full resize-y"
                         required>{{ old('description', $product->description) }}</textarea>
                 </label>
 
-                <div class="flex flex-wrap items-end gap-2">
+                <div class="flex flex-wrap items-end gap-2 lg:col-span-2">
                     <button class="btn-footer h-12">
                         <x-ui.icon name="save" class="h-4 w-4" />
                         <span>Save Product</span>

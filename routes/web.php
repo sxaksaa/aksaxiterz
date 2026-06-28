@@ -68,7 +68,7 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
 
     $categories = Category::where(function ($query) {
         $query->where('slug', 'mobile')
-            ->orWhereHas('products');
+            ->orWhereHas('products', fn ($query) => $query->visible());
     })
         ->orderByRaw($categoryOrder)
         ->orderBy('name')
@@ -78,6 +78,7 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
+        ->visible()
         ->withCount('availableLicenseStocks')
         ->withExists(['availableLicenseStocks as has_available_stock'])
         ->orderByDesc('has_available_stock')
@@ -109,6 +110,7 @@ $productsFragment = function (Request $request) {
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
+        ->visible()
         ->withCount('availableLicenseStocks')
         ->withExists(['availableLicenseStocks as has_available_stock'])
         ->orderByDesc('has_available_stock')
@@ -217,6 +219,7 @@ Route::get('/product/{product}', function (string $product) use ($activePromoVou
         'category',
         'packages' => fn ($query) => $query->withCount('availableLicenseStocks')->orderBy('price'),
     ])
+        ->visible()
         ->withCount('availableLicenseStocks')
         ->where('slug', $product)
         ->firstOrFail();

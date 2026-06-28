@@ -49,9 +49,9 @@ class PaymentService
         ?string $voucherCode = null,
         int $quantity = 1
     ): array {
-        $this->ensurePakasirConfigured();
-
         $product = Product::findOrFail($productId);
+        $this->ensureProductVisible($product);
+        $this->ensurePakasirConfigured();
 
         $package = Package::where('id', $packageId)
             ->where('product_id', $productId)
@@ -183,10 +183,10 @@ class PaymentService
             throw new \Exception('Invalid payment method');
         }
 
+        $product = Product::findOrFail($productId);
+        $this->ensureProductVisible($product);
         $this->ensureDirectCryptoConfigured($coin);
         $network = $this->directCryptoNetwork($coin);
-
-        $product = Product::findOrFail($productId);
 
         $package = Package::where('id', $packageId)
             ->where('product_id', $productId)
@@ -258,6 +258,8 @@ class PaymentService
         int $quantity = 1,
         ?string $selectedToken = null
     ): array {
+        $product = Product::findOrFail($productId);
+        $this->ensureProductVisible($product);
         $this->ensureBinancePayConfigured();
         $pay = config('services.binance.pay', []);
         $token = strtoupper(trim((string) ($selectedToken ?: ($pay['token'] ?? 'USDT'))));
@@ -273,7 +275,6 @@ class PaymentService
             ? $tokenQrContent
             : ($pay['qr_content'] ?? null);
 
-        $product = Product::findOrFail($productId);
         $package = Package::where('id', $packageId)
             ->where('product_id', $productId)
             ->firstOrFail();
@@ -343,6 +344,7 @@ class PaymentService
         ?Order $order = null,
         ?string $voucherCode = null
     ): array {
+        $this->ensureCartProductsVisible($items);
         $this->ensurePakasirConfigured();
         $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
         $order = $this->prepareCartOrder($user, $items, 'pakasir', $order, $voucherCode, $localExpiresAt);
@@ -392,6 +394,7 @@ class PaymentService
             throw new \Exception('Invalid payment method');
         }
 
+        $this->ensureCartProductsVisible($items);
         $this->ensureDirectCryptoConfigured($coin);
         $network = $this->directCryptoNetwork($coin);
         $expiresAt = now()->addMinutes(max(5, (int) config('services.crypto_direct.expires_minutes', 10)));
@@ -445,6 +448,7 @@ class PaymentService
         ?Order $order = null,
         ?string $voucherCode = null
     ): array {
+        $this->ensureCartProductsVisible($items);
         $this->ensureBinancePayConfigured();
         $pay = config('services.binance.pay', []);
         $token = strtoupper(trim($selectedToken));
@@ -1177,6 +1181,24 @@ class PaymentService
 
         if ($cancelled > 0) {
             $this->stockReservationService->release($order);
+        }
+    }
+
+    private function ensureProductVisible(Product $product): void
+    {
+        if (! $product->is_visible) {
+            throw new \Exception('This product is not available for purchase.');
+        }
+    }
+
+    private function ensureCartProductsVisible(Collection $items): void
+    {
+        foreach ($items as $item) {
+            $product = $item->product ?? Product::find($item->product_id);
+
+            if (! $product || ! $product->is_visible) {
+                throw new \Exception('A product in this order is no longer available for purchase.');
+            }
         }
     }
 

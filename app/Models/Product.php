@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -15,9 +16,19 @@ class Product extends Model
         'name',
         'slug',
         'status',
+        'is_visible',
         'description',
         'important_note',
     ];
+
+    protected $casts = [
+        'is_visible' => 'boolean',
+    ];
+
+    public function scopeVisible(Builder $query): Builder
+    {
+        return $query->where('is_visible', true);
+    }
 
     public static function statusOptions(): array
     {
