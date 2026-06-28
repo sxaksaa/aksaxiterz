@@ -90,8 +90,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
                     <input name="slug" value="{{ old('slug', $editCategory->slug ?? '') }}" class="search-bar w-full"
-                        placeholder="pc, android, ios" maxlength="80">
-                    <span class="mt-2 block text-xs text-gray-500">Leave empty to generate from name.</span>
+                        placeholder="pc-android-ios" maxlength="80">
                 </label>
 
                 <button class="btn-footer h-12">

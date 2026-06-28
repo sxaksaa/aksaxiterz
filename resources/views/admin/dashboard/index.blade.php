@@ -14,18 +14,6 @@
                 default => number_format((int) $card['value']),
             };
         };
-        $statusClass = fn ($status) => match ($status) {
-            'paid' => 'status-pill-paid',
-            'pending' => 'status-pill-pending',
-            default => 'status-pill-cancelled',
-        };
-        $methodLabel = fn ($method) => match ($method) {
-            'pakasir' => 'QRIS',
-            'crypto' => 'Crypto',
-            'binance_pay' => 'Binance Pay',
-            default => ucfirst($method ?: 'Legacy'),
-        };
-
         $chartPoints = collect($salesTrend['points']);
         $chartWidth = 760;
         $chartHeight = 260;
@@ -57,7 +45,7 @@
         };
     @endphp
 
-    <div class="page-shell py-6 md:py-10" aria-live="polite">
+    <div class="page-shell min-w-0 py-6 md:py-10" aria-live="polite">
         <section class="orders-hero fade-up mb-6">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -100,10 +88,10 @@
             </div>
         </section>
 
-        <div class="mb-6 grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-            <section class="product-section fade-up">
+        <div class="mb-6 grid min-w-0 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+            <section class="product-section min-w-0 fade-up">
                 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
+                    <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Sales Trend</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">{{ $rangeMeta['label'] }}</h2>
                         <p class="mt-1 text-sm text-gray-400">{{ $rangeMeta['description'] }}</p>
@@ -154,8 +142,8 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto pb-1">
-                        <svg viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" class="min-w-[720px] w-full" role="img" aria-label="Sales trend chart"
+                    <div class="w-full min-w-0 overflow-x-auto pb-1">
+                        <svg viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" class="w-full min-w-[600px] sm:min-w-[720px]" role="img" aria-label="Sales trend chart"
                             data-dashboard-chart-svg>
                         <defs>
                             <linearGradient id="aksaRevenueFill" x1="0" x2="0" y1="0" y2="1">
@@ -282,7 +270,7 @@
                 @endunless
             </section>
 
-            <section class="product-section fade-up">
+            <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Period Summary</p>
@@ -294,7 +282,7 @@
                 <div class="grid gap-3">
                     <div class="rounded-xl border border-[#27272A] bg-black/20 p-3">
                         <div class="text-xs text-gray-500">Window</div>
-                        <div class="mt-1 text-sm font-semibold text-white">{{ $rangeMeta['description'] }}</div>
+                        <div class="mt-1 break-words text-sm font-semibold text-white">{{ $rangeMeta['description'] }}</div>
                     </div>
                     <div class="rounded-xl border border-[#27272A] bg-black/20 p-3">
                         <div class="text-xs text-gray-500">Average IDR order</div>
@@ -322,8 +310,8 @@
             </section>
         </div>
 
-        <div class="mb-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            <section class="product-section fade-up">
+        <div class="mb-6 grid min-w-0 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Operations</p>
@@ -360,7 +348,7 @@
                 </div>
             </section>
 
-            <section class="product-section fade-up">
+            <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Stock</p>
@@ -410,7 +398,7 @@
             </section>
         @endif
 
-        <section class="product-section mb-6 fade-up">
+        <section class="product-section mb-6 min-w-0 fade-up">
             <div class="mb-4 flex items-start justify-between gap-3">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ $rangeMeta['label'] }}</p>
@@ -435,102 +423,5 @@
             </div>
         </section>
 
-        <div class="orders-table-wrap hidden lg:block fade-up">
-            <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">Recent Orders</h2>
-                    <p class="mt-1 text-xs text-gray-500">{{ $rangeMeta['label'] }} customer checkout activity.</p>
-                </div>
-                <a href="{{ route('admin.orders.index') }}" class="order-action">
-                    <x-ui.icon name="eye" class="h-4 w-4" />
-                    <span>View All</span>
-                </a>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[980px] text-sm">
-                    <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
-                        <tr>
-                            <th class="p-4 text-left">Order</th>
-                            <th class="p-4 text-left">Customer</th>
-                            <th class="p-4 text-left">Items</th>
-                            <th class="p-4 text-left">Method</th>
-                            <th class="p-4 text-left">Status</th>
-                            <th class="p-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($recentOrders as $order)
-                            <tr class="orders-table-row">
-                                <td class="p-4">
-                                    <div class="font-mono text-xs font-semibold text-gray-300">{{ $order->order_id }}</div>
-                                    <div class="mt-1 text-xs text-gray-500">
-                                        Created: {{ $order->created_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }} WIB
-                                    </div>
-                                    @if ($order->paid_at)
-                                        <div class="mt-1 text-xs text-gray-500">
-                                            Paid: {{ $order->paid_at?->timezone(config('app.timezone'))->format('d M Y, H:i') ?? '-' }} WIB
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="p-4">
-                                    <div class="font-semibold text-white">{{ $order->user->name ?? '-' }}</div>
-                                    <div class="mt-1 max-w-[220px] truncate text-xs text-gray-500">{{ $order->user->email ?? '-' }}</div>
-                                </td>
-                                <td class="p-4">
-                                    @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
-                                </td>
-                                <td class="p-4 text-gray-300">{{ $methodLabel($order->payment_method) }}</td>
-                                <td class="p-4">
-                                    <span class="status-pill {{ $statusClass($order->status) }}">{{ ucfirst($order->status) }}</span>
-                                    <div class="mt-1 text-xs text-gray-500">{{ $order->licenses_count }} licenses</div>
-                                </td>
-                                <td class="p-4 text-right">
-                                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action compact-action" title="Open order detail" aria-label="Open detail for {{ $order->order_id }}">
-                                        <x-ui.icon name="eye" class="h-4 w-4" />
-                                        <span class="sr-only">Detail</span>
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="p-8">
-                                    <div class="empty-state">No recent orders yet.</div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="space-y-4 lg:hidden">
-            @forelse ($recentOrders as $order)
-                <article class="order-mobile-card motion-card">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
-                            <div class="mt-2">
-                                @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
-                            </div>
-                            <div class="mt-1 truncate text-xs text-gray-500">{{ $order->user->email ?? '-' }}</div>
-                        </div>
-                        <span class="status-pill {{ $statusClass($order->status) }}">{{ ucfirst($order->status) }}</span>
-                    </div>
-
-                    <div class="mt-4 grid gap-2 text-sm text-gray-400">
-                        <div>Method: <span class="font-semibold text-white">{{ $methodLabel($order->payment_method) }}</span></div>
-                        <div>Delivery: <span class="font-semibold text-white">{{ $order->licenses_count }} licenses</span></div>
-                    </div>
-
-                    <a href="{{ route('admin.orders.show', $order) }}" class="order-action mt-4 w-full">
-                        <x-ui.icon name="eye" class="h-4 w-4" />
-                        <span>Detail</span>
-                    </a>
-                </article>
-            @empty
-                <div class="empty-state">No recent orders yet.</div>
-            @endforelse
-        </div>
     </div>
 @endsection

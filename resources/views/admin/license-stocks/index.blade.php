@@ -107,7 +107,8 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">License keys</span>
-                    <textarea name="license_keys" rows="4" class="search-bar min-h-28 w-full resize-y"
+                    <textarea name="license_keys" rows="1" class="search-bar stock-key-textarea w-full"
+                        data-stock-key-input
                         placeholder="Put new license keys here&#10;One key per line" required>{{ old('license_keys') }}</textarea>
                 </label>
 
@@ -465,6 +466,19 @@
                         clearPackage: true
                     });
                 });
+            });
+
+            document.querySelectorAll('[data-stock-key-input]').forEach((textarea) => {
+                const resizeTextarea = () => {
+                    const maxHeight = Number.parseInt(getComputedStyle(textarea).maxHeight, 10) || 240;
+
+                    textarea.style.height = 'auto';
+                    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+                    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+                };
+
+                textarea.addEventListener('input', resizeTextarea);
+                resizeTextarea();
             });
 
             form?.addEventListener('submit', () => {

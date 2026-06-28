@@ -109,13 +109,6 @@ class DashboardController extends Controller
         $topProducts = $this->topProducts($filteredPaidOrders);
         $paymentSplit = $this->paymentSplit($filteredPaidOrders);
 
-        $recentOrders = $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)
-            ->with(['user', 'product', 'package', 'items'])
-            ->withCount('licenses')
-            ->latest()
-            ->take(8)
-            ->get();
-
         $lowStockPackages = $lowStockPackages->take(8)->values();
 
         return view('admin.dashboard.index', compact(
@@ -132,7 +125,6 @@ class DashboardController extends Controller
             'orderStats',
             'topProducts',
             'paymentSplit',
-            'recentOrders',
             'lowStockPackages',
             'lowStockThreshold'
         ));

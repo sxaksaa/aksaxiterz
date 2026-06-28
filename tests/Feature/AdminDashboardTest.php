@@ -104,17 +104,13 @@ class AdminDashboardTest extends TestCase
             ->assertSee('09:00')
             ->assertSee('13:00')
             ->assertSee('23:00')
-            ->assertSee('Created: 24 Jun 2026, 13:10 WIB')
-            ->assertSee('Paid: 24 Jun 2026, 13:15 WIB')
-            ->assertSee('ORDER-HOURLY-DASH')
-            ->assertSee('ORDER-BINANCE-DASH');
+            ->assertDontSee('Recent Orders');
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => '1', 'method' => 'binance_pay']))
             ->assertOk()
             ->assertSee('Binance Pay crypto revenue line')
-            ->assertSee('ORDER-BINANCE-DASH')
-            ->assertDontSee('ORDER-HOURLY-DASH');
+            ->assertDontSee('Recent Orders');
     }
 
     public function test_weekly_and_monthly_ranges_use_matching_chart_buckets(): void
@@ -163,13 +159,13 @@ class AdminDashboardTest extends TestCase
             ->assertOk()
             ->assertSee('04 May 2026 - 24 Jun 2026 by paid week (WIB)')
             ->assertSee('08 Jun - 14 Jun')
-            ->assertSee('ORDER-WEEKLY-DASH');
+            ->assertDontSee('Recent Orders');
 
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => 'monthly']))
             ->assertOk()
             ->assertSee('Jul 2025 - Jun 2026 by paid month (WIB)')
             ->assertSee('Jun 2026')
-            ->assertSee('ORDER-WEEKLY-DASH');
+            ->assertDontSee('Recent Orders');
     }
 }
