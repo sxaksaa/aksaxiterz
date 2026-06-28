@@ -152,11 +152,17 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('Aurora')
             ->assertSee('Drip');
-        $this->actingAs($user)
+        $licenseResponse = $this->actingAs($user)
             ->get('/licenses?order='.$order->order_id)
             ->assertOk()
             ->assertSee('Aurora')
-            ->assertSee('Drip');
+            ->assertSee('Drip')
+            ->assertSee('3 licenses in this order')
+            ->assertSee('Copy All');
+
+        $licenseHtml = $licenseResponse->getContent();
+        $this->assertSame(1, substr_count($licenseHtml, 'data-license-order="'.$order->order_id.'"'));
+        $this->assertSame(3, substr_count($licenseHtml, 'data-copy-license='));
 
         config(['admin.emails' => [$user->email]]);
         $this->actingAs($user)

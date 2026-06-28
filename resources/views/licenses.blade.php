@@ -12,7 +12,16 @@
         ];
         $selectedOrderId = request()->query('order');
         $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
-        $renderedOrderAnchors = [];
+        $formatDuration = static fn ($duration) => str_replace(
+            ['1 Hari', '7 Hari', '30 Hari', 'Hari'],
+            ['1 Day', '7 Days', '30 Days', 'Days'],
+            (string) $duration,
+        );
+        $licenseGroups = $licenses->groupBy(static function ($license) {
+            $orderId = trim((string) $license->order_id);
+
+            return $orderId !== '' ? 'order:' . $orderId : 'license:' . $license->id;
+        });
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -95,25 +104,34 @@
 
         <div class="grid gap-4 md:gap-6">
 
-            @forelse($licenses as $license)
+            @forelse($licenseGroups as $orderLicenses)
                 @php
-                    $licenseOrderId = (string) $license->order_id;
-                    $isFirstForOrder = $licenseOrderId !== '' && ! isset($renderedOrderAnchors[$licenseOrderId]);
+                    $firstLicense = $orderLicenses->first();
+                    $licenseOrderId = trim((string) $firstLicense->order_id);
                     $licenseAnchor = $licenseOrderId !== ''
-                        ? 'license-' . $licenseOrderId . ($isFirstForOrder ? '' : '-' . $license->id)
-                        : 'license-' . $license->id;
-                    $isSelectedLicense = $selectedOrderId !== '' && $licenseOrderId !== '' && hash_equals($selectedOrderId, $licenseOrderId);
-                    $renderedOrderAnchors[$licenseOrderId] = true;
+                        ? 'license-' . $licenseOrderId
+                        : 'license-' . $firstLicense->id;
+                    $isSelectedOrder = $selectedOrderId !== ''
+                        && $licenseOrderId !== ''
+                        && hash_equals($selectedOrderId, $licenseOrderId);
+                    $copyAllValue = $orderLicenses->map(static function ($license) use ($formatDuration) {
+                        $productName = trim((string) ($license->product->name ?? 'Product'));
+
+                        return ($productName !== '' ? $productName : 'Product')
+                            . ' | ' . $formatDuration($license->duration)
+                            . ' | ' . $license->license_key;
+                    })->implode("\n");
                 @endphp
 
-                <div id="{{ $licenseAnchor }}" class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedLicense ? 'license-card-selected' : '' }}">
+                <div id="{{ $licenseAnchor }}" data-license-order="{{ $licenseOrderId }}"
+                    class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedOrder ? 'license-card-selected' : '' }}">
 
                     <!-- TOP -->
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 
                         <div>
-                            <h2 class="font-semibold text-base sm:text-lg flex items-center gap-2 flex-wrap">
-                                {{ $license->product->name ?? 'Product' }}
+                            <h2 class="flex flex-wrap items-center gap-2 text-base font-semibold sm:text-lg">
+                                {{ $orderLicenses->count() }} {{ Str::plural('license', $orderLicenses->count()) }} in this order
 
                                 @if ($loop->first)
                                     <span class="text-[10px] sm:text-xs bg-[#9333EA]/20 text-[#C084FC] px-2 py-1 rounded">
@@ -121,16 +139,12 @@
                                     </span>
                                 @endif
 
-                                @if ($isSelectedLicense)
+                                @if ($isSelectedOrder)
                                     <span class="text-[10px] sm:text-xs bg-[#9333EA]/25 text-[#E9D5FF] px-2 py-1 rounded">
                                         SELECTED ORDER
                                     </span>
                                 @endif
                             </h2>
-
-                            <p class="text-xs sm:text-sm text-gray-400">
-                                {{ str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $license->duration) }}
-                            </p>
 
                             @if ($licenseOrderId !== '')
                                 <p class="mt-1 font-mono text-[10px] sm:text-xs text-gray-500">
@@ -139,30 +153,52 @@
                             @endif
 
                             <p class="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                Purchased: {{ $license->created_at->format('d M Y, H:i') }}
+                                Purchased: {{ $firstLicense->created_at->format('d M Y, H:i') }}
                             </p>
                         </div>
 
-                        <!-- STATUS -->
-                        <span class="status-pill status-pill-paid self-start sm:self-auto">
-                            Active
-                        </span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="status-pill status-pill-paid">Active</span>
+
+                            @if ($orderLicenses->count() > 1)
+                                <button type="button" data-copy-value="{{ $copyAllValue }}"
+                                    data-copy-title="Order licenses copied"
+                                    data-copy-message="All keys and durations are ready to paste."
+                                    class="order-action btn-press">
+                                    <x-ui.icon name="copy" class="h-4 w-4" />
+                                    <span data-button-label>Copy All</span>
+                                </button>
+                            @endif
+                        </div>
 
                     </div>
 
-                    <!-- KEY -->
-                    <div class="license-key-box flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="grid gap-3">
+                        @foreach ($orderLicenses as $license)
+                            <div class="license-key-box flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                                        <span class="text-sm font-semibold text-white">
+                                            {{ $license->product->name ?? 'Product' }}
+                                        </span>
+                                        <span class="rounded-md border border-[#9333EA]/30 bg-[#9333EA]/10 px-2 py-0.5 text-[11px] font-semibold text-[#D8B4FE]">
+                                            {{ $formatDuration($license->duration) }}
+                                        </span>
+                                    </div>
+                                    <span id="key-{{ $license->id }}"
+                                        class="break-all font-mono text-xs text-gray-300 sm:text-sm">
+                                        {{ $license->license_key }}
+                                    </span>
+                                </div>
 
-                        <span id="key-{{ $license->id }}" class="font-mono text-xs sm:text-sm text-gray-300 break-all">
-                            {{ $license->license_key }}
-                        </span>
-
-                        <button type="button" data-copy-license="{{ $license->id }}"
-                            class="order-action btn-press self-end sm:self-auto">
-                            <x-ui.icon name="copy" class="h-4 w-4" />
-                            <span data-button-label>Copy</span>
-                        </button>
-
+                                <button type="button" data-copy-license="{{ $license->id }}"
+                                    aria-label="Copy {{ $license->product->name ?? 'product' }} license key"
+                                    class="order-action btn-press self-end shrink-0 sm:self-auto">
+                                    <x-ui.icon name="copy" class="h-4 w-4" />
+                                    <span data-button-label>Copy</span>
+                                </button>
+                            </div>
+                        @endforeach
                     </div>
 
                 </div>
