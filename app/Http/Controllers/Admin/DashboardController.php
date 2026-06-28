@@ -79,6 +79,7 @@ class DashboardController extends Controller
 
         $lowStockThreshold = (int) config('admin.low_stock_threshold', 3);
         $lowStockPackages = Package::query()
+            ->whereHas('product', fn ($query) => $query->visible())
             ->with('product')
             ->withCount(['licenseStocks', 'availableLicenseStocks'])
             ->orderBy('product_id')

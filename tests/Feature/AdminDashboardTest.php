@@ -168,4 +168,54 @@ class AdminDashboardTest extends TestCase
             ->assertSee('Jun 2026')
             ->assertDontSee('Recent Orders');
     }
+
+    public function test_hidden_products_are_excluded_from_low_stock_notice(): void
+    {
+        config([
+            'admin.emails' => ['admin@example.com'],
+            'admin.low_stock_threshold' => 3,
+        ]);
+
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $category = Category::create([
+            'name' => 'Low Stock Products',
+            'slug' => 'low-stock-products',
+        ]);
+
+        $visibleProduct = Product::create([
+            'category_id' => $category->id,
+            'name' => 'AAA Visible Product',
+            'slug' => 'aaa-visible-product',
+            'status' => Product::STATUS_READY,
+            'is_visible' => true,
+            'description' => 'Visible product.',
+        ]);
+        $hiddenProduct = Product::create([
+            'category_id' => $category->id,
+            'name' => 'AAA Hidden Product',
+            'slug' => 'aaa-hidden-product',
+            'status' => Product::STATUS_READY,
+            'is_visible' => false,
+            'description' => 'Hidden product.',
+        ]);
+
+        Package::create([
+            'product_id' => $visibleProduct->id,
+            'name' => 'Visible Package',
+            'price' => 10000,
+            'price_usdt' => 1,
+        ]);
+        Package::create([
+            'product_id' => $hiddenProduct->id,
+            'name' => 'Hidden Package',
+            'price' => 10000,
+            'price_usdt' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee('AAA Visible Product - Visible Package')
+            ->assertDontSee('AAA Hidden Product - Hidden Package');
+    }
 }
