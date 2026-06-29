@@ -130,7 +130,9 @@ class AdminOrderOperationsTest extends TestCase
             ->assertOk()
             ->assertSee($incomplete->order_id)
             ->assertDontSee($complete->order_id)
-            ->assertSee('Delivery issues');
+            ->assertSee('Delivery issues')
+            ->assertSee('min-w-[1100px] text-sm xl:min-w-full', false)
+            ->assertDontSee('min-w-[1240px]', false);
     }
 
     public function test_paid_order_with_license_hides_manual_delivery_actions(): void

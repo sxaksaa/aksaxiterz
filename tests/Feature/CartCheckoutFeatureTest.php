@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\VoucherException;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\LicenseStock;
@@ -216,7 +217,7 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertSame(18.5, $usdcQuote['final_usdt']);
     }
 
-    public function test_bundle_voucher_requires_selected_packages_and_discounts_only_that_bundle(): void
+    public function test_bundle_voucher_requires_selected_products_and_discounts_only_that_bundle(): void
     {
         [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 100000, 5, 1);
         [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 5, 1, $user);
@@ -230,7 +231,7 @@ class CartCheckoutFeatureTest extends TestCase
             'minimum_purchase' => 0,
             'usage_limit' => 10,
             'per_user_limit' => 0,
-            'required_package_ids' => [$firstPackage->id, $secondPackage->id],
+            'required_product_ids' => [$firstProduct->id, $secondProduct->id],
             'is_active' => true,
         ]);
 
@@ -247,9 +248,9 @@ class CartCheckoutFeatureTest extends TestCase
 
         try {
             app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
-            $this->fail('The bundle voucher should reject carts without every required package.');
-        } catch (\App\Exceptions\VoucherException $error) {
-            $this->assertStringContainsString('selected bundle packages', $error->getMessage());
+            $this->fail('The bundle voucher should reject carts without every required product.');
+        } catch (VoucherException $error) {
+            $this->assertStringContainsString('selected bundle products', $error->getMessage());
         }
 
         CartItem::create([
@@ -266,7 +267,44 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertSame(20000, $quote['discount_idr']);
         $this->assertSame(480000, $quote['final_idr']);
         $this->assertSame(2, $quote['discount_units']);
-        $this->assertEqualsCanonicalizing([$firstPackage->id, $secondPackage->id], $quote['required_package_ids']);
+        $this->assertEqualsCanonicalizing([$firstProduct->id, $secondProduct->id], $quote['required_product_ids']);
+    }
+
+    public function test_product_voucher_accepts_any_package_duration_from_that_product(): void
+    {
+        [$user, $product] = $this->catalogItem('BR Mods PC', 35000, 2, 1);
+        $tenDayPackage = Package::create([
+            'product_id' => $product->id,
+            'name' => '10 Days',
+            'price' => 100000,
+            'price_usdt' => 6,
+        ]);
+        $voucher = Voucher::create([
+            'code' => 'BRMODS',
+            'discount_percent' => 10,
+            'max_discount' => 10000,
+            'max_discount_usdt' => 0.5,
+            'max_discount_usdc' => 0.5,
+            'minimum_purchase' => 0,
+            'usage_limit' => 10,
+            'per_user_limit' => 0,
+            'required_product_ids' => [$product->id],
+            'is_active' => true,
+        ]);
+
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $tenDayPackage->id,
+            'quantity' => 1,
+        ]);
+
+        $items = CartItem::with(['product', 'package'])->where('user_id', $user->id)->get();
+        $quote = app(VoucherService::class)->quoteCart($items, $user, $voucher->code);
+
+        $this->assertSame(10000, $quote['discount_idr']);
+        $this->assertSame(90000, $quote['final_idr']);
+        $this->assertSame([$product->id], $quote['required_product_ids']);
     }
 
     public function test_bundle_calculates_each_quantity_from_its_own_unit_price(): void

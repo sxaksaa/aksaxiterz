@@ -11,25 +11,24 @@
         $formatDateInput = fn ($value) => $value?->format('Y-m-d\TH:i');
         $selectedActiveStatus = (string) old('is_active', $editVoucher ? (int) $editVoucher->is_active : 1);
         $selectedActiveLabel = $selectedActiveStatus === '0' ? 'Inactive' : 'Active';
-        $packageOptionLabel = fn ($package) => trim(($package->product?->name ?? 'Product') . ' - ' . $package->name);
-        $selectedRequiredPackageIds = collect(old('required_package_ids', $editVoucher?->requiredPackageIds() ?? []))
+        $selectedRequiredProductIds = collect(old('required_product_ids', $editVoucher?->requiredProductIds() ?? []))
             ->map(fn ($id) => (int) $id)
             ->all();
-        $selectedRequiredPackageNames = collect($selectedRequiredPackageIds)
-            ->map(fn ($id) => $packagesById->get($id))
+        $selectedRequiredProductNames = collect($selectedRequiredProductIds)
+            ->map(fn ($id) => $productsById->get($id))
             ->filter()
-            ->map(fn ($package) => $packageOptionLabel($package))
+            ->pluck('name')
             ->values();
-        $bundlePickerLabel = $selectedRequiredPackageNames->isEmpty()
+        $bundlePickerLabel = $selectedRequiredProductNames->isEmpty()
             ? 'General voucher'
-            : ($selectedRequiredPackageNames->count() <= 2
-                ? $selectedRequiredPackageNames->join(' + ')
-                : $selectedRequiredPackageNames->count() . ' packages selected');
-        $bundleLabel = function ($voucher) use ($packagesById, $packageOptionLabel) {
-            $names = collect($voucher->requiredPackageIds())
-                ->map(fn ($id) => $packagesById->get($id))
+            : ($selectedRequiredProductNames->count() <= 2
+                ? $selectedRequiredProductNames->join(' + ')
+                : $selectedRequiredProductNames->count() . ' products selected');
+        $bundleLabel = function ($voucher) use ($productsById) {
+            $names = collect($voucher->requiredProductIds())
+                ->map(fn ($id) => $productsById->get($id))
                 ->filter()
-                ->map(fn ($package) => $packageOptionLabel($package))
+                ->pluck('name')
                 ->values();
 
             return $names->isEmpty() ? 'General voucher' : 'Bundle: ' . $names->join(' + ');
@@ -151,45 +150,76 @@
                 </label>
 
                 <div class="block md:col-span-2 xl:col-span-2">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Required bundle packages</span>
+                    <span class="mb-2 block text-xs font-semibold text-gray-400">Required bundle products</span>
                     <div class="relative" data-bundle-picker>
                         <button type="button"
-                            class="search-bar flex min-h-12 w-full items-center justify-between gap-3 text-left"
-                            data-bundle-toggle aria-expanded="false" aria-controls="voucherBundlePackagePanel">
-                            <span class="min-w-0 truncate" data-bundle-label>{{ $bundlePickerLabel }}</span>
-                            <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" data-bundle-arrow
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                                aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                            </svg>
+                            class="search-bar group flex min-h-12 w-full items-center justify-between gap-3 text-left transition hover:border-[#A855F7]/70 hover:bg-[#9333EA]/5"
+                            data-bundle-toggle aria-expanded="false" aria-controls="voucherBundleProductPanel">
+                            <span class="flex min-w-0 items-center gap-3">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 text-[#C084FC] transition group-hover:border-[#A855F7]/50 group-hover:bg-[#9333EA]/15">
+                                    <x-ui.icon name="boxes" class="h-4 w-4" />
+                                </span>
+                                <span class="min-w-0 truncate font-medium text-white" data-bundle-label>{{ $bundlePickerLabel }}</span>
+                            </span>
+                            <span class="flex shrink-0 items-center gap-2">
+                                <span class="{{ count($selectedRequiredProductIds) === 0 ? 'hidden' : '' }} rounded-full border border-[#9333EA]/35 bg-[#9333EA]/10 px-2 py-0.5 text-[11px] font-semibold text-[#D8B4FE]"
+                                    data-bundle-count>{{ count($selectedRequiredProductIds) }}</span>
+                                <svg class="h-4 w-4 text-gray-400 transition-transform group-hover:text-[#C084FC]" data-bundle-arrow
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                    aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                                </svg>
+                            </span>
                         </button>
 
-                        <div id="voucherBundlePackagePanel"
-                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] shadow-2xl"
+                        <div id="voucherBundleProductPanel"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-2xl border border-[#9333EA]/35 bg-[#0D0D12]/95 shadow-[0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
                             data-bundle-panel>
-                            <div class="max-h-64 overflow-y-auto p-2">
-                                @forelse ($availablePackages as $package)
-                                    @php($optionLabel = $packageOptionLabel($package))
-                                    <label class="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 text-sm text-gray-300 transition hover:bg-[#9333EA]/10">
-                                        <input type="checkbox" name="required_package_ids[]" value="{{ $package->id }}"
-                                            class="mt-1 h-4 w-4 rounded border-gray-600 bg-[#09090c]"
-                                            style="accent-color: #9333EA"
-                                            data-bundle-checkbox data-label="{{ $optionLabel }}"
-                                            @checked(in_array((int) $package->id, $selectedRequiredPackageIds, true))>
-                                        <span class="min-w-0">
-                                            <span class="block truncate text-white">{{ $optionLabel }}</span>
-                                            <span class="block text-xs text-gray-500">
-                                                {{ $formatIdr($package->price) }} / {{ $formatCrypto($package->price_usdt, 'USDT') }}
-                                            </span>
+                            <div class="flex items-center justify-between gap-4 border-b border-white/[0.06] px-4 py-3">
+                                <div>
+                                    <div class="text-sm font-semibold text-white">Choose eligible products</div>
+                                    <div class="mt-0.5 text-xs text-gray-500">All package durations are included automatically.</div>
+                                </div>
+                                <span class="shrink-0 rounded-full border border-[#9333EA]/25 bg-[#9333EA]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#C084FC]">
+                                    Product level
+                                </span>
+                            </div>
+
+                            <div class="grid max-h-72 gap-2 overflow-y-auto p-3 sm:grid-cols-2">
+                                @forelse ($availableProducts as $product)
+                                    <label class="group relative flex cursor-pointer items-center gap-3 rounded-xl p-3 text-sm text-gray-300">
+                                        <input type="checkbox" name="required_product_ids[]" value="{{ $product->id }}"
+                                            class="peer sr-only"
+                                            data-bundle-checkbox data-label="{{ $product->name }}"
+                                            @checked(in_array((int) $product->id, $selectedRequiredProductIds, true))>
+
+                                        <span class="pointer-events-none absolute inset-0 rounded-xl border border-white/[0.07] bg-white/[0.025] transition duration-200 group-hover:border-[#9333EA]/35 group-hover:bg-[#9333EA]/[0.07] peer-checked:border-[#A855F7]/70 peer-checked:bg-[#9333EA]/15 peer-focus-visible:ring-2 peer-focus-visible:ring-[#C084FC]"></span>
+
+                                        <span class="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#18181F] text-xs font-bold text-gray-400 transition group-hover:text-white peer-checked:border-[#A855F7]/60 peer-checked:bg-[#9333EA]/25 peer-checked:text-[#E9D5FF]">
+                                            {{ mb_strtoupper(mb_substr($product->name, 0, 1)) }}
+                                        </span>
+                                        <span class="relative z-10 min-w-0 flex-1">
+                                            <span class="block truncate font-semibold text-gray-200 transition group-hover:text-white">{{ $product->name }}</span>
+                                            <span class="mt-0.5 block text-[11px] text-gray-500">Every package</span>
+                                        </span>
+                                        <span class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#09090C] text-transparent transition peer-checked:border-[#A855F7] peer-checked:bg-[#9333EA] peer-checked:text-white peer-checked:shadow-[0_0_18px_rgba(147,51,234,0.45)]">
+                                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="m5 12 4 4L19 6" />
+                                            </svg>
                                         </span>
                                     </label>
                                 @empty
-                                    <div class="px-3 py-2 text-sm text-gray-500">No packages available.</div>
+                                    <div class="px-3 py-6 text-center text-sm text-gray-500 sm:col-span-2">No products available.</div>
                                 @endforelse
+                            </div>
+
+                            <div class="border-t border-white/[0.06] bg-black/10 px-4 py-2.5 text-[11px] text-gray-500">
+                                Leave everything unselected to make this a general voucher.
                             </div>
                         </div>
                     </div>
-                    <span class="mt-2 block text-xs text-gray-500">Leave empty for general vouchers.</span>
+                    <span class="mt-2 block text-xs text-gray-500">Selected products accept every package duration.</span>
                 </div>
 
                 <div class="block">
@@ -526,6 +556,21 @@
             once: true
         });
 
+        const closeOtherVoucherPickers = (activePicker) => {
+            document.querySelectorAll('[data-datetime-picker], [data-bundle-picker], [data-status-picker]')
+                .forEach((picker) => {
+                    if (picker === activePicker) return;
+
+                    const panel = picker.querySelector('[data-datetime-panel], [data-bundle-panel], [data-status-panel]');
+                    const toggle = picker.querySelector('[data-datetime-toggle], [data-bundle-toggle], [data-status-toggle]');
+                    const arrow = picker.querySelector('[data-bundle-arrow], [data-status-arrow]');
+
+                    panel?.classList.add('hidden');
+                    toggle?.setAttribute('aria-expanded', 'false');
+                    arrow?.classList.remove('rotate-180');
+                });
+        };
+
         document.querySelectorAll('[data-datetime-picker]').forEach((picker) => {
             const valueInput = picker.querySelector('[data-datetime-value]');
             const toggle = picker.querySelector('[data-datetime-toggle]');
@@ -672,11 +717,7 @@
                 event.stopPropagation();
                 const isOpen = !panel.classList.contains('hidden');
 
-                document.querySelectorAll('[data-datetime-panel]').forEach((otherPanel) => {
-                    if (otherPanel !== panel) {
-                        otherPanel.classList.add('hidden');
-                    }
-                });
+                if (!isOpen) closeOtherVoucherPickers(picker);
                 panel.classList.toggle('hidden', isOpen);
                 toggle.setAttribute('aria-expanded', String(!isOpen));
             });
@@ -729,6 +770,7 @@
             const toggle = picker.querySelector('[data-bundle-toggle]');
             const panel = picker.querySelector('[data-bundle-panel]');
             const label = picker.querySelector('[data-bundle-label]');
+            const count = picker.querySelector('[data-bundle-count]');
             const arrow = picker.querySelector('[data-bundle-arrow]');
             const checkboxes = Array.from(picker.querySelectorAll('[data-bundle-checkbox]'));
 
@@ -745,11 +787,15 @@
                     return selected.join(' + ');
                 }
 
-                return `${selected.length} packages selected`;
+                return `${selected.length} products selected`;
             };
 
             const refresh = () => {
+                const selectedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+
                 label.textContent = selectedText();
+                count.textContent = selectedCount;
+                count.classList.toggle('hidden', selectedCount === 0);
             };
 
             const close = () => {
@@ -762,6 +808,7 @@
                 event.stopPropagation();
                 const isOpen = !panel.classList.contains('hidden');
 
+                if (!isOpen) closeOtherVoucherPickers(picker);
                 panel.classList.toggle('hidden', isOpen);
                 toggle.setAttribute('aria-expanded', String(!isOpen));
                 arrow.classList.toggle('rotate-180', !isOpen);
@@ -819,6 +866,7 @@
                 event.stopPropagation();
                 const isOpen = !panel.classList.contains('hidden');
 
+                if (!isOpen) closeOtherVoucherPickers(picker);
                 panel.classList.toggle('hidden', isOpen);
                 toggle.setAttribute('aria-expanded', String(!isOpen));
                 arrow.classList.toggle('rotate-180', !isOpen);

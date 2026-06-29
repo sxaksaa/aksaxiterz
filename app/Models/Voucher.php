@@ -16,6 +16,7 @@ class Voucher extends Model
         'usage_limit',
         'per_user_limit',
         'required_package_ids',
+        'required_product_ids',
         'is_active',
         'starts_at',
         'expires_at',
@@ -30,6 +31,7 @@ class Voucher extends Model
         'usage_limit' => 'integer',
         'per_user_limit' => 'integer',
         'required_package_ids' => 'array',
+        'required_product_ids' => 'array',
         'is_active' => 'boolean',
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
@@ -50,9 +52,19 @@ class Voucher extends Model
             ->all();
     }
 
+    public function requiredProductIds(): array
+    {
+        return collect($this->required_product_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function hasBundleRequirement(): bool
     {
-        return $this->requiredPackageIds() !== [];
+        return $this->requiredProductIds() !== [];
     }
 
     public function availabilityStatus(): string

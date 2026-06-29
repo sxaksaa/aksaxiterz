@@ -170,7 +170,7 @@ class VoucherService
             'discount_units' => $discountUnits,
             'max_discount_total' => $voucher->max_discount * $discountUnits,
             'max_discount_crypto_total' => round($maxDiscountCrypto * $discountUnits, 6),
-            'required_package_ids' => $voucher->requiredPackageIds(),
+            'required_product_ids' => $voucher->requiredProductIds(),
             'minimum_purchase' => $voucher->minimum_purchase,
             'base_idr' => $baseIdr,
             'discount_idr' => $discountIdr,
@@ -233,26 +233,26 @@ class VoucherService
 
     private function eligibleDiscountLines(Voucher $voucher, Collection $discountLines): Collection
     {
-        $requiredPackageIds = $voucher->requiredPackageIds();
+        $requiredProductIds = $voucher->requiredProductIds();
 
-        if ($requiredPackageIds === []) {
+        if ($requiredProductIds === []) {
             return $discountLines;
         }
 
-        $cartPackageIds = $discountLines
-            ->pluck('package_id')
+        $cartProductIds = $discountLines
+            ->pluck('product_id')
             ->map(fn ($id) => (int) $id)
             ->filter(fn (int $id) => $id > 0)
             ->unique()
             ->values();
-        $missingPackageIds = collect($requiredPackageIds)->diff($cartPackageIds);
+        $missingProductIds = collect($requiredProductIds)->diff($cartProductIds);
 
-        if ($missingPackageIds->isNotEmpty()) {
-            throw new VoucherException('This voucher only applies to its selected bundle packages.');
+        if ($missingProductIds->isNotEmpty()) {
+            throw new VoucherException('This voucher requires all selected bundle products.');
         }
 
         return $discountLines
-            ->filter(fn (array $line) => in_array((int) $line['package_id'], $requiredPackageIds, true))
+            ->filter(fn (array $line) => in_array((int) $line['product_id'], $requiredProductIds, true))
             ->values();
     }
 

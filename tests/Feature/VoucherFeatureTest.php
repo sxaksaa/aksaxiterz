@@ -387,7 +387,11 @@ class VoucherFeatureTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.vouchers.index'))
             ->assertOk()
-            ->assertSee('Required bundle packages')
+            ->assertSee('Required bundle products')
+            ->assertSee('Choose eligible products')
+            ->assertSee('All package durations are included automatically.')
+            ->assertSee('data-bundle-count', false)
+            ->assertSee('class="peer sr-only"', false)
             ->assertSee('name="max_discount" value="10000"', false)
             ->assertSee('name="max_discount_usdt" value="0.5"', false)
             ->assertSee('name="max_discount_usdc" value="0.5"', false);
@@ -432,8 +436,8 @@ class VoucherFeatureTest extends TestCase
     {
         config(['admin.emails' => ['admin@example.com']]);
         $admin = User::factory()->create(['email' => 'admin@example.com']);
-        [, , $firstPackage] = $this->makeCatalog(100000, 5);
-        [, , $secondPackage] = $this->makeCatalog(150000, 8);
+        [, $firstProduct] = $this->makeCatalog(100000, 5);
+        [, $secondProduct] = $this->makeCatalog(150000, 8);
 
         $this->actingAs($admin)
             ->post(route('admin.vouchers.store'), [
@@ -445,7 +449,7 @@ class VoucherFeatureTest extends TestCase
                 'minimum_purchase' => 0,
                 'usage_limit' => 20,
                 'per_user_limit' => 0,
-                'required_package_ids' => [$firstPackage->id, $secondPackage->id],
+                'required_product_ids' => [$firstProduct->id, $secondProduct->id],
                 'is_active' => 1,
             ])
             ->assertRedirect(route('admin.vouchers.index'));
@@ -453,8 +457,8 @@ class VoucherFeatureTest extends TestCase
         $voucher = Voucher::where('code', 'BUNDLEAB')->firstOrFail();
 
         $this->assertEqualsCanonicalizing(
-            [$firstPackage->id, $secondPackage->id],
-            $voucher->requiredPackageIds()
+            [$firstProduct->id, $secondProduct->id],
+            $voucher->requiredProductIds()
         );
     }
 

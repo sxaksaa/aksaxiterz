@@ -117,14 +117,14 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[1240px] text-sm">
+                <table class="w-full min-w-[1100px] text-sm xl:min-w-full">
                     <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
                         <tr>
                             <th class="p-4 text-left">Order</th>
                             <th class="p-4 text-left">Customer</th>
                             <th class="p-4 text-left">Product</th>
                             <th class="p-4 text-left">Method</th>
-                            <th class="w-[330px] min-w-[330px] p-4 text-left">Status</th>
+                            <th class="w-[300px] p-4 text-left">Status</th>
                             <th class="p-4 text-left">Paid At</th>
                             <th class="p-4 text-right">Action</th>
                         </tr>
@@ -156,7 +156,7 @@
                                     @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $methodLabel }}</td>
-                                <td class="w-[330px] min-w-[330px] p-4">
+                                <td class="w-[300px] p-4">
                                     <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
                                     <div class="mt-1 text-xs {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-gray-500' }}">
                                         {{ $order->licenses_count }} / {{ $order->quantity }} delivered

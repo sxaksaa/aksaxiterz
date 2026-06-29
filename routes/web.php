@@ -54,12 +54,10 @@ $activePromoVoucher = function (?Product $product = null) {
         ->get();
 
     if ($product) {
-        $packageIds = $product->packages->pluck('id')->map(fn ($id) => (int) $id);
+        $vouchers = $vouchers->filter(function (VoucherModel $voucher) use ($product): bool {
+            $requiredProductIds = $voucher->requiredProductIds();
 
-        $vouchers = $vouchers->filter(function (VoucherModel $voucher) use ($packageIds): bool {
-            $requiredPackageIds = $voucher->requiredPackageIds();
-
-            return $requiredPackageIds === [] || $packageIds->intersect($requiredPackageIds)->isNotEmpty();
+            return $requiredProductIds === [] || in_array((int) $product->id, $requiredProductIds, true);
         });
     }
 

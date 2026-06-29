@@ -136,6 +136,13 @@
                     </thead>
                     <tbody>
                         @forelse ($downloads as $download)
+                            @php
+                                $copyUrls = collect($download->links ?: [])
+                                    ->pluck('url')
+                                    ->map(fn ($url) => trim((string) $url))
+                                    ->filter()
+                                    ->implode("\n");
+                            @endphp
                             <tr class="orders-table-row">
                                 <td class="p-4">
                                     <div class="font-semibold text-white">{{ $download->name }}</div>
@@ -168,6 +175,16 @@
                                                 <span>Delete</span>
                                             </button>
                                         </form>
+                                        @if ($copyUrls !== '')
+                                            <button type="button" data-download-copy="{{ $download->id }}"
+                                                data-copy-value="{{ $copyUrls }}"
+                                                data-copy-title="Download link copied"
+                                                data-copy-message="The download URL is ready to paste."
+                                                class="order-action btn-press">
+                                                <x-ui.icon name="copy" class="h-4 w-4" />
+                                                <span data-button-label>Copy</span>
+                                            </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -185,6 +202,13 @@
 
         <div class="space-y-4 lg:hidden">
             @forelse ($downloads as $download)
+                @php
+                    $copyUrls = collect($download->links ?: [])
+                        ->pluck('url')
+                        ->map(fn ($url) => trim((string) $url))
+                        ->filter()
+                        ->implode("\n");
+                @endphp
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -207,6 +231,16 @@
                                 <span>Delete</span>
                             </button>
                         </form>
+                        @if ($copyUrls !== '')
+                            <button type="button" data-download-copy="{{ $download->id }}"
+                                data-copy-value="{{ $copyUrls }}"
+                                data-copy-title="Download link copied"
+                                data-copy-message="The download URL is ready to paste."
+                                class="order-action btn-press">
+                                <x-ui.icon name="copy" class="h-4 w-4" />
+                                <span data-button-label>Copy</span>
+                            </button>
+                        @endif
                     </div>
                 </article>
             @empty

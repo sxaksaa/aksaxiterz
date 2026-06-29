@@ -49,6 +49,13 @@ class AdminDownloadManagementTest extends TestCase
         $this->assertCount(2, $download->links);
 
         $this->actingAs($admin)
+            ->get(route('admin.downloads.index'))
+            ->assertOk()
+            ->assertSee('data-download-copy="'.$download->id.'"', false)
+            ->assertSee('data-copy-value="https://example.com/main.zip', false)
+            ->assertSee('https://example.com/mirror.zip', false);
+
+        $this->actingAs($admin)
             ->delete(route('admin.downloads.destroy', $download))
             ->assertRedirect(route('admin.downloads.index'));
 
