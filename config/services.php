@@ -142,4 +142,14 @@ return [
         ],
     ],
 
+    'brmods' => [
+        'reset_url' => env('BRMODS_RESET_URL', 'https://brmods.net/api/reset.php'),
+        'api_key' => env('BRMODS_API_KEY'),
+        'product_slug' => env('BRMODS_PRODUCT_SLUG', 'br-mods-pc'),
+        'cooldown_hours' => (int) env('BRMODS_RESET_COOLDOWN_HOURS', 24),
+        'connect_timeout_seconds' => (int) env('BRMODS_CONNECT_TIMEOUT_SECONDS', 5),
+        'timeout_seconds' => (int) env('BRMODS_TIMEOUT_SECONDS', 15),
+        'pending_timeout_minutes' => (int) env('BRMODS_PENDING_TIMEOUT_MINUTES', 2),
+    ],
+
 ];

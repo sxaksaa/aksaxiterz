@@ -5,6 +5,7 @@
         $discordUrl = config('links.discord_url');
         $licenseCount = $licenses->count();
         $latestLicense = $licenses->first();
+        $licenseResetStates = $licenseResetStates ?? [];
         $orderStats = $orderStats ?? [
             'total' => 0,
             'paid' => 0,
@@ -59,6 +60,20 @@
                 </div>
             </div>
         </section>
+
+        @if (session('license_reset_success'))
+            <div class="mb-5 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-200 fade-up"
+                role="status">
+                {{ session('license_reset_success') }}
+            </div>
+        @endif
+
+        @if ($errors->has('license_reset'))
+            <div class="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 fade-up"
+                role="alert">
+                {{ $errors->first('license_reset') }}
+            </div>
+        @endif
 
         <div class="discord-mini-panel mb-5 fade-up md:p-5">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -175,6 +190,23 @@
 
                     <div class="grid gap-3">
                         @foreach ($orderLicenses as $license)
+                            @php
+                                $resetState = $licenseResetStates[$license->id] ?? [
+                                    'supported' => false,
+                                    'username' => null,
+                                    'is_paid_purchase' => false,
+                                    'configured' => false,
+                                    'available_at' => null,
+                                    'remaining_seconds' => 0,
+                                    'can_reset' => false,
+                                ];
+                                $resetMinutes = max(0, (int) ceil(($resetState['remaining_seconds'] ?? 0) / 60));
+                                $resetHours = intdiv($resetMinutes, 60);
+                                $resetMinuteRemainder = $resetMinutes % 60;
+                                $resetWaitLabel = $resetHours > 0
+                                    ? $resetHours . 'h' . ($resetMinuteRemainder > 0 ? ' ' . $resetMinuteRemainder . 'm' : '')
+                                    : $resetMinuteRemainder . 'm';
+                            @endphp
                             <div class="license-key-box flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
                                     <div class="mb-2 flex flex-wrap items-center gap-2">
@@ -189,14 +221,55 @@
                                         class="break-all font-mono text-xs text-gray-300 sm:text-sm">
                                         {{ $license->license_key }}
                                     </span>
+
+                                    @if ($resetState['supported'] && $resetState['username'])
+                                        <p class="mt-2 text-[11px] text-gray-500">
+                                            HWID reset username: {{ $resetState['username'] }} · once every 24 hours
+                                        </p>
+                                    @endif
                                 </div>
 
-                                <button type="button" data-copy-license="{{ $license->id }}"
-                                    aria-label="Copy {{ $license->product->name ?? 'product' }} license key"
-                                    class="order-action btn-press self-end shrink-0 sm:self-auto">
-                                    <x-ui.icon name="copy" class="h-4 w-4" />
-                                    <span data-button-label>Copy</span>
-                                </button>
+                                <div class="flex flex-wrap items-center justify-end gap-2 self-end shrink-0 sm:self-auto">
+                                    @if ($resetState['supported'])
+                                        @if ($resetState['can_reset'])
+                                            <form method="POST" action="{{ route('licenses.reset-hwid', $license) }}"
+                                                data-confirm="Reset HWID for {{ $resetState['username'] }}? This action is limited to once every 24 hours."
+                                                data-brmods-reset-form>
+                                                @csrf
+                                                <button type="submit"
+                                                    class="order-action license-reset-action btn-press">
+                                                    <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                                                    <span data-button-label>Reset HWID</span>
+                                                </button>
+                                            </form>
+                                        @elseif (($resetState['remaining_seconds'] ?? 0) > 0)
+                                            <button type="button" class="order-action license-reset-action" disabled
+                                                title="Reset available at {{ $resetState['available_at']?->timezone(config('app.timezone'))->format('d M Y, H:i') }} WIB">
+                                                <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                                                <span>Reset in {{ $resetWaitLabel }}</span>
+                                            </button>
+                                        @elseif (! $resetState['configured'])
+                                            <button type="button" class="order-action license-reset-action" disabled
+                                                title="HWID reset is temporarily unavailable">
+                                                <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                                                <span>Reset unavailable</span>
+                                            </button>
+                                        @else
+                                            <button type="button" class="order-action license-reset-action" disabled
+                                                title="Contact support for this license">
+                                                <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
+                                                <span>Contact Support</span>
+                                            </button>
+                                        @endif
+                                    @endif
+
+                                    <button type="button" data-copy-license="{{ $license->id }}"
+                                        aria-label="Copy {{ $license->product->name ?? 'product' }} license key"
+                                        class="order-action btn-press">
+                                        <x-ui.icon name="copy" class="h-4 w-4" />
+                                        <span data-button-label>Copy</span>
+                                    </button>
+                                </div>
                             </div>
                         @endforeach
                     </div>

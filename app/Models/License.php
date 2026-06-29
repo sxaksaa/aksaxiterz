@@ -34,4 +34,16 @@ class License extends Model
     {
         return $this->belongsTo(OrderItem::class);
     }
+
+    public function resetAttempts()
+    {
+        return $this->hasMany(LicenseReset::class);
+    }
+
+    public function latestSuccessfulReset()
+    {
+        return $this->hasOne(LicenseReset::class)
+            ->where('status', LicenseReset::STATUS_SUCCEEDED)
+            ->latestOfMany('succeeded_at');
+    }
 }

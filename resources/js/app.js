@@ -1953,6 +1953,20 @@ document.addEventListener('submit', (event) => {
     }
 }, true);
 
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('[data-brmods-reset-form]');
+
+    if (!form || event.defaultPrevented) return;
+
+    const button = form.querySelector('button[type="submit"]');
+
+    if (!button) return;
+
+    button.disabled = true;
+    setButtonLabel(button, 'Resetting...');
+    button.classList.add('opacity-60', 'pointer-events-none');
+});
+
 document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-qris-close]')) return;
 

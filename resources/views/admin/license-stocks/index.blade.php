@@ -301,10 +301,8 @@
                                     @endif
                                 </td>
                                 <td class="p-4 text-right">
-                                    @if ($stock->is_sold || $isReserved)
-                                        <span class="text-xs text-gray-500">Locked</span>
-                                    @else
-                                        <div class="inline-flex justify-end gap-2">
+                                    <div class="inline-flex items-center justify-end gap-2">
+                                        @if (! $stock->is_sold && ! $isReserved)
                                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"
                                                 class="order-action">
                                                 <x-ui.icon name="edit-3" class="h-4 w-4" />
@@ -320,8 +318,17 @@
                                                     <span>Delete</span>
                                                 </button>
                                             </form>
-                                        </div>
-                                    @endif
+                                        @endif
+
+                                        <button type="button" data-stock-copy="{{ $stock->id }}"
+                                            data-copy-value="{{ $stock->license_key }}"
+                                            data-copy-title="License copied"
+                                            data-copy-message="The license key is ready to paste."
+                                            class="order-action btn-press">
+                                            <x-ui.icon name="copy" class="h-4 w-4" />
+                                            <span data-button-label>Copy</span>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -377,10 +384,8 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 flex gap-2">
-                        @if ($stock->is_sold || $isReserved)
-                            <span class="text-xs text-gray-500">Locked</span>
-                        @else
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @if (! $stock->is_sold && ! $isReserved)
                             <a href="{{ route('admin.license-stocks.index', array_merge(request()->query(), ['edit' => $stock->id])) }}"
                                 class="order-action">
                                 <x-ui.icon name="edit-3" class="h-4 w-4" />
@@ -396,6 +401,15 @@
                                 </button>
                             </form>
                         @endif
+
+                        <button type="button" data-stock-copy="{{ $stock->id }}"
+                            data-copy-value="{{ $stock->license_key }}"
+                            data-copy-title="License copied"
+                            data-copy-message="The license key is ready to paste."
+                            class="order-action btn-press">
+                            <x-ui.icon name="copy" class="h-4 w-4" />
+                            <span data-button-label>Copy</span>
+                        </button>
                     </div>
                 </article>
             @empty

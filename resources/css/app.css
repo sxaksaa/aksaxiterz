@@ -1454,6 +1454,18 @@
         transform: none;
     }
 
+    .license-reset-action {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(96, 165, 250, 0.34);
+        color: #bfdbfe;
+    }
+
+    .license-reset-action:hover:not(:disabled) {
+        background: rgba(59, 130, 246, 0.18);
+        border-color: rgba(147, 197, 253, 0.55);
+        color: #ffffff;
+    }
+
     .order-action.compact-action {
         min-width: 2.5rem;
         padding-inline: 0.65rem;

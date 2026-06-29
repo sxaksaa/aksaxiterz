@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\LicenseResetController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\VoucherController;
 use App\Models\Category;
@@ -19,6 +20,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Voucher as VoucherModel;
+use App\Services\BrModsResetService;
 use App\Services\PendingOrderExpirationService;
 use App\Support\ProductSalesSignals;
 use App\Support\RecentPurchaseFeed;
@@ -330,10 +332,21 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:30,1');
 
     // License
-    Route::get('/licenses', function (PendingOrderExpirationService $pendingOrderExpirationService) {
+    Route::get('/licenses', function (
+        PendingOrderExpirationService $pendingOrderExpirationService,
+        BrModsResetService $brModsResetService,
+    ) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
-        $licenses = License::with(['product', 'orderItem'])->where('user_id', auth()->id())->latest()->get();
+        $licenses = License::with(['product', 'order', 'orderItem', 'latestSuccessfulReset'])
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->get();
+        $licenseResetStates = $licenses
+            ->mapWithKeys(fn (License $license) => [
+                $license->id => $brModsResetService->state($license),
+            ])
+            ->all();
 
         $orderStats = [
             'total' => Order::where('user_id', auth()->id())->count(),
@@ -341,8 +354,11 @@ Route::middleware('auth')->group(function () {
             'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
         ];
 
-        return view('licenses', compact('licenses', 'orderStats'));
+        return view('licenses', compact('licenses', 'orderStats', 'licenseResetStates'));
     });
+    Route::post('/licenses/{license}/reset-hwid', [LicenseResetController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('licenses.reset-hwid');
 
     // Orders
     Route::get('/orders', function (PendingOrderExpirationService $pendingOrderExpirationService) {

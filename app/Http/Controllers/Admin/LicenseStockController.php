@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LicenseStock;
 use App\Models\Package;
 use App\Models\Product;
+use App\Services\BrModsResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -54,7 +55,7 @@ class LicenseStockController extends Controller
         ));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, BrModsResetService $brModsResetService)
     {
         $validated = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
@@ -84,6 +85,20 @@ class LicenseStockController extends Controller
                 ->withErrors(['license_keys' => 'Import up to 500 license keys at a time.']);
         }
 
+        if ($brModsResetService->supportsProduct($package->product)) {
+            $invalidKeys = $keys->filter(
+                fn (string $key): bool => $brModsResetService->extractUsername($key) === null
+            );
+
+            if ($invalidKeys->isNotEmpty()) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'license_keys' => 'BR Mods licenses must use the format 👤username🔑key. Invalid entries: '.$invalidKeys->take(3)->implode(', '),
+                    ]);
+            }
+        }
+
         $existingKeys = LicenseStock::whereIn('license_key', $keys)->pluck('license_key');
 
         if ($existingKeys->isNotEmpty()) {
@@ -108,8 +123,11 @@ class LicenseStockController extends Controller
         return back()->with('info', $keys->count().' license keys added.');
     }
 
-    public function update(Request $request, LicenseStock $licenseStock)
-    {
+    public function update(
+        Request $request,
+        LicenseStock $licenseStock,
+        BrModsResetService $brModsResetService,
+    ) {
         if ($licenseStock->is_sold || $licenseStock->isReserved()) {
             return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be edited.']);
         }
@@ -133,8 +151,21 @@ class LicenseStockController extends Controller
                 ->withErrors(['package_id' => 'Select a package from the chosen product.']);
         }
 
+        $licenseKey = trim($validated['license_key']);
+
+        if (
+            $brModsResetService->supportsProduct($package->product) &&
+            $brModsResetService->extractUsername($licenseKey) === null
+        ) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'license_key' => 'BR Mods licenses must use the format 👤username🔑key.',
+                ]);
+        }
+
         $licenseStock->update([
-            'license_key' => trim($validated['license_key']),
+            'license_key' => $licenseKey,
             'product_id' => $package->product_id,
             'package_id' => $package->id,
         ]);
