@@ -437,6 +437,14 @@
                                                 <span>Delete</span>
                                             </button>
                                         </form>
+                                        <button type="button" data-voucher-copy="{{ $voucher->id }}"
+                                            data-copy-value="{{ $voucher->code }}"
+                                            data-copy-title="Voucher copied"
+                                            data-copy-message="The voucher code is ready to paste."
+                                            class="order-action btn-press">
+                                            <x-ui.icon name="copy" class="h-4 w-4" />
+                                            <span data-button-label>Copy</span>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -468,7 +476,7 @@
                     <div class="mt-4 text-xs text-gray-400">
                         Minimum {{ $formatIdr($voucher->minimum_purchase) }} · {{ $voucher->active_uses_count }} active uses
                     </div>
-                    <div class="mt-4 flex gap-2">
+                    <div class="mt-4 flex flex-wrap gap-2">
                         <a href="{{ route('admin.vouchers.show', $voucher) }}" class="order-action">
                             <x-ui.icon name="eye" class="h-4 w-4" />
                             <span>Uses</span>
@@ -485,6 +493,14 @@
                                 <span>Delete</span>
                             </button>
                         </form>
+                        <button type="button" data-voucher-copy="{{ $voucher->id }}"
+                            data-copy-value="{{ $voucher->code }}"
+                            data-copy-title="Voucher copied"
+                            data-copy-message="The voucher code is ready to paste."
+                            class="order-action btn-press">
+                            <x-ui.icon name="copy" class="h-4 w-4" />
+                            <span data-button-label>Copy</span>
+                        </button>
                     </div>
                 </article>
             @empty

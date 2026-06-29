@@ -100,6 +100,8 @@ class AdminDashboardTest extends TestCase
             ->assertSee('Binance')
             ->assertSee('Crypto')
             ->assertSee('All order value line')
+            ->assertSee('rx="4" fill="#9333EA"', false)
+            ->assertDontSee('#38BDF8')
             ->assertSee('00:00')
             ->assertSee('09:00')
             ->assertSee('13:00')

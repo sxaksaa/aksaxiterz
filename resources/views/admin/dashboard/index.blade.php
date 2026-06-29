@@ -102,7 +102,7 @@
                             <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
                                 {{ $salesTrend['line_label'] }} line
                             </span>
-                            <span class="rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-2 text-[#BAE6FD]">
+                            <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
                                 Order bars
                             </span>
                         </div>
@@ -180,7 +180,7 @@
                             @endphp
 
                             <rect x="{{ $x - ($barWidth / 2) }}" y="{{ $barY }}" width="{{ $barWidth }}" height="{{ $orderHeight }}"
-                                rx="4" fill="#38BDF8" opacity="{{ $point['orders'] > 0 ? '0.34' : '0.12' }}">
+                                rx="4" fill="#9333EA" opacity="{{ $point['orders'] > 0 ? '0.42' : '0.14' }}">
                                 <title>{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $salesTrend['line_label'] }} {{ $formattedLine }}, {{ $formattedIdr }}, {{ $formattedCrypto }}</title>
                             </rect>
 

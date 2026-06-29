@@ -541,7 +541,9 @@ class VoucherFeatureTest extends TestCase
             ->get(route('admin.vouchers.index'))
             ->assertOk()
             ->assertSee(route('admin.vouchers.show', $voucher), false)
-            ->assertSee('Uses');
+            ->assertSee('Uses')
+            ->assertSee('data-voucher-copy="'.$voucher->id.'"', false)
+            ->assertSee('data-copy-value="REPORT10"', false);
     }
 
     private function makeVoucher(array $overrides = []): Voucher
