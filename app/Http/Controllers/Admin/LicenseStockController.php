@@ -33,7 +33,13 @@ class LicenseStockController extends Controller
             ->withQueryString();
 
         $products = Product::orderBy('name')->get();
+        $addableProducts = Product::visible()->orderBy('name')->get();
         $packages = Package::with('product')
+            ->orderBy('product_id')
+            ->orderBy('price')
+            ->get();
+        $addablePackages = Package::with('product')
+            ->whereHas('product', fn ($query) => $query->visible())
             ->orderBy('product_id')
             ->orderBy('price')
             ->get();
@@ -49,7 +55,9 @@ class LicenseStockController extends Controller
         return view('admin.license-stocks.index', compact(
             'stocks',
             'products',
+            'addableProducts',
             'packages',
+            'addablePackages',
             'editStock',
             'stats'
         ));
@@ -69,6 +77,12 @@ class LicenseStockController extends Controller
             return back()
                 ->withInput()
                 ->withErrors(['package_id' => 'Select a package from the chosen product.']);
+        }
+
+        if (! $package->product?->is_visible) {
+            return back()
+                ->withInput()
+                ->withErrors(['product_id' => 'Hidden products cannot receive new stock. Make the product public first.']);
         }
 
         $keys = $this->licenseKeys($validated['license_keys']);
@@ -208,7 +222,8 @@ class LicenseStockController extends Controller
 
     private function packageForProduct(int $packageId, int $productId): ?Package
     {
-        return Package::whereKey($packageId)
+        return Package::with('product')
+            ->whereKey($packageId)
             ->where('product_id', $productId)
             ->first();
     }

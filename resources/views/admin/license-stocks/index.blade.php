@@ -11,7 +11,7 @@
             return ($package->product->name ?? 'Product') . ' - ' . $packageName($package);
         };
         $selectedCreateProductId = old('product_id');
-        $selectedCreatePackage = old('package_id') ? $packages->firstWhere('id', (int) old('package_id')) : null;
+        $selectedCreatePackage = old('package_id') ? $addablePackages->firstWhere('id', (int) old('package_id')) : null;
 
         if (! $selectedCreateProductId && $selectedCreatePackage) {
             $selectedCreateProductId = $selectedCreatePackage->product_id;
@@ -80,8 +80,9 @@
                     <select name="product_id" class="search-bar w-full" required data-package-product-select
                         data-package-target="stockCreatePackage">
                         <option value="">Select product</option>
-                        @foreach ($products as $product)
-                            <option value="{{ $product->id }}" @selected((string) $selectedCreateProductId === (string) $product->id)>
+                        @foreach ($addableProducts as $product)
+                            <option value="{{ $product->id }}" data-add-stock-product="{{ $product->id }}"
+                                @selected((string) $selectedCreateProductId === (string) $product->id)>
                                 {{ $product->name }}
                             </option>
                         @endforeach
@@ -94,8 +95,9 @@
                         data-package-select data-require-product="true" data-empty-label="Select product first"
                         data-selected-empty-label="Select package">
                         <option value="">Select product first</option>
-                        @foreach ($packages as $package)
+                        @foreach ($addablePackages as $package)
                             <option value="{{ $package->id }}" data-product-id="{{ $package->product_id }}"
+                                data-add-stock-package="{{ $package->id }}"
                                 data-duration-label="{{ $packageName($package) }}"
                                 data-full-label="{{ $packageLabel($package) }}"
                                 @selected((string) old('package_id') === (string) $package->id)>

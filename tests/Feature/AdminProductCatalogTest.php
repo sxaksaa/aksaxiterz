@@ -144,6 +144,37 @@ class AdminProductCatalogTest extends TestCase
         app(PaymentService::class)->createPakasirPayment($buyer, $product->id, $package->id);
     }
 
+    public function test_hidden_product_cannot_receive_new_stock_but_remains_available_in_stock_management(): void
+    {
+        [$admin, $product, $package] = $this->makeCatalogProduct();
+
+        $product->update(['is_visible' => false]);
+
+        $stockPage = $this->actingAs($admin)->get(route('admin.license-stocks.index'));
+
+        $stockPage
+            ->assertOk()
+            ->assertSee($product->name)
+            ->assertDontSee('data-add-stock-product="'.$product->id.'"', false)
+            ->assertDontSee('data-add-stock-package="'.$package->id.'"', false);
+
+        $this->actingAs($admin)
+            ->from(route('admin.license-stocks.index'))
+            ->post(route('admin.license-stocks.store'), [
+                'product_id' => $product->id,
+                'package_id' => $package->id,
+                'license_keys' => 'HIDDEN-PRODUCT-NEW-STOCK',
+            ])
+            ->assertRedirect(route('admin.license-stocks.index'))
+            ->assertSessionHasErrors([
+                'product_id' => 'Hidden products cannot receive new stock. Make the product public first.',
+            ]);
+
+        $this->assertDatabaseMissing('license_stocks', [
+            'license_key' => 'HIDDEN-PRODUCT-NEW-STOCK',
+        ]);
+    }
+
     public function test_admin_cannot_delete_product_with_order_or_stock_history(): void
     {
         [$admin, $product, $package] = $this->makeCatalogProduct();
