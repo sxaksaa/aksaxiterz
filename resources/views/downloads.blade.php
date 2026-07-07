@@ -25,7 +25,7 @@
             </p>
         </div>
 
-        <div class="mx-auto grid max-w-5xl gap-4">
+        <div class="mx-auto grid max-w-5xl gap-4" data-download-accordion-group>
             @forelse ($downloads as $download)
                 @php
                     $links = collect($download['links'] ?? [])

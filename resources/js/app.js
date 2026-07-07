@@ -1789,9 +1789,145 @@ async function softNavigate(url, options = {}) {
     }
 }
 
+const DOWNLOAD_ACCORDION_SELECTOR = '[data-download-accordion]';
+
+function shouldReduceMotion() {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+}
+
+function downloadAccordionPanel(accordion) {
+    return accordion.querySelector('.download-accordion-panel');
+}
+
+function setDownloadAccordionExpanded(accordion, expanded) {
+    accordion.querySelector('summary')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+}
+
+function resetDownloadAccordionPanel(panel) {
+    panel.style.height = '';
+    panel.style.opacity = '';
+    panel.style.overflow = '';
+    panel.style.transform = '';
+}
+
+function afterDownloadAccordionTransition(panel, callback) {
+    let completed = false;
+
+    const finish = (event = null) => {
+        if (event && event.target !== panel) return;
+        if (completed) return;
+
+        completed = true;
+        panel.removeEventListener('transitionend', finish);
+        callback();
+    };
+
+    panel.addEventListener('transitionend', finish);
+    window.setTimeout(finish, 320);
+}
+
+function openDownloadAccordion(accordion) {
+    const panel = downloadAccordionPanel(accordion);
+
+    if (!panel || shouldReduceMotion()) {
+        accordion.open = true;
+        setDownloadAccordionExpanded(accordion, true);
+        return;
+    }
+
+    if (accordion.open || accordion.dataset.downloadAccordionAnimating === 'true') return;
+
+    accordion.dataset.downloadAccordionAnimating = 'true';
+    accordion.open = true;
+    setDownloadAccordionExpanded(accordion, true);
+    panel.style.height = '0px';
+    panel.style.opacity = '0';
+    panel.style.overflow = 'hidden';
+    panel.style.transform = 'translateY(-4px)';
+
+    requestAnimationFrame(() => {
+        panel.style.height = `${panel.scrollHeight}px`;
+        panel.style.opacity = '1';
+        panel.style.transform = 'translateY(0)';
+    });
+
+    afterDownloadAccordionTransition(panel, () => {
+        delete accordion.dataset.downloadAccordionAnimating;
+        resetDownloadAccordionPanel(panel);
+    });
+}
+
+function closeDownloadAccordion(accordion) {
+    const panel = downloadAccordionPanel(accordion);
+
+    if (!panel || shouldReduceMotion()) {
+        accordion.open = false;
+        setDownloadAccordionExpanded(accordion, false);
+        return;
+    }
+
+    if (!accordion.open || accordion.dataset.downloadAccordionAnimating === 'true') return;
+
+    accordion.dataset.downloadAccordionAnimating = 'true';
+    setDownloadAccordionExpanded(accordion, false);
+    panel.style.height = `${panel.offsetHeight}px`;
+    panel.style.opacity = '1';
+    panel.style.overflow = 'hidden';
+    panel.style.transform = 'translateY(0)';
+
+    requestAnimationFrame(() => {
+        panel.style.height = '0px';
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateY(-4px)';
+    });
+
+    afterDownloadAccordionTransition(panel, () => {
+        accordion.open = false;
+        delete accordion.dataset.downloadAccordionAnimating;
+        resetDownloadAccordionPanel(panel);
+    });
+}
+
+function downloadAccordionsFromRoot(root = document) {
+    const directMatch = root instanceof Element && root.matches(DOWNLOAD_ACCORDION_SELECTOR) ? [root] : [];
+    const nestedMatches = Array.from(root.querySelectorAll?.(DOWNLOAD_ACCORDION_SELECTOR) || []);
+
+    return [...directMatch, ...nestedMatches];
+}
+
+function initializeDownloadAccordions(root = document) {
+    downloadAccordionsFromRoot(root).forEach((accordion) => {
+        if (!(accordion instanceof HTMLDetailsElement)) return;
+        if (accordion.dataset.downloadAccordionReady === 'true') return;
+
+        accordion.dataset.downloadAccordionReady = 'true';
+        setDownloadAccordionExpanded(accordion, accordion.open);
+
+        accordion.querySelector('summary')?.addEventListener('click', (event) => {
+            event.preventDefault();
+
+            if (accordion.open) {
+                closeDownloadAccordion(accordion);
+                return;
+            }
+
+            const group = accordion.closest('[data-download-accordion-group]') || document;
+
+            group.querySelectorAll(DOWNLOAD_ACCORDION_SELECTOR).forEach((otherAccordion) => {
+                if (otherAccordion !== accordion) {
+                    closeDownloadAccordion(otherAccordion);
+                }
+            });
+
+            openDownloadAccordion(accordion);
+        });
+    });
+}
+
 function initializeGlobalPageEnhancements(root = document) {
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
+    initializeDownloadAccordions(root);
 }
 
 if (document.readyState === 'loading') {

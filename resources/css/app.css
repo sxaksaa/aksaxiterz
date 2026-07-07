@@ -1303,6 +1303,9 @@
     .download-accordion-panel {
         @apply grid gap-3 border-t px-5 py-4 md:grid-cols-2 md:px-6;
         border-color: rgba(39, 39, 42, 0.88);
+        overflow: hidden;
+        transition: height 220ms ease, opacity 180ms ease, transform 220ms ease;
+        will-change: height, opacity, transform;
     }
 
     .download-resource-link {
