@@ -79,8 +79,8 @@
                 <label class="block lg:col-span-2">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Download links</span>
                     <textarea name="links_text" rows="5" class="search-bar min-h-32 w-full resize-y"
-                        placeholder="Download Files | https://example.com/file.zip&#10;Mirror | https://example.com/mirror">{{ old('links_text', $linksText) }}</textarea>
-                    <span class="mt-2 block text-xs text-gray-500">Use one link per line: Label | URL</span>
+                        placeholder="Download Loader | https://aksaxiterz.com/downloads/xg-team/xg-team-loader.exe&#10;Watch Tutorial | https://aksaxiterz.com/downloads/xg-team/tutorial.mp4&#10;Requirements | https://aksaxiterz.com/downloads/xg-team/requirements.zip">{{ old('links_text', $linksText) }}</textarea>
+                    <span class="mt-2 block text-xs text-gray-500">Use one link per line: Label | URL. Each line becomes one button inside the product accordion.</span>
                 </label>
 
                 <div class="flex flex-wrap items-center gap-3 lg:col-span-2">

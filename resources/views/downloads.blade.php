@@ -21,36 +21,90 @@
             <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Files</p>
             <h2 class="text-2xl font-semibold text-white">Choose what you need</h2>
             <p class="max-w-2xl text-sm leading-6 text-gray-400">
-                Each card opens a public file folder or direct download file.
+                Open a product, then pick the exact file, video, or setup resource you need.
             </p>
         </div>
 
-        <div class="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mx-auto grid max-w-5xl gap-4">
             @forelse ($downloads as $download)
                 @php
-                    $links = collect($download['links'] ?? [])->filter(fn ($link) => filled($link['url'] ?? null));
+                    $links = collect($download['links'] ?? [])
+                        ->filter(fn ($link) => filled($link['url'] ?? null))
+                        ->values();
+                    $resourceLabel = $links->count() . ' ' . Str::plural('resource', $links->count());
+                    $resourceIcon = static function (array $link): string {
+                        $label = Str::lower((string) ($link['label'] ?? ''));
+                        $url = Str::lower((string) ($link['url'] ?? ''));
+                        $path = (string) parse_url($url, PHP_URL_PATH);
+                        $extension = Str::lower(pathinfo($path, PATHINFO_EXTENSION));
+
+                        if (str_contains($label, 'video') || str_contains($label, 'tutorial') || in_array($extension, ['mp4', 'mov', 'mkv', 'webm'], true)) {
+                            return 'play-circle';
+                        }
+
+                        if (str_contains($label, 'guide') || str_contains($label, 'setup') || in_array($extension, ['pdf', 'txt'], true)) {
+                            return 'book-open';
+                        }
+
+                        if (in_array($extension, ['exe', 'zip', 'rar', '7z', 'dll', 'apk'], true)) {
+                            return 'download';
+                        }
+
+                        return 'external-link';
+                    };
+                    $resourceMeta = static function (array $link): string {
+                        $url = (string) ($link['url'] ?? '');
+                        $path = (string) parse_url($url, PHP_URL_PATH);
+                        $extension = Str::upper(pathinfo($path, PATHINFO_EXTENSION));
+
+                        if ($extension !== '') {
+                            return $extension;
+                        }
+
+                        $host = (string) parse_url($url, PHP_URL_HOST);
+
+                        return $host !== '' ? $host : 'Link';
+                    };
                 @endphp
 
-                <article class="download-card motion-card flex flex-col text-left">
-                    <h2 class="text-lg font-semibold text-white">{{ $download['name'] }}</h2>
+                <details class="download-card download-accordion motion-card text-left" @if ($loop->first) open @endif
+                    data-download-accordion>
+                    <summary class="download-accordion-summary">
+                        <span class="min-w-0">
+                            <span class="block truncate text-lg font-semibold text-white">{{ $download['name'] }}</span>
+                            <span class="mt-1 block text-xs text-gray-500">{{ $resourceLabel }}</span>
+                        </span>
+                        <span class="download-accordion-chevron" aria-hidden="true">
+                            <x-ui.icon name="chevron-down" class="h-4 w-4" />
+                        </span>
+                    </summary>
 
-                    <div class="mt-auto grid gap-3 pt-5">
+                    <div class="download-accordion-panel">
                         @forelse ($links as $link)
                             <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer"
-                                class="inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition btn-main">
-                                <x-ui.icon name="download" class="h-4 w-4" />
-                                <span>{{ $link['label'] }}</span>
+                                class="download-resource-link">
+                                <span class="download-resource-icon">
+                                    <x-ui.icon name="{{ $resourceIcon($link) }}" class="h-4 w-4" />
+                                </span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-sm font-semibold text-white">
+                                        {{ $link['label'] ?? 'Download' }}
+                                    </span>
+                                    <span class="mt-0.5 block text-xs text-gray-500">
+                                        {{ $resourceMeta($link) }}
+                                    </span>
+                                </span>
+                                <x-ui.icon name="external-link" class="h-4 w-4 shrink-0 text-gray-500" />
                             </a>
                         @empty
-                            <span
-                                class="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-[#27272A] bg-[#15151B] px-4 py-3 text-sm font-semibold text-gray-500">
+                            <span class="download-resource-empty">
                                 Download link not set
                             </span>
                         @endforelse
                     </div>
-                </article>
+                </details>
             @empty
-                <div class="empty-state md:col-span-2">
+                <div class="empty-state">
                     No public downloads have been configured yet.
                 </div>
             @endforelse
