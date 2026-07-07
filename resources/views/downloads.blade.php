@@ -67,8 +67,7 @@
                     };
                 @endphp
 
-                <details class="download-card download-accordion motion-card text-left" @if ($loop->first) open @endif
-                    data-download-accordion>
+                <details class="download-card download-accordion motion-card text-left" data-download-accordion>
                     <summary class="download-accordion-summary">
                         <span class="min-w-0">
                             <span class="block truncate text-lg font-semibold text-white">{{ $download['name'] }}</span>
