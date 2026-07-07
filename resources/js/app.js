@@ -1790,101 +1790,98 @@ async function softNavigate(url, options = {}) {
 }
 
 const DOWNLOAD_ACCORDION_SELECTOR = '[data-download-accordion]';
+const DOWNLOAD_ACCORDION_DURATION = 280;
+const DOWNLOAD_ACCORDION_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 function shouldReduceMotion() {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-}
-
-function downloadAccordionPanel(accordion) {
-    return accordion.querySelector('.download-accordion-panel');
 }
 
 function setDownloadAccordionExpanded(accordion, expanded) {
     accordion.querySelector('summary')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 }
 
-function resetDownloadAccordionPanel(panel) {
-    panel.style.height = '';
-    panel.style.opacity = '';
-    panel.style.overflow = '';
-    panel.style.transform = '';
+function clearDownloadAccordionAnimation(accordion) {
+    accordion._downloadAccordionCleanup?.();
+    accordion._downloadAccordionCleanup = null;
+    accordion.style.height = '';
+    accordion.style.overflow = '';
+    accordion.style.transition = '';
+    delete accordion.dataset.downloadAccordionAnimating;
 }
 
-function afterDownloadAccordionTransition(panel, callback) {
-    let completed = false;
-
-    const finish = (event = null) => {
-        if (event && event.target !== panel) return;
-        if (completed) return;
-
-        completed = true;
-        panel.removeEventListener('transitionend', finish);
-        callback();
-    };
-
-    panel.addEventListener('transitionend', finish);
-    window.setTimeout(finish, 320);
-}
-
-function openDownloadAccordion(accordion) {
-    const panel = downloadAccordionPanel(accordion);
-
-    if (!panel || shouldReduceMotion()) {
-        accordion.open = true;
-        setDownloadAccordionExpanded(accordion, true);
+function animateDownloadAccordionHeight(accordion, startHeight, endHeight, onFinish) {
+    if (shouldReduceMotion()) {
+        onFinish();
+        clearDownloadAccordionAnimation(accordion);
         return;
     }
 
-    if (accordion.open || accordion.dataset.downloadAccordionAnimating === 'true') return;
+    let completed = false;
+
+    const finish = (event = null) => {
+        if (event && event.target !== accordion) return;
+        if (completed) return;
+
+        completed = true;
+        accordion.removeEventListener('transitionend', finish);
+        window.clearTimeout(timeout);
+        accordion._downloadAccordionCleanup = null;
+        onFinish();
+        clearDownloadAccordionAnimation(accordion);
+    };
+
+    const timeout = window.setTimeout(finish, DOWNLOAD_ACCORDION_DURATION + 100);
 
     accordion.dataset.downloadAccordionAnimating = 'true';
-    accordion.open = true;
-    setDownloadAccordionExpanded(accordion, true);
-    panel.style.height = '0px';
-    panel.style.opacity = '0';
-    panel.style.overflow = 'hidden';
-    panel.style.transform = 'translateY(-4px)';
+    accordion.style.overflow = 'hidden';
+    accordion.style.transition = '';
+    accordion.style.height = `${startHeight}px`;
+    accordion.addEventListener('transitionend', finish);
+    accordion._downloadAccordionCleanup = () => {
+        completed = true;
+        accordion.removeEventListener('transitionend', finish);
+        window.clearTimeout(timeout);
+    };
 
     requestAnimationFrame(() => {
-        panel.style.height = `${panel.scrollHeight}px`;
-        panel.style.opacity = '1';
-        panel.style.transform = 'translateY(0)';
+        accordion.style.transition = `height ${DOWNLOAD_ACCORDION_DURATION}ms ${DOWNLOAD_ACCORDION_EASING}`;
+        accordion.style.height = `${endHeight}px`;
     });
+}
 
-    afterDownloadAccordionTransition(panel, () => {
-        delete accordion.dataset.downloadAccordionAnimating;
-        resetDownloadAccordionPanel(panel);
+function openDownloadAccordion(accordion) {
+    if (accordion.open && accordion.dataset.downloadAccordionAnimating !== 'true') return;
+
+    clearDownloadAccordionAnimation(accordion);
+    const startHeight = accordion.offsetHeight;
+
+    accordion.open = true;
+    setDownloadAccordionExpanded(accordion, true);
+
+    const endHeight = accordion.offsetHeight;
+
+    animateDownloadAccordionHeight(accordion, startHeight, endHeight, () => {
+        accordion.open = true;
+        setDownloadAccordionExpanded(accordion, true);
     });
 }
 
 function closeDownloadAccordion(accordion) {
-    const panel = downloadAccordionPanel(accordion);
+    if (!accordion.open && accordion.dataset.downloadAccordionAnimating !== 'true') return;
 
-    if (!panel || shouldReduceMotion()) {
+    clearDownloadAccordionAnimation(accordion);
+
+    if (!accordion.open) return;
+
+    const startHeight = accordion.offsetHeight;
+    const summaryHeight = accordion.querySelector('summary')?.offsetHeight || 0;
+
+    setDownloadAccordionExpanded(accordion, false);
+
+    animateDownloadAccordionHeight(accordion, startHeight, summaryHeight, () => {
         accordion.open = false;
         setDownloadAccordionExpanded(accordion, false);
-        return;
-    }
-
-    if (!accordion.open || accordion.dataset.downloadAccordionAnimating === 'true') return;
-
-    accordion.dataset.downloadAccordionAnimating = 'true';
-    setDownloadAccordionExpanded(accordion, false);
-    panel.style.height = `${panel.offsetHeight}px`;
-    panel.style.opacity = '1';
-    panel.style.overflow = 'hidden';
-    panel.style.transform = 'translateY(0)';
-
-    requestAnimationFrame(() => {
-        panel.style.height = '0px';
-        panel.style.opacity = '0';
-        panel.style.transform = 'translateY(-4px)';
-    });
-
-    afterDownloadAccordionTransition(panel, () => {
-        accordion.open = false;
-        delete accordion.dataset.downloadAccordionAnimating;
-        resetDownloadAccordionPanel(panel);
     });
 }
 
