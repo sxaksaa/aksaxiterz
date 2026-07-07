@@ -193,13 +193,22 @@
                             @php
                                 $resetState = $licenseResetStates[$license->id] ?? [
                                     'supported' => false,
+                                    'provider' => null,
+                                    'provider_label' => null,
+                                    'identifier' => null,
+                                    'identifier_label' => 'license',
                                     'username' => null,
                                     'is_paid_purchase' => false,
                                     'configured' => false,
                                     'available_at' => null,
                                     'remaining_seconds' => 0,
+                                    'cooldown_hours' => 24,
                                     'can_reset' => false,
                                 ];
+                                $resetProviderLabel = $resetState['provider_label'] ?? 'HWID';
+                                $resetIdentifier = $resetState['identifier'] ?? $resetState['username'] ?? null;
+                                $resetIdentifierLabel = $resetState['identifier_label'] ?? 'license';
+                                $resetCooldownHours = max(1, (int) ($resetState['cooldown_hours'] ?? 24));
                                 $resetMinutes = max(0, (int) ceil(($resetState['remaining_seconds'] ?? 0) / 60));
                                 $resetHours = intdiv($resetMinutes, 60);
                                 $resetMinuteRemainder = $resetMinutes % 60;
@@ -222,9 +231,9 @@
                                         {{ $license->license_key }}
                                     </span>
 
-                                    @if ($resetState['supported'] && $resetState['username'])
+                                    @if ($resetState['supported'] && $resetIdentifier)
                                         <p class="mt-2 text-[11px] text-gray-500">
-                                            HWID reset username: {{ $resetState['username'] }} · once every 24 hours
+                                            HWID reset {{ $resetIdentifierLabel }}: {{ $resetIdentifier }} · once every {{ $resetCooldownHours }} hours
                                         </p>
                                     @endif
                                 </div>
@@ -233,8 +242,8 @@
                                     @if ($resetState['supported'])
                                         @if ($resetState['can_reset'])
                                             <form method="POST" action="{{ route('licenses.reset-hwid', $license) }}"
-                                                data-confirm="Reset HWID for {{ $resetState['username'] }}? This action is limited to once every 24 hours."
-                                                data-brmods-reset-form>
+                                                data-confirm="Reset {{ $resetProviderLabel }} HWID for {{ $resetIdentifier }}? This action is limited to once every {{ $resetCooldownHours }} hours."
+                                                data-license-reset-form>
                                                 @csrf
                                                 <button type="submit"
                                                     class="order-action license-reset-action btn-press">

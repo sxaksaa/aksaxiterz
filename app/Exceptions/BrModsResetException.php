@@ -3,15 +3,14 @@
 namespace App\Exceptions;
 
 use Carbon\CarbonInterface;
-use RuntimeException;
 
-class BrModsResetException extends RuntimeException
+class BrModsResetException extends LicenseResetException
 {
     public function __construct(
         string $message,
-        public readonly string $reason = 'unavailable',
-        public readonly ?CarbonInterface $availableAt = null,
+        string $reason = 'unavailable',
+        ?CarbonInterface $availableAt = null,
     ) {
-        parent::__construct($message);
+        parent::__construct($message, $reason, $availableAt);
     }
 }

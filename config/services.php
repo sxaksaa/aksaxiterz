@@ -152,4 +152,14 @@ return [
         'pending_timeout_minutes' => (int) env('BRMODS_PENDING_TIMEOUT_MINUTES', 2),
     ],
 
+    'xgteam' => [
+        'reset_url' => env('XGTEAM_RESET_URL', 'https://xgteam.pythonanywhere.com/resethwid'),
+        'secret' => env('XGTEAM_RESET_SECRET'),
+        'product_slug' => env('XGTEAM_PRODUCT_SLUG', 'xg-team'),
+        'cooldown_hours' => (int) env('XGTEAM_RESET_COOLDOWN_HOURS', 48),
+        'connect_timeout_seconds' => (int) env('XGTEAM_CONNECT_TIMEOUT_SECONDS', 5),
+        'timeout_seconds' => (int) env('XGTEAM_TIMEOUT_SECONDS', 15),
+        'pending_timeout_minutes' => (int) env('XGTEAM_PENDING_TIMEOUT_MINUTES', 2),
+    ],
+
 ];

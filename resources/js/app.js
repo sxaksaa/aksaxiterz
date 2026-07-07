@@ -1954,7 +1954,7 @@ document.addEventListener('submit', (event) => {
 }, true);
 
 document.addEventListener('submit', (event) => {
-    const form = event.target.closest('[data-brmods-reset-form]');
+    const form = event.target.closest('[data-license-reset-form]');
 
     if (!form || event.defaultPrevented) return;
 

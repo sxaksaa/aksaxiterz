@@ -20,7 +20,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Voucher as VoucherModel;
-use App\Services\BrModsResetService;
+use App\Services\LicenseResetManager;
 use App\Services\PendingOrderExpirationService;
 use App\Support\ProductSalesSignals;
 use App\Support\RecentPurchaseFeed;
@@ -332,7 +332,7 @@ Route::middleware('auth')->group(function () {
     // License
     Route::get('/licenses', function (
         PendingOrderExpirationService $pendingOrderExpirationService,
-        BrModsResetService $brModsResetService,
+        LicenseResetManager $licenseResetManager,
     ) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
@@ -342,7 +342,7 @@ Route::middleware('auth')->group(function () {
             ->get();
         $licenseResetStates = $licenses
             ->mapWithKeys(fn (License $license) => [
-                $license->id => $brModsResetService->state($license),
+                $license->id => $licenseResetManager->state($license),
             ])
             ->all();
 

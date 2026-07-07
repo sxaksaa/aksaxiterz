@@ -51,10 +51,10 @@ class BrModsLicenseResetTest extends TestCase
 
         $html = $response->getContent();
 
-        $this->assertSame(1, substr_count($html, 'data-brmods-reset-form'));
+        $this->assertSame(1, substr_count($html, 'data-license-reset-form'));
         $this->assertLessThan(
             strpos($html, 'data-copy-license="'.$brLicense->id.'"'),
-            strpos($html, 'data-brmods-reset-form'),
+            strpos($html, 'data-license-reset-form'),
             'The Reset HWID action should render to the left of Copy.',
         );
     }

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Exceptions\BrModsResetException;
+use App\Exceptions\LicenseResetException;
 use App\Models\License;
 use App\Models\LicenseReset;
 use App\Models\Product;
@@ -15,9 +15,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class BrModsResetService
+class XgTeamResetService
 {
-    public const PROVIDER = 'brmods';
+    public const PROVIDER = 'xgteam';
 
     public function supports(License $license): bool
     {
@@ -31,34 +31,34 @@ class BrModsResetService
     public function supportsProduct(?Product $product): bool
     {
         return $product && hash_equals(
-            Str::lower(trim((string) config('services.brmods.product_slug', 'br-mods-pc'))),
+            Str::lower(trim((string) config('services.xgteam.product_slug', 'xg-team'))),
             Str::lower(trim((string) $product->slug)),
         );
     }
 
-    public function extractUsername(string $credential): ?string
+    public function extractLicenseKey(string $credential): ?string
     {
-        if (! preg_match('/👤\s*([^🔑\r\n]+?)\s*🔑/u', $credential, $matches)) {
-            return null;
+        $licenseKey = trim($credential);
+
+        if (preg_match('/\b(AksaXg-[A-Za-z0-9_-]+)\b/i', $licenseKey, $matches)) {
+            $licenseKey = (string) $matches[1];
         }
 
-        $username = trim((string) ($matches[1] ?? ''));
-
         if (
-            $username === '' ||
-            mb_strlen($username) > 120 ||
-            preg_match('/[\x00-\x1F\x7F]/u', $username)
+            $licenseKey === '' ||
+            mb_strlen($licenseKey) > 120 ||
+            preg_match('/[\x00-\x1F\x7F\s]/u', $licenseKey)
         ) {
             return null;
         }
 
-        return $username;
+        return $licenseKey;
     }
 
     public function state(License $license): array
     {
         $supported = $this->supports($license);
-        $username = $supported ? $this->extractUsername((string) $license->license_key) : null;
+        $licenseKey = $supported ? $this->extractLicenseKey((string) $license->license_key) : null;
         $order = $license->relationLoaded('order')
             ? $license->order
             : $license->order()->first();
@@ -82,10 +82,10 @@ class BrModsResetService
         return [
             'supported' => $supported,
             'provider' => self::PROVIDER,
-            'provider_label' => 'BR Mods',
-            'identifier' => $username,
-            'identifier_label' => 'username',
-            'username' => $username,
+            'provider_label' => 'XG Team',
+            'identifier' => $licenseKey,
+            'identifier_label' => 'license',
+            'username' => $licenseKey,
             'is_paid_purchase' => (bool) $isPaidPurchase,
             'configured' => $this->isConfigured(),
             'available_at' => $availableAt,
@@ -93,7 +93,7 @@ class BrModsResetService
             'cooldown_hours' => $this->cooldownHours(),
             'can_reset' => $supported &&
                 $isPaidPurchase &&
-                $username !== null &&
+                $licenseKey !== null &&
                 $this->isConfigured() &&
                 $remainingSeconds === 0,
         ];
@@ -101,18 +101,18 @@ class BrModsResetService
 
     public function reset(License $license, User $user): LicenseReset
     {
-        [$lockedLicense, $username, $attempt] = DB::transaction(function () use ($license, $user): array {
+        [$lockedLicense, $licenseKey, $attempt] = DB::transaction(function () use ($license, $user): array {
             $lockedLicense = License::with(['product', 'order'])
                 ->whereKey($license->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
             if ((int) $lockedLicense->user_id !== (int) $user->id) {
-                throw new BrModsResetException('This license does not belong to your account.', 'not_owned');
+                throw new LicenseResetException('This license does not belong to your account.', 'not_owned');
             }
 
             if (! $this->supports($lockedLicense)) {
-                throw new BrModsResetException('HWID reset is not available for this product.', 'unsupported');
+                throw new LicenseResetException('HWID reset is not available for this product.', 'unsupported');
             }
 
             if (
@@ -120,21 +120,21 @@ class BrModsResetService
                 $lockedLicense->order->status !== 'paid' ||
                 (int) $lockedLicense->order->user_id !== (int) $user->id
             ) {
-                throw new BrModsResetException('Only a paid BR Mods license can be reset.', 'not_paid');
+                throw new LicenseResetException('Only a paid XG Team license can be reset.', 'not_paid');
             }
 
             if (! $this->isConfigured()) {
-                throw new BrModsResetException(
+                throw new LicenseResetException(
                     'HWID reset is temporarily unavailable. Please contact support.',
                     'not_configured',
                 );
             }
 
-            $username = $this->extractUsername((string) $lockedLicense->license_key);
+            $licenseKey = $this->extractLicenseKey((string) $lockedLicense->license_key);
 
-            if ($username === null) {
-                throw new BrModsResetException(
-                    'This BR Mods license format cannot be reset automatically. Please contact support.',
+            if ($licenseKey === null) {
+                throw new LicenseResetException(
+                    'This XG Team license format cannot be reset automatically. Please contact support.',
                     'invalid_credential',
                 );
             }
@@ -152,7 +152,7 @@ class BrModsResetService
                 : null;
 
             if ($availableAt?->isFuture()) {
-                throw new BrModsResetException(
+                throw new LicenseResetException(
                     'This license can be reset again in '.$this->humanRemaining($availableAt).'.',
                     'cooldown',
                     $availableAt,
@@ -168,7 +168,7 @@ class BrModsResetService
                 ->exists();
 
             if ($hasRecentAttempt) {
-                throw new BrModsResetException(
+                throw new LicenseResetException(
                     'An HWID reset for this license is already in progress.',
                     'in_progress',
                 );
@@ -178,21 +178,20 @@ class BrModsResetService
                 'license_id' => $lockedLicense->id,
                 'user_id' => $user->id,
                 'provider' => self::PROVIDER,
-                'username' => $username,
+                'username' => $licenseKey,
                 'status' => LicenseReset::STATUS_PENDING,
             ]);
 
-            return [$lockedLicense, $username, $attempt];
+            return [$lockedLicense, $licenseKey, $attempt];
         });
 
         try {
-            $response = Http::asJson()
-                ->acceptJson()
-                ->withHeaders(['X-API-Key' => (string) config('services.brmods.api_key')])
-                ->connectTimeout(max(1, (int) config('services.brmods.connect_timeout_seconds', 5)))
-                ->timeout(max(2, (int) config('services.brmods.timeout_seconds', 15)))
-                ->post((string) config('services.brmods.reset_url'), [
-                    'username' => $username,
+            $response = Http::acceptJson()
+                ->connectTimeout(max(1, (int) config('services.xgteam.connect_timeout_seconds', 5)))
+                ->timeout(max(2, (int) config('services.xgteam.timeout_seconds', 15)))
+                ->get((string) config('services.xgteam.reset_url'), [
+                    'secret' => (string) config('services.xgteam.secret'),
+                    'license' => $licenseKey,
                 ]);
         } catch (ConnectionException $exception) {
             $attempt->update([
@@ -200,15 +199,15 @@ class BrModsResetService
                 'provider_message' => 'Connection failed',
             ]);
 
-            Log::warning('BRMods HWID reset connection failed.', [
+            Log::warning('XG Team HWID reset connection failed.', [
                 'license_id' => $lockedLicense->id,
                 'user_id' => $user->id,
                 'attempt_id' => $attempt->id,
                 'exception' => $exception->getMessage(),
             ]);
 
-            throw new BrModsResetException(
-                'BRMods could not be reached. Please try again in a moment.',
+            throw new LicenseResetException(
+                'XG Team could not be reached. Please try again in a moment.',
                 'connection_failed',
             );
         }
@@ -222,16 +221,16 @@ class BrModsResetService
                 'provider_message' => $providerMessage,
             ]);
 
-            Log::warning('BRMods HWID reset was rejected.', [
+            Log::warning('XG Team HWID reset was rejected.', [
                 'license_id' => $lockedLicense->id,
                 'user_id' => $user->id,
                 'attempt_id' => $attempt->id,
                 'http_status' => $response->status(),
             ]);
 
-            throw new BrModsResetException(
-                'BRMods could not reset this HWID. Please try again later or contact support.',
-                'provider_rejected',
+            throw new LicenseResetException(
+                $this->customerRejectionMessage($providerMessage),
+                $this->isCooldownMessage($providerMessage) ? 'provider_cooldown' : 'provider_rejected',
             );
         }
 
@@ -242,7 +241,7 @@ class BrModsResetService
             'succeeded_at' => now(),
         ]);
 
-        Log::info('BRMods HWID reset completed.', [
+        Log::info('XG Team HWID reset completed.', [
             'license_id' => $lockedLicense->id,
             'user_id' => $user->id,
             'attempt_id' => $attempt->id,
@@ -253,10 +252,10 @@ class BrModsResetService
 
     public function isConfigured(): bool
     {
-        $url = trim((string) config('services.brmods.reset_url'));
+        $url = trim((string) config('services.xgteam.reset_url'));
         $scheme = Str::lower((string) parse_url($url, PHP_URL_SCHEME));
 
-        return filled(config('services.brmods.api_key')) &&
+        return filled(config('services.xgteam.secret')) &&
             filter_var($url, FILTER_VALIDATE_URL) !== false &&
             $scheme === 'https';
     }
@@ -285,7 +284,7 @@ class BrModsResetService
 
         $status = Str::lower(trim((string) ($data['status'] ?? '')));
 
-        if (in_array($status, ['error', 'failed', 'failure', 'rejected', 'erro'], true)) {
+        if (in_array($status, ['error', 'failed', 'failure', 'rejected', 'unauthorized'], true)) {
             return false;
         }
 
@@ -305,7 +304,7 @@ class BrModsResetService
         $normalized = Str::lower(trim((string) $value));
 
         return $normalized !== '' &&
-            ! in_array($normalized, ['0', 'false', 'no', 'null', 'error', 'failed', 'failure', 'erro'], true);
+            ! in_array($normalized, ['0', 'false', 'no', 'null', 'error', 'failed', 'failure', 'unauthorized'], true);
     }
 
     private function providerMessage(Response $response): ?string
@@ -328,14 +327,29 @@ class BrModsResetService
         return $clean !== '' ? Str::limit($clean, 1000, '') : null;
     }
 
+    private function customerRejectionMessage(?string $providerMessage): string
+    {
+        if ($this->isCooldownMessage($providerMessage)) {
+            return $providerMessage;
+        }
+
+        return 'XG Team could not reset this HWID. Please try again later or contact support.';
+    }
+
+    private function isCooldownMessage(?string $providerMessage): bool
+    {
+        return $providerMessage !== null &&
+            str_contains(Str::lower($providerMessage), 'cooldown');
+    }
+
     private function cooldownHours(): int
     {
-        return max(1, (int) config('services.brmods.cooldown_hours', 24));
+        return max(1, (int) config('services.xgteam.cooldown_hours', 48));
     }
 
     private function pendingTimeoutMinutes(): int
     {
-        return max(1, (int) config('services.brmods.pending_timeout_minutes', 2));
+        return max(1, (int) config('services.xgteam.pending_timeout_minutes', 2));
     }
 
     private function humanRemaining(CarbonInterface $availableAt): string
