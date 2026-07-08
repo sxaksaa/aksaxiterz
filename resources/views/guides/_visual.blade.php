@@ -36,7 +36,7 @@
         <div class="flex items-center gap-2 border-b border-[#27272A] px-3 py-2">
             <span class="h-2.5 w-2.5 rounded-full bg-red-400/80"></span>
             <span class="h-2.5 w-2.5 rounded-full bg-yellow-300/80"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-green-400/80"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-aksa-accent-soft"></span>
             <span class="ml-2 truncate text-[11px] font-semibold text-gray-500">{{ $title }}</span>
         </div>
 

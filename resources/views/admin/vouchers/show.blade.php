@@ -96,7 +96,7 @@
                                     <div class="mt-1 text-xs text-gray-500">{{ $order->total_quantity }} {{ $order->total_quantity === 1 ? 'key' : 'keys' }}</div>
                                 </td>
                                 <td class="p-4 text-right font-semibold text-gray-200">{{ $formatRowMoney($row, 'subtotal_value') }}</td>
-                                <td class="p-4 text-right font-semibold text-emerald-300">-{{ $formatRowMoney($row, 'discount_value') }}</td>
+                                <td class="p-4 text-right font-semibold text-aksa-accent">-{{ $formatRowMoney($row, 'discount_value') }}</td>
                                 <td class="p-4 text-right">
                                     <div class="font-semibold text-aksa-accent-soft">{{ $formatRowMoney($row, 'final_value') }}</div>
                                     <div class="mt-1 text-xs text-gray-500">Requested {{ $formatRowMoney($row, 'paid_value') }}</div>
@@ -139,7 +139,7 @@
                         </div>
                         <div class="qris-detail-row">
                             <span>Voucher cut</span>
-                            <span class="font-semibold text-emerald-300">-{{ $formatRowMoney($row, 'discount_value') }}</span>
+                            <span class="font-semibold text-aksa-accent">-{{ $formatRowMoney($row, 'discount_value') }}</span>
                         </div>
                         <div class="qris-detail-row qris-total-row">
                             <span>After voucher</span>

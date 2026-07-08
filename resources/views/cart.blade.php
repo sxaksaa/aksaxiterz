@@ -57,7 +57,7 @@
                                     <p class="text-xs uppercase tracking-normal text-aksa-accent">{{ $item->product->category?->name ?? 'Product' }}</p>
                                     <h2 class="mt-1 truncate text-lg font-semibold text-white">{{ $item->product->name }}</h2>
                                     <p class="mt-1 text-sm text-gray-400">{{ $item->package->name }}</p>
-                                    <p class="mt-2 text-xs {{ $item->available_stock >= $item->quantity ? 'text-emerald-300' : 'text-red-300' }}">
+                                    <p class="mt-2 text-xs {{ $item->available_stock >= $item->quantity ? 'text-aksa-accent' : 'text-red-300' }}">
                                         {{ $item->available_stock }} keys currently available
                                     </p>
                                 </div>
@@ -231,7 +231,7 @@
                     </div>
                     <div id="cartDiscountRow" class="summary-row mb-2 hidden">
                         <span>Voucher</span>
-                        <span id="cartDiscount" class="text-emerald-300">-</span>
+                        <span id="cartDiscount" class="text-aksa-accent">-</span>
                     </div>
                     <div class="summary-row">
                         <span>Total</span>
@@ -322,8 +322,8 @@
                 function voucherFeedback(message, variant = 'success') {
                     const element = document.getElementById('cartVoucherFeedback');
                     element.innerText = message;
-                    element.classList.remove('hidden', 'text-emerald-300', 'text-red-300', 'text-gray-400');
-                    element.classList.add(variant === 'success' ? 'text-emerald-300' : (variant === 'loading' ? 'text-gray-400' : 'text-red-300'));
+                    element.classList.remove('hidden', 'text-aksa-accent', 'text-red-300', 'text-gray-400');
+                    element.classList.add(variant === 'success' ? 'text-aksa-accent' : (variant === 'loading' ? 'text-gray-400' : 'text-red-300'));
                 }
 
                 document.querySelectorAll('[data-cart-quantity-form]').forEach(form => {

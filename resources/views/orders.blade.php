@@ -7,34 +7,34 @@
         $pendingOrders = $orderStats['pending'] ?? $orders->where('status', 'pending')->count();
     @endphp
 
-    <div class="page-shell py-6 md:py-10">
-        <section class="orders-hero fade-up mb-6">
-            <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
-                <div>
-                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Order Center</p>
-                    <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Order History</h1>
-                    <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+    <div class="page-shell public-account-page py-7 md:py-12">
+        <section class="orders-hero account-hero fade-up mb-8">
+            <div class="account-hero-layout">
+                <div class="account-hero-copy">
+                    <p class="account-eyebrow">Order Center</p>
+                    <h1 class="account-title">Order History</h1>
+                    <p class="account-copy">
                         Track payments, continue pending invoices, and jump back into your licenses after checkout.
                     </p>
                 </div>
+
+                <div class="account-stat-grid account-stat-grid-3">
+                    <div class="order-stat account-stat">
+                        <div class="account-stat-value">{{ $totalOrders }}</div>
+                        <div class="account-stat-label">Total orders</div>
+                    </div>
+                    <div class="order-stat account-stat">
+                        <div class="account-stat-value">{{ $paidOrders }}</div>
+                        <div class="account-stat-label">Paid orders</div>
+                    </div>
+                    <div class="order-stat account-stat">
+                        <div class="account-stat-value">{{ $pendingOrders }}</div>
+                        <div class="account-stat-label">Waiting payment</div>
+                    </div>
+                </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $totalOrders }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Total orders</div>
-                </div>
-                <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $paidOrders }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Paid orders</div>
-                </div>
-                <div class="order-stat">
-                    <div class="text-xl font-semibold text-white">{{ $pendingOrders }}</div>
-                    <div class="mt-1 text-xs text-gray-400">Waiting payment</div>
-                </div>
-            </div>
-
-            <div class="order-help-strip mt-4">
+            <div class="order-help-strip account-helper-row">
                 <span>
                     <x-ui.icon name="refresh-cw" class="h-4 w-4" />
                     Auto checks run in the background

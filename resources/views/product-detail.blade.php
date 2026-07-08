@@ -375,7 +375,7 @@
                     @if (($saving['saving'] ?? 0) > 0)
                         <div class="package-saving">
                             <div class="flex items-center justify-between gap-2">
-                                <p class="text-xs font-semibold text-emerald-300" data-currency-text
+                                <p class="text-xs font-semibold text-aksa-accent" data-currency-text
                                     data-idr="Save Rp {{ number_format($saving['saving']) }}"
                                     data-usd="Save {{ $formatUsdCompact($saving['saving_usdt']) }}">
                                     Save Rp {{ number_format($saving['saving']) }}
@@ -467,7 +467,7 @@
 
             <div id="voucherDiscountRow" class="summary-row mb-2 hidden">
                 <span id="voucherDiscountLabel">Voucher</span>
-                <span id="voucherDiscountAmount" class="text-emerald-300">-</span>
+                <span id="voucherDiscountAmount" class="text-aksa-accent">-</span>
             </div>
 
             <div class="summary-row">
@@ -920,8 +920,8 @@
         function setVoucherFeedback(message, variant = 'success') {
             const feedback = document.getElementById('voucherFeedback');
             feedback.innerText = message;
-            feedback.classList.remove('hidden', 'text-emerald-300', 'text-red-300', 'text-gray-400');
-            feedback.classList.add(variant === 'success' ? 'text-emerald-300' : (variant === 'loading' ? 'text-gray-400' : 'text-red-300'));
+            feedback.classList.remove('hidden', 'text-aksa-accent', 'text-red-300', 'text-gray-400');
+            feedback.classList.add(variant === 'success' ? 'text-aksa-accent' : (variant === 'loading' ? 'text-gray-400' : 'text-red-300'));
         }
 
         function clearVoucher(message = null) {

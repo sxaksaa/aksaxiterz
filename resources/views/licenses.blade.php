@@ -25,44 +25,57 @@
         });
     @endphp
 
-    <div class="page-shell py-6 md:py-10">
+    <div class="page-shell public-account-page py-7 md:py-12">
 
-        <section class="license-hero mb-6 fade-up">
-            <div class="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
-                <div>
-                    <p class="mb-2 text-sm font-semibold text-aksa-accent">License Vault</p>
-                    <h1 class="text-3xl font-bold tracking-normal md:text-4xl">My Licenses</h1>
-                    <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+        <section class="license-hero account-hero mb-8 fade-up">
+            <div class="account-hero-layout">
+                <div class="account-hero-copy">
+                    <p class="account-eyebrow">License Vault</p>
+                    <h1 class="account-title">My Licenses</h1>
+                    <p class="account-copy">
                         Your paid license keys are stored here. Copy the key you need and download the matching tools
                         when you are ready to set up.
                     </p>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
-                    <div class="license-stat">
-                        <div class="text-xl font-semibold text-white">{{ $licenseCount }}</div>
-                        <div class="mt-1 text-xs text-gray-400">Active licenses</div>
+                <div class="account-actions">
+                    <a href="/downloads" class="btn-footer-secondary account-action-button">
+                        <x-ui.icon name="download" class="h-4 w-4" />
+                        <span>Download Tools</span>
+                    </a>
+                    <a href="{{ $discordUrl ?: '#' }}"
+                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                        class="discord-cta account-action-button {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
+                        <x-ui.icon name="discord" class="h-4 w-4" />
+                        <span>Join Discord</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="account-stat-grid account-stat-grid-4">
+                <div class="license-stat account-stat">
+                    <div class="account-stat-value">{{ $licenseCount }}</div>
+                    <div class="account-stat-label">Active licenses</div>
+                </div>
+                <div class="license-stat account-stat">
+                    <div class="account-stat-value">{{ $orderStats['paid'] }}</div>
+                    <div class="account-stat-label">Paid orders</div>
+                </div>
+                <div class="license-stat account-stat">
+                    <div class="account-stat-value">{{ $orderStats['pending'] }}</div>
+                    <div class="account-stat-label">Pending orders</div>
+                </div>
+                <div class="license-stat account-stat">
+                    <div class="account-stat-value">
+                        {{ $latestLicense?->created_at?->format('d M') ?? '-' }}
                     </div>
-                    <div class="license-stat">
-                        <div class="text-xl font-semibold text-white">{{ $orderStats['paid'] }}</div>
-                        <div class="mt-1 text-xs text-gray-400">Paid orders</div>
-                    </div>
-                    <div class="license-stat">
-                        <div class="text-xl font-semibold text-white">{{ $orderStats['pending'] }}</div>
-                        <div class="mt-1 text-xs text-gray-400">Pending orders</div>
-                    </div>
-                    <div class="license-stat">
-                        <div class="text-xl font-semibold text-white">
-                            {{ $latestLicense?->created_at?->format('d M') ?? '-' }}
-                        </div>
-                        <div class="mt-1 text-xs text-gray-400">Latest purchase</div>
-                    </div>
+                    <div class="account-stat-label">Latest purchase</div>
                 </div>
             </div>
         </section>
 
         @if (session('license_reset_success'))
-            <div class="mb-5 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-200 fade-up"
+            <div class="mb-5 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft fade-up"
                 role="status">
                 {{ session('license_reset_success') }}
             </div>
@@ -75,46 +88,11 @@
             </div>
         @endif
 
-        <div class="discord-mini-panel mb-5 fade-up md:p-5">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">Need setup help or buyer support?</h2>
-                    <p class="mt-1 text-sm text-gray-400">
-                        Join Discord to claim buyer support, ask for setup help, and request eligible license resets.
-                    </p>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        <span class="support-pill">Buyer support</span>
-                        <span class="support-pill">Customer support</span>
-                        <span class="support-pill">License reset</span>
-                        <span class="support-pill">Setup guidance</span>
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="/downloads"
-                        class="inline-flex items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white">
-                        <x-ui.icon name="download" class="h-4 w-4" />
-                        <span>Download Tools</span>
-                    </a>
-                    <a href="{{ $discordUrl ?: '#' }}"
-                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
-                        class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        <x-ui.icon name="discord" class="h-4 w-4" />
-                        <span>Join Discord</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
         <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Keys</p>
                 <h2 class="mt-1 text-2xl font-semibold text-white">Available licenses</h2>
             </div>
-            <a href="/downloads" class="btn-footer-secondary w-fit">
-                <x-ui.icon name="download" class="h-4 w-4" />
-                <span>Download Tools</span>
-            </a>
         </div>
 
         <div class="grid gap-4 md:gap-6">

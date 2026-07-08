@@ -144,10 +144,10 @@
                         </button>
                     </div>
                 </div>
+                @if ($hasCryptoMismatch || ($isPending && ! $canSyncCrypto && ! $canSyncBinancePay && $order->expired_at))
                 <div class="text-right">
-                    <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
                     @if ($hasCryptoMismatch)
-                        <div class="mt-1 text-xs text-red-300">Contact support</div>
+                        <div class="text-xs text-red-300">Contact support</div>
                     @endif
                     @if ($isPending && ! $canSyncCrypto && ! $canSyncBinancePay && $order->expired_at)
                         <div class="mt-1 text-xs text-gray-400">
@@ -155,6 +155,7 @@
                         </div>
                     @endif
                 </div>
+                @endif
             </div>
 
             <div class="mt-4">
@@ -300,7 +301,7 @@
                     <th class="p-4 text-left">Method</th>
                     <th class="p-4 text-left">Price</th>
                     <th class="p-4 text-left">Created at</th>
-                    <th class="p-4 text-left">Status</th>
+                    <th class="p-4 text-left">Progress</th>
                     <th class="p-4 text-right">Payment</th>
                 </tr>
             </thead>
@@ -463,9 +464,8 @@
                             @endif
                         </td>
                         <td class="p-4">
-                            <span class="status-pill {{ $statusClass }}">{{ $statusLabel }}</span>
                             @if ($hasCryptoMismatch)
-                                <div class="mt-1 text-xs text-red-300">Contact support</div>
+                                <div class="text-xs text-red-300">Contact support</div>
                             @endif
                             @if ($isPending && ! $canSyncCrypto && ! $canSyncBinancePay && $order->expired_at)
                                 <div class="mt-1 text-xs text-gray-400">
