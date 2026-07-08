@@ -3,14 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+    :root {
+        --aksa-bg: #09090d;
+        --aksa-bg-soft: #0d0d12;
+        --aksa-surface: rgba(18, 18, 24, 0.82);
+        --aksa-surface-raised: rgba(24, 24, 31, 0.84);
+        --aksa-border: rgba(113, 113, 122, 0.28);
+        --aksa-border-strong: rgba(161, 161, 170, 0.38);
+        --aksa-purple: #a855f7;
+        --aksa-purple-muted: rgba(168, 85, 247, 0.12);
+        --aksa-cyan-muted: rgba(34, 211, 238, 0.08);
+        --aksa-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+        --aksa-shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.18);
+    }
+
     html {
         scroll-behavior: smooth;
-        scrollbar-color: rgba(168, 85, 247, 0.72) #09090c;
+        scrollbar-color: rgba(168, 85, 247, 0.54) #09090c;
         scrollbar-width: thin;
     }
 
     * {
-        scrollbar-color: rgba(168, 85, 247, 0.72) #09090c;
+        scrollbar-color: rgba(168, 85, 247, 0.54) #09090c;
         scrollbar-width: thin;
     }
 
@@ -29,10 +43,10 @@
         min-height: 52px;
         border: 2px solid #09090c;
         border-radius: 999px;
-        background: linear-gradient(180deg, rgba(216, 180, 254, 0.92), rgba(147, 51, 234, 0.76));
+        background: linear-gradient(180deg, rgba(216, 180, 254, 0.72), rgba(147, 51, 234, 0.56));
         box-shadow:
-            inset 0 0 0 1px rgba(255, 255, 255, 0.14),
-            0 0 18px rgba(147, 51, 234, 0.24);
+            inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+            0 0 14px rgba(147, 51, 234, 0.14);
     }
 
     *::-webkit-scrollbar-thumb:hover {
@@ -58,15 +72,20 @@
         background:
             radial-gradient(
                 circle at 18% 10%,
-                rgba(147, 51, 234, 0.14),
+                rgba(168, 85, 247, 0.08),
                 transparent 30rem
             ),
             radial-gradient(
                 circle at 82% 0%,
-                rgba(147, 51, 234, 0.18),
+                rgba(34, 211, 238, 0.055),
+                transparent 28rem
+            ),
+            radial-gradient(
+                circle at 50% 110%,
+                rgba(168, 85, 247, 0.06),
                 transparent 34rem
             ),
-            linear-gradient(180deg, #08080c 0%, #0d0d12 48%, #09090c 100%);
+            linear-gradient(180deg, var(--aksa-bg) 0%, var(--aksa-bg-soft) 48%, #08080b 100%);
     }
 
     input[type="date"],
@@ -281,9 +300,9 @@
     }
 
     .surface {
-        background: rgba(21, 21, 27, 0.86);
-        border: 1px solid rgba(63, 63, 70, 0.9);
-        box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
+        background: linear-gradient(180deg, var(--aksa-surface-raised), var(--aksa-surface));
+        border: 1px solid var(--aksa-border);
+        box-shadow: var(--aksa-shadow);
         backdrop-filter: blur(18px);
     }
 
@@ -305,20 +324,20 @@
     .card-glow:hover,
     .product-card:hover,
     .glow-hover:hover {
-        border-color: rgba(147, 51, 234, 0.72);
+        border-color: rgba(168, 85, 247, 0.42);
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.16),
-            0 18px 45px rgba(147, 51, 234, 0.13),
-            0 10px 24px rgba(147, 51, 234, 0.15);
-        transform: translateY(-4px);
+            0 0 0 1px rgba(168, 85, 247, 0.08),
+            0 18px 44px rgba(0, 0, 0, 0.28),
+            0 12px 30px rgba(168, 85, 247, 0.08);
+        transform: translateY(-2px);
     }
 
     .product-card:hover {
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.26),
-            0 22px 52px rgba(147, 51, 234, 0.18),
-            0 18px 38px rgba(0, 0, 0, 0.38);
-        transform: translateY(-4px);
+            0 0 0 1px rgba(168, 85, 247, 0.12),
+            0 20px 48px rgba(0, 0, 0, 0.34),
+            0 14px 34px rgba(168, 85, 247, 0.1);
+        transform: translateY(-2px);
         z-index: 2;
     }
 
@@ -328,7 +347,7 @@
         inset: 0;
         background: linear-gradient(
             135deg,
-            rgba(147, 51, 234, 0.12),
+            rgba(168, 85, 247, 0.08),
             transparent 44%
         );
         opacity: 0;
@@ -338,7 +357,7 @@
     }
 
     .product-card::after {
-        content: "";
+        content: none;
         position: absolute;
         top: -25%;
         bottom: -25%;
@@ -369,8 +388,8 @@
     }
 
     .product-card:hover::after {
-        opacity: 1;
-        transform: translateX(520%) skewX(-18deg);
+        opacity: 0;
+        transform: translateX(-120%) skewX(-18deg);
     }
 
     .product-card-storefront {
@@ -386,7 +405,7 @@
         gap: 0.45rem;
         border: 1px solid rgba(147, 51, 234, 0.24);
         border-radius: 0.65rem;
-        background: rgba(147, 51, 234, 0.09);
+        background: rgba(168, 85, 247, 0.08);
         color: #d8b4fe;
         font-size: 0.75rem;
         font-weight: 700;
@@ -470,31 +489,29 @@
 
     .category-chip {
         @apply inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition;
-        background: rgba(21, 21, 27, 0.86);
-        border-color: #27272a;
+        background: rgba(18, 18, 24, 0.78);
+        border-color: var(--aksa-border);
         color: #a1a1aa;
     }
 
     .category-chip:hover {
-        border-color: rgba(147, 51, 234, 0.65);
+        border-color: rgba(168, 85, 247, 0.46);
         color: #ffffff;
         transform: translateY(-1px);
     }
 
     .category-chip.active {
-        background: #9333ea;
-        border-color: #9333ea;
+        background: rgba(147, 51, 234, 0.82);
+        border-color: rgba(216, 180, 254, 0.48);
         color: #ffffff;
-        box-shadow: 0 12px 25px rgba(147, 51, 234, 0.22);
+        box-shadow: 0 12px 25px rgba(147, 51, 234, 0.14);
     }
 
     .search-bar {
         @apply w-full rounded-[999px] border px-4 py-3 text-white transition;
-        background: rgba(21, 21, 27, 0.9);
-        border-color: rgba(147, 51, 234, 0.72);
-        box-shadow:
-            0 0 0 3px rgba(147, 51, 234, 0.12),
-            0 12px 28px rgba(147, 51, 234, 0.08);
+        background: rgba(14, 14, 20, 0.78);
+        border-color: rgba(113, 113, 122, 0.36);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
     textarea.search-bar {
@@ -529,20 +546,18 @@
 
     .aksa-select-trigger {
         @apply flex min-h-12 w-full items-center justify-between gap-3 rounded-[999px] border px-4 py-3 text-left text-white transition;
-        background: rgba(21, 21, 27, 0.9);
-        border-color: rgba(147, 51, 234, 0.72);
-        box-shadow:
-            0 0 0 3px rgba(147, 51, 234, 0.12),
-            0 12px 28px rgba(147, 51, 234, 0.08);
+        background: rgba(14, 14, 20, 0.78);
+        border-color: rgba(113, 113, 122, 0.36);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
     .aksa-select-trigger:focus,
     .aksa-select-trigger:hover {
-        border-color: rgba(192, 132, 252, 0.95);
+        border-color: rgba(168, 85, 247, 0.72);
         outline: none;
         box-shadow:
-            0 0 0 4px rgba(147, 51, 234, 0.18),
-            0 16px 34px rgba(147, 51, 234, 0.14);
+            0 0 0 4px rgba(168, 85, 247, 0.11),
+            0 12px 26px rgba(0, 0, 0, 0.18);
     }
 
     .aksa-select-trigger:disabled {
@@ -581,11 +596,11 @@
         margin-top: 0.5rem;
         max-height: 18rem;
         overflow-y: auto;
-        border: 1px solid rgba(147, 51, 234, 0.34);
+        border: 1px solid rgba(168, 85, 247, 0.28);
         border-radius: 0.75rem;
-        background: #111115;
+        background: rgba(13, 13, 18, 0.98);
         padding: 0.5rem;
-        box-shadow: 0 24px 52px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(147, 51, 234, 0.12);
+        box-shadow: 0 24px 52px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(168, 85, 247, 0.08);
     }
 
     .aksa-select-panel.hidden {
@@ -633,11 +648,11 @@
 
     .search-bar:focus,
     .search-bar:hover {
-        border-color: rgba(192, 132, 252, 0.95);
+        border-color: rgba(168, 85, 247, 0.72);
         outline: none;
         box-shadow:
-            0 0 0 4px rgba(147, 51, 234, 0.18),
-            0 16px 34px rgba(147, 51, 234, 0.14);
+            0 0 0 4px rgba(168, 85, 247, 0.11),
+            0 12px 26px rgba(0, 0, 0, 0.18);
     }
 
     :where(a, button, input, textarea, [role="button"]):focus-visible {
@@ -647,8 +662,8 @@
 
     .btn-main {
         @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3 font-semibold text-white transition;
-        background: linear-gradient(135deg, #9333ea, #7c3aed);
-        box-shadow: 0 18px 35px rgba(147, 51, 234, 0.18);
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        box-shadow: 0 14px 30px rgba(109, 40, 217, 0.18);
     }
 
     .btn-main > * {
@@ -669,8 +684,8 @@
     .btn-main:hover {
         transform: translateY(-1px);
         box-shadow:
-            0 18px 35px rgba(147, 51, 234, 0.22),
-            0 10px 28px rgba(124, 58, 237, 0.18);
+            0 18px 34px rgba(109, 40, 217, 0.22),
+            0 10px 24px rgba(0, 0, 0, 0.2);
     }
 
     .btn-main:hover::after,
@@ -681,11 +696,11 @@
     .discord-cta {
         @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3 text-sm font-bold text-white transition;
         background:
-            linear-gradient(135deg, rgba(192, 132, 252, 0.98), rgba(147, 51, 234, 0.98) 48%, rgba(109, 40, 217, 0.98));
+            linear-gradient(135deg, rgba(168, 85, 247, 0.94), rgba(124, 58, 237, 0.96));
         box-shadow:
-            0 18px 38px rgba(147, 51, 234, 0.32),
-            0 0 0 1px rgba(216, 180, 254, 0.28);
-        animation: ctaPulse 2.8s ease-in-out infinite;
+            0 16px 34px rgba(109, 40, 217, 0.24),
+            0 0 0 1px rgba(216, 180, 254, 0.18);
+        animation: ctaPulse 3.6s ease-in-out infinite;
     }
 
     .discord-cta:hover {
@@ -698,21 +713,21 @@
     .discord-nav-cta {
         @apply hidden items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-white transition xl:inline-flex;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.95), rgba(109, 40, 217, 0.95));
-        box-shadow: 0 12px 28px rgba(147, 51, 234, 0.28);
+            linear-gradient(135deg, rgba(147, 51, 234, 0.9), rgba(109, 40, 217, 0.94));
+        box-shadow: 0 12px 26px rgba(109, 40, 217, 0.2);
     }
 
     .discord-nav-cta:hover {
         transform: translateY(-1px);
-        box-shadow: 0 16px 34px rgba(147, 51, 234, 0.38);
+        box-shadow: 0 16px 32px rgba(109, 40, 217, 0.26);
     }
 
     .discord-panel {
         @apply surface relative overflow-hidden rounded-xl p-5;
-        border-color: rgba(147, 51, 234, 0.62);
+        border-color: rgba(168, 85, 247, 0.36);
         box-shadow:
-            0 22px 58px rgba(0, 0, 0, 0.32),
-            0 18px 44px rgba(147, 51, 234, 0.18);
+            0 22px 50px rgba(0, 0, 0, 0.28),
+            0 14px 34px rgba(168, 85, 247, 0.08);
     }
 
     .discord-panel::before,
@@ -720,16 +735,16 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: linear-gradient(115deg, rgba(147, 51, 234, 0.18), transparent 46%, rgba(192, 132, 252, 0.11));
-        opacity: 0.8;
+        background: linear-gradient(115deg, rgba(168, 85, 247, 0.1), transparent 46%, rgba(34, 211, 238, 0.06));
+        opacity: 0.72;
         pointer-events: none;
     }
 
     .discord-mini-panel {
         @apply relative overflow-hidden rounded-xl border p-4;
-        background: rgba(147, 51, 234, 0.1);
-        border-color: rgba(147, 51, 234, 0.34);
-        box-shadow: 0 16px 34px rgba(147, 51, 234, 0.08);
+        background: rgba(18, 18, 24, 0.72);
+        border-color: rgba(168, 85, 247, 0.24);
+        box-shadow: var(--aksa-shadow-soft);
     }
 
     .discord-panel > *,
@@ -747,12 +762,12 @@
     .home-hero {
         @apply relative overflow-hidden rounded-xl border p-5 md:p-7;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(21, 21, 27, 0.9) 48%, rgba(9, 9, 12, 0.95)),
-            rgba(21, 21, 27, 0.86);
-        border-color: rgba(147, 51, 234, 0.34);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(24, 24, 31, 0.86) 46%, rgba(9, 9, 13, 0.94)),
+            rgba(18, 18, 24, 0.86);
+        border-color: rgba(168, 85, 247, 0.24);
         box-shadow:
-            0 24px 68px rgba(0, 0, 0, 0.32),
-            0 18px 42px rgba(147, 51, 234, 0.11);
+            0 24px 56px rgba(0, 0, 0, 0.28),
+            0 12px 34px rgba(168, 85, 247, 0.06);
     }
 
     .home-hero::before {
@@ -760,8 +775,8 @@
         position: absolute;
         inset: 0;
         background:
-            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.17), transparent 24rem),
-            radial-gradient(circle at 92% 4%, rgba(147, 51, 234, 0.18), transparent 22rem);
+            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.09), transparent 24rem),
+            radial-gradient(circle at 92% 4%, rgba(34, 211, 238, 0.06), transparent 22rem);
         pointer-events: none;
     }
 
@@ -772,21 +787,21 @@
 
     .home-panel {
         @apply rounded-xl border p-4 transition md:p-5;
-        background: rgba(9, 9, 12, 0.34);
-        border-color: rgba(147, 51, 234, 0.26);
+        background: rgba(9, 9, 12, 0.28);
+        border-color: rgba(113, 113, 122, 0.28);
     }
 
     .home-panel:hover {
-        border-color: rgba(147, 51, 234, 0.5);
-        background: rgba(147, 51, 234, 0.08);
+        border-color: rgba(168, 85, 247, 0.38);
+        background: rgba(168, 85, 247, 0.06);
         transform: translateY(-2px);
     }
 
     .home-flow {
         @apply rounded-xl border p-4 md:p-5;
-        background: rgba(21, 21, 27, 0.72);
-        border-color: rgba(63, 63, 70, 0.9);
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+        background: rgba(18, 18, 24, 0.72);
+        border-color: rgba(113, 113, 122, 0.28);
+        box-shadow: var(--aksa-shadow-soft);
     }
 
     .home-flow-grid {
@@ -795,8 +810,8 @@
 
     .home-flow-step {
         @apply relative flex min-w-0 gap-3 rounded-xl border p-4;
-        background: rgba(9, 9, 12, 0.34);
-        border-color: rgba(147, 51, 234, 0.22);
+        background: rgba(9, 9, 12, 0.3);
+        border-color: rgba(113, 113, 122, 0.24);
     }
 
     .home-flow-step::after {
@@ -807,9 +822,9 @@
         width: 3.4rem;
         height: 3.4rem;
         border-radius: 999px;
-        background: rgba(147, 51, 234, 0.1);
+        background: rgba(168, 85, 247, 0.08);
         filter: blur(18px);
-        opacity: 0.75;
+        opacity: 0.44;
         pointer-events: none;
     }
 
@@ -835,32 +850,32 @@
 
     .home-stat {
         @apply rounded-xl border px-4 py-3 transition;
-        background: rgba(21, 21, 27, 0.72);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(18, 18, 24, 0.72);
+        border-color: rgba(113, 113, 122, 0.28);
     }
 
     .home-stat:hover {
-        border-color: rgba(147, 51, 234, 0.5);
+        border-color: rgba(168, 85, 247, 0.38);
         transform: translateY(-2px);
     }
 
     .home-toolbar {
         @apply rounded-xl border p-4 md:p-5;
-        background: rgba(21, 21, 27, 0.78);
-        border-color: rgba(63, 63, 70, 0.9);
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+        background: rgba(18, 18, 24, 0.78);
+        border-color: rgba(113, 113, 122, 0.28);
+        box-shadow: var(--aksa-shadow-soft);
     }
 
     .product-hero,
     .license-hero {
         @apply relative overflow-hidden rounded-xl border p-5 md:p-7;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(21, 21, 27, 0.9) 52%, rgba(9, 9, 12, 0.95)),
-            rgba(21, 21, 27, 0.86);
-        border-color: rgba(147, 51, 234, 0.32);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.09), rgba(24, 24, 31, 0.86) 52%, rgba(9, 9, 13, 0.94)),
+            rgba(18, 18, 24, 0.86);
+        border-color: rgba(168, 85, 247, 0.24);
         box-shadow:
-            0 24px 68px rgba(0, 0, 0, 0.3),
-            0 18px 42px rgba(147, 51, 234, 0.1);
+            0 24px 56px rgba(0, 0, 0, 0.28),
+            0 12px 34px rgba(168, 85, 247, 0.06);
     }
 
     .product-hero::before,
@@ -869,8 +884,8 @@
         position: absolute;
         inset: 0;
         background:
-            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.16), transparent 24rem),
-            radial-gradient(circle at 92% 10%, rgba(147, 51, 234, 0.14), transparent 22rem);
+            radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.08), transparent 24rem),
+            radial-gradient(circle at 92% 10%, rgba(34, 211, 238, 0.06), transparent 22rem);
         pointer-events: none;
     }
 
@@ -926,14 +941,14 @@
     .product-stat,
     .license-stat {
         @apply rounded-xl border p-4 transition;
-        background: rgba(9, 9, 12, 0.36);
-        border-color: rgba(147, 51, 234, 0.26);
+        background: rgba(9, 9, 12, 0.3);
+        border-color: rgba(113, 113, 122, 0.26);
     }
 
     .product-stat:hover,
     .license-stat:hover {
-        border-color: rgba(147, 51, 234, 0.54);
-        background: rgba(147, 51, 234, 0.1);
+        border-color: rgba(168, 85, 247, 0.42);
+        background: rgba(168, 85, 247, 0.06);
         transform: translateY(-2px);
     }
 
@@ -951,9 +966,9 @@
     .product-section {
         @apply rounded-xl border p-5 md:p-6;
         min-width: 0;
-        background: rgba(21, 21, 27, 0.82);
-        border-color: rgba(63, 63, 70, 0.9);
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+        background: linear-gradient(180deg, rgba(24, 24, 31, 0.78), rgba(18, 18, 24, 0.78));
+        border-color: rgba(113, 113, 122, 0.28);
+        box-shadow: var(--aksa-shadow-soft);
     }
 
     .product-section.is-select-open {
@@ -966,18 +981,18 @@
     .package-card,
     .license-card {
         @apply relative overflow-hidden rounded-xl border transition duration-300;
-        background: rgba(21, 21, 27, 0.86);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(18, 18, 24, 0.82);
+        border-color: rgba(113, 113, 122, 0.3);
     }
 
     .checkout-card:hover,
     .package-card:hover,
     .license-card:hover {
-        border-color: rgba(147, 51, 234, 0.62);
+        border-color: rgba(168, 85, 247, 0.44);
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.12),
-            0 18px 42px rgba(147, 51, 234, 0.12);
-        transform: translateY(-3px);
+            0 0 0 1px rgba(168, 85, 247, 0.08),
+            0 18px 42px rgba(0, 0, 0, 0.24);
+        transform: translateY(-2px);
     }
 
     .license-card.is-select-open,
@@ -1140,6 +1155,13 @@
         transform: translateY(-100%);
     }
 
+    .site-navbar {
+        background: rgba(10, 10, 15, 0.82) !important;
+        border-color: rgba(113, 113, 122, 0.18) !important;
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.24);
+        backdrop-filter: blur(18px);
+    }
+
     .nav-item {
         display: inline-flex;
         align-items: center;
@@ -1169,7 +1191,7 @@
         left: 0;
         height: 2px;
         border-radius: 999px;
-        background: #9333ea;
+        background: linear-gradient(90deg, #7dd3fc, #a855f7);
         opacity: 0;
         transform: scaleX(0.6);
         transition:
@@ -1193,11 +1215,11 @@
     }
 
     .nav-item.active {
-        color: #c084fc;
+        color: #d8b4fe;
     }
 
     .nav-item.active .nav-icon {
-        color: #c084fc;
+        color: #d8b4fe;
     }
 
     .product-container-loading {
@@ -1211,12 +1233,12 @@
     .download-hero {
         @apply relative overflow-hidden rounded-xl border px-5 py-7 md:px-8 md:py-9;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(21, 21, 27, 0.92) 48%, rgba(9, 9, 12, 0.95)),
-            rgba(21, 21, 27, 0.86);
-        border-color: rgba(147, 51, 234, 0.34);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(24, 24, 31, 0.88) 48%, rgba(9, 9, 13, 0.95)),
+            rgba(18, 18, 24, 0.86);
+        border-color: rgba(168, 85, 247, 0.24);
         box-shadow:
-            0 24px 68px rgba(0, 0, 0, 0.32),
-            0 18px 42px rgba(147, 51, 234, 0.1);
+            0 24px 56px rgba(0, 0, 0, 0.28),
+            0 12px 34px rgba(168, 85, 247, 0.06);
     }
 
     .download-hero::before {
@@ -1224,8 +1246,8 @@
         position: absolute;
         inset: 0;
         background:
-            radial-gradient(circle at 50% 0%, rgba(216, 180, 254, 0.16), transparent 24rem),
-            linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.08), transparent);
+            radial-gradient(circle at 50% 0%, rgba(216, 180, 254, 0.08), transparent 24rem),
+            linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.05), transparent);
         pointer-events: none;
     }
 
@@ -1236,13 +1258,13 @@
 
     .download-feature {
         @apply rounded-xl border px-4 py-3 transition;
-        background: rgba(9, 9, 12, 0.38);
-        border-color: rgba(147, 51, 234, 0.26);
+        background: rgba(9, 9, 12, 0.3);
+        border-color: rgba(113, 113, 122, 0.26);
     }
 
     .download-feature:hover {
-        border-color: rgba(147, 51, 234, 0.54);
-        background: rgba(147, 51, 234, 0.11);
+        border-color: rgba(168, 85, 247, 0.42);
+        background: rgba(168, 85, 247, 0.06);
         transform: translateY(-2px);
     }
 
@@ -1251,8 +1273,8 @@
         position: absolute;
         inset: 0;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.13), transparent 42%),
-            radial-gradient(circle at 50% 0%, rgba(216, 180, 254, 0.12), transparent 24rem);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.08), transparent 42%),
+            radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.05), transparent 24rem);
         opacity: 0;
         transition: opacity 0.3s ease;
         pointer-events: none;
@@ -1264,12 +1286,12 @@
     }
 
     .download-card:hover {
-        border-color: rgba(147, 51, 234, 0.72);
+        border-color: rgba(168, 85, 247, 0.42);
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.18),
-            0 22px 50px rgba(147, 51, 234, 0.16),
-            0 18px 42px rgba(0, 0, 0, 0.28);
-        transform: translateY(-6px) scale(1.01);
+            0 0 0 1px rgba(168, 85, 247, 0.08),
+            0 18px 44px rgba(0, 0, 0, 0.28),
+            0 12px 30px rgba(168, 85, 247, 0.08);
+        transform: translateY(-2px);
     }
 
     .download-card:hover::before {
@@ -1303,25 +1325,25 @@
 
     .download-accordion-panel {
         @apply grid gap-3 border-t px-5 py-4 md:grid-cols-2 md:px-6;
-        border-color: rgba(39, 39, 42, 0.88);
+        border-color: rgba(113, 113, 122, 0.2);
     }
 
     .download-resource-link {
         @apply flex min-h-16 items-center gap-3 rounded-xl border px-4 py-3 transition;
-        background: rgba(9, 9, 12, 0.44);
-        border-color: #27272a;
+        background: rgba(9, 9, 12, 0.34);
+        border-color: rgba(113, 113, 122, 0.22);
     }
 
     .download-resource-link:hover {
-        background: rgba(147, 51, 234, 0.11);
-        border-color: rgba(147, 51, 234, 0.58);
-        transform: translateY(-2px);
+        background: rgba(168, 85, 247, 0.06);
+        border-color: rgba(168, 85, 247, 0.36);
+        transform: translateY(-1px);
     }
 
     .download-resource-icon {
         @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-[#C084FC];
-        background: rgba(147, 51, 234, 0.1);
-        border-color: rgba(147, 51, 234, 0.28);
+        background: rgba(168, 85, 247, 0.09);
+        border-color: rgba(168, 85, 247, 0.24);
     }
 
     .download-resource-empty {
@@ -1367,17 +1389,17 @@
     .orders-hero {
         @apply relative overflow-hidden rounded-xl border p-5 md:p-6;
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.14), rgba(21, 21, 27, 0.9) 52%, rgba(9, 9, 12, 0.95)),
-            rgba(21, 21, 27, 0.86);
-        border-color: rgba(147, 51, 234, 0.32);
-        box-shadow: 0 24px 62px rgba(0, 0, 0, 0.3);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.09), rgba(24, 24, 31, 0.86) 52%, rgba(9, 9, 13, 0.94)),
+            rgba(18, 18, 24, 0.86);
+        border-color: rgba(168, 85, 247, 0.24);
+        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.28);
     }
 
     .orders-hero::before {
         content: "";
         position: absolute;
         inset: 0;
-        background: radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.16), transparent 23rem);
+        background: radial-gradient(circle at 8% 0%, rgba(216, 180, 254, 0.08), transparent 23rem);
         pointer-events: none;
     }
 
@@ -1388,13 +1410,13 @@
 
     .order-stat {
         @apply rounded-xl border px-4 py-3 transition;
-        background: rgba(9, 9, 12, 0.36);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(9, 9, 12, 0.3);
+        border-color: rgba(113, 113, 122, 0.26);
     }
 
     .order-stat:hover {
-        border-color: rgba(147, 51, 234, 0.5);
-        background: rgba(147, 51, 234, 0.09);
+        border-color: rgba(168, 85, 247, 0.38);
+        background: rgba(168, 85, 247, 0.06);
         transform: translateY(-2px);
     }
 
@@ -1420,17 +1442,17 @@
 
     .order-mobile-card {
         @apply relative overflow-hidden rounded-xl border p-4 transition duration-300;
-        background: rgba(21, 21, 27, 0.88);
-        border-color: rgba(63, 63, 70, 0.9);
-        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+        background: rgba(18, 18, 24, 0.82);
+        border-color: rgba(113, 113, 122, 0.3);
+        box-shadow: var(--aksa-shadow-soft);
     }
 
     .order-mobile-card:hover {
-        border-color: rgba(147, 51, 234, 0.62);
+        border-color: rgba(168, 85, 247, 0.42);
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.12),
-            0 18px 42px rgba(147, 51, 234, 0.12);
-        transform: translateY(-4px);
+            0 0 0 1px rgba(168, 85, 247, 0.08),
+            0 18px 42px rgba(0, 0, 0, 0.24);
+        transform: translateY(-2px);
     }
 
     .orders-table-wrap {
@@ -1442,7 +1464,7 @@
     }
 
     .orders-table-row:hover {
-        background: rgba(147, 51, 234, 0.07);
+        background: rgba(168, 85, 247, 0.045);
     }
 
     .status-pill {
@@ -1650,8 +1672,8 @@
 
     .empty-state {
         @apply rounded-xl border p-8 text-center text-sm text-gray-400;
-        background: rgba(21, 21, 27, 0.76);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(18, 18, 24, 0.78);
+        border-color: rgba(113, 113, 122, 0.28);
     }
 
     .empty-state-icon {
@@ -1663,9 +1685,9 @@
         justify-content: center;
         border: 1px solid rgba(147, 51, 234, 0.32);
         border-radius: 1rem;
-        background: rgba(147, 51, 234, 0.12);
+        background: rgba(168, 85, 247, 0.1);
         color: #c084fc;
-        box-shadow: 0 14px 30px rgba(147, 51, 234, 0.12);
+        box-shadow: 0 12px 24px rgba(168, 85, 247, 0.08);
     }
 
     .empty-state-title {
@@ -1728,12 +1750,12 @@
     .qris-dialog {
         @apply relative w-full max-w-md rounded-xl border p-5 shadow-2xl;
         background:
-            radial-gradient(circle at top left, rgba(147, 51, 234, 0.18), transparent 32%),
+            radial-gradient(circle at top left, rgba(168, 85, 247, 0.1), transparent 32%),
             rgba(14, 14, 18, 0.98);
-        border-color: rgba(147, 51, 234, 0.34);
+        border-color: rgba(168, 85, 247, 0.26);
         box-shadow:
-            0 24px 72px rgba(0, 0, 0, 0.5),
-            0 0 0 1px rgba(216, 180, 254, 0.08);
+            0 24px 62px rgba(0, 0, 0, 0.46),
+            0 0 0 1px rgba(216, 180, 254, 0.06);
     }
 
     .qris-close-button {
@@ -1838,43 +1860,45 @@
 
     .order-pagination {
         @apply flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between;
-        background: rgba(21, 21, 27, 0.72);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(18, 18, 24, 0.72);
+        border-color: rgba(113, 113, 122, 0.28);
     }
 
     .order-pagination-link {
         @apply inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold text-gray-300 transition;
-        background: rgba(9, 9, 12, 0.34);
-        border-color: rgba(63, 63, 70, 0.9);
+        background: rgba(9, 9, 12, 0.3);
+        border-color: rgba(113, 113, 122, 0.3);
     }
 
     .order-pagination-link:hover {
-        border-color: rgba(147, 51, 234, 0.58);
+        border-color: rgba(168, 85, 247, 0.42);
         color: #ffffff;
         transform: translateY(-1px);
     }
 
     .order-pagination-link.is-active {
-        background: rgba(147, 51, 234, 0.22);
-        border-color: rgba(147, 51, 234, 0.62);
+        background: rgba(168, 85, 247, 0.18);
+        border-color: rgba(168, 85, 247, 0.48);
         color: #ffffff;
     }
 
     .btn-footer {
         @apply inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition;
-        border-color: rgba(147, 51, 234, 0.55);
+        background: rgba(168, 85, 247, 0.08);
+        border-color: rgba(168, 85, 247, 0.36);
         color: #c084fc;
     }
 
     .btn-footer:hover {
-        border-color: #c084fc;
+        background: rgba(168, 85, 247, 0.14);
+        border-color: rgba(216, 180, 254, 0.5);
         color: #ffffff;
     }
 
     .btn-footer-secondary {
         @apply inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white;
-        border-color: #27272a;
-        background: rgba(21, 21, 27, 0.58);
+        border-color: rgba(113, 113, 122, 0.28);
+        background: rgba(18, 18, 24, 0.58);
     }
 
     .badge {
@@ -1977,9 +2001,9 @@
     }
 
     .crypto-coin-option.active {
-        border-color: rgba(147, 51, 234, 0.86);
-        background: rgba(147, 51, 234, 0.14);
-        box-shadow: 0 0 0 1px rgba(147, 51, 234, 0.16);
+        border-color: rgba(168, 85, 247, 0.58);
+        background: rgba(168, 85, 247, 0.11);
+        box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.1);
     }
 
     .crypto-coin-header {
@@ -2030,13 +2054,13 @@
         opacity: 0;
         pointer-events: none;
         background:
-            linear-gradient(135deg, rgba(37, 20, 54, 0.96), rgba(13, 13, 18, 0.96) 58%),
+            linear-gradient(135deg, rgba(33, 24, 45, 0.94), rgba(13, 13, 18, 0.96) 58%),
             rgba(21, 21, 27, 0.96);
-        border-color: rgba(147, 51, 234, 0.42);
+        border-color: rgba(168, 85, 247, 0.3);
         color: #d4d4d8;
         box-shadow:
             0 18px 42px rgba(0, 0, 0, 0.36),
-            0 0 0 1px rgba(147, 51, 234, 0.1);
+            0 0 0 1px rgba(168, 85, 247, 0.08);
         transition:
             opacity 320ms ease,
             transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -2051,7 +2075,7 @@
         z-index: 0;
         background:
             linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.08) 38%, transparent 58%),
-            radial-gradient(circle at 92% 0%, rgba(192, 132, 252, 0.22), transparent 36%);
+            radial-gradient(circle at 92% 0%, rgba(192, 132, 252, 0.14), transparent 36%);
         opacity: 0;
         pointer-events: none;
         transform: translateX(-35%);
@@ -2084,8 +2108,8 @@
         filter: saturate(1.04);
         box-shadow:
             0 22px 52px rgba(0, 0, 0, 0.42),
-            0 0 0 1px rgba(192, 132, 252, 0.18),
-            0 0 34px rgba(147, 51, 234, 0.16);
+            0 0 0 1px rgba(192, 132, 252, 0.12),
+            0 0 28px rgba(168, 85, 247, 0.1);
     }
 
     .app-toast.is-visible::before {
@@ -2282,13 +2306,13 @@
 
     .payment-card.active,
     .package.active {
-        border-color: rgba(147, 51, 234, 0.92);
+        border-color: rgba(168, 85, 247, 0.62);
         background:
-            linear-gradient(135deg, rgba(147, 51, 234, 0.16), rgba(21, 21, 27, 0.86)),
-            rgba(21, 21, 27, 0.92);
+            linear-gradient(135deg, rgba(168, 85, 247, 0.11), rgba(18, 18, 24, 0.86)),
+            rgba(18, 18, 24, 0.9);
         box-shadow:
-            0 0 0 1px rgba(147, 51, 234, 0.18),
-            0 16px 36px rgba(147, 51, 234, 0.18);
+            0 0 0 1px rgba(168, 85, 247, 0.1),
+            0 16px 34px rgba(0, 0, 0, 0.22);
     }
 
     .payment-card.is-pressing {
