@@ -50,7 +50,7 @@
                             return 'download';
                         }
 
-                        return 'external-link';
+                        return 'download';
                     };
                     $resourceMeta = static function (array $link): string {
                         $url = (string) ($link['url'] ?? '');
