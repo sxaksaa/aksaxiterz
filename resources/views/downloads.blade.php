@@ -46,7 +46,7 @@
                             return 'book-open';
                         }
 
-                        if (in_array($extension, ['exe', 'zip', 'rar', '7z', 'dll', 'apk'], true)) {
+                        if (in_array($extension, ['exe', 'ipa', 'xapk', 'apk', 'zip', 'rar', '7z', 'dll', 'msi'], true)) {
                             return 'download';
                         }
 
@@ -93,7 +93,6 @@
                                         {{ $resourceMeta($link) }}
                                     </span>
                                 </span>
-                                <x-ui.icon name="external-link" class="h-4 w-4 shrink-0 text-gray-500" />
                             </a>
                         @empty
                             <span class="download-resource-empty">
