@@ -14,12 +14,12 @@
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
             <div>
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin User Detail</p>
+                <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin User Detail</p>
                 <div class="flex flex-wrap items-center gap-3">
                     @if ($user->avatar)
                         <img src="{{ $user->avatar }}" alt="" class="h-12 w-12 rounded-full object-cover">
                     @else
-                        <div class="flex h-12 w-12 items-center justify-center rounded-full border border-[#9333EA]/35 bg-[#9333EA]/10 text-sm font-semibold text-[#D8B4FE]">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-full border border-aksa-accent-35 bg-aksa-accent-10 text-sm font-semibold text-aksa-accent-soft">
                             {{ strtoupper(substr($user->name ?: $user->email, 0, 1)) }}
                         </div>
                     @endif
@@ -68,10 +68,10 @@
         <section class="product-section mb-6 fade-up">
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Orders</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Orders</p>
                     <h2 class="mt-1 text-xl font-semibold text-white">Order History</h2>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $orders->total() }} orders
                 </span>
             </div>
@@ -170,10 +170,10 @@
         <section class="product-section fade-up">
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Licenses</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Licenses</p>
                     <h2 class="mt-1 text-xl font-semibold text-white">Delivered Licenses</h2>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $licenses->total() }} licenses
                 </span>
             </div>
@@ -199,7 +199,7 @@
                                 <td class="p-4 text-gray-300">{{ $license->orderItem?->package_name ?? $license->duration ?? '-' }}</td>
                                 <td class="p-4">
                                     @if ($license->order)
-                                        <a href="{{ route('admin.orders.show', $license->order) }}" class="font-mono text-xs text-[#C084FC]">{{ $license->order_id }}</a>
+                                        <a href="{{ route('admin.orders.show', $license->order) }}" class="font-mono text-xs text-aksa-accent">{{ $license->order_id }}</a>
                                     @elseif ($license->order_id)
                                         <span class="font-mono text-xs text-gray-400">{{ $license->order_id }}</span>
                                     @else

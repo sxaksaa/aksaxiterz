@@ -5,7 +5,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Users</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         See who has registered, how many orders they made, and how many licenses they received.
@@ -64,7 +64,7 @@
                     <h2 class="text-sm font-semibold text-white">Registered Users</h2>
                     <p class="mt-1 text-xs text-gray-500">Users are created from Google login or normal auth records.</p>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $users->total() }} users
                 </span>
             </div>
@@ -96,7 +96,7 @@
                                         @if ($user->avatar)
                                             <img src="{{ $user->avatar }}" alt="" class="h-9 w-9 rounded-full object-cover">
                                         @else
-                                            <div class="flex h-9 w-9 items-center justify-center rounded-full border border-[#9333EA]/35 bg-[#9333EA]/10 text-xs font-semibold text-[#D8B4FE]">
+                                            <div class="flex h-9 w-9 items-center justify-center rounded-full border border-aksa-accent-35 bg-aksa-accent-10 text-xs font-semibold text-aksa-accent-soft">
                                                 {{ strtoupper(substr($user->name ?: $user->email, 0, 1)) }}
                                             </div>
                                         @endif

@@ -5,7 +5,7 @@
         <section class="product-hero mb-6 fade-up">
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Custom Bundle</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Custom Bundle</p>
                     <h1 class="mt-2 text-3xl font-bold text-white md:text-4xl">Your cart</h1>
                     <p class="mt-2 max-w-2xl text-sm text-gray-400">
                         Combine different products and packages into one payment. Stock is reserved only after checkout starts.
@@ -54,7 +54,7 @@
                         <article class="panel-card motion-card p-5" data-cart-item="{{ $item->id }}">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
-                                    <p class="text-xs uppercase tracking-normal text-[#C084FC]">{{ $item->product->category?->name ?? 'Product' }}</p>
+                                    <p class="text-xs uppercase tracking-normal text-aksa-accent">{{ $item->product->category?->name ?? 'Product' }}</p>
                                     <h2 class="mt-1 truncate text-lg font-semibold text-white">{{ $item->product->name }}</h2>
                                     <p class="mt-1 text-sm text-gray-400">{{ $item->package->name }}</p>
                                     <p class="mt-2 text-xs {{ $item->available_stock >= $item->quantity ? 'text-emerald-300' : 'text-red-300' }}">
@@ -104,7 +104,7 @@
 
                 <aside class="product-section fade-up">
                     <div class="mb-5">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Bundle Checkout</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Bundle Checkout</p>
                         <h2 id="cartBundleCount" class="mt-1 text-xl font-semibold text-white">{{ $cartItems->count() }} packages · {{ $cartItems->sum('quantity') }} keys</h2>
                         <div class="mt-3 flex flex-wrap gap-2">
                             <span class="support-pill">
@@ -235,7 +235,7 @@
                     </div>
                     <div class="summary-row">
                         <span>Total</span>
-                        <span id="cartTotal" class="font-semibold text-[#C084FC]">Select payment</span>
+                        <span id="cartTotal" class="font-semibold text-aksa-accent">Select payment</span>
                     </div>
 
                     <button id="cartCheckoutButton" type="button" class="btn-main mt-5 w-full">

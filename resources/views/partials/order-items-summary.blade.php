@@ -8,7 +8,7 @@
         <div class="{{ $compact ? 'text-xs' : 'rounded-lg border border-[#27272A] bg-black/15 px-3 py-2 text-sm' }}">
             <span class="font-semibold text-white">{{ $summaryItem->product_name }}</span>
             <span class="text-gray-500">· {{ $summaryItem->package_name }}</span>
-            <span class="text-[#C084FC]">×{{ $summaryItem->quantity }}</span>
+            <span class="text-aksa-accent">×{{ $summaryItem->quantity }}</span>
         </div>
     @endforeach
 </div>

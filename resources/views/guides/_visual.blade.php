@@ -26,8 +26,8 @@
     };
 @endphp
 
-<div class="relative overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] p-4">
-    <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(147,51,234,0.28),transparent_18rem)]"></div>
+<div class="relative overflow-hidden rounded-xl border border-aksa-accent-30 bg-[#111115] p-4">
+    <div class="absolute inset-0 aksa-guide-visual-glow"></div>
 
     @if ($imageUrl)
         <img src="{{ $imageUrl }}" alt="{{ $title }}" class="relative aspect-[16/10] w-full rounded-lg border border-[#27272A] object-cover shadow-2xl">

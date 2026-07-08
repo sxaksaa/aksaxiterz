@@ -8,7 +8,7 @@
                     <x-ui.icon name="wallet" class="h-5 w-5" />
                 </span>
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Direct stablecoin address</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Direct stablecoin address</p>
                     <h2 id="aksaCryptoTitle" class="mt-1 text-xl font-semibold text-white">Crypto Payment</h2>
                 </div>
             </div>
@@ -28,7 +28,7 @@
         <div id="aksaCryptoPaymentDetails" class="mt-5 grid gap-3 text-sm">
             <div class="crypto-payment-warning">
                 <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
-                <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
+                <p class="mt-1 text-sm font-semibold leading-5 text-aksa-accent-soft">
                     Send exactly the amount shown below. Network/exchange fee is not included.
                 </p>
                 <p class="mt-1 text-xs leading-5 text-gray-300">
@@ -75,7 +75,7 @@
             </div>
             <div class="qris-detail-row">
                 <span>Expires</span>
-                <span id="aksaCryptoExpires" class="text-right font-mono text-xs text-[#D8B4FE]" data-expire="">-</span>
+                <span id="aksaCryptoExpires" class="text-right font-mono text-xs text-aksa-accent-soft" data-expire="">-</span>
             </div>
         </div>
 

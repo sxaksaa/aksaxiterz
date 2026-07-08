@@ -32,7 +32,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin Order Detail</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin Order Detail</p>
                     <h1 class="break-all text-2xl font-bold tracking-normal md:text-4xl">{{ $order->order_id }}</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Verify customer payment state, license delivery, and provider references before helping support.
@@ -63,7 +63,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -78,7 +78,7 @@
             <section class="product-section fade-up">
                 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Order</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Order</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Payment Record</h2>
                     </div>
                     <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
@@ -103,7 +103,7 @@
                     </div>
                     <div class="qris-detail-row">
                         <span>Amount</span>
-                        <span class="font-semibold text-[#D8B4FE]">
+                        <span class="font-semibold text-aksa-accent-soft">
                             {{ ($order->payment_method === 'crypto' || $isBinancePay) ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken : 'Rp ' . number_format($order->price) }}
                         </span>
                     </div>
@@ -117,7 +117,7 @@
                     </div>
                     <div class="qris-detail-row qris-total-row">
                         <span>Paid at</span>
-                        <span class="text-right font-semibold text-[#D8B4FE]">{{ $paidAt ? $paidAt->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
+                        <span class="text-right font-semibold text-aksa-accent-soft">{{ $paidAt ? $paidAt->format('d M Y, H:i:s') . ' WIB' : '-' }}</span>
                     </div>
                 </div>
 
@@ -169,7 +169,7 @@
             <div class="grid gap-6">
                 <section class="product-section fade-up">
                     <div class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Delivery</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Delivery</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Licenses</h2>
                     </div>
 
@@ -183,7 +183,7 @@
                             @endforeach
                             <div class="qris-detail-row qris-total-row">
                                 <span>Delivery progress</span>
-                                <span class="text-right font-semibold text-[#D8B4FE]">{{ $deliveredCount }} / {{ $quantity }}</span>
+                                <span class="text-right font-semibold text-aksa-accent-soft">{{ $deliveredCount }} / {{ $quantity }}</span>
                             </div>
                         </div>
                     @else
@@ -193,7 +193,7 @@
 
                 <section class="product-section fade-up">
                     <div class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ ($isDirectCrypto || $isBinancePay) ? 'Payment Scanner' : 'Provider' }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">{{ ($isDirectCrypto || $isBinancePay) ? 'Payment Scanner' : 'Provider' }}</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Payment Data</h2>
                     </div>
 
@@ -211,7 +211,7 @@
                             </div>
                             <div class="qris-detail-row qris-total-row">
                                 <span>Expected amount</span>
-                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
+                                <span class="text-right font-mono text-xs font-semibold text-aksa-accent-soft">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
                             </div>
                             <div class="qris-detail-row">
                                 <span>Receive address</span>
@@ -243,7 +243,7 @@
                                         <p class="mt-1 text-xs leading-5 text-gray-400">{{ $binanceDiagnostics['message'] }}</p>
                                     @endif
                                     @if (! empty($binanceDiagnostics['rejections']))
-                                        <p class="mt-1 break-all font-mono text-[11px] text-[#F5D0FE]">
+                                        <p class="mt-1 break-all font-mono text-[11px] text-aksa-accent-soft">
                                             Rejected: {{ collect($binanceDiagnostics['rejections'])->map(fn ($count, $reason) => str_replace('_', ' ', $reason) . '=' . $count)->implode(', ') }}
                                         </p>
                                     @endif
@@ -264,7 +264,7 @@
                                     <p class="mt-1 text-xs leading-5 text-gray-300">
                                         Expected {{ $amountMismatch['expected_amount'] ?? '-' }} {{ $cryptoToken }}, received {{ $amountMismatch['received_amount'] ?? '-' }} {{ $cryptoToken }}.
                                     </p>
-                                    <p class="mt-1 break-all font-mono text-[11px] text-[#F5D0FE]">
+                                    <p class="mt-1 break-all font-mono text-[11px] text-aksa-accent-soft">
                                         {{ $amountMismatch['tx_hash'] ?? '-' }}
                                     </p>
                                 </div>
@@ -278,7 +278,7 @@
                             </div>
                             <div class="qris-detail-row qris-total-row">
                                 <span>Expected amount</span>
-                                <span class="text-right font-mono text-xs font-semibold text-[#D8B4FE]">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
+                                <span class="text-right font-mono text-xs font-semibold text-aksa-accent-soft">{{ $payload['amount'] ?? '-' }} {{ $cryptoToken }}</span>
                             </div>
                             <div class="qris-detail-row">
                                 <span>Pay ID</span>

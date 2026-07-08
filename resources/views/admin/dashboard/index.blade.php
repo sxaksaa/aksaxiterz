@@ -49,7 +49,7 @@
         <section class="orders-hero fade-up mb-6">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Dashboard</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         {{ $rangeMeta['label'] }} performance, order activity, and stock pressure.
@@ -61,7 +61,7 @@
                         <a href="{{ $dashboardUrl(['range' => $rangeKey]) }}"
                             data-dashboard-range-link
                             aria-current="{{ (string) $activeRange === (string) $rangeKey ? 'page' : 'false' }}"
-                            class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition {{ (string) $activeRange === (string) $rangeKey ? 'bg-[#9333EA] text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
+                            class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition {{ (string) $activeRange === (string) $rangeKey ? 'bg-aksa-accent text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
                             {{ $range['label'] }}
                         </a>
                     @endforeach
@@ -73,14 +73,14 @@
                     <div class="order-stat">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <div class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
+                                <div class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                                     {{ $card['label'] }}
                                 </div>
                                 <div class="mt-2 text-xl font-semibold text-white">
                                     {{ $formatMetric($card) }}
                                 </div>
                             </div>
-                            <x-ui.icon name="{{ $card['icon'] }}" class="h-5 w-5 text-[#C084FC]" />
+                            <x-ui.icon name="{{ $card['icon'] }}" class="h-5 w-5 text-aksa-accent" />
                         </div>
                         <div class="mt-3 text-xs text-gray-400">{{ $card['caption'] }}</div>
                     </div>
@@ -92,17 +92,17 @@
             <section class="product-section min-w-0 fade-up">
                 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Sales Trend</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Sales Trend</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">{{ $rangeMeta['label'] }}</h2>
                         <p class="mt-1 text-sm text-gray-400">{{ $rangeMeta['description'] }}</p>
                     </div>
 
                     <div class="flex flex-col gap-2 sm:items-end">
                         <div class="flex flex-wrap gap-2 text-xs font-semibold sm:justify-end">
-                            <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
+                            <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-2 text-aksa-accent-soft">
                                 {{ $salesTrend['line_label'] }} line
                             </span>
-                            <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-2 text-[#D8B4FE]">
+                            <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-2 text-aksa-accent-soft">
                                 Order bars
                             </span>
                         </div>
@@ -112,7 +112,7 @@
                                 <a href="{{ $dashboardUrl(['method' => $methodKey]) }}"
                                     data-dashboard-range-link
                                     aria-current="{{ (string) $activePaymentMethod === (string) $methodKey ? 'page' : 'false' }}"
-                                    class="inline-flex min-h-9 items-center justify-center rounded-lg px-3 transition {{ (string) $activePaymentMethod === (string) $methodKey ? 'bg-[#9333EA] text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
+                                    class="inline-flex min-h-9 items-center justify-center rounded-lg px-3 transition {{ (string) $activePaymentMethod === (string) $methodKey ? 'bg-aksa-accent text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white' }}">
                                     {{ $method['short'] }}
                                 </a>
                             @endforeach
@@ -147,8 +147,8 @@
                             data-dashboard-chart-svg>
                         <defs>
                             <linearGradient id="aksaRevenueFill" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stop-color="#C084FC" stop-opacity="0.24" />
-                                <stop offset="100%" stop-color="#C084FC" stop-opacity="0" />
+                                <stop offset="0%" stop-color="var(--aksa-purple)" stop-opacity="0.24" />
+                                <stop offset="100%" stop-color="var(--aksa-purple)" stop-opacity="0" />
                             </linearGradient>
                         </defs>
 
@@ -180,7 +180,7 @@
                             @endphp
 
                             <rect x="{{ $x - ($barWidth / 2) }}" y="{{ $barY }}" width="{{ $barWidth }}" height="{{ $orderHeight }}"
-                                rx="4" fill="#9333EA" opacity="{{ $point['orders'] > 0 ? '0.42' : '0.14' }}">
+                                rx="4" fill="var(--aksa-purple-strong)" opacity="{{ $point['orders'] > 0 ? '0.42' : '0.14' }}">
                                 <title>{{ $point['label'] }}: {{ $point['orders'] }} orders, {{ $salesTrend['line_label'] }} {{ $formattedLine }}, {{ $formattedIdr }}, {{ $formattedCrypto }}</title>
                             </rect>
 
@@ -222,7 +222,7 @@
 
                         @if ($chartPoints->isNotEmpty() && $revenuePath)
                             <path d="{{ $revenueAreaPath }}" fill="url(#aksaRevenueFill)" />
-                            <path d="{{ $revenuePath }}" fill="none" stroke="#C084FC" stroke-width="3.5"
+                            <path d="{{ $revenuePath }}" fill="none" stroke="var(--aksa-purple)" stroke-width="3.5"
                                 stroke-linecap="round" stroke-linejoin="round" />
 
                             @foreach ($chartPoints as $pointIndex => $point)
@@ -232,7 +232,7 @@
                                         $revenueY = $chartBottom - (($point['line_revenue'] / $salesTrend['max_line_revenue']) * $plotHeight);
                                     @endphp
                                     <circle cx="{{ $x }}" cy="{{ $revenueY }}" r="4"
-                                        fill="#D8B4FE" stroke="#111115" stroke-width="2">
+                                        fill="var(--aksa-purple-soft)" stroke="#111115" stroke-width="2">
                                         <title>{{ $point['label'] }}: {{ $formatLineRevenue($point['line_revenue']) }} {{ $salesTrend['line_label'] }}</title>
                                     </circle>
                                 @endif
@@ -273,10 +273,10 @@
             <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Period Summary</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Period Summary</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">{{ $rangeMeta['label'] }}</h2>
                     </div>
-                    <x-ui.icon name="sliders-horizontal" class="h-5 w-5 text-[#C084FC]" />
+                    <x-ui.icon name="sliders-horizontal" class="h-5 w-5 text-aksa-accent" />
                 </div>
 
                 <div class="grid gap-3">
@@ -293,7 +293,7 @@
                 </div>
 
                 <div class="mt-5">
-                    <div class="mb-2 text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Payment Split</div>
+                    <div class="mb-2 text-xs font-semibold uppercase tracking-normal text-aksa-accent">Payment Split</div>
                     <div class="grid gap-2">
                         @forelse ($paymentSplit as $row)
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-[#27272A] bg-black/20 px-3 py-2">
@@ -314,7 +314,7 @@
             <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Operations</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Operations</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Needs attention</h2>
                         <p class="mt-1 text-xs text-gray-500">{{ $rangeMeta['label'] }} order activity.</p>
                     </div>
@@ -325,7 +325,7 @@
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <a href="{{ route('admin.orders.index', ['status' => 'pending']) }}" class="order-stat transition hover:border-[#9333EA]/50">
+                    <a href="{{ route('admin.orders.index', ['status' => 'pending']) }}" class="order-stat transition hover:border-aksa-accent-50">
                         <div class="text-xl font-semibold text-white">{{ $orderStats['pending'] }}</div>
                         <div class="mt-1 text-xs text-gray-400">Pending orders</div>
                     </a>
@@ -335,7 +335,7 @@
                         </div>
                         <div class="mt-1 text-xs text-gray-400">Delivery issues</div>
                     </a>
-                    <a href="{{ route('admin.license-stocks.index', ['status' => 'available']) }}" class="order-stat transition hover:border-[#9333EA]/50">
+                    <a href="{{ route('admin.license-stocks.index', ['status' => 'available']) }}" class="order-stat transition hover:border-aksa-accent-50">
                         <div class="text-xl font-semibold text-white">{{ $stockStats['available'] }}</div>
                         <div class="mt-1 text-xs text-gray-400">Available keys</div>
                     </a>
@@ -351,7 +351,7 @@
             <section class="product-section min-w-0 fade-up">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Stock</p>
+                        <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Stock</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">License inventory</h2>
                     </div>
                     <a href="{{ route('admin.license-stocks.index') }}" class="order-action">
@@ -401,7 +401,7 @@
         <section class="product-section mb-6 min-w-0 fade-up">
             <div class="mb-4 flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">{{ $rangeMeta['label'] }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">{{ $rangeMeta['label'] }}</p>
                     <h2 class="mt-1 text-xl font-semibold text-white">Top products</h2>
                 </div>
                 <a href="{{ route('admin.orders.index', ['status' => 'paid']) }}" class="order-action">
@@ -414,7 +414,7 @@
                 @forelse ($topProducts as $product)
                     <div class="rounded-xl border border-[#27272A] bg-black/20 p-3">
                         <div class="truncate text-sm font-semibold text-white">{{ $product['product'] }}</div>
-                        <div class="mt-3 text-xl font-semibold text-[#C084FC]">{{ $product['quantity'] }}</div>
+                        <div class="mt-3 text-xl font-semibold text-aksa-accent">{{ $product['quantity'] }}</div>
                         <div class="mt-1 text-xs text-gray-500">{{ $formatIdr($product['idr_total']) }} IDR line total</div>
                     </div>
                 @empty

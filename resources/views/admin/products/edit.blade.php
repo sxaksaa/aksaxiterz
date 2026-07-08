@@ -12,7 +12,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin Catalog</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin Catalog</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">{{ $product->name }}</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Update public product details and package prices used by checkout.
@@ -41,7 +41,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -54,7 +54,7 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Product</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Product</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Product Details</h2>
             </div>
 
@@ -119,7 +119,7 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Please Read</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Important Note</h2>
                 <p class="mt-2 text-sm leading-6 text-gray-400">
                     Optional. This note appears on the product page and is hidden completely when empty.
@@ -149,7 +149,7 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Prices</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Prices</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Package Prices</h2>
             </div>
 
@@ -228,7 +228,7 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">New Package</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">New Package</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Add Package Price</h2>
             </div>
 

@@ -168,7 +168,7 @@
                 </div>
                 <div class="flex items-center justify-between gap-3">
                     <span class="text-xs text-gray-500">Price</span>
-                    <span class="font-semibold text-[#D8B4FE]">{{ $priceLabel }}</span>
+                    <span class="font-semibold text-aksa-accent-soft">{{ $priceLabel }}</span>
                 </div>
                 <div class="flex items-start justify-between gap-3">
                     <span class="text-xs text-gray-500">Created at</span>
@@ -286,7 +286,7 @@
         <div>
             <h2 class="text-sm font-semibold text-white">Recent Orders</h2>
         </div>
-        <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+        <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
             {{ method_exists($orders, 'total') ? $orders->total() : $orders->count() }} records
         </span>
     </div>
@@ -452,12 +452,12 @@
                         <td class="p-4">
                             <span class="method-pill {{ $methodClass }}">{{ $methodLabel }}</span>
                         </td>
-                        <td class="p-4 font-semibold text-[#D8B4FE]">{{ $priceLabel }}</td>
+                        <td class="p-4 font-semibold text-aksa-accent-soft">{{ $priceLabel }}</td>
                         <td class="p-4 whitespace-nowrap text-xs text-gray-300">
                             <div>{{ $orderDate?->format('d M Y') ?? '-' }}</div>
                             <div class="mt-1 text-gray-500">{{ $orderDate ? $orderDate->format('H:i:s') . ' WIB' : '-' }}</div>
                             @if ($isPaid)
-                                <div class="mt-2 text-[10px] uppercase tracking-normal text-[#C084FC]">Paid at</div>
+                                <div class="mt-2 text-[10px] uppercase tracking-normal text-aksa-accent">Paid at</div>
                                 <div class="mt-1">{{ $paidDate?->format('d M Y') ?? '-' }}</div>
                                 <div class="mt-1 text-gray-500">{{ $paidDate ? $paidDate->format('H:i:s') . ' WIB' : '-' }}</div>
                             @endif

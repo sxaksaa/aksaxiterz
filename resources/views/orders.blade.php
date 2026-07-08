@@ -11,7 +11,7 @@
         <section class="orders-hero fade-up mb-6">
             <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Order Center</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Order Center</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Order History</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Track payments, continue pending invoices, and jump back into your licenses after checkout.

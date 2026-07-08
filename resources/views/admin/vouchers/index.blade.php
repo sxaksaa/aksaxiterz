@@ -39,7 +39,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Vouchers</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Configure separate QRIS, USDT, and USDC discount caps, usage limits, bundle rules, and promo schedules.
@@ -65,7 +65,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -79,7 +79,7 @@
         <section class="product-section relative z-40 mb-6 overflow-visible fade-up">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                         {{ $isEditing ? 'Edit Voucher' : 'New Voucher' }}
                     </p>
                     <h2 class="mt-1 text-xl font-semibold text-white">
@@ -153,18 +153,18 @@
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Required bundle products</span>
                     <div class="relative" data-bundle-picker>
                         <button type="button"
-                            class="search-bar group flex min-h-12 w-full items-center justify-between gap-3 text-left transition hover:border-[#A855F7]/70 hover:bg-[#9333EA]/5"
+                            class="search-bar group flex min-h-12 w-full items-center justify-between gap-3 text-left transition hover:border-aksa-accent-soft-70 hover:bg-aksa-accent-5"
                             data-bundle-toggle aria-expanded="false" aria-controls="voucherBundleProductPanel">
                             <span class="flex min-w-0 items-center gap-3">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 text-[#C084FC] transition group-hover:border-[#A855F7]/50 group-hover:bg-[#9333EA]/15">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent transition group-hover:border-aksa-accent-soft-50 group-hover:bg-aksa-accent-15">
                                     <x-ui.icon name="boxes" class="h-4 w-4" />
                                 </span>
                                 <span class="min-w-0 truncate font-medium text-white" data-bundle-label>{{ $bundlePickerLabel }}</span>
                             </span>
                             <span class="flex shrink-0 items-center gap-2">
-                                <span class="{{ count($selectedRequiredProductIds) === 0 ? 'hidden' : '' }} rounded-full border border-[#9333EA]/35 bg-[#9333EA]/10 px-2 py-0.5 text-[11px] font-semibold text-[#D8B4FE]"
+                                <span class="{{ count($selectedRequiredProductIds) === 0 ? 'hidden' : '' }} rounded-full border border-aksa-accent-35 bg-aksa-accent-10 px-2 py-0.5 text-[11px] font-semibold text-aksa-accent-soft"
                                     data-bundle-count>{{ count($selectedRequiredProductIds) }}</span>
-                                <svg class="h-4 w-4 text-gray-400 transition-transform group-hover:text-[#C084FC]" data-bundle-arrow
+                                <svg class="h-4 w-4 text-gray-400 transition-transform group-hover:text-aksa-accent" data-bundle-arrow
                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                                     aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
@@ -173,14 +173,14 @@
                         </button>
 
                         <div id="voucherBundleProductPanel"
-                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-2xl border border-[#9333EA]/35 bg-[#0D0D12]/95 shadow-[0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-2xl border border-aksa-accent-35 bg-[#0D0D12]/95 shadow-[0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
                             data-bundle-panel>
                             <div class="flex items-center justify-between gap-4 border-b border-white/[0.06] px-4 py-3">
                                 <div>
                                     <div class="text-sm font-semibold text-white">Choose eligible products</div>
                                     <div class="mt-0.5 text-xs text-gray-500">All package durations are included automatically.</div>
                                 </div>
-                                <span class="shrink-0 rounded-full border border-[#9333EA]/25 bg-[#9333EA]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#C084FC]">
+                                <span class="shrink-0 rounded-full border border-aksa-accent-25 bg-aksa-accent-10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-aksa-accent">
                                     Product level
                                 </span>
                             </div>
@@ -193,16 +193,16 @@
                                             data-bundle-checkbox data-label="{{ $product->name }}"
                                             @checked(in_array((int) $product->id, $selectedRequiredProductIds, true))>
 
-                                        <span class="pointer-events-none absolute inset-0 rounded-xl border border-white/[0.07] bg-white/[0.025] transition duration-200 group-hover:border-[#9333EA]/35 group-hover:bg-[#9333EA]/[0.07] peer-checked:border-[#A855F7]/70 peer-checked:bg-[#9333EA]/15 peer-focus-visible:ring-2 peer-focus-visible:ring-[#C084FC]"></span>
+                                        <span class="pointer-events-none absolute inset-0 rounded-xl border border-white/[0.07] bg-white/[0.025] transition duration-200 group-hover:border-aksa-accent-35 group-hover:bg-aksa-accent-7 peer-checked:border-aksa-accent-soft-70 peer-checked:bg-aksa-accent-15 peer-focus-visible:ring-2 peer-focus-visible:ring-aksa-accent"></span>
 
-                                        <span class="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#18181F] text-xs font-bold text-gray-400 transition group-hover:text-white peer-checked:border-[#A855F7]/60 peer-checked:bg-[#9333EA]/25 peer-checked:text-[#E9D5FF]">
+                                        <span class="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#18181F] text-xs font-bold text-gray-400 transition group-hover:text-white peer-checked:border-aksa-accent-soft-60 peer-checked:bg-aksa-accent-25 peer-checked:text-aksa-accent-bright">
                                             {{ mb_strtoupper(mb_substr($product->name, 0, 1)) }}
                                         </span>
                                         <span class="relative z-10 min-w-0 flex-1">
                                             <span class="block truncate font-semibold text-gray-200 transition group-hover:text-white">{{ $product->name }}</span>
                                             <span class="mt-0.5 block text-[11px] text-gray-500">Every package</span>
                                         </span>
-                                        <span class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#09090C] text-transparent transition peer-checked:border-[#A855F7] peer-checked:bg-[#9333EA] peer-checked:text-white peer-checked:shadow-[0_0_18px_rgba(147,51,234,0.45)]">
+                                        <span class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#09090C] text-transparent transition peer-checked:border-aksa-accent peer-checked:bg-aksa-accent peer-checked:text-white peer-checked:shadow-aksa-glow">
                                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                                 stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                 <path d="m5 12 4 4L19 6" />
@@ -238,7 +238,7 @@
                         </button>
 
                         <div id="voucherStartsAtPanel"
-                            class="absolute left-0 right-0 z-50 mt-2 hidden min-w-[320px] overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] p-3 shadow-2xl"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden min-w-[320px] overflow-hidden rounded-xl border border-aksa-accent-30 bg-[#111115] p-3 shadow-2xl"
                             data-datetime-panel>
                             <div class="mb-3 flex items-center justify-between gap-3">
                                 <button type="button" class="order-action h-9 w-9 p-0" data-datetime-prev aria-label="Previous month">
@@ -295,7 +295,7 @@
                         </button>
 
                         <div id="voucherExpiresAtPanel"
-                            class="absolute left-0 right-0 z-50 mt-2 hidden min-w-[320px] overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] p-3 shadow-2xl"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden min-w-[320px] overflow-hidden rounded-xl border border-aksa-accent-30 bg-[#111115] p-3 shadow-2xl"
                             data-datetime-panel>
                             <div class="mb-3 flex items-center justify-between gap-3">
                                 <button type="button" class="order-action h-9 w-9 p-0" data-datetime-prev aria-label="Previous month">
@@ -353,19 +353,19 @@
                         </button>
 
                         <div id="voucherStatusPanel"
-                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-xl border border-[#9333EA]/30 bg-[#111115] p-2 shadow-2xl"
+                            class="absolute left-0 right-0 z-50 mt-2 hidden overflow-hidden rounded-xl border border-aksa-accent-30 bg-[#111115] p-2 shadow-2xl"
                             data-status-panel>
                             <button type="button"
-                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white"
+                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white"
                                 data-status-option data-value="1" data-label="Active">
                                 <span>Active</span>
-                                <span class="hidden h-2 w-2 rounded-full bg-[#C084FC]" data-status-check></span>
+                                <span class="hidden h-2 w-2 rounded-full bg-aksa-accent-soft" data-status-check></span>
                             </button>
                             <button type="button"
-                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white"
+                                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white"
                                 data-status-option data-value="0" data-label="Inactive">
                                 <span>Inactive</span>
-                                <span class="hidden h-2 w-2 rounded-full bg-[#C084FC]" data-status-check></span>
+                                <span class="hidden h-2 w-2 rounded-full bg-aksa-accent-soft" data-status-check></span>
                             </button>
                         </div>
                     </div>
@@ -492,7 +492,7 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <div class="font-semibold text-white">{{ $voucher->code }}</div>
-                            <div class="mt-1 text-xs text-[#C084FC]">{{ $voucher->discount_percent }}% up to {{ $formatIdr($voucher->max_discount) }}</div>
+                            <div class="mt-1 text-xs text-aksa-accent">{{ $voucher->discount_percent }}% up to {{ $formatIdr($voucher->max_discount) }}</div>
                             <div class="mt-1 text-xs text-gray-500">{{ $bundleLabel($voucher) }}</div>
                             <div class="mt-1 text-xs text-gray-500">
                                 {{ $formatCrypto($voucher->max_discount_usdt, 'USDT') }} /
@@ -685,10 +685,10 @@
                     button.className = [
                         'h-9 rounded-lg text-sm font-semibold transition',
                         isSelected
-                            ? 'bg-[#9333EA] text-white shadow-lg shadow-[#9333EA]/25'
-                            : 'bg-white/[0.03] text-gray-200 hover:bg-[#9333EA]/20 hover:text-white',
+                            ? 'bg-aksa-accent text-white shadow-lg shadow-aksa-accent-25'
+                            : 'bg-white/[0.03] text-gray-200 hover:bg-aksa-accent-20 hover:text-white',
                         isPreviousMonth || isNextMonth ? 'opacity-45' : '',
-                        isToday && !isSelected ? 'ring-1 ring-[#C084FC]/70' : '',
+                        isToday && !isSelected ? 'ring-1 ring-aksa-accent-70' : '',
                     ].filter(Boolean).join(' ');
                     button.addEventListener('click', () => {
                         selectedDate = cellDate;
@@ -846,7 +846,7 @@
                 options.forEach((option) => {
                     const isSelected = option.dataset.value === valueInput.value;
 
-                    option.classList.toggle('bg-[#9333EA]/15', isSelected);
+                    option.classList.toggle('bg-aksa-accent-15', isSelected);
                     option.classList.toggle('text-white', isSelected);
                     option.querySelector('[data-status-check]')?.classList.toggle('hidden', !isSelected);
 

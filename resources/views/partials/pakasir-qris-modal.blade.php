@@ -8,7 +8,7 @@
                     <x-ui.icon name="qr-code" class="h-5 w-5" />
                 </span>
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">QRIS for Indonesia & Malaysia-supported wallets</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">QRIS for Indonesia & Malaysia-supported wallets</p>
                     <h2 id="aksaQrisTitle" class="mt-1 text-xl font-semibold text-white">Scan to Pay</h2>
                 </div>
             </div>

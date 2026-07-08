@@ -21,7 +21,7 @@
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
             <div>
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                 <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Categories</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                     Manage storefront categories used by catalog filters, product forms, and platform badges.
@@ -45,7 +45,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -59,7 +59,7 @@
         <section class="product-section mb-6 fade-up">
             <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                         {{ $isEditing ? 'Edit Category' : 'New Category' }}
                     </p>
                     <h2 class="mt-1 text-xl font-semibold text-white">
@@ -128,7 +128,7 @@
                     <h2 class="text-sm font-semibold text-white">Category Records</h2>
                     <p class="mt-1 text-xs text-gray-500">Icons are inferred from slug/name for PC, Android, and iOS.</p>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $categories->total() }} records
                 </span>
             </div>

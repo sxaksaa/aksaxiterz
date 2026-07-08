@@ -30,7 +30,7 @@
         <section class="license-hero mb-6 fade-up">
             <div class="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">License Vault</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">License Vault</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">My Licenses</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Your paid license keys are stored here. Copy the key you need and download the matching tools
@@ -108,7 +108,7 @@
 
         <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Keys</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Keys</p>
                 <h2 class="mt-1 text-2xl font-semibold text-white">Available licenses</h2>
             </div>
             <a href="/downloads" class="btn-footer-secondary w-fit">
@@ -149,13 +149,13 @@
                                 {{ $orderLicenses->count() }} {{ Str::plural('license', $orderLicenses->count()) }} in this order
 
                                 @if ($loop->first)
-                                    <span class="text-[10px] sm:text-xs bg-[#9333EA]/20 text-[#C084FC] px-2 py-1 rounded">
+                                    <span class="text-[10px] sm:text-xs bg-aksa-accent-20 text-aksa-accent px-2 py-1 rounded">
                                         NEW
                                     </span>
                                 @endif
 
                                 @if ($isSelectedOrder)
-                                    <span class="text-[10px] sm:text-xs bg-[#9333EA]/25 text-[#E9D5FF] px-2 py-1 rounded">
+                                    <span class="text-[10px] sm:text-xs bg-aksa-accent-25 text-aksa-accent-bright px-2 py-1 rounded">
                                         SELECTED ORDER
                                     </span>
                                 @endif
@@ -222,7 +222,7 @@
                                         <span class="text-sm font-semibold text-white">
                                             {{ $license->product->name ?? 'Product' }}
                                         </span>
-                                        <span class="rounded-md border border-[#9333EA]/30 bg-[#9333EA]/10 px-2 py-0.5 text-[11px] font-semibold text-[#D8B4FE]">
+                                        <span class="rounded-md border border-aksa-accent-30 bg-aksa-accent-10 px-2 py-0.5 text-[11px] font-semibold text-aksa-accent-soft">
                                             {{ $formatDuration($license->duration) }}
                                         </span>
                                     </div>

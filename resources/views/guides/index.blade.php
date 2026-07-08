@@ -1,27 +1,20 @@
 @extends('layouts.app')
 
 @section('content')
-    <section class="page-shell pb-8 pt-6 md:pt-10">
+    <section class="page-shell pb-10 pt-10 md:pb-14 md:pt-16">
         <div class="download-hero mx-auto max-w-5xl fade-up">
-            <div class="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-center">
-                <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Public Guides</p>
-                    <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                        Some Guides to Fix Windows Problems.
-                    </h1>
-                    <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Practical tutorials for common setup issues.
-                    </p>
-                </div>
-
-                @include('guides._visual', ['variant' => 'overview', 'title' => 'Guide preview'])
-            </div>
+            <h1 class="hero-title">
+                Practical guides for <span class="hero-accent">clean setup</span> fixes.
+            </h1>
+            <p class="hero-copy">
+                Short tutorials for common Windows, emulator, and setup problems.
+            </p>
         </div>
     </section>
 
     <section class="page-shell pb-16 md:pb-20">
         <div class="mx-auto mb-5 flex max-w-5xl flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Knowledge Base</p>
+            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Knowledge Base</p>
             <h2 class="text-2xl font-semibold text-white">Choose a guide</h2>
             <p class="max-w-2xl text-sm leading-6 text-gray-400">
                 Open a guide and follow each step in order.

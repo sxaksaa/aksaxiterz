@@ -9,7 +9,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
         <!-- LOGO -->
         <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
             <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
-                class="block h-8 w-auto max-w-[136px] drop-shadow-[0_0_18px_rgba(147,51,234,0.35)] sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
+                class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
                 width="612" height="195" draggable="false">
         </a>
 
@@ -52,12 +52,12 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
             @auth
                 <a href="{{ route('cart.index') }}"
-                    class="relative inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-[#9333EA]/60 hover:text-white"
+                    class="relative inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-aksa-accent-60 hover:text-white"
                     aria-label="Open cart with {{ $cartCount }} items">
-                    <x-ui.icon name="shopping-cart" class="h-4 w-4 text-[#C084FC]" />
+                    <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
                     <span>Cart</span>
                     <span data-cart-count
-                        class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-[#9333EA] px-2 py-0.5 text-[10px] font-bold text-white">
+                        class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-aksa-accent px-2 py-0.5 text-[10px] font-bold text-white">
                         {{ $cartCount }}
                     </span>
                 </a>
@@ -74,7 +74,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
             <!-- MOBILE MENU BUTTON -->
             <button id="menuBtn" type="button" data-mobile-menu-toggle class="inline-flex items-center gap-2 p-2 text-sm text-white xl:hidden">
-                <x-ui.icon name="menu" class="h-5 w-5 text-[#C084FC]" />
+                <x-ui.icon name="menu" class="h-5 w-5 text-aksa-accent" />
                 <span data-button-label>Menu</span>
             </button>
 
@@ -88,11 +88,11 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
                         @if ($user->avatar)
                             <img src="{{ $user->avatar }}" alt="{{ $user->name }}"
-                                class="w-8 h-8 rounded-full object-cover border border-[#9333EA]/40">
+                                class="w-8 h-8 rounded-full object-cover border border-aksa-accent-40">
                         @else
                             <span
                                 class="w-8 h-8 flex items-center justify-center
-                bg-[#9333EA]/20 text-[#C084FC] rounded-full text-xs font-bold">
+                bg-aksa-accent-20 text-aksa-accent rounded-full text-xs font-bold">
                                 {{ strtoupper(substr($user->name, 0, 1)) }}
                             </span>
                         @endif
@@ -110,48 +110,48 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                         @if ($user->isAdmin())
                             <div class="border-b border-[#27272A]">
                                 <a href="{{ route('admin.dashboard') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="home" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="home" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Dashboard</span>
                                 </a>
                                 <a href="{{ route('admin.activity.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="activity" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="activity" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Activity</span>
                                 </a>
                                 <a href="{{ route('admin.products.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="boxes" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="boxes" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Catalog</span>
                                 </a>
                                 <a href="{{ route('admin.categories.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="filter" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="filter" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Categories</span>
                                 </a>
                                 <a href="{{ route('admin.downloads.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="download" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="download" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Downloads</span>
                                 </a>
                                 <a href="{{ route('admin.orders.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="receipt" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="receipt" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Orders</span>
                                 </a>
                                 <a href="{{ route('admin.license-stocks.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="key-round" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="key-round" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Stock</span>
                                 </a>
                                 <a href="{{ route('admin.users.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="users" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="users" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Users</span>
                                 </a>
                                 <a href="{{ route('admin.vouchers.index') }}"
-                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-[#9333EA]/10 hover:text-white">
-                                    <x-ui.icon name="ticket-percent" class="h-4 w-4 text-[#C084FC]" />
+                                    class="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 transition hover:bg-aksa-accent-10 hover:text-white">
+                                    <x-ui.icon name="ticket-percent" class="h-4 w-4 text-aksa-accent" />
                                     <span>Admin Vouchers</span>
                                 </a>
                             </div>
@@ -160,7 +160,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                         <form action="/logout" method="POST">
                             @csrf
                             <button
-                                class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-400 transition hover:bg-[#9333EA]/10">
+                                class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-400 transition hover:bg-aksa-accent-10">
                                 <x-ui.icon name="log-out" class="h-4 w-4" />
                                 <span>Logout</span>
                             </button>
@@ -171,7 +171,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
                 </div>
             @else
                 <a href="/auth/google" class="hidden items-center gap-2 text-gray-400 transition hover:text-white xl:inline-flex">
-                    <x-ui.icon name="log-in" class="h-4 w-4 text-[#C084FC]" />
+                    <x-ui.icon name="log-in" class="h-4 w-4 text-aksa-accent" />
                     <span>Login</span>
                 </a>
             @endauth
@@ -267,16 +267,16 @@ transition-all duration-300 ease-out">
                     <x-ui.icon name="discord" class="h-4 w-4" />
                     <span>Discord</span>
                 </span>
-                <span class="text-xs text-[#C084FC]">Support</span>
+                <span class="text-xs text-aksa-accent">Support</span>
             </a>
 
             <div class="border-t border-[#27272A] pt-3 text-xs text-gray-400 flex items-center gap-2">
                 @if (auth()->user()->avatar)
                     <img src="{{ auth()->user()->avatar }}" alt="{{ auth()->user()->name }}"
-                        class="w-7 h-7 rounded-full object-cover border border-[#9333EA]/40">
+                        class="w-7 h-7 rounded-full object-cover border border-aksa-accent-40">
                 @else
                     <span
-                        class="w-7 h-7 flex items-center justify-center bg-[#9333EA]/20 text-[#C084FC] rounded-full text-[10px] font-bold">
+                        class="w-7 h-7 flex items-center justify-center bg-aksa-accent-20 text-aksa-accent rounded-full text-[10px] font-bold">
                         {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                     </span>
                 @endif
@@ -305,7 +305,7 @@ transition-all duration-300 ease-out">
                     <x-ui.icon name="discord" class="h-4 w-4" />
                     <span>Discord</span>
                 </span>
-                <span class="text-xs text-[#C084FC]">Support</span>
+                <span class="text-xs text-aksa-accent">Support</span>
             </a>
         @endguest
 

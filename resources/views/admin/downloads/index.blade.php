@@ -13,7 +13,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Downloads</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Manage public download cards, setup folders, and direct file links shown on the Downloads page.
@@ -34,7 +34,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -48,7 +48,7 @@
         <section class="product-section mb-6 fade-up">
             <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                         {{ $isEditing ? 'Edit Download' : 'New Download' }}
                     </p>
                     <h2 class="mt-1 text-xl font-semibold text-white">
@@ -120,7 +120,7 @@
                     <h2 class="text-sm font-semibold text-white">Download Cards</h2>
                     <p class="mt-1 text-xs text-gray-500">Every item listed here appears on the public Downloads page.</p>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $downloads->total() }} records
                 </span>
             </div>
@@ -151,7 +151,7 @@
                                     <div class="grid gap-2">
                                         @forelse ($download->links ?: [] as $link)
                                             <a href="{{ $link['url'] ?? '#' }}" target="_blank" rel="noopener noreferrer"
-                                                class="max-w-[320px] truncate text-xs font-semibold text-[#D8B4FE] hover:text-white">
+                                                class="max-w-[320px] truncate text-xs font-semibold text-aksa-accent-soft hover:text-white">
                                                 {{ $link['label'] ?? 'Download' }}
                                             </a>
                                         @empty

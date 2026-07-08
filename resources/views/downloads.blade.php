@@ -1,24 +1,21 @@
 @extends('layouts.app')
 
 @section('content')
-    <section class="page-shell pb-8 pt-6 md:pt-10">
-        <div class="download-hero mx-auto flex max-w-5xl items-center fade-up">
-            <div class="max-w-3xl">
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">Public Download Tools</p>
-                <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                    Get instant access to all tools and download files in one place.
-                </h1>
-                <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                    Public setup packages, companion files, emulator resources, and required runtimes. Pick the matching
-                    card below and open the file folder you need.
-                </p>
-            </div>
+    <section class="page-shell pb-10 pt-10 md:pb-14 md:pt-16">
+        <div class="download-hero mx-auto max-w-5xl fade-up">
+            <h1 class="hero-title">
+                All setup files in <span class="hero-accent">one clean place.</span>
+            </h1>
+            <p class="hero-copy">
+                Public setup packages, companion files, emulator resources, and required runtimes. Pick the matching
+                product below and open the exact file you need.
+            </p>
         </div>
     </section>
 
     <section class="page-shell pb-16 md:pb-20">
         <div class="mx-auto mb-5 flex max-w-5xl flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Files</p>
+            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Files</p>
             <h2 class="text-2xl font-semibold text-white">Choose what you need</h2>
             <p class="max-w-2xl text-sm leading-6 text-gray-400">
                 Open a product, then pick the exact file, video, or setup resource you need.

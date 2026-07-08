@@ -18,7 +18,7 @@
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
             <div>
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">Voucher Usage</p>
+                <p class="mb-2 text-sm font-semibold text-aksa-accent">Voucher Usage</p>
                 <h1 class="break-all text-3xl font-bold tracking-normal md:text-4xl">{{ $voucher->code }}</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                     Customer usage, checkout totals, final payment amounts, and voucher discounts for this promo code.
@@ -98,7 +98,7 @@
                                 <td class="p-4 text-right font-semibold text-gray-200">{{ $formatRowMoney($row, 'subtotal_value') }}</td>
                                 <td class="p-4 text-right font-semibold text-emerald-300">-{{ $formatRowMoney($row, 'discount_value') }}</td>
                                 <td class="p-4 text-right">
-                                    <div class="font-semibold text-[#D8B4FE]">{{ $formatRowMoney($row, 'final_value') }}</div>
+                                    <div class="font-semibold text-aksa-accent-soft">{{ $formatRowMoney($row, 'final_value') }}</div>
                                     <div class="mt-1 text-xs text-gray-500">Requested {{ $formatRowMoney($row, 'paid_value') }}</div>
                                 </td>
                                 <td class="p-4 text-xs text-gray-400">
@@ -143,7 +143,7 @@
                         </div>
                         <div class="qris-detail-row qris-total-row">
                             <span>After voucher</span>
-                            <span class="font-semibold text-[#D8B4FE]">{{ $formatRowMoney($row, 'final_value') }}</span>
+                            <span class="font-semibold text-aksa-accent-soft">{{ $formatRowMoney($row, 'final_value') }}</span>
                         </div>
                     </div>
                     <div class="mt-4 text-xs text-gray-500">{{ $row['method_label'] }} · Requested {{ $formatRowMoney($row, 'paid_value') }}</div>

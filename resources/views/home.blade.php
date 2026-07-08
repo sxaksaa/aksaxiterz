@@ -5,34 +5,31 @@
         $totalStock = $products->sum('available_license_stocks_count');
     @endphp
 
-    <section class="page-shell pb-6 pt-6 md:pt-10">
+    <section class="page-shell pb-12 pt-12 md:pb-16 md:pt-20">
         <div class="home-hero fade-up">
-            <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
-                <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Digital License Platform</p>
-                    <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                        Premium tools and instant digital licenses.
-                    </h1>
-                    <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        Browse trusted digital tools, pay securely, and get quick access to license keys, setup
-                        guides, and customer support.
-                    </p>
-                </div>
+            <h1 class="hero-title">
+                Premium tools with <span class="hero-accent">instant license</span> access.
+            </h1>
+            <p class="hero-copy">
+                Browse trusted digital tools, pay securely, and get quick access to license keys, setup guides, and
+                customer support.
+            </p>
 
-                <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div class="home-panel">
-                        <div class="text-xl font-semibold text-white">5000+ Licenses</div>
-                        <div class="mt-1 text-xs text-gray-400">Delivered to customers with support.</div>
-                    </div>
-                    <div class="home-panel">
-                        <div class="text-xl font-semibold text-white">2000+ Members</div>
-                        <div class="mt-1 text-xs text-gray-400">Member vouchers, restock alerts, and setup help.</div>
-                    </div>
-                    <div class="home-panel">
-                        <div class="text-xl font-semibold text-white">Since 2024</div>
-                        <div class="mt-1 text-xs text-gray-400">{{ $totalStock }} licenses ready for auto delivery.</div>
-                    </div>
-                </div>
+            <div class="hero-actions">
+                <a href="#products" class="btn-main px-5 py-3">
+                    <x-ui.icon name="boxes" class="h-4 w-4" />
+                    <span>Browse Products</span>
+                </a>
+                <a href="/downloads" class="btn-footer-secondary h-12 px-5">
+                    <x-ui.icon name="download" class="h-4 w-4" />
+                    <span>Downloads</span>
+                </a>
+            </div>
+
+            <div class="home-proof-strip">
+                <span><strong>5000+</strong> licenses delivered</span>
+                <span><strong>2000+</strong> community members</span>
+                <span><strong>{{ $totalStock }}</strong> ready stock</span>
             </div>
         </div>
     </section>
@@ -47,8 +44,7 @@
         <div class="home-flow fade-up">
             <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">How it works</p>
-                    <h2 class="mt-1 text-2xl font-semibold text-white">Checkout in three steps</h2>
+                    <h2 class="text-2xl font-semibold text-white">Checkout in three steps</h2>
                 </div>
             </div>
 
@@ -107,7 +103,7 @@
         <div class="home-toolbar fade-up">
             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Products</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Products</p>
                     <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
                     <p class="mt-1 text-sm text-gray-400">Search by product name or filter by category.</p>
                 </div>
@@ -138,7 +134,7 @@
 
     <div class="page-shell pb-16 md:pb-20">
         <div class="mb-5 flex flex-col gap-2 text-center md:text-left">
-            <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Storefront</p>
+            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Storefront</p>
             <h2 class="text-2xl font-semibold text-white">Available products</h2>
         </div>
 

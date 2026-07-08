@@ -68,7 +68,7 @@
             <div class="grid gap-5 md:grid-cols-[1fr_340px] md:items-stretch">
                 <div class="flex min-w-0 flex-col justify-between gap-5">
                     <div>
-                        <a href="/" class="text-sm text-[#C084FC] transition hover:text-white">Back to products</a>
+                        <a href="/" class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
                         <div class="mt-4 flex flex-wrap gap-2">
                             <span class="support-pill product-hero-pill">
                                 <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
@@ -92,7 +92,7 @@
                 <div class="grid gap-3">
                     <div class="product-stat product-stat-featured">
                         <div class="text-xs uppercase text-gray-500">Starts from</div>
-                        <div class="mt-2 text-2xl font-bold text-[#D8B4FE]">
+                        <div class="mt-2 text-2xl font-bold text-aksa-accent-soft">
                             {{ $minPackage ? 'Rp ' . number_format($minPackage->price) : '-' }}
                         </div>
                         <div class="mt-1 text-sm text-gray-400">
@@ -104,7 +104,7 @@
                         <div class="mb-2 text-xs uppercase text-gray-500">Availability</div>
                         <div class="flex items-end justify-between gap-4">
                             <div>
-                                <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-[#C084FC]' : 'text-amber-300' }}">
+                                <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-aksa-accent' : 'text-amber-300' }}">
                                     {{ $hasAutoDelivery ? $stock : 'Manual' }}
                                 </div>
                                 <div class="text-sm text-gray-400">
@@ -128,7 +128,7 @@
         @if (filled($product->important_note))
             <div class="product-section mb-6 fade-up">
                 <div class="mb-4">
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Please Read</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Please Read</p>
                     <h3 class="mt-1 text-xl font-semibold text-white">Important Note</h3>
                 </div>
                 <p class="max-w-4xl whitespace-pre-line text-sm leading-6 text-gray-300">{{ $product->important_note }}</p>
@@ -162,7 +162,7 @@
 
         <div id="checkout" class="product-section mb-6 scroll-mt-28 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Checkout</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Checkout</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Payment Method</h2>
                 <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
             </div>
@@ -320,7 +320,7 @@
 
         <div class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Packages</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Packages</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Select Package</h2>
                 <p class="mt-1 text-sm text-gray-400">Pick the duration that matches what you need.</p>
             </div>
@@ -395,7 +395,7 @@
                     @if ($packageStock <= 0)
                         <button type="button"
                             data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
-                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#9333EA]/35 bg-[#9333EA]/10 px-3 py-2 text-xs font-semibold text-[#D8B4FE] transition hover:border-[#C084FC] hover:bg-[#9333EA]/20 hover:text-white">
+                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-aksa-accent-35 bg-aksa-accent-10 px-3 py-2 text-xs font-semibold text-aksa-accent-soft transition hover:border-aksa-accent hover:bg-aksa-accent-20 hover:text-white">
                             <x-ui.icon name="discord" class="h-4 w-4" />
                             <span>Join Discord to Order</span>
                         </button>
@@ -409,7 +409,7 @@
         <div id="summaryBox" class="hidden product-summary-card fade-up">
 
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Ready to pay</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Ready to pay</p>
                 <h3 class="mt-1 text-xl font-semibold text-white">Order Summary</h3>
             </div>
 
@@ -458,7 +458,7 @@
                     Want a voucher code?
                     <a href="{{ $discordUrl ?: '#' }}"
                         @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
-                        class="font-semibold text-[#C084FC] hover:text-white {{ $discordUrl ? '' : 'pointer-events-none opacity-50' }}">
+                        class="font-semibold text-aksa-accent hover:text-white {{ $discordUrl ? '' : 'pointer-events-none opacity-50' }}">
                         Join our Discord server to get promo codes.
                     </a>
                 </p>
@@ -472,7 +472,7 @@
 
             <div class="summary-row">
                 <span>Total</span>
-                <span id="totalPrice" class="font-semibold text-[#C084FC]">-</span>
+                <span id="totalPrice" class="font-semibold text-aksa-accent">-</span>
             </div>
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">

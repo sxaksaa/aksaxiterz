@@ -17,7 +17,7 @@
     <div class="page-shell py-6 md:py-10">
         <section class="product-hero mb-6 fade-up">
             <div class="max-w-3xl">
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">{{ $eyebrow ?? 'Legal' }}</p>
+                <p class="mb-2 text-sm font-semibold text-aksa-accent">{{ $eyebrow ?? 'Legal' }}</p>
                 <h1 class="text-3xl font-bold tracking-normal md:text-5xl">{{ $title }}</h1>
                 <p class="mt-4 max-w-2xl break-words text-sm leading-6 text-gray-400 md:text-base">
                     {{ $summary }}
@@ -37,7 +37,7 @@
                 <div class="mt-4 grid gap-2 text-sm">
                     @foreach ($legalLinks as $key => $link)
                         <a href="{{ $link['url'] }}"
-                            class="footer-link {{ ($slug ?? '') === $key ? 'text-[#C084FC]' : '' }}">
+                            class="footer-link {{ ($slug ?? '') === $key ? 'text-aksa-accent' : '' }}">
                             {{ $link['label'] }}
                         </a>
                     @endforeach

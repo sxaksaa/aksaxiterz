@@ -33,7 +33,7 @@
     <section class="page-shell pb-16 md:pb-20">
         <div class="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
             <aside class="product-section fade-up">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Before You Start</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Before You Start</p>
                 <div class="mt-4 grid gap-3">
                     @foreach ($guide['requirements'] ?? [] as $requirement)
                         <div class="rounded-lg border border-[#27272A] bg-black/20 px-3 py-3 text-sm text-gray-300">
@@ -42,7 +42,7 @@
                     @endforeach
                 </div>
 
-                <div class="mt-5 rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-3 text-xs leading-5 text-[#D8B4FE]">
+                <div class="mt-5 rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-3 text-xs leading-5 text-aksa-accent-soft">
                     Updated {{ $updatedAt }}. Follow the steps carefully and restart Windows when requested.
                 </div>
             </aside>
@@ -58,7 +58,7 @@
                             ])
 
                             <div>
-                                <div class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">
+                                <div class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                                     Step {{ $index + 1 }}
                                 </div>
                                 <h2 class="mt-2 text-xl font-semibold text-white">{{ $step['title'] }}</h2>
@@ -72,7 +72,7 @@
 
         @if ($relatedGuides->isNotEmpty())
             <div class="mx-auto mt-8 max-w-5xl">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">More Guides</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">More Guides</p>
                 <div class="mt-3 grid gap-3 md:grid-cols-3">
                     @foreach ($relatedGuides as $related)
                         <a href="{{ route('guides.show', $related['slug']) }}" class="download-feature block">

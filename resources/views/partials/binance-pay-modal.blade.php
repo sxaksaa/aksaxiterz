@@ -8,7 +8,7 @@
                     <x-ui.icon name="binance" class="h-5 w-5" />
                 </span>
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Binance user-to-user payment</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Binance user-to-user payment</p>
                     <h2 id="aksaBinancePayTitle" class="mt-1 text-xl font-semibold text-white">Pay with Binance</h2>
                 </div>
             </div>
@@ -25,7 +25,7 @@
         <div id="aksaBinancePayDetails">
             <div class="crypto-payment-warning mt-5">
                 <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Important</p>
-                <p class="mt-1 text-sm font-semibold leading-5 text-[#F5D0FE]">
+                <p class="mt-1 text-sm font-semibold leading-5 text-aksa-accent-soft">
                     Send the exact amount shown. Use Binance Pay, not an on-chain withdrawal.
                 </p>
                 <p class="mt-1 text-xs leading-5 text-gray-300">
@@ -64,7 +64,7 @@
                 </div>
                 <div class="qris-detail-row">
                     <span>Time remaining</span>
-                    <span id="aksaBinancePayExpires" class="text-right font-mono text-xs text-[#D8B4FE]">-</span>
+                    <span id="aksaBinancePayExpires" class="text-right font-mono text-xs text-aksa-accent-soft">-</span>
                 </div>
             </div>
         </div>

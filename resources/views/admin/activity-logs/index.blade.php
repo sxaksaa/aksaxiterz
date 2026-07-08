@@ -4,7 +4,7 @@
     <div class="page-shell py-6 md:py-10">
         <section class="orders-hero fade-up mb-6">
             <div>
-                <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                 <h1 class="text-3xl font-bold tracking-normal md:text-4xl">Activity</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                     Review successful catalog, stock, voucher, download, and order changes made by administrators.
@@ -81,7 +81,7 @@
                     <h2 class="text-sm font-semibold text-white">Admin Activity</h2>
                     <p class="mt-1 text-xs text-gray-500">Only successful write actions are recorded.</p>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $logs->total() }} records
                 </span>
             </div>
@@ -110,7 +110,7 @@
                                     <div class="mt-1 max-w-[220px] truncate text-xs text-gray-500">{{ $log->admin_email }}</div>
                                 </td>
                                 <td class="p-4">
-                                    <span class="inline-flex rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-2.5 py-1 text-xs font-semibold text-[#D8B4FE]">
+                                    <span class="inline-flex rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-2.5 py-1 text-xs font-semibold text-aksa-accent-soft">
                                         {{ $log->section_label }}
                                     </span>
                                     <div class="mt-2 font-semibold text-white">{{ $log->action_label }}</div>
@@ -148,7 +148,7 @@
                             <div class="font-semibold text-white">{{ $log->action_label }}</div>
                             <div class="mt-1 truncate text-xs text-gray-500">{{ $log->admin_name }} · {{ $log->admin_email }}</div>
                         </div>
-                        <span class="inline-flex shrink-0 rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-2.5 py-1 text-xs font-semibold text-[#D8B4FE]">
+                        <span class="inline-flex shrink-0 rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-2.5 py-1 text-xs font-semibold text-aksa-accent-soft">
                             {{ $log->section_label }}
                         </span>
                     </div>

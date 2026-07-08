@@ -2,23 +2,34 @@
     $discordUrl = config('links.discord_url');
 @endphp
 
-<footer class="mt-8 border-t border-[#27272A] bg-[#09090C]/80">
-    <div class="page-shell py-8 md:py-10">
+<footer class="site-footer mt-10">
+    <div class="page-shell py-10 md:py-12">
         <div class="grid gap-8 md:grid-cols-[1.35fr_0.8fr_0.9fr_0.95fr]">
-            <div>
+            <div class="footer-brand-block">
                 <a href="/" class="footer-brand" aria-label="Aksa Xiterz home">
                     <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
-                        class="block h-10 w-auto max-w-[180px] drop-shadow-[0_0_20px_rgba(147,51,234,0.32)]"
+                        class="block h-10 w-auto max-w-[180px] aksa-logo-glow"
                         width="612" height="195" draggable="false">
                 </a>
 
                 <p class="mt-3 max-w-sm text-sm leading-6 text-gray-400">
                     Digital licenses, setup resources, secure checkout, and customer support in one place.
                 </p>
+
+                <div class="footer-meta-row">
+                    <span>
+                        <x-ui.icon name="shield-check" class="h-3.5 w-3.5" />
+                        Secure checkout
+                    </span>
+                    <span>
+                        <x-ui.icon name="key-round" class="h-3.5 w-3.5" />
+                        Instant delivery
+                    </span>
+                </div>
             </div>
 
-            <div>
-                <h2 class="text-sm font-semibold text-white">Quick Links</h2>
+            <div class="footer-column">
+                <h2 class="footer-heading">Quick Links</h2>
                 <div class="mt-3 grid gap-2 text-sm">
                     <a href="/" class="footer-link">Products</a>
                     <a href="{{ route('guides.index') }}" class="footer-link">Guides</a>
@@ -30,8 +41,8 @@
                 </div>
             </div>
 
-            <div>
-                <h2 class="text-sm font-semibold text-white">Support</h2>
+            <div class="footer-column">
+                <h2 class="footer-heading">Support</h2>
                 <p class="mt-3 text-sm leading-6 text-gray-400">
                     Setup help, license delivery checks, reset requests, and payment support.
                 </p>
@@ -46,8 +57,8 @@
                 </a>
             </div>
 
-            <div>
-                <h2 class="text-sm font-semibold text-white">Legal</h2>
+            <div class="footer-column">
+                <h2 class="footer-heading">Legal</h2>
                 <div class="mt-3 grid gap-2 text-sm">
                     <a href="/terms" class="footer-link">Terms</a>
                     <a href="/privacy" class="footer-link">Privacy Policy</a>
@@ -58,7 +69,7 @@
             </div>
         </div>
 
-        <div class="mt-8 border-t border-[#27272A] pt-5 text-center text-xs text-gray-500">
+        <div class="footer-bottom">
             <span>© {{ date('Y') }} Aksa Xiterz. Since 2024. All rights reserved.</span>
         </div>
     </div>

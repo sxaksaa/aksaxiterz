@@ -24,7 +24,7 @@
         <section class="orders-hero fade-up mb-6">
             <div>
                 <div>
-                    <p class="mb-2 text-sm font-semibold text-[#C084FC]">Admin</p>
+                    <p class="mb-2 text-sm font-semibold text-aksa-accent">Admin</p>
                     <h1 class="text-3xl font-bold tracking-normal md:text-4xl">License Stock</h1>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                         Add, search, and maintain unsold license keys before they are delivered to customers.
@@ -53,7 +53,7 @@
         </section>
 
         @if (session('info'))
-            <div class="mb-4 rounded-xl border border-[#9333EA]/30 bg-[#9333EA]/10 px-4 py-3 text-sm text-[#D8B4FE]">
+            <div class="mb-4 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft">
                 {{ session('info') }}
             </div>
         @endif
@@ -66,7 +66,7 @@
 
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Bulk Add</p>
+                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Bulk Add</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Add License Keys</h2>
                 <p class="mt-1 text-sm text-gray-400">Paste one key per line. Commas and semicolons also work.</p>
             </div>
@@ -124,7 +124,7 @@
         @if ($editStock)
             <section class="product-section mb-6 fade-up">
                 <div class="mb-4">
-                    <p class="text-xs font-semibold uppercase tracking-normal text-[#C084FC]">Edit</p>
+                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Edit</p>
                     <h2 class="mt-1 text-xl font-semibold text-white">Edit Unsold Key</h2>
                 </div>
 
@@ -249,7 +249,7 @@
                     <h2 class="text-sm font-semibold text-white">Stock Records</h2>
                     <p class="mt-1 text-xs text-gray-500">Sold keys are locked for audit safety.</p>
                 </div>
-                <span class="rounded-lg border border-[#9333EA]/30 bg-[#9333EA]/10 px-3 py-1 text-xs font-semibold text-[#C084FC]">
+                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
                     {{ $stocks->total() }} records
                 </span>
             </div>
