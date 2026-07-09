@@ -1,12 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-    @php
-        $totalOrders = $orderStats['total'] ?? $orders->count();
-        $paidOrders = $orderStats['paid'] ?? $orders->where('status', 'paid')->count();
-        $pendingOrders = $orderStats['pending'] ?? $orders->where('status', 'pending')->count();
-    @endphp
-
     <div class="page-shell public-account-page py-7 md:py-12">
         <section class="orders-hero account-hero fade-up mb-8">
             <div class="account-hero-layout">
@@ -17,36 +11,6 @@
                         Track payments, continue pending invoices, and jump back into your licenses after checkout.
                     </p>
                 </div>
-
-                <div class="account-stat-grid account-stat-grid-3">
-                    <div class="order-stat account-stat">
-                        <div class="account-stat-value">{{ $totalOrders }}</div>
-                        <div class="account-stat-label">Total orders</div>
-                    </div>
-                    <div class="order-stat account-stat">
-                        <div class="account-stat-value">{{ $paidOrders }}</div>
-                        <div class="account-stat-label">Paid orders</div>
-                    </div>
-                    <div class="order-stat account-stat">
-                        <div class="account-stat-value">{{ $pendingOrders }}</div>
-                        <div class="account-stat-label">Waiting payment</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="order-help-strip account-helper-row">
-                <span>
-                    <x-ui.icon name="refresh-cw" class="h-4 w-4" />
-                    Auto checks run in the background
-                </span>
-                <span>
-                    <x-ui.icon name="copy" class="h-4 w-4" />
-                    Copy Order ID for support
-                </span>
-                <span>
-                    <x-ui.icon name="key-round" class="h-4 w-4" />
-                    Paid licenses appear in Licenses
-                </span>
             </div>
         </section>
 
@@ -57,7 +21,7 @@
         @endif
 
         <div id="ordersContent" class="fade-up">
-            @include('partials.orders-list', ['orders' => $orders])
+            @include('partials.orders-list', ['orders' => $orders, 'orderStats' => $orderStats])
         </div>
 
     </div>

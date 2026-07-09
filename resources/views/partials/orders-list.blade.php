@@ -1,6 +1,26 @@
 @php
     $now = now();
+    $ordersCollection = method_exists($orders, 'getCollection') ? $orders->getCollection() : collect($orders);
+    $orderStats = $orderStats ?? [
+        'total' => method_exists($orders, 'total') ? $orders->total() : $ordersCollection->count(),
+        'paid' => $ordersCollection->where('status', 'paid')->count(),
+        'pending' => $ordersCollection->where('status', 'pending')->count(),
+    ];
+    $orderSummaryStats = [
+        ['value' => $orderStats['total'] ?? 0, 'label' => 'Total orders'],
+        ['value' => $orderStats['paid'] ?? 0, 'label' => 'Paid orders'],
+        ['value' => $orderStats['pending'] ?? 0, 'label' => 'Waiting payment'],
+    ];
 @endphp
+
+<div class="orders-mobile-summary lg:hidden" aria-label="Order summary">
+    @foreach ($orderSummaryStats as $summaryStat)
+        <div class="orders-summary-chip">
+            <strong>{{ $summaryStat['value'] }}</strong>
+            <span>{{ $summaryStat['label'] }}</span>
+        </div>
+    @endforeach
+</div>
 
 <div class="space-y-4 lg:hidden">
     @forelse ($orders as $order)
@@ -131,6 +151,9 @@
             $paymentHintIcon = $isPaid
                 ? 'key-round'
                 : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
+            $licenseTargetUrl = filled($order->order_id)
+                ? '/licenses?order=' . rawurlencode((string) $order->order_id) . '#license-' . rawurlencode((string) $order->order_id)
+                : '/licenses';
         @endphp
 
         <article class="order-mobile-card motion-card">
@@ -199,7 +222,7 @@
             @if ($hasPaymentAction || $isPaid)
                 <div class="mt-4 flex flex-col gap-2">
                     @if ($isPaid && ! $hasPaymentAction)
-                        <a href="/licenses" class="order-action w-full">
+                        <a href="{{ $licenseTargetUrl }}" class="order-action w-full">
                             <x-ui.icon name="key-round" class="h-4 w-4" />
                             <span>Open Licenses</span>
                         </a>
@@ -283,13 +306,19 @@
 </div>
 
 <div class="orders-table-wrap hidden lg:block">
-    <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
-        <div>
-            <h2 class="text-sm font-semibold text-white">Recent Orders</h2>
+    <div class="orders-table-header">
+        <div class="orders-table-heading">
+            <h2>Recent Orders</h2>
+            <p>Latest invoices and payment progress.</p>
         </div>
-        <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
-            {{ method_exists($orders, 'total') ? $orders->total() : $orders->count() }} records
-        </span>
+        <div class="orders-summary-chips" aria-label="Order summary">
+            @foreach ($orderSummaryStats as $summaryStat)
+                <div class="orders-summary-chip">
+                    <strong>{{ $summaryStat['value'] }}</strong>
+                    <span>{{ $summaryStat['label'] }}</span>
+                </div>
+            @endforeach
+        </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -435,6 +464,9 @@
                         $paymentHintIcon = $isPaid
                             ? 'key-round'
                             : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
+                        $licenseTargetUrl = filled($order->order_id)
+                            ? '/licenses?order=' . rawurlencode((string) $order->order_id) . '#license-' . rawurlencode((string) $order->order_id)
+                            : '/licenses';
                     @endphp
 
                     <tr class="orders-table-row">
@@ -482,7 +514,7 @@
                             <div class="inline-flex flex-wrap justify-end gap-2">
                                 @if (! $hasPaymentAction)
                                     @if ($isPaid)
-                                        <a href="/licenses" class="order-action">
+                                        <a href="{{ $licenseTargetUrl }}" class="order-action">
                                             <x-ui.icon name="key-round" class="h-4 w-4" />
                                             <span>Licenses</span>
                                         </a>

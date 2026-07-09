@@ -2,7 +2,6 @@
 
 @section('content')
     @php
-        $discordUrl = config('links.discord_url');
         $licenseCount = $licenses->count();
         $latestLicense = $licenses->first();
         $licenseResetStates = $licenseResetStates ?? [];
@@ -23,6 +22,12 @@
 
             return $orderId !== '' ? 'order:' . $orderId : 'license:' . $license->id;
         });
+        $licenseSummaryStats = [
+            ['value' => $licenseCount, 'label' => 'Active'],
+            ['value' => $orderStats['paid'] ?? 0, 'label' => 'Paid orders'],
+            ['value' => $orderStats['pending'] ?? 0, 'label' => 'Pending'],
+            ['value' => $latestLicense?->created_at?->format('d M') ?? '-', 'label' => 'Latest'],
+        ];
     @endphp
 
     <div class="page-shell public-account-page py-7 md:py-12">
@@ -36,40 +41,6 @@
                         Your paid license keys are stored here. Copy the key you need and download the matching tools
                         when you are ready to set up.
                     </p>
-                </div>
-
-                <div class="account-actions">
-                    <a href="/downloads" class="btn-footer-secondary account-action-button">
-                        <x-ui.icon name="download" class="h-4 w-4" />
-                        <span>Download Tools</span>
-                    </a>
-                    <a href="{{ $discordUrl ?: '#' }}"
-                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
-                        class="discord-cta account-action-button {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        <x-ui.icon name="discord" class="h-4 w-4" />
-                        <span>Join Discord</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="account-stat-grid account-stat-grid-4">
-                <div class="license-stat account-stat">
-                    <div class="account-stat-value">{{ $licenseCount }}</div>
-                    <div class="account-stat-label">Active licenses</div>
-                </div>
-                <div class="license-stat account-stat">
-                    <div class="account-stat-value">{{ $orderStats['paid'] }}</div>
-                    <div class="account-stat-label">Paid orders</div>
-                </div>
-                <div class="license-stat account-stat">
-                    <div class="account-stat-value">{{ $orderStats['pending'] }}</div>
-                    <div class="account-stat-label">Pending orders</div>
-                </div>
-                <div class="license-stat account-stat">
-                    <div class="account-stat-value">
-                        {{ $latestLicense?->created_at?->format('d M') ?? '-' }}
-                    </div>
-                    <div class="account-stat-label">Latest purchase</div>
                 </div>
             </div>
         </section>
@@ -88,10 +59,19 @@
             </div>
         @endif
 
-        <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div class="license-section-header fade-up">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Keys</p>
                 <h2 class="mt-1 text-2xl font-semibold text-white">Available licenses</h2>
+            </div>
+
+            <div class="license-summary-strip" aria-label="License summary">
+                @foreach ($licenseSummaryStats as $summaryStat)
+                    <div class="license-summary-stat">
+                        <strong>{{ $summaryStat['value'] }}</strong>
+                        <span>{{ $summaryStat['label'] }}</span>
+                    </div>
+                @endforeach
             </div>
         </div>
 

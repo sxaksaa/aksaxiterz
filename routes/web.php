@@ -381,6 +381,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders-fragment', function (PendingOrderExpirationService $pendingOrderExpirationService) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
+        $orderStats = [
+            'total' => Order::where('user_id', auth()->id())->count(),
+            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
+            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
+        ];
+
         $orders = Order::with(['product', 'package', 'items.product', 'items.package'])
             ->withCount('licenses')
             ->where('user_id', auth()->id())
@@ -388,7 +394,7 @@ Route::middleware('auth')->group(function () {
             ->paginate(8)
             ->withPath('/orders');
 
-        return view('partials.orders-list', compact('orders'));
+        return view('partials.orders-list', compact('orders', 'orderStats'));
     })->middleware('throttle:30,1');
 });
 
