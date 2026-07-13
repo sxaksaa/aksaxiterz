@@ -1,10 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-    @php
-        $totalStock = $products->sum('available_license_stocks_count');
-    @endphp
-
     <section class="page-shell pb-12 pt-12 md:pb-16 md:pt-20">
         <div class="home-hero fade-up">
             <h1 class="hero-title">
@@ -25,7 +21,7 @@
             <div class="home-proof-strip">
                 <span><strong>5000+</strong> licenses delivered</span>
                 <span><strong>2000+</strong> community members</span>
-                <span><strong>{{ $totalStock }}</strong> ready stock</span>
+                <span><strong data-total-ready-stock>{{ $totalStock }}</strong> ready stock</span>
             </div>
         </div>
     </section>
@@ -102,20 +98,28 @@
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('DOMContentLoaded', () => {
 
-            let timeout;
             let currentCategory = @json(request('category', ''));
             const productEndpoint = @json(route('products.fragment', [], false));
+            const productStockEndpoint = @json(route('products.stocks', [], false));
+            const stockPollingInterval = 20000;
 
             const searchInput = document.getElementById('searchInput');
             const container = document.getElementById('productContainer');
+            const totalStock = document.querySelector('[data-total-ready-stock]');
+            let searchTimeout = null;
+            let productRequestController = null;
+            let productRequestSequence = 0;
+            let stockRequestController = null;
+            let stockPollingTimer = null;
+            let stockPollingDisposed = false;
 
             if (!searchInput || !container) return;
 
             searchInput.addEventListener('input', function() {
 
-                clearTimeout(timeout);
+                clearTimeout(searchTimeout);
 
-                timeout = setTimeout(() => {
+                searchTimeout = setTimeout(() => {
                     fetchProducts(this.value, currentCategory);
                 }, 200);
 
@@ -154,6 +158,12 @@
 
             function fetchProducts(search, category) {
 
+                const requestSequence = ++productRequestSequence;
+                productRequestController?.abort();
+                stockRequestController?.abort();
+                const controller = new AbortController();
+                productRequestController = controller;
+
                 const params = new URLSearchParams({
                     search,
                     category,
@@ -163,10 +173,12 @@
                 container.innerHTML = productSkeletonHtml();
 
                 fetch(`${productEndpoint}?${params.toString()}`, {
+                        cache: 'no-store',
                         headers: {
                             'Accept': 'text/html',
                             'X-Requested-With': 'XMLHttpRequest',
                         },
+                        signal: controller.signal,
                     })
                     .then(res => {
                         if (!res.ok) {
@@ -176,9 +188,14 @@
                         return res.text();
                     })
                     .then(html => {
+                        if (requestSequence !== productRequestSequence) return;
+
                         container.innerHTML = html.trim() || emptyProductsHtml();
+                        refreshProductStocks();
                     })
                     .catch(error => {
+                        if (error.name === 'AbortError' || requestSequence !== productRequestSequence) return;
+
                         container.innerHTML = emptyProductsHtml(
                             'Products could not be loaded. Please refresh the page and try again.'
                         );
@@ -190,9 +207,168 @@
                         }
                     })
                     .finally(() => {
-                        container.classList.remove('product-container-loading');
+                        if (productRequestController === controller) {
+                            productRequestController = null;
+                            container.classList.remove('product-container-loading');
+                        }
                     });
             }
+
+            function applyProductStockSnapshot(snapshot) {
+                if (!snapshot || !Array.isArray(snapshot.products)) return;
+
+                snapshot.products.forEach((product) => {
+                    const productId = Number(product.id);
+                    const stock = Number(product.available_stock);
+
+                    if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(stock) || stock < 0) {
+                        return;
+                    }
+
+                    const card = container.querySelector(`[data-product-stock-card][data-product-id="${productId}"]`);
+
+                    if (!card) return;
+
+                    const status = product.status === 'updating' ? 'updating' : 'ready';
+                    const isUpdating = status === 'updating';
+                    const hasReadyStock = !isUpdating && stock > 0;
+                    const statusBadge = card.querySelector('[data-product-status-badge]');
+
+                    card.dataset.productStatus = status;
+                    card.dataset.productStock = String(stock);
+
+                    if (statusBadge) {
+                        statusBadge.textContent = product.status_label || (isUpdating ? 'Updating' : 'Ready');
+                        statusBadge.classList.toggle('product-status-badge-updating', isUpdating);
+                        statusBadge.classList.toggle('product-status-badge-ready', !isUpdating);
+                    }
+
+                    card.querySelector('[data-product-stock-icon-ready]')
+                        ?.classList.toggle('hidden', !hasReadyStock);
+                    card.querySelector('[data-product-stock-icon-unavailable]')
+                        ?.classList.toggle('hidden', hasReadyStock);
+
+                    const stockLabel = card.querySelector('[data-product-stock-label]');
+
+                    if (stockLabel) {
+                        stockLabel.textContent = isUpdating
+                            ? 'Update alerts in Discord'
+                            : (stock > 0 ? `${stock} ready` : 'Manual order');
+                    }
+                });
+
+                const totalAvailableStock = Number(snapshot.total_available_stock);
+
+                if (totalStock && Number.isSafeInteger(totalAvailableStock) && totalAvailableStock >= 0) {
+                    totalStock.textContent = String(totalAvailableStock);
+                }
+            }
+
+            async function refreshProductStocks() {
+                if (stockPollingDisposed || document.hidden || stockRequestController) return;
+
+                const controller = new AbortController();
+                stockRequestController = controller;
+
+                try {
+                    const response = await fetch(productStockEndpoint, {
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        signal: controller.signal,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Stock refresh failed with status ${response.status}`);
+                    }
+
+                    const snapshot = await response.json();
+
+                    if (!controller.signal.aborted && !stockPollingDisposed) {
+                        applyProductStockSnapshot(snapshot);
+                    }
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        // Stock polling is best-effort; checkout still validates availability on the server.
+                    }
+                } finally {
+                    if (stockRequestController === controller) {
+                        stockRequestController = null;
+                    }
+                }
+            }
+
+            function clearStockPollingTimer() {
+                if (stockPollingTimer) {
+                    clearTimeout(stockPollingTimer);
+                    stockPollingTimer = null;
+                }
+            }
+
+            function pauseStockPolling() {
+                clearStockPollingTimer();
+
+                const controller = stockRequestController;
+                controller?.abort();
+
+                if (stockRequestController === controller) {
+                    stockRequestController = null;
+                }
+            }
+
+            function scheduleStockPolling(delay = stockPollingInterval) {
+                clearStockPollingTimer();
+
+                if (stockPollingDisposed || document.hidden) return;
+
+                stockPollingTimer = setTimeout(async () => {
+                    stockPollingTimer = null;
+                    await refreshProductStocks();
+                    scheduleStockPolling();
+                }, delay);
+            }
+
+            async function resumeStockPolling() {
+                if (stockPollingDisposed || document.hidden) return;
+
+                clearStockPollingTimer();
+                await refreshProductStocks();
+                scheduleStockPolling();
+            }
+
+            function disposeHomePage() {
+                stockPollingDisposed = true;
+                clearTimeout(searchTimeout);
+                productRequestSequence++;
+                productRequestController?.abort();
+                productRequestController = null;
+                pauseStockPolling();
+            }
+
+            scheduleStockPolling();
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    pauseStockPolling();
+                } else {
+                    resumeStockPolling();
+                }
+            });
+
+            window.addEventListener('pagehide', pauseStockPolling);
+
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) {
+                    resumeStockPolling();
+                }
+            });
+
+            window.addEventListener('aksa:before-page-swap', disposeHomePage, {
+                once: true,
+            });
 
             function emptyProductsHtml(message = 'No products match this filter yet.') {
                 return `

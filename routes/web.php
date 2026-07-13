@@ -16,6 +16,7 @@ use App\Http\Controllers\VoucherController;
 use App\Models\Category;
 use App\Models\DownloadItem;
 use App\Models\License;
+use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -100,10 +101,14 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
     }
 
     $products = app(ProductSalesSignals::class)->apply($query->get());
+    $totalStock = LicenseStock::query()
+        ->available()
+        ->whereHas('product', fn ($query) => $query->visible())
+        ->count();
     $recentPurchases = app(RecentPurchaseFeed::class)->storefront();
     $promoVoucher = $activePromoVoucher();
 
-    return view('home', compact('categories', 'products', 'recentPurchases', 'promoVoucher'));
+    return view('home', compact('categories', 'products', 'totalStock', 'recentPurchases', 'promoVoucher'));
 });
 
 $productsFragment = function (Request $request) {

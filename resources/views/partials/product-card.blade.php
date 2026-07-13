@@ -18,13 +18,16 @@
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
         $isUpdating = $product->status === \App\Models\Product::STATUS_UPDATING;
-        $availabilityIcon = $isUpdating ? 'discord' : ($stock > 0 ? 'key-round' : 'discord');
+        $hasReadyStock = ! $isUpdating && $stock > 0;
         $availabilityLabel = $isUpdating ? 'Update alerts in Discord' : ($stock > 0 ? $stock . ' ready' : 'Manual order');
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
     @endphp
 
-    <a href="{{ route('products.show', $product) }}" class="product-card product-card-storefront fade-up flex min-h-60 flex-col gap-4 p-5">
+    <a href="{{ route('products.show', $product) }}"
+        class="product-card product-card-storefront fade-up flex min-h-60 flex-col gap-4 p-5"
+        data-product-stock-card data-product-id="{{ $product->id }}" data-product-status="{{ $product->status }}"
+        data-product-stock="{{ $stock }}">
 
         <div class="flex items-start justify-between gap-3">
             <span class="product-category-pill">
@@ -32,7 +35,8 @@
                 <span>{{ $categoryName }}</span>
             </span>
 
-            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">{{ $product->status_label }}</span>
+            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}"
+                data-product-status-badge>{{ $product->status_label }}</span>
         </div>
 
         <div>
@@ -57,9 +61,12 @@
                 <x-ui.icon name="calendar" class="h-4 w-4" />
                 <span>From {{ $durationLabel }}</span>
             </span>
-            <span class="product-card-fact">
-                <x-ui.icon :name="$availabilityIcon" class="h-4 w-4" />
-                <span>{{ $availabilityLabel }}</span>
+            <span class="product-card-fact" data-product-availability>
+                <x-ui.icon name="key-round" class="h-4 w-4 {{ $hasReadyStock ? '' : 'hidden' }}"
+                    data-product-stock-icon-ready />
+                <x-ui.icon name="discord" class="h-4 w-4 {{ $hasReadyStock ? 'hidden' : '' }}"
+                    data-product-stock-icon-unavailable />
+                <span data-product-stock-label>{{ $availabilityLabel }}</span>
             </span>
         </div>
 
