@@ -30,6 +30,12 @@ class VoucherController extends Controller
         abort_unless($package->product?->is_visible, 404);
         $quantity = (int) ($validated['quantity'] ?? 1);
 
+        if (! $package->product->isReadyForAutomaticCheckout()) {
+            return response()->json([
+                'message' => 'This product is not ready for automatic checkout.',
+            ], 422);
+        }
+
         if ($quantity > $package->availableLicenseStocks()->count()) {
             return response()->json(['message' => 'The selected quantity is no longer available.'], 422);
         }

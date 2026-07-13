@@ -83,6 +83,7 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
         ->visible()
         ->withCount('availableLicenseStocks')
         ->withExists(['availableLicenseStocks as has_available_stock'])
+        ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Product::STATUS_READY])
         ->orderByDesc('has_available_stock')
         ->orderBy('name');
 
@@ -103,7 +104,7 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
     $products = app(ProductSalesSignals::class)->apply($query->get());
     $totalStock = LicenseStock::query()
         ->available()
-        ->whereHas('product', fn ($query) => $query->visible())
+        ->whereHas('product', fn ($query) => $query->visible()->ready())
         ->count();
     $recentPurchases = app(RecentPurchaseFeed::class)->storefront();
     $promoVoucher = $activePromoVoucher();
@@ -119,6 +120,7 @@ $productsFragment = function (Request $request) {
         ->visible()
         ->withCount('availableLicenseStocks')
         ->withExists(['availableLicenseStocks as has_available_stock'])
+        ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Product::STATUS_READY])
         ->orderByDesc('has_available_stock')
         ->orderBy('name');
 

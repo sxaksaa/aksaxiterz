@@ -33,7 +33,7 @@ class ProductStockFeedTest extends TestCase
         $existingVisibleProducts = Product::visible()->count();
         $existingVisibleStock = LicenseStock::query()
             ->available()
-            ->whereHas('product', fn ($query) => $query->visible())
+            ->whereHas('product', fn ($query) => $query->visible()->ready())
             ->count();
         $user = User::factory()->create();
         $category = Category::create(['name' => 'PC', 'slug' => 'stock-feed-pc']);
@@ -119,11 +119,19 @@ class ProductStockFeedTest extends TestCase
     {
         $existingVisibleStock = LicenseStock::query()
             ->available()
-            ->whereHas('product', fn ($query) => $query->visible())
+            ->whereHas('product', fn ($query) => $query->visible()->ready())
             ->count();
         $category = Category::create(['name' => 'Android', 'slug' => 'stock-feed-android']);
         [$product, $package] = $this->productWithPackage($category, 'Restock Product', 'restock-product');
         $stock = $this->stock($product, $package, 'RESTOCK-SENSITIVE-KEY');
+        [$updatingProduct, $updatingPackage] = $this->productWithPackage(
+            $category,
+            'Updating Stock Product',
+            'updating-stock-product'
+        );
+        $updatingProduct->update(['status' => Product::STATUS_UPDATING]);
+        $this->stock($updatingProduct, $updatingPackage, 'UPDATING-SENSITIVE-KEY-1');
+        $this->stock($updatingProduct, $updatingPackage, 'UPDATING-SENSITIVE-KEY-2');
 
         $this->getJson(route('products.stocks'))
             ->assertOk()
@@ -132,7 +140,16 @@ class ProductStockFeedTest extends TestCase
                 'id' => $product->id,
                 'available_stock' => 1,
             ])
+            ->assertJsonFragment([
+                'id' => $updatingProduct->id,
+                'status' => Product::STATUS_UPDATING,
+                'available_stock' => 2,
+            ])
             ->assertDontSee('RESTOCK-SENSITIVE-KEY');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('<strong data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>', false);
 
         $stock->update(['is_sold' => true]);
 
@@ -146,10 +163,38 @@ class ProductStockFeedTest extends TestCase
 
         $this->get('/')
             ->assertOk()
+            ->assertSee('<strong data-total-ready-stock>'.$existingVisibleStock.'</strong>', false)
             ->assertSee('data-total-ready-stock', false)
             ->assertSee('data-product-stock-card', false)
             ->assertSee('data-product-stock-label', false)
             ->assertSee('productStockEndpoint', false);
+    }
+
+    public function test_home_and_fragment_list_ready_products_before_updating_products(): void
+    {
+        $category = Category::create(['name' => 'Ordering', 'slug' => 'stock-feed-ordering']);
+        [$readyProduct] = $this->productWithPackage(
+            $category,
+            'Zulu Ready Without Stock',
+            'zulu-ready-without-stock'
+        );
+        [$updatingProduct, $updatingPackage] = $this->productWithPackage(
+            $category,
+            'Aardvark Updating With Stock',
+            'aardvark-updating-with-stock'
+        );
+        $updatingProduct->update(['status' => Product::STATUS_UPDATING]);
+        $this->stock($updatingProduct, $updatingPackage, 'UPDATING-ORDER-SENSITIVE-KEY');
+
+        foreach (['/', route('products.fragment')] as $url) {
+            $this->get($url)
+                ->assertOk()
+                ->assertSeeInOrder([
+                    'data-product-id="'.$readyProduct->id.'"',
+                    'data-product-id="'.$updatingProduct->id.'"',
+                ], false)
+                ->assertDontSee('UPDATING-ORDER-SENSITIVE-KEY');
+        }
     }
 
     private function productWithPackage(

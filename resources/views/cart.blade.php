@@ -30,6 +30,12 @@
             </div>
         @endif
 
+        @if ($hasUnavailableItems)
+            <div data-cart-checkout-paused class="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+                One or more products are updating or unavailable. Remove the paused items before checkout.
+            </div>
+        @endif
+
         @if ($cartItems->isEmpty())
             <section class="empty-state fade-up">
                 <span class="empty-state-icon">
@@ -50,15 +56,17 @@
                             $otherCartQuantity = $cartItems->sum('quantity') - $item->quantity;
                             $remainingCartCapacity = max(1, \App\Services\CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity);
                             $maxItemQuantity = min($item->available_stock, $remainingCartCapacity);
+                            $itemCheckoutAvailable = (bool) $item->is_checkout_available;
                         @endphp
-                        <article class="panel-card motion-card p-5" data-cart-item="{{ $item->id }}">
+                        <article class="panel-card motion-card p-5 {{ $itemCheckoutAvailable ? '' : 'border-amber-400/30' }}"
+                            data-cart-item="{{ $item->id }}" data-cart-item-checkout-ready="{{ $itemCheckoutAvailable ? 'true' : 'false' }}">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
                                     <p class="text-xs uppercase tracking-normal text-aksa-accent">{{ $item->product->category?->name ?? 'Product' }}</p>
                                     <h2 class="mt-1 truncate text-lg font-semibold text-white">{{ $item->product->name }}</h2>
                                     <p class="mt-1 text-sm text-gray-400">{{ $item->package->name }}</p>
-                                    <p class="mt-2 text-xs {{ $item->available_stock >= $item->quantity ? 'text-aksa-accent' : 'text-red-300' }}">
-                                        {{ $item->available_stock }} keys currently available
+                                    <p class="mt-2 text-xs {{ ! $itemCheckoutAvailable ? 'text-amber-200' : ($item->available_stock >= $item->quantity ? 'text-aksa-accent' : 'text-red-300') }}">
+                                        {{ $itemCheckoutAvailable ? $item->available_stock . ' keys currently available' : 'This product is not available for checkout' }}
                                     </p>
                                 </div>
 
@@ -79,11 +87,11 @@
                                         @method('PATCH')
                                         <button type="submit" name="quantity" value="{{ $item->quantity - 1 }}"
                                             class="quantity-stepper-button" aria-label="Decrease {{ $item->product->name }} quantity"
-                                            @disabled($item->quantity <= 1)>−</button>
+                                            @disabled(! $itemCheckoutAvailable || $item->quantity <= 1)>−</button>
                                         <output class="quantity-stepper-value" aria-live="polite">{{ $item->quantity }}</output>
                                         <button type="submit" name="quantity" value="{{ $item->quantity + 1 }}"
                                             class="quantity-stepper-button" aria-label="Increase {{ $item->product->name }} quantity"
-                                            @disabled($item->quantity >= $maxItemQuantity)>+</button>
+                                            @disabled(! $itemCheckoutAvailable || $item->quantity >= $maxItemQuantity)>+</button>
                                     </form>
 
                                     <form method="POST" action="{{ route('cart.items.destroy', $item) }}">
@@ -112,15 +120,16 @@
                                 <span>Secure checkout</span>
                             </span>
                             <span class="support-pill">
-                                <x-ui.icon name="key-round" class="h-4 w-4" />
-                                <span>Instant delivery</span>
+                                <x-ui.icon name="{{ $hasUnavailableItems ? 'refresh-cw' : 'key-round' }}" class="h-4 w-4" />
+                                <span>{{ $hasUnavailableItems ? 'Checkout paused' : 'Instant delivery' }}</span>
                             </span>
                         </div>
                     </div>
 
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Payment Method</p>
                     <div class="grid gap-2">
-                        <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="pakasir">
+                        <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
+                            data-cart-payment="pakasir" @disabled($hasUnavailableItems)>
                             <span class="payment-card-heading">
                                 <span class="payment-card-icon">
                                     <x-ui.icon name="qr-code" class="h-5 w-5" />
@@ -130,7 +139,8 @@
                             <span class="mt-1 block text-xs text-gray-400">Pay the bundle total in IDR</span>
                         </button>
                         @if ($binancePayAvailable)
-                            <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="binance_pay">
+                            <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
+                                data-cart-payment="binance_pay" @disabled($hasUnavailableItems)>
                                 <span class="payment-card-heading">
                                     <span class="payment-card-icon">
                                         <x-ui.icon name="binance" class="h-5 w-5 text-[#F0B90B]" />
@@ -140,7 +150,8 @@
                                 <span class="mt-1 block text-xs text-gray-400">Choose USDT or USDC</span>
                             </button>
                         @endif
-                        <button type="button" class="checkout-card payment-card p-4 text-left" data-cart-payment="crypto">
+                        <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
+                            data-cart-payment="crypto" @disabled($hasUnavailableItems)>
                             <span class="payment-card-heading">
                                 <span class="payment-card-icon">
                                     <x-ui.icon name="wallet" class="h-5 w-5" />
@@ -216,8 +227,8 @@
                         </label>
                         <div class="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
                             <input id="cartVoucherCode" class="search-bar min-w-0 uppercase" maxlength="50"
-                                placeholder="Enter voucher code" autocomplete="off">
-                            <button id="cartApplyVoucher" type="button" class="btn-footer h-12">
+                                placeholder="Enter voucher code" autocomplete="off" @disabled($hasUnavailableItems)>
+                            <button id="cartApplyVoucher" type="button" class="btn-footer h-12" @disabled($hasUnavailableItems)>
                                 <x-ui.icon name="ticket-percent" class="h-4 w-4" />
                                 <span>Apply</span>
                             </button>
@@ -238,9 +249,11 @@
                         <span id="cartTotal" class="font-semibold text-aksa-accent">Select payment</span>
                     </div>
 
-                    <button id="cartCheckoutButton" type="button" class="btn-main mt-5 w-full">
+                    <button id="cartCheckoutButton" type="button"
+                        class="btn-main mt-5 w-full {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
+                        @disabled($hasUnavailableItems)>
                         <x-ui.icon name="credit-card" class="h-4 w-4" />
-                        <span data-button-label>Choose Payment Method</span>
+                        <span data-button-label>{{ $hasUnavailableItems ? 'Checkout Paused' : 'Choose Payment Method' }}</span>
                     </button>
                     <p class="mt-3 text-xs leading-5 text-gray-500">
                         All cart items must still be available when checkout starts. One failed item cancels the whole invoice.
@@ -270,6 +283,7 @@
                 let binanceToken = null;
                 let voucherQuote = null;
                 let voucherCode = null;
+                const cartCheckoutAvailable = @json(! $hasUnavailableItems);
 
                 const formatIdr = value => `Rp ${Number(value).toLocaleString('id-ID')}`;
                 const formatUsd = value => `$${Number(value).toLocaleString(undefined, {
@@ -316,6 +330,13 @@
                     document.getElementById('cartDiscountRow').classList.toggle('hidden', !voucherQuote);
 
                     const button = document.getElementById('cartCheckoutButton');
+
+                    if (!cartCheckoutAvailable) {
+                        button.disabled = true;
+                        setButtonLabel(button, 'Checkout Paused');
+                        return;
+                    }
+
                     setButtonLabel(button, paymentMethod ? 'Pay Bundle' : 'Choose Payment Method');
                 }
 

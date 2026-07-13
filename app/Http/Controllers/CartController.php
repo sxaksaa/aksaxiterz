@@ -20,9 +20,13 @@ class CartController extends Controller
     {
         $items = $this->cartService->items($request->user());
         $this->attachAvailability($items);
+        $hasUnavailableItems = $items->contains(
+            fn ($item): bool => ! (bool) $item->is_checkout_available
+        );
 
         return view('cart', [
             'cartItems' => $items,
+            'hasUnavailableItems' => $hasUnavailableItems,
             'subtotalIdr' => (int) $items->sum(fn ($item) => $item->package->price * $item->quantity),
             'subtotalUsdt' => round((float) $items->sum(fn ($item) => $item->package->price_usdt * $item->quantity), 6),
             'binancePayAvailable' => app()->environment('local') || (
@@ -170,6 +174,10 @@ class CartController extends Controller
     {
         foreach ($items as $item) {
             $item->setAttribute('available_stock', $item->package->availableLicenseStocks()->count());
+            $item->setAttribute(
+                'is_checkout_available',
+                (bool) $item->product?->isReadyForAutomaticCheckout()
+            );
         }
     }
 

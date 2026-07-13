@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
+use App\Models\Product;
 use App\Services\BinancePayOrderVerifier;
 use App\Services\CartService;
 use App\Services\CheckoutLockService;
@@ -63,6 +64,18 @@ class PaymentController extends Controller
             $binancePayToken = $this->retryBinancePayToken($oldOrder);
             $retryItems = $oldOrder->items()->with(['product', 'package'])->get();
             $hasStoredItems = $retryItems->isNotEmpty();
+            $retryProducts = $hasStoredItems
+                ? $retryItems->pluck('product')
+                : collect([$oldOrder->product()->first()]);
+
+            if ($retryProducts->contains(
+                fn ($product): bool => ! ($product instanceof Product) || ! $product->isReadyForAutomaticCheckout()
+            )) {
+                return $this->paymentErrorResponse(
+                    $request,
+                    'This product is not ready for automatic checkout.'
+                );
+            }
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {
                 return $this->paymentErrorResponse(

@@ -202,6 +202,22 @@ class VoucherFeatureTest extends TestCase
             ->assertJsonPath('message', 'The selected quantity is no longer available.');
     }
 
+    public function test_preview_rejects_an_updating_product_even_when_stock_exists(): void
+    {
+        [$user, $product, $package] = $this->makeCatalog(100000, 6, true);
+        $product->update(['status' => Product::STATUS_UPDATING]);
+        $this->makeVoucher();
+
+        $this->actingAs($user)->postJson(route('vouchers.preview'), [
+            'code' => 'AKSA10',
+            'package_id' => $package->id,
+            'payment_method' => 'pakasir',
+            'quantity' => 1,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'This product is not ready for automatic checkout.');
+    }
+
     public function test_cancelled_order_releases_voucher_for_the_same_account(): void
     {
         [$user, $product, $package] = $this->makeCatalog(100000, 6);

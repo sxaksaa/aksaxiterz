@@ -67,6 +67,36 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertDontSee('>Update<', false);
     }
 
+    public function test_cart_page_disables_checkout_when_an_item_changes_to_updating(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Paused Product', 20000, 1.25, 1);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'quantity' => 1,
+        ]);
+        $product->update(['status' => Product::STATUS_UPDATING]);
+
+        $response = $this->actingAs($user)
+            ->get(route('cart.index'))
+            ->assertOk()
+            ->assertSee('data-cart-checkout-paused', false)
+            ->assertSee('data-cart-item-checkout-ready="false"', false)
+            ->assertSee('This product is not available for checkout')
+            ->assertSee('Remove the paused items before checkout.')
+            ->assertSee('Checkout Paused');
+
+        $this->assertMatchesRegularExpression(
+            '/id="cartCheckoutButton"[^>]*disabled/s',
+            $response->getContent()
+        );
+        $this->assertMatchesRegularExpression(
+            '/data-cart-payment="pakasir"[^>]*disabled/s',
+            $response->getContent()
+        );
+    }
+
     public function test_cart_checkout_creates_one_discounted_invoice_and_delivers_every_item(): void
     {
         config([

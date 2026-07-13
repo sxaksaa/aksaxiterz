@@ -25,7 +25,9 @@ class ProductStockController extends Controller
 
         return response()->json([
             'products' => $products,
-            'total_available_stock' => $products->sum('available_stock'),
+            'total_available_stock' => $products
+                ->where('status', Product::STATUS_READY)
+                ->sum('available_stock'),
         ])->withHeaders([
             'Cache-Control' => 'no-store, private, max-age=0',
             'Pragma' => 'no-cache',

@@ -4,7 +4,10 @@
     @php
         $stock = $product->available_license_stocks_count ?? 0;
         $discordUrl = config('links.discord_url');
-        $hasAutoDelivery = $stock > 0;
+        $isProductReady = $product->status === \App\Models\Product::STATUS_READY;
+        $hasAutoDelivery = $isProductReady && $stock > 0;
+        $checkoutAvailable = $hasAutoDelivery;
+        $unavailablePayLabel = $isProductReady ? 'Join Discord to Order' : 'Checkout Paused';
         $binancePayConfigured = (bool) config('services.binance.pay.enabled') &&
             filled(config('services.binance.pay.pay_id')) &&
             filled(config('services.binance.pay.api_key')) &&
@@ -31,7 +34,7 @@
         $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
             ? 'product-status-badge-updating'
             : 'product-status-badge-ready';
-        $needsUpdateAlerts = $product->status === \App\Models\Product::STATUS_UPDATING;
+        $needsUpdateAlerts = ! $isProductReady;
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
         $startDurationDays = $minPackage?->durationDays();
@@ -62,7 +65,8 @@
             ->first();
     @endphp
 
-    <div id="content" class="page-shell py-6 md:py-10">
+    <div id="content" class="page-shell py-6 md:py-10"
+        data-product-checkout-ready="{{ $isProductReady ? 'true' : 'false' }}">
 
         <div class="product-hero mb-6 fade-up">
             <div class="grid gap-5 md:grid-cols-[1fr_340px] md:items-stretch">
@@ -105,7 +109,7 @@
                         <div class="flex items-end justify-between gap-4">
                             <div>
                                 <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-aksa-accent' : 'text-amber-300' }}">
-                                    {{ $hasAutoDelivery ? $stock : 'Manual' }}
+                                    {{ $needsUpdateAlerts ? 'Updating' : ($hasAutoDelivery ? $stock : 'Manual') }}
                                 </div>
                                 <div class="text-sm text-gray-400">
                                     {{ $needsUpdateAlerts ? 'update alerts on Discord' : ($hasAutoDelivery ? 'license ready' : 'order via Discord') }}
@@ -167,10 +171,17 @@
                 <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
             </div>
 
+        @if (! $isProductReady)
+            <div data-checkout-paused class="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+                Checkout is temporarily paused while this product is updating. Join Discord for availability alerts.
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
 
             <div id="btnPakasir" data-payment-method="pakasir"
-                class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+                aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
+                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                 <div class="payment-card-heading">
                     <span class="payment-card-icon">
@@ -184,7 +195,8 @@
 
             @if ($binancePayAvailable)
                 <div id="btnBinancePay" data-payment-method="binance_pay"
-                    class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+                    aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
+                    class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                     <div class="payment-card-heading">
                         <span class="payment-card-icon">
@@ -198,7 +210,8 @@
             @endif
 
             <div id="btnCrypto" data-payment-method="crypto"
-                class="checkout-card p-5 cursor-pointer payment-card flex flex-col gap-1">
+                aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
+                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                 <div class="payment-card-heading">
                     <span class="payment-card-icon">
@@ -329,6 +342,7 @@
             @foreach ($product->packages as $p)
                 @php
                     $packageStock = $p->available_license_stocks_count ?? 0;
+                    $packageCheckoutAvailable = $isProductReady && $packageStock > 0;
                     $packageName = str_replace(['1 Hari', '7 Hari', '30 Hari', 'Hari'], ['1 Day', '7 Days', '30 Days', 'Days'], $p->name);
                     $saving = $packageSavings[$p->id] ?? null;
                     $badge = $bestValuePackageId === $p->id ? 'Best Value' : null;
@@ -336,8 +350,10 @@
 
                 <div data-package-card data-price="{{ (float) $p->price }}" data-package-id="{{ $p->id }}"
                     data-package-name="{{ $p->name }}" data-price-usdt="{{ (float) $p->price_usdt }}"
-                    data-stock="{{ $packageStock }}"
-                    class="package-card p-4 relative package transition {{ $packageStock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
+                    data-stock="{{ $packageCheckoutAvailable ? $packageStock : 0 }}"
+                    data-package-checkout-enabled="{{ $packageCheckoutAvailable ? 'true' : 'false' }}"
+                    aria-disabled="{{ $packageCheckoutAvailable ? 'false' : 'true' }}"
+                    class="package-card p-4 relative package transition {{ $packageCheckoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
 
                     @if ($badge)
                         <div class="badge">{{ $badge }}</div>
@@ -387,17 +403,18 @@
                         </div>
                     @endif
 
-                    <p class="package-availability {{ $packageStock > 0 ? 'package-availability-ready' : 'package-availability-manual' }}">
+                    <p class="package-availability {{ $packageCheckoutAvailable ? 'package-availability-ready' : 'package-availability-manual' }}">
                         <span class="package-availability-dot" aria-hidden="true"></span>
-                        {{ $packageStock > 0 ? $packageStock . ' licenses ready' : 'Manual order via Discord' }}
+                        {{ ! $isProductReady ? 'Checkout paused during update' : ($packageStock > 0 ? $packageStock . ' licenses ready' : 'Manual order via Discord') }}
                     </p>
 
-                    @if ($packageStock <= 0)
+                    @if (! $packageCheckoutAvailable)
                         <button type="button"
                             data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
+                            data-request-mode="{{ $isProductReady ? 'manual-order' : 'update-alert' }}"
                             class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-aksa-accent-35 bg-aksa-accent-10 px-3 py-2 text-xs font-semibold text-aksa-accent-soft transition hover:border-aksa-accent hover:bg-aksa-accent-20 hover:text-white">
                             <x-ui.icon name="discord" class="h-4 w-4" />
-                            <span>Join Discord to Order</span>
+                            <span>{{ $isProductReady ? 'Join Discord to Order' : 'Get Update Alerts' }}</span>
                         </button>
                     @endif
 
@@ -477,18 +494,18 @@
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
                 <button id="addToCartBtn" type="button"
-                    class="btn-footer-secondary min-h-12 w-full {{ $stock <= 0 ? 'cursor-not-allowed opacity-60' : '' }}"
-                    {{ $stock <= 0 ? 'disabled' : '' }}>
+                    class="btn-footer-secondary min-h-12 w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
+                    {{ ! $checkoutAvailable ? 'disabled' : '' }}>
                     <x-ui.icon name="shopping-cart" class="h-4 w-4" />
-                    <span data-button-label>{{ $stock <= 0 ? 'Unavailable' : 'Add to Cart' }}</span>
+                    <span data-button-label>{{ ! $checkoutAvailable ? 'Unavailable' : 'Add to Cart' }}</span>
                 </button>
                 <button id="payMainBtn"
                     class="btn-main w-full
-        {{ $stock <= 0 ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
-                    {{ $stock <= 0 ? 'disabled' : '' }}>
+        {{ ! $checkoutAvailable ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
+                    {{ ! $checkoutAvailable ? 'disabled' : '' }}>
 
-                    <x-ui.icon name="{{ $stock <= 0 ? 'discord' : (auth()->check() ? 'credit-card' : 'log-in') }}" class="h-4 w-4" />
-                    <span data-button-label>{{ $stock <= 0 ? 'Join Discord to Order' : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}</span>
+                    <x-ui.icon name="{{ ! $checkoutAvailable ? 'discord' : (auth()->check() ? 'credit-card' : 'log-in') }}" class="h-4 w-4" />
+                    <span data-button-label>{{ ! $checkoutAvailable ? $unavailablePayLabel : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}</span>
 
                 </button>
             </div>
@@ -543,7 +560,9 @@
         let voucherRequestSequence = 0;
         let networkDropdownOpen = false;
         const productDetailPageController = new AbortController();
-        const hasStock = @json($stock > 0);
+        const productReadyForCheckout = @json($isProductReady);
+        const hasStock = @json($checkoutAvailable);
+        const unavailablePayLabel = @json($unavailablePayLabel);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
@@ -626,8 +645,11 @@
             showToast('Login required', 'Please login with Google before checkout.', loginUrl, 'warning');
         }
 
-        async function requestManualOrder(productName, packageName) {
-            const message = `I want to buy ${productName} - ${packageName}. Is manual order available?`;
+        async function requestManualOrder(productName, packageName, mode = 'manual-order') {
+            const isUpdateAlert = mode === 'update-alert';
+            const message = isUpdateAlert
+                ? `Please notify me when ${productName} - ${packageName} is ready again.`
+                : `I want to buy ${productName} - ${packageName}. Is manual order available?`;
             const copyRequest = navigator.clipboard
                 ? navigator.clipboard.writeText(message)
                 : Promise.reject(new Error('Clipboard unavailable'));
@@ -638,9 +660,21 @@
 
             try {
                 await copyRequest;
-                showToast('Message copied', 'Paste it in Discord to request a manual order.', null, 'success');
+                showToast(
+                    'Message copied',
+                    isUpdateAlert
+                        ? 'Paste it in Discord to request an availability alert.'
+                        : 'Paste it in Discord to request a manual order.',
+                    null,
+                    'success'
+                );
             } catch (error) {
-                showToast('Manual order request', 'Join Discord and send the product plus package name.', null, 'warning');
+                showToast(
+                    isUpdateAlert ? 'Update alert request' : 'Manual order request',
+                    'Join Discord and send the product plus package name.',
+                    null,
+                    'warning'
+                );
             }
         }
 
@@ -648,6 +682,11 @@
            PAYMENT
         ========================= */
         function selectPayment(type) {
+
+            if (!productReadyForCheckout) {
+                showToast('Checkout paused', 'This product is still updating. Join Discord for availability alerts.', null, 'warning');
+                return;
+            }
 
             selectedPayment = type;
 
@@ -707,6 +746,11 @@
            PACKAGE
         ========================= */
         function selectPackage(card) {
+            if (!productReadyForCheckout) {
+                showToast('Checkout paused', 'This product is still updating. Join Discord for availability alerts.', null, 'warning');
+                return;
+            }
+
             const price = Number(card.dataset.price || 0);
             const id = Number(card.dataset.packageId || 0);
             const name = card.dataset.packageName || '';
@@ -1244,7 +1288,11 @@
         document.querySelectorAll('[data-manual-order]').forEach((button) => {
             button.addEventListener('click', (event) => {
                 event.stopPropagation();
-                requestManualOrder(button.dataset.productName || '', button.dataset.packageName || '');
+                requestManualOrder(
+                    button.dataset.productName || '',
+                    button.dataset.packageName || '',
+                    button.dataset.requestMode || 'manual-order'
+                );
             });
         });
 
@@ -1479,7 +1527,7 @@
             if (btn) {
                 if (!hasStock) {
                     btn.disabled = true
-                    setButtonLabel(btn, 'Join Discord to Order')
+                    setButtonLabel(btn, unavailablePayLabel)
                     return
                 }
 

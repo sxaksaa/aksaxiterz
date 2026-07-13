@@ -30,6 +30,16 @@ class Product extends Model
         return $query->where('is_visible', true);
     }
 
+    public function scopeReady(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_READY);
+    }
+
+    public function isReadyForAutomaticCheckout(): bool
+    {
+        return $this->is_visible && $this->status === self::STATUS_READY;
+    }
+
     public static function statusOptions(): array
     {
         return [
