@@ -48,6 +48,7 @@ class RecentPurchaseFeed
                 $packageName = $item->package_name ?: $item->package?->name ?: $order->package?->name ?: 'License';
 
                 return [
+                    'key' => $this->purchaseKey($order, $item),
                     'buyer' => $this->maskedBuyer($order->user?->name ?: $order->user?->email),
                     'product' => $productName,
                     'package' => $this->normalizedPackageName($packageName),
@@ -56,6 +57,18 @@ class RecentPurchaseFeed
                     'paid_at' => $paidAt?->toIso8601String(),
                 ];
             });
+    }
+
+    private function purchaseKey(Order $order, OrderItem $item): string
+    {
+        $itemIdentity = $item->getKey()
+            ?: 'legacy:'.$item->product_id.':'.$item->package_id;
+
+        return hash_hmac(
+            'sha256',
+            'recent-purchase:'.$order->getKey().':'.$itemIdentity,
+            (string) config('app.key')
+        );
     }
 
     private function maskedBuyer(?string $value): string

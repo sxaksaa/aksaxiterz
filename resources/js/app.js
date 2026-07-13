@@ -946,6 +946,9 @@ const RECENT_PURCHASE_SNOOZE_KEY = 'aksa_recent_purchase_snoozed_until';
 const RECENT_PURCHASE_VISIBLE_MS = 8200;
 const RECENT_PURCHASE_GAP_MS = 14500;
 const RECENT_PURCHASE_INITIAL_DELAY_MS = 1800;
+const RECENT_PURCHASE_NEW_DELAY_MS = 350;
+const RECENT_PURCHASE_POLL_MS = 20000;
+const RECENT_PURCHASE_MAX_KNOWN_KEYS = 100;
 
 function clearRecentPurchaseToast() {
     recentPurchaseToastCleanup?.();
@@ -979,11 +982,88 @@ function parseRecentPurchaseData(toast) {
         const purchases = JSON.parse(raw);
 
         return Array.isArray(purchases)
-            ? purchases.filter((purchase) => purchase && purchase.product)
+            ? normalizeRecentPurchases(purchases)
             : [];
     } catch (error) {
         return [];
     }
+}
+
+function recentPurchaseKey(purchase) {
+    const key = String(purchase?.key || '').trim();
+
+    if (key) return key;
+
+    return [
+        purchase?.paid_at || '',
+        purchase?.buyer || '',
+        purchase?.product || '',
+        purchase?.package || '',
+        Number(purchase?.quantity || 1),
+    ].join('|');
+}
+
+function normalizeRecentPurchases(purchases) {
+    if (!Array.isArray(purchases)) return [];
+
+    const uniquePurchases = new Map();
+
+    purchases.forEach((purchase) => {
+        if (!purchase || !purchase.product) return;
+
+        const key = recentPurchaseKey(purchase);
+
+        if (!key || uniquePurchases.has(key)) return;
+
+        uniquePurchases.set(key, {
+            ...purchase,
+            key,
+        });
+    });
+
+    return Array.from(uniquePurchases.values());
+}
+
+function recentPurchaseFeedUrl(toast) {
+    const endpoint = toast?.dataset.recentPurchaseEndpoint?.trim();
+
+    if (!endpoint) return null;
+
+    const url = new URL(endpoint, window.location.origin);
+    const productSlug = toast.dataset.recentPurchaseProductSlug?.trim();
+
+    if (productSlug) {
+        url.searchParams.set('product', productSlug);
+    }
+
+    return url;
+}
+
+function recentPurchaseRelativeTime(paidAt, fallback = 'recently') {
+    const timestamp = Date.parse(paidAt || '');
+
+    if (!Number.isFinite(timestamp)) return fallback || 'recently';
+
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+
+    if (seconds < 60) return 'just now';
+
+    const minutes = Math.floor(seconds / 60);
+
+    if (minutes < 60) return `${minutes}m ago`;
+
+    const hours = Math.floor(minutes / 60);
+
+    if (hours < 24) return `${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+
+    if (days < 14) return `${days}d ago`;
+
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+    }).format(new Date(timestamp));
 }
 
 function setRecentPurchaseContent(toast, purchase) {
@@ -999,25 +1079,9 @@ function setRecentPurchaseContent(toast, purchase) {
     if (buyer) buyer.textContent = purchase.buyer || 'Customer';
     if (product) product.textContent = purchase.product || 'Product';
     if (packageName) packageName.textContent = packageLabel;
-    if (time) time.textContent = purchase.ago || 'recently';
-}
-
-function showRecentPurchaseToast(toast) {
-    toast.style.setProperty('--recent-purchase-duration', `${RECENT_PURCHASE_VISIBLE_MS}ms`);
-    toast.hidden = false;
-    toast.classList.remove('is-visible');
-    void toast.offsetWidth;
-    window.requestAnimationFrame(() => toast.classList.add('is-visible'));
-}
-
-function hideRecentPurchaseToast(toast) {
-    toast.classList.remove('is-visible');
-
-    window.setTimeout(() => {
-        if (!toast.classList.contains('is-visible')) {
-            toast.hidden = true;
-        }
-    }, 300);
+    if (time) {
+        time.textContent = recentPurchaseRelativeTime(purchase.paid_at, purchase.ago);
+    }
 }
 
 function initializeRecentPurchaseToast(root = document) {
@@ -1026,61 +1090,319 @@ function initializeRecentPurchaseToast(root = document) {
     const toast = root.querySelector?.('[data-recent-purchase-toast]')
         || document.querySelector('[data-recent-purchase-toast]');
 
-    if (!toast || recentPurchaseSnoozed()) return;
+    if (!toast) return;
 
-    const purchases = parseRecentPurchaseData(toast);
+    toast.hidden = true;
+    toast.classList.remove('is-visible');
 
-    if (purchases.length === 0) return;
+    if (recentPurchaseSnoozed()) return;
 
-    const timers = new Set();
+    const endpoint = recentPurchaseFeedUrl(toast);
     const closeButton = toast.querySelector('[data-recent-purchase-close]');
+    let purchases = parseRecentPurchaseData(toast);
+    let purchasesByKey = new Map(purchases.map((purchase) => [purchase.key, purchase]));
+    const knownKeys = new Set();
+    const knownKeyOrder = [];
+    let priorityKeys = [];
     let closed = false;
+    let paused = document.hidden;
     let index = 0;
+    let cycleTimer = null;
+    let visibleTimer = null;
+    let hideTimer = null;
+    let pollTimer = null;
+    let renderFrame = null;
+    let requestController = null;
 
-    const setTimer = (handler, delay) => {
-        const timer = window.setTimeout(() => {
-            timers.delete(timer);
-            handler();
-        }, delay);
-        timers.add(timer);
+    const rememberKey = (key) => {
+        if (knownKeys.has(key)) return false;
 
-        return timer;
+        knownKeys.add(key);
+        knownKeyOrder.push(key);
+
+        while (knownKeyOrder.length > RECENT_PURCHASE_MAX_KNOWN_KEYS) {
+            knownKeys.delete(knownKeyOrder.shift());
+        }
+
+        return true;
     };
 
-    const clearTimers = () => {
-        timers.forEach((timer) => window.clearTimeout(timer));
-        timers.clear();
+    purchases.forEach((purchase) => rememberKey(purchase.key));
+
+    const clearTimer = (timer) => {
+        if (timer !== null) window.clearTimeout(timer);
+    };
+
+    const clearCycleTimers = () => {
+        clearTimer(cycleTimer);
+        clearTimer(visibleTimer);
+        clearTimer(hideTimer);
+        cycleTimer = null;
+        visibleTimer = null;
+        hideTimer = null;
+
+        if (renderFrame !== null) {
+            window.cancelAnimationFrame(renderFrame);
+            renderFrame = null;
+        }
+    };
+
+    const concealToast = (immediately = false) => {
+        if (renderFrame !== null) {
+            window.cancelAnimationFrame(renderFrame);
+            renderFrame = null;
+        }
+
+        clearTimer(hideTimer);
+        hideTimer = null;
+        toast.classList.remove('is-visible');
+
+        if (immediately) {
+            toast.hidden = true;
+            return;
+        }
+
+        hideTimer = window.setTimeout(() => {
+            hideTimer = null;
+
+            if (!toast.classList.contains('is-visible')) {
+                toast.hidden = true;
+            }
+        }, 300);
+    };
+
+    const revealToast = () => {
+        clearTimer(hideTimer);
+        hideTimer = null;
+
+        if (renderFrame !== null) {
+            window.cancelAnimationFrame(renderFrame);
+        }
+
+        toast.style.setProperty('--recent-purchase-duration', `${RECENT_PURCHASE_VISIBLE_MS}ms`);
+        toast.hidden = false;
+        toast.classList.remove('is-visible');
+        void toast.offsetWidth;
+
+        renderFrame = window.requestAnimationFrame(() => {
+            renderFrame = null;
+
+            if (!closed && !paused) {
+                toast.classList.add('is-visible');
+            }
+        });
+    };
+
+    const nextPurchase = () => {
+        while (priorityKeys.length > 0) {
+            const priorityPurchase = purchasesByKey.get(priorityKeys.shift());
+
+            if (priorityPurchase) return priorityPurchase;
+        }
+
+        if (purchases.length === 0) return null;
+
+        const purchase = purchases[index % purchases.length];
+        index = (index + 1) % purchases.length;
+
+        return purchase;
     };
 
     const cycle = () => {
-        if (closed) return;
+        cycleTimer = null;
 
-        setRecentPurchaseContent(toast, purchases[index]);
-        showRecentPurchaseToast(toast);
+        if (closed || paused || recentPurchaseSnoozed()) return;
 
-        setTimer(() => {
-            hideRecentPurchaseToast(toast);
-            index = (index + 1) % purchases.length;
-            setTimer(cycle, RECENT_PURCHASE_GAP_MS);
+        const purchase = nextPurchase();
+
+        if (!purchase) {
+            concealToast();
+            return;
+        }
+
+        setRecentPurchaseContent(toast, purchase);
+        revealToast();
+
+        clearTimer(visibleTimer);
+        visibleTimer = window.setTimeout(() => {
+            visibleTimer = null;
+            concealToast();
+            cycleTimer = window.setTimeout(
+                cycle,
+                priorityKeys.length > 0 ? RECENT_PURCHASE_NEW_DELAY_MS : RECENT_PURCHASE_GAP_MS,
+            );
         }, RECENT_PURCHASE_VISIBLE_MS);
     };
 
-    const close = () => {
+    const scheduleCycle = (delay) => {
+        if (closed || paused || recentPurchaseSnoozed() || visibleTimer !== null) return;
+
+        clearTimer(cycleTimer);
+        cycleTimer = window.setTimeout(cycle, delay);
+    };
+
+    const applyPurchaseSnapshot = (nextPurchases) => {
+        const normalizedPurchases = normalizeRecentPurchases(nextPurchases);
+        const nextPurchasesByKey = new Map(
+            normalizedPurchases.map((purchase) => [purchase.key, purchase]),
+        );
+        const newKeys = normalizedPurchases
+            .map((purchase) => purchase.key)
+            .filter((key) => rememberKey(key));
+
+        purchases = normalizedPurchases;
+        purchasesByKey = nextPurchasesByKey;
+        index = purchases.length > 0 ? index % purchases.length : 0;
+        priorityKeys = [
+            ...newKeys,
+            ...priorityKeys.filter((key) => nextPurchasesByKey.has(key) && !newKeys.includes(key)),
+        ];
+
+        if (purchases.length === 0) {
+            clearTimer(cycleTimer);
+            cycleTimer = null;
+
+            if (visibleTimer === null) concealToast();
+
+            return;
+        }
+
+        if (newKeys.length > 0 && visibleTimer === null) {
+            scheduleCycle(RECENT_PURCHASE_NEW_DELAY_MS);
+        } else if (cycleTimer === null && visibleTimer === null) {
+            scheduleCycle(RECENT_PURCHASE_INITIAL_DELAY_MS);
+        }
+    };
+
+    const refreshPurchases = async () => {
+        if (!endpoint || closed || paused || recentPurchaseSnoozed() || requestController) return;
+
+        const controller = new AbortController();
+        requestController = controller;
+
+        try {
+            const response = await fetch(endpoint.href, {
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Recent purchases refresh failed with status ${response.status}`);
+            }
+
+            const payload = await response.json();
+            const nextPurchases = Array.isArray(payload) ? payload : payload?.purchases;
+
+            if (!controller.signal.aborted && !closed && !paused) {
+                applyPurchaseSnapshot(nextPurchases);
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                // Social proof polling is best-effort and must never interrupt the storefront.
+            }
+        } finally {
+            if (requestController === controller) {
+                requestController = null;
+            }
+        }
+    };
+
+    const schedulePoll = (delay = RECENT_PURCHASE_POLL_MS) => {
+        clearTimer(pollTimer);
+        pollTimer = null;
+
+        if (!endpoint || closed || paused || recentPurchaseSnoozed()) return;
+
+        pollTimer = window.setTimeout(async () => {
+            pollTimer = null;
+            await refreshPurchases();
+            schedulePoll();
+        }, delay);
+    };
+
+    const pause = () => {
+        if (closed) return;
+
+        paused = true;
+        clearTimer(pollTimer);
+        pollTimer = null;
+        clearCycleTimers();
+
+        const controller = requestController;
+        controller?.abort();
+
+        if (requestController === controller) {
+            requestController = null;
+        }
+
+        concealToast(true);
+    };
+
+    const resume = async () => {
+        if (closed || document.hidden || recentPurchaseSnoozed()) return;
+
+        paused = false;
+        await refreshPurchases();
+
+        if (!closed && !paused) {
+            if (purchases.length > 0 && cycleTimer === null && visibleTimer === null) {
+                scheduleCycle(RECENT_PURCHASE_NEW_DELAY_MS);
+            }
+
+            schedulePoll();
+        }
+    };
+
+    const visibilityChanged = () => {
+        if (document.hidden) {
+            pause();
+        } else {
+            resume();
+        }
+    };
+
+    const pageShown = (event) => {
+        if (event.persisted) resume();
+    };
+
+    const cleanup = () => {
+        if (closed) return;
+
         closed = true;
+        paused = true;
+        clearTimer(pollTimer);
+        pollTimer = null;
+        clearCycleTimers();
+        requestController?.abort();
+        requestController = null;
+        closeButton?.removeEventListener('click', close);
+        document.removeEventListener('visibilitychange', visibilityChanged);
+        window.removeEventListener('pagehide', pause);
+        window.removeEventListener('pageshow', pageShown);
+        concealToast(true);
+    };
+
+    const close = () => {
         snoozeRecentPurchaseToast();
-        clearTimers();
-        hideRecentPurchaseToast(toast);
+        cleanup();
     };
 
     closeButton?.addEventListener('click', close);
-    setTimer(cycle, RECENT_PURCHASE_INITIAL_DELAY_MS);
+    document.addEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('pagehide', pause);
+    window.addEventListener('pageshow', pageShown);
 
-    recentPurchaseToastCleanup = () => {
-        closed = true;
-        clearTimers();
-        closeButton?.removeEventListener('click', close);
-        toast.classList.remove('is-visible');
-    };
+    if (!paused && purchases.length > 0) {
+        scheduleCycle(RECENT_PURCHASE_INITIAL_DELAY_MS);
+    }
+
+    schedulePoll();
+    recentPurchaseToastCleanup = cleanup;
 }
 
 const customSelects = new WeakMap();
