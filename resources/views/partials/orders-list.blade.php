@@ -73,9 +73,6 @@
             );
             $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
-            $isAutoVerifying = $isCryptoInvoiceActive || $isBinancePayInvoiceActive;
-            $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isAutoVerifying ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-            $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isAutoVerifying ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
             $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
             $methodClass = $isPakasir ? 'method-pill-pakasir' : '';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
@@ -139,18 +136,22 @@
             $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                 $canOpenBinancePay || $canSyncBinancePay ||
                 $canSyncPakasir || $canContinuePakasir || $canCancel;
+            $canVerifySentPayment = ($canSyncCrypto && ! $isCryptoInvoiceActive) ||
+                ($canSyncBinancePay && ! $isBinancePayInvoiceActive);
             $paymentHint = $isPaid
                 ? 'Payment confirmed. Open Licenses to view delivered keys.'
                 : ($hasCryptoMismatch
                     ? 'Payment amount needs support review. Keep this Order ID ready.'
-                    : ($isPending
-                        ? 'Keep the invoice open and use Check Payment after sending payment.'
-                        : ($isExpired
-                            ? 'This invoice is closed. Start a new checkout when you are ready.'
-                            : 'This checkout was cancelled. No payment action is needed.')));
+                    : ($canVerifySentPayment
+                        ? 'Invoice closed. If payment was already sent, use Verify Sent Payment before verification access ends.'
+                        : ($isPending
+                            ? 'Keep the invoice open and use Check Payment after sending payment.'
+                            : ($isExpired
+                                ? 'This invoice is closed. Start a new checkout when you are ready.'
+                                : 'This checkout was cancelled. No payment action is needed.'))));
             $paymentHintIcon = $isPaid
                 ? 'key-round'
-                : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
+                : ($hasCryptoMismatch ? 'life-buoy' : (($isPending || $canVerifySentPayment) ? 'refresh-cw' : 'receipt'));
             $licenseTargetUrl = filled($order->order_id)
                 ? '/licenses?order=' . rawurlencode((string) $order->order_id) . '#license-' . rawurlencode((string) $order->order_id)
                 : '/licenses';
@@ -386,9 +387,6 @@
                         );
                         $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
-                        $isAutoVerifying = $isCryptoInvoiceActive || $isBinancePayInvoiceActive;
-                        $statusLabel = $isPaid ? 'Paid' : ($hasCryptoMismatch ? 'Amount mismatch' : ($isAutoVerifying ? 'Verifying' : ($isExpired ? 'Expired' : ($isPending ? 'Pending' : 'Cancelled'))));
-                        $statusClass = $isPaid ? 'status-pill-paid' : ($hasCryptoMismatch ? 'status-pill-warning' : ($isAutoVerifying ? 'status-pill-pending' : ($isExpired ? 'status-pill-expired' : ($isPending ? 'status-pill-pending' : 'status-pill-cancelled'))));
                         $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
                         $methodClass = $isPakasir ? 'method-pill-pakasir' : '';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
@@ -452,18 +450,22 @@
                         $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                             $canOpenBinancePay || $canSyncBinancePay ||
                             $canSyncPakasir || $canContinuePakasir || $canCancel;
+                        $canVerifySentPayment = ($canSyncCrypto && ! $isCryptoInvoiceActive) ||
+                            ($canSyncBinancePay && ! $isBinancePayInvoiceActive);
                         $paymentHint = $isPaid
                             ? 'Payment confirmed. Open Licenses to view delivered keys.'
                             : ($hasCryptoMismatch
                                 ? 'Payment amount needs support review. Keep this Order ID ready.'
-                                : ($isPending
-                                    ? 'Keep the invoice open and use Check Payment after sending payment.'
-                                    : ($isExpired
-                                        ? 'This invoice is closed. Start a new checkout when you are ready.'
-                                        : 'This checkout was cancelled. No payment action is needed.')));
+                                : ($canVerifySentPayment
+                                    ? 'Invoice closed. If payment was already sent, use Verify Sent Payment before verification access ends.'
+                                    : ($isPending
+                                        ? 'Keep the invoice open and use Check Payment after sending payment.'
+                                        : ($isExpired
+                                            ? 'This invoice is closed. Start a new checkout when you are ready.'
+                                            : 'This checkout was cancelled. No payment action is needed.'))));
                         $paymentHintIcon = $isPaid
                             ? 'key-round'
-                            : ($hasCryptoMismatch ? 'life-buoy' : ($isPending ? 'refresh-cw' : 'receipt'));
+                            : ($hasCryptoMismatch ? 'life-buoy' : (($isPending || $canVerifySentPayment) ? 'refresh-cw' : 'receipt'));
                         $licenseTargetUrl = filled($order->order_id)
                             ? '/licenses?order=' . rawurlencode((string) $order->order_id) . '#license-' . rawurlencode((string) $order->order_id)
                             : '/licenses';

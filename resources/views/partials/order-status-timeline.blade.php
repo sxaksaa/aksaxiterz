@@ -1,8 +1,9 @@
 @php
     $status = (string) ($order->status ?? '');
     $isPaid = $status === 'paid';
-    $isPending = $status === 'pending';
-    $isClosed = in_array($status, ['cancelled', 'expired'], true);
+    $isPastDue = $status === 'pending' && $order->expired_at && now()->gte($order->expired_at);
+    $isPending = $status === 'pending' && ! $isPastDue;
+    $isClosed = $isPastDue || in_array($status, ['cancelled', 'expired'], true);
     $deliveredCount = (int) ($order->licenses_count ?? 0);
     $quantity = max(1, (int) ($order->quantity ?? $order->total_quantity ?? 1));
     $isDelivered = $isPaid && $deliveredCount >= $quantity;

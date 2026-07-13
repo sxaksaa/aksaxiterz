@@ -77,7 +77,7 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringContainsString('Closed', $html);
         $this->assertStringNotContainsString('Verifying', $html);
         $this->assertStringContainsString('Verify Sent Payment', $html);
         $this->assertStringContainsString('data-order-id="ORDER-CANCELLED"', $html);
@@ -93,7 +93,7 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Expired', $html);
+        $this->assertStringContainsString('Closed', $html);
         $this->assertStringNotContainsString('View Address', $html);
         $this->assertStringContainsString('Verify Sent Payment', $html);
         $this->assertStringContainsString('class="sync-crypto-form"', $html);
@@ -108,7 +108,7 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringContainsString('Closed', $html);
         $this->assertStringNotContainsString('View Address', $html);
         $this->assertStringNotContainsString('Verify Sent Payment', $html);
         $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
@@ -128,7 +128,7 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringContainsString('Closed', $html);
         $this->assertStringNotContainsString('Verify Sent Payment', $html);
         $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
     }
@@ -203,7 +203,7 @@ class PaymentPresentationTest extends TestCase
 
         $html = $this->renderOrders([$order]);
 
-        $this->assertStringContainsString('Cancelled', $html);
+        $this->assertStringContainsString('Closed', $html);
         $this->assertStringNotContainsString('Start New Checkout', $html);
         $this->assertStringNotContainsString('/product/1', $html);
         $this->assertStringNotContainsString('No action', $html);
@@ -226,7 +226,8 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringContainsString('Paid at', $html);
         $this->assertStringContainsString($expectedTime, $html);
         $this->assertStringNotContainsString('View License', $html);
-        $this->assertStringNotContainsString('/licenses?order=ORDER-TEST#license-ORDER-TEST', $html);
+        $this->assertStringContainsString('Open Licenses', $html);
+        $this->assertStringContainsString('/licenses?order=ORDER-TEST#license-ORDER-TEST', $html);
     }
 
     private function fakeOrder(array $attributes = []): Order

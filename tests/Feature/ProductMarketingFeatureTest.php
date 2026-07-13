@@ -68,7 +68,7 @@ class ProductMarketingFeatureTest extends TestCase
             ->assertSee('Discord member promo')
             ->assertSee('Member voucher drops available')
             ->assertSee('Claim on Discord')
-            ->assertSee('Member vouchers, restock alerts, and setup help.')
+            ->assertSee('Join Discord to claim promo codes, restock alerts, setup help, and buyer support.')
             ->assertDontSee('HEMAT10')
             ->assertDontSee('10% off up to Rp 15.000')
             ->assertSee('Aurora Best')
