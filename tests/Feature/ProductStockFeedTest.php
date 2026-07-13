@@ -170,6 +170,202 @@ class ProductStockFeedTest extends TestCase
             ->assertSee('productStockEndpoint', false);
     }
 
+    public function test_product_detail_feed_reports_package_stock_with_available_semantics_without_leaking_keys(): void
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'Detail Feed', 'slug' => 'detail-stock-feed']);
+        [$product, $package] = $this->productWithPackage(
+            $category,
+            'Detail Stock Product',
+            'detail-stock-product'
+        );
+        $secondPackage = Package::create([
+            'product_id' => $product->id,
+            'name' => '90 Days',
+            'price' => 50000,
+            'price_usdt' => 3.25,
+        ]);
+
+        $this->stock($product, $package, 'DETAIL-AVAILABLE-KEY');
+        $this->stock($product, $package, 'DETAIL-SOLD-KEY', ['is_sold' => true]);
+
+        $activeOrder = $this->order($user, $product, $package, 'DETAIL-ACTIVE-ORDER');
+        $this->stock($product, $package, 'DETAIL-ACTIVE-RESERVED-KEY', [
+            'reserved_order_id' => $activeOrder->id,
+            'reserved_until' => now()->addHour(),
+        ]);
+
+        $cancelledOrder = $this->order($user, $product, $package, 'DETAIL-CANCELLED-ORDER', [
+            'status' => 'cancelled',
+        ]);
+        $this->stock($product, $package, 'DETAIL-CANCELLED-RESERVED-KEY', [
+            'reserved_order_id' => $cancelledOrder->id,
+            'reserved_until' => now()->addHour(),
+        ]);
+
+        $expiredCryptoOrder = $this->order($user, $product, $package, 'DETAIL-EXPIRED-CRYPTO-ORDER');
+        $this->stock($product, $package, 'DETAIL-EXPIRED-CRYPTO-KEY', [
+            'reserved_order_id' => $expiredCryptoOrder->id,
+            'reserved_until' => now()->subMinute(),
+        ]);
+
+        $expiredQrisOrder = $this->order($user, $product, $package, 'DETAIL-EXPIRED-QRIS-ORDER', [
+            'payment_method' => 'pakasir',
+        ]);
+        $this->stock($product, $package, 'DETAIL-EXPIRED-QRIS-KEY', [
+            'reserved_order_id' => $expiredQrisOrder->id,
+            'reserved_until' => now()->subMinute(),
+        ]);
+
+        $this->stock($product, $secondPackage, 'DETAIL-SECOND-PACKAGE-KEY');
+
+        $response = $this->getJson(route('products.stock-detail', ['product' => $product->slug]));
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('id', $product->id)
+            ->assertJsonPath('status', Product::STATUS_READY)
+            ->assertJsonPath('status_label', 'Ready')
+            ->assertJsonPath('available_stock', 4)
+            ->assertJsonCount(2, 'packages')
+            ->assertJsonPath('packages.0.id', $package->id)
+            ->assertJsonPath('packages.0.available_stock', 3)
+            ->assertJsonPath('packages.1.id', $secondPackage->id)
+            ->assertJsonPath('packages.1.available_stock', 1);
+
+        $rootKeys = array_keys($response->json());
+        sort($rootKeys);
+        $this->assertSame([
+            'available_stock',
+            'id',
+            'packages',
+            'status',
+            'status_label',
+        ], $rootKeys);
+
+        foreach ($response->json('packages') as $packagePayload) {
+            $packageKeys = array_keys($packagePayload);
+            sort($packageKeys);
+            $this->assertSame(['available_stock', 'id'], $packageKeys);
+        }
+
+        foreach ([
+            'DETAIL-AVAILABLE-KEY',
+            'DETAIL-SOLD-KEY',
+            'DETAIL-ACTIVE-RESERVED-KEY',
+            'DETAIL-CANCELLED-RESERVED-KEY',
+            'DETAIL-EXPIRED-CRYPTO-KEY',
+            'DETAIL-EXPIRED-QRIS-KEY',
+            'DETAIL-SECOND-PACKAGE-KEY',
+            'DETAIL-ACTIVE-ORDER',
+            'DETAIL-CANCELLED-ORDER',
+            'DETAIL-EXPIRED-CRYPTO-ORDER',
+            'DETAIL-EXPIRED-QRIS-ORDER',
+        ] as $secret) {
+            $this->assertStringNotContainsString($secret, $response->getContent());
+        }
+
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('max-age=0', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame('no-cache', $response->headers->get('Pragma'));
+    }
+
+    public function test_product_detail_feed_reflects_stock_and_status_changes_on_the_next_request(): void
+    {
+        $category = Category::create(['name' => 'Live Detail', 'slug' => 'live-detail-stock']);
+        [$product, $package] = $this->productWithPackage(
+            $category,
+            'Live Detail Product',
+            'live-detail-product'
+        );
+        $this->stock($product, $package, 'LIVE-DETAIL-INITIAL-KEY');
+        $endpoint = route('products.stock-detail', ['product' => $product->slug]);
+
+        $this->getJson($endpoint)
+            ->assertOk()
+            ->assertJsonPath('status', Product::STATUS_READY)
+            ->assertJsonPath('status_label', 'Ready')
+            ->assertJsonPath('available_stock', 1)
+            ->assertJsonPath('packages.0.available_stock', 1);
+
+        $this->stock($product, $package, 'LIVE-DETAIL-NEW-KEY');
+        $product->update(['status' => Product::STATUS_UPDATING]);
+
+        $this->getJson($endpoint)
+            ->assertOk()
+            ->assertJsonPath('status', Product::STATUS_UPDATING)
+            ->assertJsonPath('status_label', 'Updating')
+            ->assertJsonPath('available_stock', 2)
+            ->assertJsonPath('packages.0.available_stock', 2)
+            ->assertDontSee('LIVE-DETAIL-INITIAL-KEY')
+            ->assertDontSee('LIVE-DETAIL-NEW-KEY');
+    }
+
+    public function test_product_detail_feed_rejects_hidden_and_unknown_products(): void
+    {
+        $category = Category::create(['name' => 'Private Detail', 'slug' => 'private-detail-stock']);
+        [$hiddenProduct] = $this->productWithPackage(
+            $category,
+            'Hidden Detail Product',
+            'hidden-detail-product',
+            false
+        );
+
+        $this->getJson(route('products.stock-detail', ['product' => $hiddenProduct->slug]))
+            ->assertNotFound();
+
+        $this->getJson(route('products.stock-detail', ['product' => 'unknown-detail-product']))
+            ->assertNotFound();
+    }
+
+    public function test_product_detail_renders_live_stock_endpoint_and_total_and_package_targets(): void
+    {
+        $category = Category::create(['name' => 'Detail Markers', 'slug' => 'detail-stock-markers']);
+        [$product, $package] = $this->productWithPackage(
+            $category,
+            'Detail Marker Product',
+            'detail-marker-product'
+        );
+        $this->stock($product, $package, 'DETAIL-MARKER-KEY-1');
+        $this->stock($product, $package, 'DETAIL-MARKER-KEY-2');
+
+        $response = $this->get(route('products.show', $product));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-product-checkout-ready="true"', false)
+            ->assertSee(
+                'data-product-stock-endpoint="'.route(
+                    'products.stock-detail',
+                    ['product' => $product->slug],
+                    false
+                ).'"',
+                false
+            )
+            ->assertSee('data-product-status-badge', false)
+            ->assertSee('data-product-availability-value', false)
+            ->assertSee('data-product-availability-caption', false)
+            ->assertSee('data-product-availability-note', false)
+            ->assertSee('data-package-card', false)
+            ->assertSee('data-package-id="'.$package->id.'"', false)
+            ->assertSee('data-stock="2"', false)
+            ->assertSee('data-package-checkout-enabled="true"', false)
+            ->assertSee('data-package-availability', false)
+            ->assertSee('2 licenses ready')
+            ->assertSee('data-manual-order', false)
+            ->assertSee('data-manual-order-label', false)
+            ->assertSee('id="addToCartBtn"', false)
+            ->assertSee('id="payMainBtn"', false)
+            ->assertDontSee('DETAIL-MARKER-KEY-1')
+            ->assertDontSee('DETAIL-MARKER-KEY-2');
+
+        $this->assertMatchesRegularExpression(
+            '/data-product-availability-value[^>]*>\s*2\s*</',
+            $response->getContent()
+        );
+    }
+
     public function test_home_and_fragment_list_ready_products_before_updating_products(): void
     {
         $category = Category::create(['name' => 'Ordering', 'slug' => 'stock-feed-ordering']);

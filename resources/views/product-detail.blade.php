@@ -66,7 +66,8 @@
     @endphp
 
     <div id="content" class="page-shell py-6 md:py-10"
-        data-product-checkout-ready="{{ $isProductReady ? 'true' : 'false' }}">
+        data-product-checkout-ready="{{ $checkoutAvailable ? 'true' : 'false' }}"
+        data-product-stock-endpoint="{{ route('products.stock-detail', $product, false) }}">
 
         <div class="product-hero mb-6 fade-up">
             <div class="grid gap-5 md:grid-cols-[1fr_340px] md:items-stretch">
@@ -78,7 +79,8 @@
                                 <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
                                 <span>{{ $categoryName }}</span>
                             </span>
-                            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                            <span data-product-status-badge
+                                class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
                                 {{ $product->status_label }}
                             </span>
                             @if ($salesBadgeLabel)
@@ -108,14 +110,15 @@
                         <div class="mb-2 text-xs uppercase text-gray-500">Availability</div>
                         <div class="flex items-end justify-between gap-4">
                             <div>
-                                <div class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-aksa-accent' : 'text-amber-300' }}">
+                                <div data-product-availability-value
+                                    class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-aksa-accent' : 'text-amber-300' }}">
                                     {{ $needsUpdateAlerts ? 'Updating' : ($hasAutoDelivery ? $stock : 'Manual') }}
                                 </div>
-                                <div class="text-sm text-gray-400">
+                                <div data-product-availability-caption class="text-sm text-gray-400">
                                     {{ $needsUpdateAlerts ? 'update alerts on Discord' : ($hasAutoDelivery ? 'license ready' : 'order via Discord') }}
                                 </div>
                             </div>
-                            <div class="text-right text-xs text-gray-500">
+                            <div data-product-availability-note class="text-right text-xs text-gray-500">
                                 {{ $needsUpdateAlerts ? 'Join Discord for update alerts' : ($hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order') }}
                             </div>
                         </div>
@@ -171,17 +174,16 @@
                 <p class="mt-1 text-sm text-gray-400">Choose a payment method before selecting your package.</p>
             </div>
 
-        @if (! $isProductReady)
-            <div data-checkout-paused class="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+            <div data-checkout-paused
+                class="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100 {{ $isProductReady ? 'hidden' : '' }}">
                 Checkout is temporarily paused while this product is updating. Join Discord for availability alerts.
             </div>
-        @endif
 
         <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
 
             <div id="btnPakasir" data-payment-method="pakasir"
-                aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
-                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+                aria-disabled="{{ $checkoutAvailable ? 'false' : 'true' }}"
+                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $checkoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                 <div class="payment-card-heading">
                     <span class="payment-card-icon">
@@ -195,8 +197,8 @@
 
             @if ($binancePayAvailable)
                 <div id="btnBinancePay" data-payment-method="binance_pay"
-                    aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
-                    class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+                    aria-disabled="{{ $checkoutAvailable ? 'false' : 'true' }}"
+                    class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $checkoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                     <div class="payment-card-heading">
                         <span class="payment-card-icon">
@@ -210,8 +212,8 @@
             @endif
 
             <div id="btnCrypto" data-payment-method="crypto"
-                aria-disabled="{{ $isProductReady ? 'false' : 'true' }}"
-                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $isProductReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+                aria-disabled="{{ $checkoutAvailable ? 'false' : 'true' }}"
+                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $checkoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
 
                 <div class="payment-card-heading">
                     <span class="payment-card-icon">
@@ -350,7 +352,7 @@
 
                 <div data-package-card data-price="{{ (float) $p->price }}" data-package-id="{{ $p->id }}"
                     data-package-name="{{ $p->name }}" data-price-usdt="{{ (float) $p->price_usdt }}"
-                    data-stock="{{ $packageCheckoutAvailable ? $packageStock : 0 }}"
+                    data-stock="{{ $packageStock }}"
                     data-package-checkout-enabled="{{ $packageCheckoutAvailable ? 'true' : 'false' }}"
                     aria-disabled="{{ $packageCheckoutAvailable ? 'false' : 'true' }}"
                     class="package-card p-4 relative package transition {{ $packageCheckoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
@@ -403,20 +405,19 @@
                         </div>
                     @endif
 
-                    <p class="package-availability {{ $packageCheckoutAvailable ? 'package-availability-ready' : 'package-availability-manual' }}">
+                    <p data-package-availability
+                        class="package-availability {{ $packageCheckoutAvailable ? 'package-availability-ready' : 'package-availability-manual' }}">
                         <span class="package-availability-dot" aria-hidden="true"></span>
-                        {{ ! $isProductReady ? 'Checkout paused during update' : ($packageStock > 0 ? $packageStock . ' licenses ready' : 'Manual order via Discord') }}
+                        <span data-package-availability-label>{{ ! $isProductReady ? 'Checkout paused during update' : ($packageStock > 0 ? $packageStock . ' licenses ready' : 'Manual order via Discord') }}</span>
                     </p>
 
-                    @if (! $packageCheckoutAvailable)
-                        <button type="button"
-                            data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
-                            data-request-mode="{{ $isProductReady ? 'manual-order' : 'update-alert' }}"
-                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-aksa-accent-35 bg-aksa-accent-10 px-3 py-2 text-xs font-semibold text-aksa-accent-soft transition hover:border-aksa-accent hover:bg-aksa-accent-20 hover:text-white">
-                            <x-ui.icon name="discord" class="h-4 w-4" />
-                            <span>{{ $isProductReady ? 'Join Discord to Order' : 'Get Update Alerts' }}</span>
-                        </button>
-                    @endif
+                    <button type="button"
+                        data-manual-order data-product-name="{{ $product->name }}" data-package-name="{{ $packageName }}"
+                        data-request-mode="{{ $isProductReady ? 'manual-order' : 'update-alert' }}"
+                        class="mt-3 {{ $packageCheckoutAvailable ? 'hidden' : 'inline-flex' }} w-full items-center justify-center gap-2 rounded-lg border border-aksa-accent-35 bg-aksa-accent-10 px-3 py-2 text-xs font-semibold text-aksa-accent-soft transition hover:border-aksa-accent hover:bg-aksa-accent-20 hover:text-white">
+                        <x-ui.icon name="discord" class="h-4 w-4" />
+                        <span data-manual-order-label>{{ $isProductReady ? 'Join Discord to Order' : 'Get Update Alerts' }}</span>
+                    </button>
 
                 </div>
             @endforeach
@@ -504,7 +505,12 @@
         {{ ! $checkoutAvailable ? 'bg-gray-600 cursor-not-allowed opacity-60' : '' }}"
                     {{ ! $checkoutAvailable ? 'disabled' : '' }}>
 
-                    <x-ui.icon name="{{ ! $checkoutAvailable ? 'discord' : (auth()->check() ? 'credit-card' : 'log-in') }}" class="h-4 w-4" />
+                    <span data-pay-icon-auto class="{{ $checkoutAvailable ? 'inline-flex' : 'hidden' }}">
+                        <x-ui.icon name="{{ auth()->check() ? 'credit-card' : 'log-in' }}" class="h-4 w-4" />
+                    </span>
+                    <span data-pay-icon-unavailable class="{{ $checkoutAvailable ? 'hidden' : 'inline-flex' }}">
+                        <x-ui.icon name="discord" class="h-4 w-4" />
+                    </span>
                     <span data-button-label>{{ ! $checkoutAvailable ? $unavailablePayLabel : (auth()->check() ? 'Pay Now' : 'Login to Pay') }}</span>
 
                 </button>
@@ -563,15 +569,26 @@
         let appliedVoucherCode = null;
         let voucherRequestSequence = 0;
         let networkDropdownOpen = false;
+        let addToCartRequestPending = false;
+        let paymentRequestPending = false;
+        let addToCartFeedbackTimer = null;
         const productDetailPageController = new AbortController();
-        const productReadyForCheckout = @json($isProductReady);
-        const hasStock = @json($checkoutAvailable);
-        const unavailablePayLabel = @json($unavailablePayLabel);
+        let productReadyForCheckout = @json($isProductReady);
+        let productUnavailable = false;
+        let hasStock = @json($stock > 0);
+        let unavailablePayLabel = @json($unavailablePayLabel);
         const isAuthenticated = @json(auth()->check());
         const loginUrl = `/auth/google?redirect=${encodeURIComponent(window.location.href)}`;
         const discordUrl = @json($discordUrl);
         let csrfToken = window.aksaCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || '';
         const addToCartUrl = @json(route('cart.items.store', $product, false));
+        const productDetailRoot = document.getElementById('content');
+        const productStockEndpoint = productDetailRoot?.dataset.productStockEndpoint || '';
+        const productStockPollingInterval = 20000;
+        const currentProductId = @json((int) $product->id);
+        let productStockPollingTimer = null;
+        let productStockRequestController = null;
+        let productStockPollingDisposed = false;
 
         function currentCsrfToken() {
             csrfToken = window.aksaCsrfToken?.() || document.querySelector('meta[name="csrf-token"]')?.content || csrfToken || '';
@@ -605,9 +622,7 @@
                 'Your secure checkout session expired. Please try again.';
         }
 
-        window.addEventListener('aksa:before-page-swap', () => {
-            productDetailPageController.abort();
-        }, {
+        window.addEventListener('aksa:before-page-swap', disposeProductDetailPage, {
             once: true
         });
 
@@ -643,6 +658,365 @@
 
         function getButtonLabel(button) {
             return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
+        }
+
+        function isProductCheckoutAvailable() {
+            return productReadyForCheckout && hasStock;
+        }
+
+        function resetSelectedPackage() {
+            selectedPackageId = null;
+            selectedPrice = 0;
+            selectedUsd = 0;
+            selectedPackageStock = 0;
+            selectedQuantity = 1;
+
+            document.querySelectorAll('[data-package-card]').forEach((card) => {
+                card.classList.remove('active');
+            });
+
+            const selectedPackage = document.getElementById('selectedPackage');
+            if (selectedPackage) selectedPackage.innerText = '-';
+            document.getElementById('summaryBox')?.classList.add('hidden');
+
+            if (appliedVoucherCode) {
+                clearVoucher();
+            }
+
+            refreshQuantityOptions();
+            updatePrice();
+        }
+
+        function refreshCheckoutControls() {
+            const checkoutAvailable = isProductCheckoutAvailable();
+            const selectedPackageAvailable = !selectedPackageId ||
+                (selectedPackageStock > 0 && selectedPackageStock >= selectedQuantity);
+            const actionAvailable = checkoutAvailable && selectedPackageAvailable;
+
+            if (productDetailRoot) {
+                productDetailRoot.dataset.productCheckoutReady = checkoutAvailable ? 'true' : 'false';
+            }
+
+            document.querySelectorAll('[data-payment-method]').forEach((card) => {
+                card.setAttribute('aria-disabled', checkoutAvailable ? 'false' : 'true');
+                card.classList.toggle('cursor-pointer', checkoutAvailable);
+                card.classList.toggle('cursor-not-allowed', !checkoutAvailable);
+                card.classList.toggle('opacity-60', !checkoutAvailable);
+            });
+
+            if (!checkoutAvailable && selectedPayment) {
+                selectedPayment = null;
+                document.querySelectorAll('[data-payment-method]').forEach((card) => card.classList.remove('active'));
+                document.getElementById('cryptoBox')?.classList.add('hidden');
+                document.getElementById('binancePayBox')?.classList.add('hidden');
+
+                if (appliedVoucherCode) {
+                    clearVoucher();
+                } else {
+                    updateAllPrices();
+                    updatePrice();
+                }
+            }
+
+            const addToCartButton = document.getElementById('addToCartBtn');
+            if (addToCartButton) {
+                const addToCartDisabled = !actionAvailable || addToCartRequestPending;
+                addToCartButton.disabled = addToCartDisabled;
+                addToCartButton.classList.toggle('cursor-not-allowed', addToCartDisabled);
+                addToCartButton.classList.toggle('opacity-60', addToCartDisabled);
+
+                if (!addToCartRequestPending) {
+                    setButtonLabel(addToCartButton, actionAvailable ? 'Add to Cart' : 'Unavailable');
+                }
+            }
+
+            const payButton = document.getElementById('payMainBtn');
+            if (payButton) {
+                const payDisabled = !actionAvailable || paymentRequestPending;
+                payButton.disabled = payDisabled;
+                payButton.classList.toggle('cursor-not-allowed', payDisabled);
+                payButton.classList.toggle('pointer-events-none', payDisabled);
+                payButton.classList.toggle('opacity-60', payDisabled);
+                payButton.classList.toggle('bg-gray-600', !actionAvailable);
+                payButton.classList.toggle('bg-gray-500', paymentRequestPending && actionAvailable);
+
+                const autoPayIcon = payButton.querySelector('[data-pay-icon-auto]');
+                const unavailablePayIcon = payButton.querySelector('[data-pay-icon-unavailable]');
+                autoPayIcon?.classList.toggle('hidden', !checkoutAvailable);
+                autoPayIcon?.classList.toggle('inline-flex', checkoutAvailable);
+                unavailablePayIcon?.classList.toggle('hidden', checkoutAvailable);
+                unavailablePayIcon?.classList.toggle('inline-flex', !checkoutAvailable);
+
+                if (!paymentRequestPending) {
+                    setButtonLabel(
+                        payButton,
+                        actionAvailable ? (isAuthenticated ? 'Pay Now' : 'Login to Pay') : unavailablePayLabel
+                    );
+                }
+            }
+        }
+
+        function applyProductStockSnapshot(payload) {
+            const snapshot = payload?.product || payload;
+            const snapshotProductId = Number(snapshot?.id);
+            const availableStock = Number(snapshot?.available_stock);
+
+            if (
+                !snapshot ||
+                snapshotProductId !== currentProductId ||
+                !Number.isSafeInteger(availableStock) ||
+                availableStock < 0 ||
+                !Array.isArray(snapshot.packages)
+            ) {
+                return;
+            }
+
+            const normalizedStatus = String(snapshot.status || '').toLowerCase();
+            productReadyForCheckout = normalizedStatus === 'ready';
+            productUnavailable = normalizedStatus === 'unavailable';
+            hasStock = availableStock > 0;
+            unavailablePayLabel = productReadyForCheckout
+                ? 'Join Discord to Order'
+                : (productUnavailable ? 'Unavailable' : 'Checkout Paused');
+
+            const statusBadge = document.querySelector('[data-product-status-badge]');
+            if (statusBadge) {
+                statusBadge.textContent = snapshot.status_label || (productReadyForCheckout ? 'Ready' : 'Updating');
+                statusBadge.classList.toggle('product-status-badge-ready', productReadyForCheckout);
+                statusBadge.classList.toggle('product-status-badge-updating', !productReadyForCheckout);
+            }
+
+            const availabilityValue = document.querySelector('[data-product-availability-value]');
+            const availabilityCaption = document.querySelector('[data-product-availability-caption]');
+            const availabilityNote = document.querySelector('[data-product-availability-note]');
+            const hasAutoDelivery = productReadyForCheckout && hasStock;
+
+            if (availabilityValue) {
+                availabilityValue.textContent = productUnavailable
+                    ? 'Unavailable'
+                    : (productReadyForCheckout ? (hasStock ? String(availableStock) : 'Manual') : 'Updating');
+                availabilityValue.classList.toggle('text-aksa-accent', hasAutoDelivery);
+                availabilityValue.classList.toggle('text-amber-300', !hasAutoDelivery);
+            }
+
+            if (availabilityCaption) {
+                availabilityCaption.textContent = productUnavailable
+                    ? 'not currently available'
+                    : (productReadyForCheckout
+                        ? (hasStock ? 'license ready' : 'order via Discord')
+                        : 'update alerts on Discord');
+            }
+
+            if (availabilityNote) {
+                availabilityNote.textContent = productUnavailable
+                    ? 'Browse other products'
+                    : (productReadyForCheckout
+                        ? (hasStock ? 'Auto delivery after paid' : 'Join Discord to order')
+                        : 'Join Discord for update alerts');
+            }
+
+            const checkoutPaused = document.querySelector('[data-checkout-paused]');
+            if (checkoutPaused) {
+                checkoutPaused.textContent = productUnavailable
+                    ? 'This product is no longer available. Please choose another product.'
+                    : 'Checkout is temporarily paused while this product is updating. Join Discord for availability alerts.';
+                checkoutPaused.classList.toggle('hidden', productReadyForCheckout);
+            }
+
+            const packageStocks = new Map();
+            snapshot.packages.forEach((item) => {
+                const packageId = Number(item?.id);
+                const packageStock = Number(item?.available_stock);
+
+                if (
+                    Number.isSafeInteger(packageId) &&
+                    packageId > 0 &&
+                    Number.isSafeInteger(packageStock) &&
+                    packageStock >= 0
+                ) {
+                    packageStocks.set(packageId, packageStock);
+                }
+            });
+
+            let selectedPackageStillAvailable = !selectedPackageId;
+            let selectedQuantityChanged = false;
+
+            document.querySelectorAll('[data-package-card]').forEach((card) => {
+                const packageId = Number(card.dataset.packageId);
+                const packageStock = packageStocks.get(packageId) || 0;
+                const packageCheckoutAvailable = productReadyForCheckout && packageStock > 0;
+                const availability = card.querySelector('[data-package-availability]');
+                const availabilityLabel = card.querySelector('[data-package-availability-label]');
+                const manualOrderButton = card.querySelector('[data-manual-order]');
+
+                card.dataset.stock = String(packageStock);
+                card.dataset.packageCheckoutEnabled = packageCheckoutAvailable ? 'true' : 'false';
+                card.setAttribute('aria-disabled', packageCheckoutAvailable ? 'false' : 'true');
+                card.classList.toggle('cursor-pointer', packageCheckoutAvailable);
+                card.classList.toggle('cursor-not-allowed', !packageCheckoutAvailable);
+                card.classList.toggle('opacity-75', !packageCheckoutAvailable);
+
+                if (availability) {
+                    availability.classList.toggle('package-availability-ready', packageCheckoutAvailable);
+                    availability.classList.toggle('package-availability-manual', !packageCheckoutAvailable);
+                }
+
+                if (availabilityLabel) {
+                    availabilityLabel.textContent = productUnavailable
+                        ? 'Product unavailable'
+                        : (!productReadyForCheckout
+                            ? 'Checkout paused during update'
+                            : (packageStock > 0 ? `${packageStock} licenses ready` : 'Manual order via Discord'));
+                }
+
+                if (manualOrderButton) {
+                    manualOrderButton.dataset.requestMode = productReadyForCheckout || productUnavailable
+                        ? 'manual-order'
+                        : 'update-alert';
+                    manualOrderButton.classList.toggle('hidden', packageCheckoutAvailable);
+                    manualOrderButton.classList.toggle('inline-flex', !packageCheckoutAvailable);
+
+                    const label = manualOrderButton.querySelector('[data-manual-order-label]');
+                    if (label) {
+                        label.textContent = productUnavailable
+                            ? 'Contact Support'
+                            : (productReadyForCheckout ? 'Join Discord to Order' : 'Get Update Alerts');
+                    }
+                }
+
+                if (packageId === selectedPackageId) {
+                    selectedPackageStillAvailable = packageCheckoutAvailable;
+
+                    if (packageCheckoutAvailable) {
+                        const previousQuantity = selectedQuantity;
+                        selectedPackageStock = packageStock;
+                        refreshQuantityOptions();
+                        selectedQuantityChanged = previousQuantity !== selectedQuantity;
+                    } else {
+                        card.classList.remove('active');
+                    }
+                }
+            });
+
+            if (!selectedPackageStillAvailable) {
+                resetSelectedPackage();
+            } else if (selectedQuantityChanged) {
+                if (appliedVoucherCode) {
+                    refreshVoucher();
+                } else {
+                    updatePrice();
+                }
+            }
+
+            refreshCheckoutControls();
+        }
+
+        async function refreshProductDetailStock() {
+            if (
+                productStockPollingDisposed ||
+                productDetailPageController.signal.aborted ||
+                document.hidden ||
+                productStockRequestController ||
+                !productStockEndpoint
+            ) {
+                return;
+            }
+
+            const controller = new AbortController();
+            productStockRequestController = controller;
+
+            try {
+                const response = await fetch(productStockEndpoint, {
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    signal: controller.signal,
+                });
+
+                if (response.status === 404) {
+                    if (!controller.signal.aborted && !productStockPollingDisposed) {
+                        applyProductStockSnapshot({
+                            id: currentProductId,
+                            status: 'Unavailable',
+                            status_label: 'Unavailable',
+                            available_stock: 0,
+                            packages: [],
+                        });
+                    }
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Product stock refresh failed with status ${response.status}`);
+                }
+
+                const snapshot = await response.json();
+
+                if (!controller.signal.aborted && !productStockPollingDisposed) {
+                    applyProductStockSnapshot(snapshot);
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    // Live stock is best-effort; the server still validates stock during checkout.
+                }
+            } finally {
+                if (productStockRequestController === controller) {
+                    productStockRequestController = null;
+                }
+            }
+        }
+
+        function clearProductStockPollingTimer() {
+            if (!productStockPollingTimer) return;
+
+            clearTimeout(productStockPollingTimer);
+            productStockPollingTimer = null;
+        }
+
+        function pauseProductStockPolling() {
+            clearProductStockPollingTimer();
+
+            const controller = productStockRequestController;
+            controller?.abort();
+
+            if (productStockRequestController === controller) {
+                productStockRequestController = null;
+            }
+        }
+
+        function scheduleProductStockPolling(delay = productStockPollingInterval) {
+            clearProductStockPollingTimer();
+
+            if (productStockPollingDisposed || productDetailPageController.signal.aborted || document.hidden) return;
+
+            productStockPollingTimer = setTimeout(async () => {
+                productStockPollingTimer = null;
+                await refreshProductDetailStock();
+                scheduleProductStockPolling();
+            }, delay);
+        }
+
+        async function resumeProductStockPolling() {
+            if (productStockPollingDisposed || productDetailPageController.signal.aborted || document.hidden) return;
+
+            clearProductStockPollingTimer();
+            await refreshProductDetailStock();
+            scheduleProductStockPolling();
+        }
+
+        function disposeProductDetailPage() {
+            if (productStockPollingDisposed) return;
+
+            productStockPollingDisposed = true;
+            pauseProductStockPolling();
+            if (addToCartFeedbackTimer) {
+                clearTimeout(addToCartFeedbackTimer);
+                addToCartFeedbackTimer = null;
+            }
+            productDetailPageController.abort();
         }
 
         function requireLogin() {
@@ -687,8 +1061,17 @@
         ========================= */
         function selectPayment(type) {
 
-            if (!productReadyForCheckout) {
-                showToast('Checkout paused', 'This product is still updating. Join Discord for availability alerts.', null, 'warning');
+            if (!isProductCheckoutAvailable()) {
+                showToast(
+                    productUnavailable ? 'Product unavailable' : (productReadyForCheckout ? 'Manual order' : 'Checkout paused'),
+                    productUnavailable
+                        ? 'This product is no longer available. Please choose another product.'
+                        : (productReadyForCheckout
+                        ? 'Auto delivery is out of stock. Join Discord to order manually.'
+                        : 'This product is still updating. Join Discord for availability alerts.'),
+                    null,
+                    'warning'
+                );
                 return;
             }
 
@@ -750,8 +1133,17 @@
            PACKAGE
         ========================= */
         function selectPackage(card) {
-            if (!productReadyForCheckout) {
-                showToast('Checkout paused', 'This product is still updating. Join Discord for availability alerts.', null, 'warning');
+            if (!productReadyForCheckout || card.dataset.packageCheckoutEnabled !== 'true') {
+                showToast(
+                    productUnavailable ? 'Product unavailable' : (productReadyForCheckout ? 'Manual order' : 'Checkout paused'),
+                    productUnavailable
+                        ? 'This product is no longer available. Please choose another product.'
+                        : (productReadyForCheckout
+                        ? 'Auto delivery is not ready for this package. Join Discord to order manually.'
+                        : 'This product is still updating. Join Discord for availability alerts.'),
+                    null,
+                    'warning'
+                );
                 return;
             }
 
@@ -1256,12 +1648,8 @@
         }
 
         function resetPayButton() {
-            const btn = document.getElementById('payMainBtn');
-            if (!btn || !hasStock) return;
-
-            btn.disabled = false;
-            setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay');
-            btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none');
+            paymentRequestPending = false;
+            refreshCheckoutControls();
         }
 
         /* =========================
@@ -1318,6 +1706,8 @@
         });
 
         document.getElementById('addToCartBtn')?.addEventListener('click', async function() {
+            if (addToCartRequestPending || !isProductCheckoutAvailable()) return;
+
             if (!isAuthenticated) {
                 requireLogin();
                 return;
@@ -1333,7 +1723,7 @@
                 return;
             }
 
-            const originalText = getButtonLabel(this);
+            addToCartRequestPending = true;
             this.disabled = true;
             setButtonLabel(this, 'Adding...');
             const body = new FormData();
@@ -1359,20 +1749,27 @@
                     throw new Error(data.message || 'The item could not be added to your cart.');
                 }
 
+                if (productStockPollingDisposed || !productDetailRoot?.isConnected) return;
+
                 document.querySelectorAll('[data-cart-count]').forEach((badge) => {
                     badge.innerText = data.cart_count;
                     badge.classList.toggle('hidden', Number(data.cart_count) <= 0);
                 });
                 showToast('Added to cart', data.message, null, 'success');
                 setButtonLabel(this, 'Added');
-                setTimeout(() => {
-                    setButtonLabel(this, originalText);
-                    this.disabled = false;
+                addToCartFeedbackTimer = setTimeout(() => {
+                    addToCartFeedbackTimer = null;
+                    if (productStockPollingDisposed || !productDetailRoot?.isConnected) return;
+
+                    addToCartRequestPending = false;
+                    refreshCheckoutControls();
                 }, 900);
             } catch (error) {
+                if (productStockPollingDisposed || !productDetailRoot?.isConnected) return;
+
                 showToast('Cart not updated', error.message, null, 'error');
-                setButtonLabel(this, originalText);
-                this.disabled = false;
+                addToCartRequestPending = false;
+                refreshCheckoutControls();
             }
         });
 
@@ -1413,6 +1810,7 @@
 
             showToast('Checkout started', 'Preparing your payment.');
 
+            paymentRequestPending = true;
             setButtonLabel(this, 'Processing...');
             this.classList.add('opacity-60')
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
@@ -1444,6 +1842,7 @@
                     }
 
                     if (error.status === 401) {
+                        resetPayButton();
                         requireLogin();
                         return;
                     }
@@ -1480,6 +1879,7 @@
                     }
 
                     if (error.status === 401) {
+                        resetPayButton();
                         requireLogin();
                         return;
                     }
@@ -1516,6 +1916,7 @@
                     }
 
                     if (error.status === 401) {
+                        resetPayButton();
                         requireLogin();
                         return;
                     }
@@ -1526,18 +1927,29 @@
             }
         });
 
-        window.addEventListener('pageshow', function() {
-            const btn = document.getElementById('payMainBtn')
-            if (btn) {
-                if (!hasStock) {
-                    btn.disabled = true
-                    setButtonLabel(btn, unavailablePayLabel)
-                    return
-                }
+        scheduleProductStockPolling();
 
-                btn.disabled = false
-                setButtonLabel(btn, isAuthenticated ? 'Pay Now' : 'Login to Pay')
-                btn.classList.remove('opacity-60', 'bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                pauseProductStockPolling();
+            } else {
+                resumeProductStockPolling();
+            }
+        }, {
+            signal: productDetailPageController.signal
+        });
+
+        window.addEventListener('pagehide', pauseProductStockPolling, {
+            signal: productDetailPageController.signal
+        });
+
+        window.addEventListener('pageshow', function(event) {
+            paymentRequestPending = false;
+            addToCartRequestPending = false;
+            refreshCheckoutControls();
+
+            if (event.persisted) {
+                resumeProductStockPolling();
             }
         }, {
             signal: productDetailPageController.signal
