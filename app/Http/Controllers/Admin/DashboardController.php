@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\GopayNotificationEvent;
 use App\Models\License;
 use App\Models\LicenseStock;
 use App\Models\Order;
@@ -107,6 +108,15 @@ class DashboardController extends Controller
             'delivery_issues' => $this->deliveryIssueCount($rangeMeta['from'], $activePaymentMethod),
         ];
 
+        $qrisEventStats = [
+            'attention' => GopayNotificationEvent::whereIn('status', [
+                'unmatched',
+                'ambiguous',
+                'stale',
+                'matched_delivery_pending',
+            ])->count(),
+        ];
+
         $topProducts = $this->topProducts($filteredPaidOrders);
         $paymentSplit = $this->paymentSplit($filteredPaidOrders);
 
@@ -127,7 +137,8 @@ class DashboardController extends Controller
             'topProducts',
             'paymentSplit',
             'lowStockPackages',
-            'lowStockThreshold'
+            'lowStockThreshold',
+            'qrisEventStats'
         ));
     }
 
@@ -147,6 +158,7 @@ class DashboardController extends Controller
         return [
             'all' => ['label' => 'All payments', 'short' => 'All'],
             'pakasir' => ['label' => 'QRIS', 'short' => 'QRIS'],
+            'gopay_qris' => ['label' => 'GoPay QRIS', 'short' => 'QRIS'],
             'binance_pay' => ['label' => 'Binance Pay', 'short' => 'Binance'],
             'crypto' => ['label' => 'Crypto', 'short' => 'Crypto'],
         ];
@@ -489,6 +501,7 @@ class DashboardController extends Controller
     {
         return match ($paymentMethod) {
             'pakasir' => 'QRIS IDR revenue',
+            'gopay_qris' => 'GoPay QRIS IDR revenue',
             'binance_pay' => 'Binance Pay crypto revenue',
             'crypto' => 'Crypto revenue',
             default => 'All order value',
@@ -546,6 +559,7 @@ class DashboardController extends Controller
     {
         return match ($method) {
             'pakasir' => 'QRIS',
+            'gopay_qris' => 'GoPay QRIS',
             'crypto' => 'Crypto',
             'binance_pay' => 'Binance Pay',
             default => ucfirst($method ?: 'Legacy'),

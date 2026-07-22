@@ -48,6 +48,7 @@ class PendingOrderExpirationService
         $summary = [
             'cancelled' => 0,
             'pakasir' => 0,
+            'gopay_qris' => 0,
             'crypto' => 0,
             'binance_pay' => 0,
         ];
@@ -72,6 +73,7 @@ class PendingOrderExpirationService
                 $method = match ($lockedOrder->payment_method) {
                     'crypto' => 'crypto',
                     'binance_pay' => 'binance_pay',
+                    'gopay_qris' => 'gopay_qris',
                     default => 'pakasir',
                 };
                 $summary['cancelled']++;

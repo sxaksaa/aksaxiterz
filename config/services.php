@@ -42,12 +42,33 @@ return [
     ],
 
     'pakasir' => [
+        'checkout_enabled' => (bool) env('PAKASIR_CHECKOUT_ENABLED', false),
         'slug' => env('PAKASIR_SLUG'),
         'api_key' => env('PAKASIR_API_KEY'),
         'url' => env('PAKASIR_URL', 'https://app.pakasir.com'),
         'return_url' => env('PAKASIR_RETURN_URL'),
         'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
         'expires_minutes' => (int) env('PAKASIR_EXPIRES_MINUTES', 5),
+    ],
+
+    'gopay_qris' => [
+        'enabled' => (bool) env('GOPAY_QRIS_ENABLED', false),
+        'static_payload' => env('GOPAY_QRIS_STATIC_PAYLOAD'),
+        'merchant_name' => env('GOPAY_QRIS_MERCHANT_NAME', 'Aksa Xiterz'),
+        'merchant_reference' => env('GOPAY_QRIS_MERCHANT_REFERENCE', 'ID102432979310'),
+        'expires_minutes' => (int) env('GOPAY_QRIS_EXPIRES_MINUTES', 10),
+        'grace_minutes' => (int) env('GOPAY_QRIS_GRACE_MINUTES', 2),
+        'recovery_hours' => (int) env('GOPAY_QRIS_RECOVERY_HOURS', 24),
+        'unique_max' => (int) env('GOPAY_QRIS_UNIQUE_MAX', 999),
+        'webhook_token' => env('GOPAY_QRIS_WEBHOOK_TOKEN'),
+        'webhook_secret' => env('GOPAY_QRIS_WEBHOOK_SECRET'),
+        'allowed_devices' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('GOPAY_QRIS_ALLOWED_DEVICES', ''))
+        ))),
+        'allowed_package' => env('GOPAY_QRIS_ALLOWED_PACKAGE', 'com.gojek.gopaymerchant'),
+        'webhook_max_skew_seconds' => (int) env('GOPAY_QRIS_WEBHOOK_MAX_SKEW_SECONDS', 300),
+        'notification_max_age_hours' => (int) env('GOPAY_QRIS_NOTIFICATION_MAX_AGE_HOURS', 24),
     ],
 
     'payments' => [

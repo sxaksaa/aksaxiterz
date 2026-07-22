@@ -19,7 +19,7 @@
             <canvas id="aksaQrisCanvas" width="256" height="256" aria-label="QRIS payment code"></canvas>
             <div id="aksaQrisExpiredOverlay" class="qris-expired-overlay hidden">
                 <strong>QRIS Expired</strong>
-                <span>This payment code is being closed. Start a new checkout to pay.</span>
+                <span>Do not pay this expired QR. Start a new checkout to get a fresh amount.</span>
             </div>
         </div>
 
@@ -29,12 +29,16 @@
                 <span id="aksaQrisOrderId" class="font-mono text-xs text-gray-300">-</span>
             </div>
             <div class="qris-detail-row">
-                <span>Product amount</span>
+                <span>Order subtotal</span>
                 <span id="aksaQrisBaseAmount" class="font-semibold text-gray-200">-</span>
             </div>
             <div class="qris-detail-row">
-                <span>QRIS fee</span>
-                <span id="aksaQrisFee" class="font-semibold text-gray-200">-</span>
+                <span>Platform fee (0.7%)</span>
+                <span id="aksaQrisPlatformFee" class="font-semibold text-gray-200">-</span>
+            </div>
+            <div class="qris-detail-row">
+                <span>Unique code</span>
+                <span id="aksaQrisUniqueAmount" class="font-semibold text-gray-200">-</span>
             </div>
             <div class="qris-detail-row qris-total-row">
                 <span>Total payment</span>
@@ -45,6 +49,10 @@
                 <span id="aksaQrisExpires" class="text-right font-mono text-gray-300">-</span>
             </div>
         </div>
+
+        <p class="mt-4 text-center text-xs leading-5 text-gray-400">
+            The exact amount is locked in this QR. Confirm the merchant name <strong class="text-gray-200">Aksa Xiterz</strong> before paying.
+        </p>
 
         <div class="mt-5">
             <button type="button" id="aksaQrisCheck" data-qris-check class="order-action w-full">

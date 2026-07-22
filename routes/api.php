@@ -1,9 +1,14 @@
 <?php
 
+use App\Http\Controllers\GopayNotificationController;
 use App\Http\Controllers\ProductStockController;
 use App\Http\Controllers\ProductStockDetailController;
 use App\Http\Controllers\RecentPurchaseController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/payments/gopay-qris/notifications', GopayNotificationController::class)
+    ->middleware('throttle:120,1')
+    ->name('payments.gopay-qris.notifications');
 
 Route::get('/product-stocks', ProductStockController::class)
     ->middleware('throttle:120,1')

@@ -106,7 +106,7 @@ class VoucherService
     ): array {
         $paymentMethod = strtolower($paymentMethod);
 
-        if (! in_array($paymentMethod, ['pakasir', 'crypto', 'binance_pay'], true)) {
+        if (! in_array($paymentMethod, ['pakasir', 'gopay_qris', 'crypto', 'binance_pay'], true)) {
             throw new VoucherException('Unsupported voucher payment method.');
         }
 

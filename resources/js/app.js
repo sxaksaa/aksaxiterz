@@ -8,6 +8,15 @@ let cryptoExpiryCountdownTimer = null;
 let binancePayExpiryCountdownTimer = null;
 let recentPurchaseToastCleanup = null;
 
+function loadQrLogo(source) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = source;
+    });
+}
+
 window.renderAksaQrCode = async function(target, value, options = {}) {
     const canvas = typeof target === 'string' ? document.querySelector(target) : target;
 
@@ -16,20 +25,50 @@ window.renderAksaQrCode = async function(target, value, options = {}) {
     }
 
     await QRCode.toCanvas(canvas, value, {
-        errorCorrectionLevel: 'M',
+        errorCorrectionLevel: 'H',
         margin: 1,
         width: options.width || 256,
         color: {
-            dark: '#09090c',
-            light: '#ffffff',
+            dark: options.darkColor || '#09090c',
+            light: options.lightColor || '#ffffff',
         },
     });
+
+    if (options.logoUrl) {
+        const logo = await loadQrLogo(options.logoUrl);
+        const context = canvas.getContext('2d');
+        const logoSize = Math.round(canvas.width * 0.18);
+        const logoPadding = Math.round(logoSize * 0.14);
+        const backgroundSize = logoSize + (logoPadding * 2);
+        const backgroundX = Math.round((canvas.width - backgroundSize) / 2);
+        const backgroundY = Math.round((canvas.height - backgroundSize) / 2);
+        const logoX = backgroundX + logoPadding;
+        const logoY = backgroundY + logoPadding;
+        const backgroundRadius = backgroundSize / 2;
+        const backgroundCenterX = canvas.width / 2;
+        const backgroundCenterY = canvas.height / 2;
+
+        context.save();
+        context.beginPath();
+        context.arc(backgroundCenterX, backgroundCenterY, backgroundRadius, 0, Math.PI * 2);
+        context.fillStyle = options.logoBackground || '#18112b';
+        context.fill();
+        context.lineWidth = Math.max(2, Math.round(canvas.width * 0.008));
+        context.strokeStyle = options.logoBorder || '#7c3aed';
+        context.stroke();
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        context.restore();
+    }
 
     return true;
 };
 
 const qrisState = {
     orderId: null,
+    statusUrl: null,
     pollTimer: null,
     isChecking: false,
     expiryHandled: false,
@@ -219,6 +258,34 @@ async function syncPakasirOrder(orderId) {
     return data;
 }
 
+async function syncGopayQrisOrder(orderId, statusUrl = null) {
+    if (!orderId) return null;
+
+    const endpoint = statusUrl || `/sync-gopay-qris-order/${encodeURIComponent(orderId)}`;
+    const response = await window.aksaFetchWithCsrf(endpoint, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && response.status !== 202) {
+        const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return data;
+}
+
+async function syncQrisOrder(orderId) {
+    return qrisState.statusUrl
+        ? syncGopayQrisOrder(orderId, qrisState.statusUrl)
+        : syncPakasirOrder(orderId);
+}
+
 async function syncCryptoOrder(orderId) {
     if (!orderId) return null;
 
@@ -281,7 +348,7 @@ function startQrisPolling(orderId) {
         qrisState.isChecking = true;
 
         try {
-            const result = await syncPakasirOrder(orderId);
+            const result = await syncQrisOrder(orderId);
 
             if (result?.status === 'paid') {
                 stopQrisPolling();
@@ -295,7 +362,7 @@ function startQrisPolling(orderId) {
                 stopQrisPolling();
             }
         } catch (error) {
-            stopQrisPolling();
+            // Keep polling after transient network/server errors.
         } finally {
             qrisState.isChecking = false;
         }
@@ -348,7 +415,7 @@ async function handleQrisExpiry() {
     qrisState.isChecking = true;
 
     try {
-        const result = await syncPakasirOrder(qrisState.orderId);
+        const result = await syncQrisOrder(qrisState.orderId);
 
         if (result?.status === 'paid') {
             stopQrisPolling();
@@ -372,6 +439,7 @@ async function handleQrisExpiry() {
 }
 
 window.syncAksaPakasirOrder = syncPakasirOrder;
+window.syncAksaGopayQrisOrder = syncGopayQrisOrder;
 window.syncAksaCryptoOrder = syncCryptoOrder;
 window.syncAksaBinancePayOrder = syncBinancePayOrder;
 
@@ -580,19 +648,24 @@ function startBinancePayExpiryCountdown(value, remainingSeconds) {
 
 window.openAksaQrisModal = async function(checkout, options = {}) {
     const modal = document.getElementById('aksaQrisModal');
-    const payment = checkout?.pakasir_payment;
+    const payment = checkout?.qris_payment || checkout?.pakasir_payment;
+    const qrPayload = payment?.qr_payload || payment?.payment_number;
 
-    if (!modal || !payment?.payment_number) {
+    if (!modal || !qrPayload) {
         return false;
     }
 
     qrisState.orderId = checkout.order_id || null;
+    qrisState.statusUrl = checkout.method === 'gopay_qris'
+        ? (checkout.status_url || `/sync-gopay-qris-order/${encodeURIComponent(qrisState.orderId || '')}`)
+        : null;
     qrisState.expiryHandled = false;
 
     document.getElementById('aksaQrisOrderId').innerText = checkout.order_id || '-';
-    document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.amount);
-    document.getElementById('aksaQrisFee').innerText = formatIdr(payment.fee);
-    document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment);
+    document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.base_amount ?? payment.amount);
+    document.getElementById('aksaQrisPlatformFee').innerText = formatIdr(payment.platform_fee ?? payment.fee ?? 0);
+    document.getElementById('aksaQrisUniqueAmount').innerText = formatIdr(payment.unique_amount ?? 0);
+    document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment ?? payment.amount);
     document.getElementById('aksaQrisExpiredOverlay')?.classList.add('hidden');
     const checkButton = document.getElementById('aksaQrisCheck');
     if (checkButton) setButtonLabel(checkButton, 'Check Payment');
@@ -602,8 +675,11 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
 
-    await window.renderAksaQrCode('#aksaQrisCanvas', payment.payment_number, {
+    await window.renderAksaQrCode('#aksaQrisCanvas', qrPayload, {
         width: 280,
+        logoUrl: '/images/logo.png',
+        darkColor: '#121018',
+        lightColor: '#f8f7ff',
     });
 
     if (options.startPolling !== false && qrisState.orderId) {
@@ -620,6 +696,8 @@ window.closeAksaQrisModal = function() {
 
     stopQrisPolling();
     stopQrisExpiryCountdown();
+    qrisState.orderId = null;
+    qrisState.statusUrl = null;
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('overflow-hidden');
@@ -2458,7 +2536,7 @@ document.addEventListener('click', async (event) => {
     button.classList.add('opacity-60', 'pointer-events-none');
 
     try {
-        const result = await syncPakasirOrder(qrisState.orderId);
+        const result = await syncQrisOrder(qrisState.orderId);
 
         if (result?.status === 'paid') {
             stopQrisPolling();

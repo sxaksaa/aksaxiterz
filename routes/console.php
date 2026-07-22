@@ -243,6 +243,7 @@ Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending o
     $this->info('Expired pending order cleanup complete.');
     $this->line("Cancelled: {$summary['cancelled']}");
     $this->line("QRIS: {$summary['pakasir']}");
+    $this->line("GoPay QRIS: {$summary['gopay_qris']}");
     $this->line("Crypto: {$summary['crypto']}");
     $this->line("Binance Pay: {$summary['binance_pay']}");
 

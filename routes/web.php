@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DownloadController;
+use App\Http\Controllers\Admin\GopayNotificationEventController;
 use App\Http\Controllers\Admin\LicenseStockController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
@@ -278,8 +279,14 @@ Route::middleware('auth')->group(function () {
     // Pakasir
     Route::post('/process-order/{id}', [PaymentController::class, 'payPakasir'])
         ->middleware('throttle:20,1');
+    Route::post('/pay-gopay-qris/{id}', [PaymentController::class, 'payGopayQris'])
+        ->middleware('throttle:20,1')
+        ->name('gopay-qris.pay');
     Route::post('/sync-pakasir-order/{orderId}', [PaymentController::class, 'syncPakasirOrder'])
         ->middleware('throttle:10,1');
+    Route::post('/sync-gopay-qris-order/{orderId}', [PaymentController::class, 'syncGopayQrisOrder'])
+        ->middleware('throttle:30,1')
+        ->name('gopay-qris.sync');
     Route::post('/sync-crypto-order/{orderId}', [PaymentController::class, 'syncCryptoOrder'])
         ->middleware('throttle:20,1');
     Route::post('/sync-binance-pay-order/{orderId}', [PaymentController::class, 'syncBinancePayOrder'])
@@ -315,6 +322,8 @@ Route::middleware('auth')->group(function () {
                     ! $order->expired_at,
                 'can_sync_binance_pay' => $order->payment_method === 'binance_pay' &&
                     $order->status === 'pending',
+                'can_sync_gopay_qris' => $order->payment_method === 'gopay_qris' &&
+                    $order->status === 'pending',
             ]);
         }
 
@@ -333,6 +342,8 @@ Route::middleware('auth')->group(function () {
             'can_sync_binance_pay' => $order->payment_method === 'binance_pay' &&
                 in_array($order->status, ['pending', 'cancelled'], true) &&
                 $remaining > -$binancePayVerifySeconds,
+            'can_sync_gopay_qris' => $order->payment_method === 'gopay_qris' &&
+                $order->status === 'pending',
         ]);
     })->middleware('throttle:30,1');
 
@@ -411,6 +422,7 @@ Route::middleware(['auth', 'admin', 'admin.activity'])
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/activity', [ActivityLogController::class, 'index'])->name('activity.index');
+        Route::get('/gopay-events', [GopayNotificationEventController::class, 'index'])->name('gopay-events.index');
         Route::get('/license-stocks', [LicenseStockController::class, 'index'])->name('license-stocks.index');
         Route::post('/license-stocks', [LicenseStockController::class, 'store'])->name('license-stocks.store');
         Route::patch('/license-stocks/{licenseStock}', [LicenseStockController::class, 'update'])->name('license-stocks.update');

@@ -2125,12 +2125,14 @@
     }
 
     .qris-canvas-wrap {
-        @apply relative mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center overflow-hidden rounded-xl border bg-white p-3;
+        @apply relative mx-auto flex aspect-square w-full max-w-[304px] items-center justify-center overflow-hidden rounded-2xl border p-3 shadow-xl;
         border-color: rgba(180, 155, 255, 0.32);
+        background: rgba(20, 17, 34, 0.92);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.3), 0 0 24px rgba(124, 58, 237, 0.1);
     }
 
     .qris-canvas-wrap canvas {
-        @apply h-full w-full;
+        @apply h-full w-full rounded-xl;
     }
 
     .qris-expired-overlay {

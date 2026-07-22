@@ -1,6 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
+    @php
+        $qrisMethod = config('services.gopay_qris.enabled')
+            ? 'gopay_qris'
+            : (config('services.pakasir.checkout_enabled', false) ? 'pakasir' : null);
+        $qrisUnavailable = blank($qrisMethod);
+    @endphp
     <div class="page-shell py-6 md:py-10">
         <section class="product-hero mb-6 fade-up">
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -128,15 +134,17 @@
 
                     <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Payment Method</p>
                     <div class="grid gap-2">
-                        <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
-                            data-cart-payment="pakasir" @disabled($hasUnavailableItems)>
+                        <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems || $qrisUnavailable ? 'cursor-not-allowed opacity-60' : '' }}"
+                            data-cart-payment="{{ $qrisMethod }}" @disabled($hasUnavailableItems || $qrisUnavailable)>
                             <span class="payment-card-heading">
                                 <span class="payment-card-icon">
                                     <x-ui.icon name="qr-code" class="h-5 w-5" />
                                 </span>
                                 <span class="font-semibold text-white">QRIS</span>
                             </span>
-                            <span class="mt-1 block text-xs text-gray-400">Pay the bundle total in IDR</span>
+                            <span class="mt-1 block text-xs text-gray-400">
+                                {{ $qrisUnavailable ? 'QRIS checkout is temporarily unavailable' : 'Pay the bundle total in IDR' }}
+                            </span>
                         </button>
                         @if ($binancePayAvailable)
                             <button type="button" class="checkout-card payment-card p-4 text-left {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
@@ -316,10 +324,11 @@
 
                 function updateTotals() {
                     const stablecoin = paymentMethod === 'crypto' || paymentMethod === 'binance_pay';
-                    const subtotal = stablecoin ? formatUsd(subtotalUsdt) : (paymentMethod === 'pakasir' ? formatIdr(subtotalIdr) : 'Select payment');
+                    const isQris = paymentMethod === 'pakasir' || paymentMethod === 'gopay_qris';
+                    const subtotal = stablecoin ? formatUsd(subtotalUsdt) : (isQris ? formatIdr(subtotalIdr) : 'Select payment');
                     const total = stablecoin
                         ? `${formatUsd(voucherQuote ? voucherQuote.final_usdt : subtotalUsdt)} + unique amount`
-                        : (paymentMethod === 'pakasir' ? formatIdr(voucherQuote ? voucherQuote.final_idr : subtotalIdr) : 'Select payment');
+                        : (isQris ? formatIdr(voucherQuote ? voucherQuote.final_idr : subtotalIdr) : 'Select payment');
                     const discount = stablecoin
                         ? `-${formatUsd(voucherQuote?.discount_usdt || 0)}`
                         : `-${formatIdr(voucherQuote?.discount_idr || 0)}`;
@@ -573,7 +582,7 @@
                         }
 
                         let opened = false;
-                        if (paymentMethod === 'pakasir') opened = await window.openAksaQrisModal?.(data);
+                        if (paymentMethod === 'pakasir' || paymentMethod === 'gopay_qris') opened = await window.openAksaQrisModal?.(data);
                         if (paymentMethod === 'binance_pay') opened = await window.openAksaBinancePayModal?.(data, { startPolling: true });
                         if (paymentMethod === 'crypto') opened = await window.openAksaCryptoModal?.(data, { startPolling: true });
 

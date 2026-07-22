@@ -239,6 +239,16 @@
                 return;
             }
 
+            if (data.method === 'gopay_qris' && data.qris_payment) {
+                const opened = await window.openAksaQrisModal?.(data, { startPolling: true });
+
+                if (!opened) {
+                    await refreshOrders();
+                }
+
+                return;
+            }
+
             if (data.method === 'pakasir' && data.payment_url) {
                 const opened = await window.openAksaQrisModal?.(data);
 
@@ -443,23 +453,26 @@
         });
 
         document.addEventListener('submit', async function(e) {
-            const form = e.target.closest('.sync-pakasir-form');
+            const form = e.target.closest('.sync-pakasir-form, .sync-qris-form');
             if (!form) return;
 
             e.preventDefault();
 
-            const button = form.querySelector('.sync-pakasir-button');
+            const button = form.querySelector('.sync-qris-button');
             const orderId = button?.dataset.orderId;
+            const qrisMethod = button?.dataset.qrisMethod || 'pakasir';
             const originalText = getButtonLabel(button);
 
             button.disabled = true;
             setButtonLabel(button, 'Checking...');
             button.classList.add('opacity-60', 'pointer-events-none');
 
-            window.showAppToast?.('Payment check', 'Checking your QRIS payment via Pakasir.');
+            window.showAppToast?.('Payment check', 'Checking your QRIS payment status.');
 
             try {
-                const result = await syncPakasirOrder(orderId);
+                const result = qrisMethod === 'gopay_qris'
+                    ? await window.syncAksaGopayQrisOrder?.(orderId)
+                    : await syncPakasirOrder(orderId);
 
                 if (result?.status === 'paid') {
                     window.showAksaPaymentSuccess?.({
@@ -659,6 +672,28 @@
                     if (result?.status === 'paid') {
                         window.showAksaPaymentSuccess?.({
                             message: 'Your QRIS payment has been verified and your license is ready.',
+                            licenseKey: result.license_key,
+                            licenseKeys: result.license_keys,
+                            orderId: result.order_id || data.order_id,
+                        }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                            variant: 'success',
+                        });
+                        refreshOrders();
+                        return;
+                    }
+
+                    if (result?.status && result.status !== lastPolledStatus) {
+                        lastPolledStatus = result.status;
+                        refreshOrders();
+                    }
+                }
+
+                if (data.can_sync_gopay_qris && data.payment_method === 'gopay_qris' && data.order_id && !qrisModalOpen) {
+                    const result = await window.syncAksaGopayQrisOrder?.(data.order_id);
+
+                    if (result?.status === 'paid') {
+                        window.showAksaPaymentSuccess?.({
+                            message: result.message || 'Your QRIS payment has been verified and your license is ready.',
                             licenseKey: result.license_key,
                             licenseKeys: result.license_keys,
                             orderId: result.order_id || data.order_id,

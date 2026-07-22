@@ -49,6 +49,7 @@ class PaymentService
         ?string $voucherCode = null,
         int $quantity = 1
     ): array {
+        $this->ensurePakasirCheckoutEnabled();
         $product = Product::findOrFail($productId);
         $this->ensureProductPurchasable($product);
         $this->ensurePakasirConfigured();
@@ -110,6 +111,88 @@ class PaymentService
             'pakasir_payment' => $order->fresh()->payment_payload,
             'order' => $order->fresh(),
         ];
+    }
+
+    public function createGopayQrisPayment(
+        $user,
+        $productId,
+        $packageId,
+        ?Order $order = null,
+        ?string $voucherCode = null,
+        int $quantity = 1
+    ): array {
+        $product = Product::findOrFail($productId);
+        $this->ensureProductPurchasable($product);
+        $this->ensureGopayQrisConfigured();
+
+        $package = Package::where('id', $packageId)
+            ->where('product_id', $productId)
+            ->firstOrFail();
+
+        if ($order) {
+            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'gopay_qris');
+        }
+
+        $quantity = $this->checkoutQuantity($order ? max(1, (int) ($order->quantity ?: 1)) : $quantity);
+
+        if ($this->availableStockCount($product, $package, $order) < $quantity) {
+            throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
+        }
+
+        $expiresAt = now()->addMinutes(max(1, (int) config('services.gopay_qris.expires_minutes', 10)));
+        $order = $this->prepareOrder(
+            $user,
+            $product,
+            $package,
+            'gopay_qris',
+            $order,
+            $voucherCode,
+            $expiresAt,
+            $order?->order_id,
+            null,
+            $quantity
+        );
+        $baseAmount = $this->idrAmount($order->price);
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $amountBreakdown = $this->claimGopayQrisAmount($order, $baseAmount);
+            $platformFee = $amountBreakdown['platform_fee'];
+            $uniqueAmount = $amountBreakdown['unique_amount'];
+            $totalAmount = $amountBreakdown['total_amount'];
+            $qrPayload = app(QrisPayloadService::class)->dynamic(
+                (string) config('services.gopay_qris.static_payload'),
+                $totalAmount
+            );
+
+            $order->update([
+                'price' => $totalAmount,
+                'payment_url' => null,
+                'payment_payload' => $this->normalizeGopayQrisPayment(
+                    $order,
+                    $baseAmount,
+                    $platformFee,
+                    $uniqueAmount,
+                    $totalAmount,
+                    $qrPayload,
+                    $expiresAt
+                ),
+                'expired_at' => $expiresAt,
+            ]);
+            $freshOrder = $order->fresh(['items']);
+            $this->stockReservationService->reserve($freshOrder);
+
+            return [
+                'payment_url' => null,
+                'gopay_qris_payment' => $freshOrder->payment_payload,
+                'order' => $freshOrder,
+            ];
+        } catch (\Exception $error) {
+            Log::error('GOPAY QRIS ERROR: '.$error->getMessage());
+            $this->cancelPendingOrder($order);
+
+            throw $error;
+        }
     }
 
     public function getPakasirStatus(Order $order): array
@@ -344,6 +427,7 @@ class PaymentService
         ?Order $order = null,
         ?string $voucherCode = null
     ): array {
+        $this->ensurePakasirCheckoutEnabled();
         $this->ensureCartProductsPurchasable($items);
         $this->ensurePakasirConfigured();
         $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
@@ -379,6 +463,69 @@ class PaymentService
             'pakasir_payment' => $order->fresh()->payment_payload,
             'order' => $order->fresh(['items']),
         ];
+    }
+
+    public function createCartGopayQrisPayment(
+        $user,
+        Collection $items,
+        ?Order $order = null,
+        ?string $voucherCode = null
+    ): array {
+        $this->ensureCartProductsPurchasable($items);
+        $this->ensureGopayQrisConfigured();
+        $expiresAt = now()->addMinutes(max(1, (int) config('services.gopay_qris.expires_minutes', 10)));
+        $order = $this->prepareCartOrder(
+            $user,
+            $items,
+            'gopay_qris',
+            $order,
+            $voucherCode,
+            $expiresAt
+        );
+        $baseAmount = $this->idrAmount($order->price);
+
+        try {
+            $this->stockReservationService->reserve($order);
+            $amountBreakdown = $this->claimGopayQrisAmount($order, $baseAmount);
+            $platformFee = $amountBreakdown['platform_fee'];
+            $uniqueAmount = $amountBreakdown['unique_amount'];
+            $totalAmount = $amountBreakdown['total_amount'];
+            $qrPayload = app(QrisPayloadService::class)->dynamic(
+                (string) config('services.gopay_qris.static_payload'),
+                $totalAmount
+            );
+            $payload = $this->normalizeGopayQrisPayment(
+                $order,
+                $baseAmount,
+                $platformFee,
+                $uniqueAmount,
+                $totalAmount,
+                $qrPayload,
+                $expiresAt
+            );
+            $payload['quantity'] = $order->total_quantity;
+            $payload['item_count'] = $order->item_count;
+
+            $order->update([
+                'price' => $totalAmount,
+                'payment_url' => null,
+                'payment_payload' => $payload,
+                'expired_at' => $expiresAt,
+            ]);
+            $freshOrder = $order->fresh(['items']);
+            $this->stockReservationService->reserve($freshOrder);
+
+            return [
+                'payment_url' => null,
+                'gopay_qris_payment' => $freshOrder->payment_payload,
+                'order' => $freshOrder,
+            ];
+        } catch (\Exception $error) {
+            Log::error('CART GOPAY QRIS ERROR: '.$error->getMessage());
+            $this->cancelPendingOrder($order);
+
+            throw $error;
+        }
     }
 
     public function createCartCryptoPayment(
@@ -1059,7 +1206,8 @@ class PaymentService
     {
         $recoveryHours = max(1, (int) config('services.crypto_direct.recovery_hours', 24));
 
-        Order::whereNotNull('payment_match_key')
+        Order::where('payment_method', 'crypto')
+            ->whereNotNull('payment_match_key')
             ->where(function ($query) use ($recoveryHours): void {
                 $query->where('status', 'paid')
                     ->orWhere(function ($expired) use ($recoveryHours): void {
@@ -1102,7 +1250,8 @@ class PaymentService
     {
         $recoveryHours = max(1, (int) config('services.binance.pay.recovery_hours', 24));
 
-        Order::whereNotNull('payment_match_key')
+        Order::where('payment_method', 'binance_pay')
+            ->whereNotNull('payment_match_key')
             ->where(function ($query) use ($recoveryHours): void {
                 $query->where('status', 'paid')
                     ->orWhere(function ($expired) use ($recoveryHours): void {
@@ -1144,6 +1293,78 @@ class PaymentService
         }
 
         throw new \Exception('No unique Binance Pay amount is currently available');
+    }
+
+    /**
+     * @return array{platform_fee: int, unique_amount: int, total_amount: int}
+     */
+    private function claimGopayQrisAmount(Order $order, int $baseAmount): array
+    {
+        if ($baseAmount < 1) {
+            throw new \Exception('Invalid GoPay QRIS amount');
+        }
+
+        $recoveryHours = max(1, (int) config('services.gopay_qris.recovery_hours', 24));
+
+        Order::where('payment_method', 'gopay_qris')
+            ->whereNotNull('payment_match_key')
+            ->where(function ($query) use ($recoveryHours): void {
+                $query->where(function ($paid) use ($recoveryHours): void {
+                    $paid->where('status', 'paid')
+                        ->where(function ($settled) use ($recoveryHours): void {
+                            $settled->where('paid_at', '<=', now()->subHours($recoveryHours))
+                                ->orWhere(function ($missingPaidAt) use ($recoveryHours): void {
+                                    $missingPaidAt->whereNull('paid_at')
+                                        ->where('updated_at', '<=', now()->subHours($recoveryHours));
+                                });
+                        });
+                })
+                    ->orWhere(function ($expired) use ($recoveryHours): void {
+                        $expired->where('status', 'cancelled')
+                            ->where(function ($deadline) use ($recoveryHours): void {
+                                $deadline->where('expired_at', '<=', now()->subHours($recoveryHours))
+                                    ->orWhere(function ($missingExpiry) use ($recoveryHours): void {
+                                        $missingExpiry->whereNull('expired_at')
+                                            ->where('created_at', '<=', now()->subHours($recoveryHours + 1));
+                                    });
+                            });
+                    });
+            })
+            ->update(['payment_match_key' => null]);
+
+        $uniqueMax = max(1, min(999, (int) config('services.gopay_qris.unique_max', 999)));
+        $merchantReference = strtolower(trim((string) config('services.gopay_qris.merchant_reference')));
+        $hash = (int) sprintf('%u', crc32($order->order_id.'|gopay-qris'));
+
+        // Gross up the subtotal so a 0.7% deduction still leaves the merchant
+        // with at least the original base amount.
+        $platformFee = (int) ceil($baseAmount / 0.993) - $baseAmount;
+
+        for ($attempt = 0; $attempt < $uniqueMax; $attempt++) {
+            $uniqueAmount = (($hash + $attempt) % $uniqueMax) + 1;
+
+            $amount = $baseAmount + $platformFee + $uniqueAmount;
+            $matchKey = hash('sha256', implode('|', ['gopay_qris', $merchantReference, $amount]));
+
+            try {
+                $order->update([
+                    'price' => $amount,
+                    'payment_match_key' => $matchKey,
+                ]);
+
+                return [
+                    'platform_fee' => $platformFee,
+                    'unique_amount' => $uniqueAmount,
+                    'total_amount' => $amount,
+                ];
+            } catch (QueryException $error) {
+                if (! str_contains(strtolower($error->getMessage()), 'payment_match_key')) {
+                    throw $error;
+                }
+            }
+        }
+
+        throw new \Exception('No unique GoPay QRIS amount is currently available');
     }
 
     private function binancePayAmount(
@@ -1411,6 +1632,34 @@ class PaymentService
         ];
     }
 
+    private function normalizeGopayQrisPayment(
+        Order $order,
+        int $baseAmount,
+        int $platformFee,
+        int $uniqueAmount,
+        int $totalAmount,
+        string $qrPayload,
+        Carbon $expiresAt
+    ): array {
+        return [
+            'type' => 'gopay_qris_notification',
+            'merchant_name' => trim((string) config('services.gopay_qris.merchant_name', 'Aksa Xiterz')),
+            'merchant_reference' => trim((string) config('services.gopay_qris.merchant_reference')),
+            'amount' => $totalAmount,
+            'base_amount' => $baseAmount,
+            'platform_fee' => $platformFee,
+            'unique_amount' => $uniqueAmount,
+            'total_payment' => $totalAmount,
+            'payment_method' => 'qris',
+            'qr_payload' => $qrPayload,
+            'payment_number' => $qrPayload,
+            'quantity' => (int) $order->quantity,
+            'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
+            'expires_at' => $expiresAt->toIso8601String(),
+            'scanner_status' => 'pending',
+        ];
+    }
+
     private function ensurePayableOrder(Order $order, $user, int $productId, int $packageId, string $method): void
     {
         if (
@@ -1559,6 +1808,38 @@ class PaymentService
     {
         if (! config('services.pakasir.slug') || ! config('services.pakasir.api_key')) {
             throw new \Exception('Pakasir is not configured');
+        }
+    }
+
+    private function ensurePakasirCheckoutEnabled(): void
+    {
+        if (! (bool) config('services.pakasir.checkout_enabled', false)) {
+            throw new \Exception('Pakasir checkout is disabled.');
+        }
+    }
+
+    private function ensureGopayQrisConfigured(): void
+    {
+        $config = config('services.gopay_qris', []);
+        $payload = trim((string) ($config['static_payload'] ?? ''));
+
+        if (
+            ! is_array($config) ||
+            ! ($config['enabled'] ?? false) ||
+            $payload === '' ||
+            blank($config['webhook_token'] ?? null) ||
+            blank($config['webhook_secret'] ?? null) ||
+            empty($config['allowed_devices'] ?? []) ||
+            ! app(QrisPayloadService::class)->validate($payload)
+        ) {
+            throw new \Exception('GoPay QRIS checkout is not configured');
+        }
+
+        $payloadMerchant = mb_strtolower(app(QrisPayloadService::class)->merchantName($payload));
+        $configuredMerchant = mb_strtolower(trim((string) ($config['merchant_name'] ?? '')));
+
+        if ($configuredMerchant === '' || ! hash_equals($configuredMerchant, $payloadMerchant)) {
+            throw new \Exception('GoPay QRIS merchant identity does not match');
         }
     }
 

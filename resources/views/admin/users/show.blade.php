@@ -95,6 +95,7 @@
                                 $methodLabel = match ($order->payment_method) {
                                     'crypto' => 'Crypto',
                                     'pakasir' => 'QRIS',
+                                    'gopay_qris' => 'GoPay QRIS',
                                     'binance_pay' => 'Binance Pay',
                                     default => ucfirst($order->payment_method ?: 'Legacy'),
                                 };

@@ -79,6 +79,7 @@
                     <select name="method" class="search-bar w-full">
                         <option value="">All methods</option>
                         <option value="pakasir" @selected(request('method') === 'pakasir')>QRIS</option>
+                        <option value="gopay_qris" @selected(request('method') === 'gopay_qris')>GoPay QRIS</option>
                         <option value="crypto" @selected(request('method') === 'crypto')>Crypto</option>
                         <option value="binance_pay" @selected(request('method') === 'binance_pay')>Binance Pay</option>
                     </select>
@@ -136,6 +137,7 @@
                                 $methodLabel = match ($order->payment_method) {
                                     'crypto' => 'Crypto',
                                     'pakasir' => 'QRIS',
+                                    'gopay_qris' => 'GoPay QRIS',
                                     'binance_pay' => 'Binance Pay',
                                     default => ucfirst($order->payment_method ?: 'Legacy'),
                                 };
@@ -217,6 +219,7 @@
                                 {{ match ($order->payment_method) {
                                     'crypto' => 'Crypto',
                                     'pakasir' => 'QRIS',
+                                    'gopay_qris' => 'GoPay QRIS',
                                     'binance_pay' => 'Binance Pay',
                                     default => ucfirst($order->payment_method ?: 'Legacy'),
                                 } }}

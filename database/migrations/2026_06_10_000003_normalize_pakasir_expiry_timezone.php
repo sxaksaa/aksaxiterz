@@ -32,7 +32,7 @@ return new class extends Migration
                         $localExpiry = Carbon::parse($normalized)
                             ->timezone($timezone)
                             ->format('Y-m-d H:i:s');
-                    } catch (\Throwable) {
+                    } catch (Throwable) {
                         continue;
                     }
 
@@ -43,7 +43,5 @@ return new class extends Migration
             });
     }
 
-    public function down(): void
-    {
-    }
+    public function down(): void {}
 };

@@ -178,6 +178,7 @@ class VoucherController extends Controller
             'binance_pay' => 'Binance Pay',
             'crypto' => 'Crypto',
             'pakasir' => 'QRIS',
+            'gopay_qris' => 'GoPay QRIS',
             default => ucfirst($order->payment_method ?: 'Legacy'),
         };
         $itemLabels = $items

@@ -13,6 +13,15 @@
             filled(config('services.binance.pay.api_key')) &&
             filled(config('services.binance.pay.api_secret'));
         $binancePayAvailable = app()->environment('local') || $binancePayConfigured;
+        $qrisMethod = config('services.gopay_qris.enabled')
+            ? 'gopay_qris'
+            : (config('services.pakasir.checkout_enabled', false) ? 'pakasir' : null);
+        $qrisCheckoutUrl = match ($qrisMethod) {
+            'gopay_qris' => route('gopay-qris.pay', $product->id),
+            'pakasir' => url('/process-order/'.$product->id),
+            default => '#',
+        };
+        $qrisCheckoutAvailable = $checkoutAvailable && filled($qrisMethod);
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatUsdCompact = function ($amount) {
             $amount = (float) $amount;
@@ -181,9 +190,9 @@
 
         <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
 
-            <div id="btnPakasir" data-payment-method="pakasir"
-                aria-disabled="{{ $checkoutAvailable ? 'false' : 'true' }}"
-                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $checkoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' }}">
+            <div id="btnPakasir" data-payment-method="{{ $qrisMethod }}"
+                aria-disabled="{{ $qrisCheckoutAvailable ? 'false' : 'true' }}"
+                class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $qrisCheckoutAvailable ? 'cursor-pointer' : 'pointer-events-none cursor-not-allowed opacity-60' }}">
 
                 <div class="payment-card-heading">
                     <span class="payment-card-icon">
@@ -191,7 +200,9 @@
                     </span>
                     <div class="font-semibold">QRIS</div>
                 </div>
-                <span class="text-xs text-gray-400">QRIS for Indonesia & Malaysia-supported wallets</span>
+                <span class="text-xs text-gray-400">
+                    {{ filled($qrisMethod) ? 'QRIS for Indonesia & Malaysia-supported wallets' : 'QRIS checkout is temporarily unavailable' }}
+                </span>
 
             </div>
 
@@ -516,7 +527,7 @@
                 </button>
             </div>
             <!-- PAKASIR FORM -->
-            <form id="pakasirForm" method="POST" action="/process-order/{{ $product->id }}" class="hidden">
+            <form id="pakasirForm" method="POST" action="{{ $qrisCheckoutUrl }}" class="hidden">
                 @csrf
                 <input type="hidden" name="package_id" id="pakasir_package">
                 <input type="hidden" name="quantity" id="pakasir_quantity" value="1">
@@ -1085,6 +1096,7 @@
                 crypto: 'btnCrypto',
                 binance_pay: 'btnBinancePay',
                 pakasir: 'btnPakasir',
+                gopay_qris: 'btnPakasir',
             }[type];
             const el = document.getElementById(target);
 
@@ -1123,7 +1135,7 @@
                     ? 'Direct stablecoin address is active. Choose a coin and network next.'
                     : (type === 'binance_pay'
                         ? 'Binance Pay is active. Choose USDT or USDC next.'
-                        : 'QRIS via Pakasir is active.'),
+                        : 'QRIS with an exact locked amount is active.'),
                 null,
                 'success'
             );
@@ -1210,7 +1222,7 @@
             const subtotalIdr = selectedPrice * selectedQuantity;
             const subtotalUsd = selectedUsd * selectedQuantity;
 
-            if (selectedPayment === 'pakasir') {
+            if (selectedPayment === 'pakasir' || selectedPayment === 'gopay_qris') {
                 subtotal = formatIdr(subtotalIdr);
                 total = voucherQuote ? formatIdr(voucherQuote.final_idr) : subtotal;
                 discount = voucherQuote ? `-${formatIdr(voucherQuote.discount_idr)}` : '-';
@@ -1816,7 +1828,7 @@
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
 
-            if (selectedPayment === 'pakasir') {
+            if (selectedPayment === 'pakasir' || selectedPayment === 'gopay_qris') {
 
                 document.getElementById('pakasir_package').value = selectedPackageId;
                 document.getElementById('pakasir_quantity').value = selectedQuantity;

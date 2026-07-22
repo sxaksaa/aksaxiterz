@@ -324,7 +324,7 @@
                     </a>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <a href="{{ route('admin.orders.index', ['status' => 'pending']) }}" class="order-stat transition hover:border-aksa-accent-50">
                         <div class="text-xl font-semibold text-white">{{ $orderStats['pending'] }}</div>
                         <div class="mt-1 text-xs text-gray-400">Pending orders</div>
@@ -344,6 +344,12 @@
                             {{ $stockStats['low_stock'] }}
                         </div>
                         <div class="mt-1 text-xs text-gray-400">Low stock packages</div>
+                    </a>
+                    <a href="{{ route('admin.gopay-events.index') }}" class="order-stat transition hover:border-red-400/40">
+                        <div class="text-xl font-semibold {{ $qrisEventStats['attention'] > 0 ? 'text-red-200' : 'text-white' }}">
+                            {{ $qrisEventStats['attention'] }}
+                        </div>
+                        <div class="mt-1 text-xs text-gray-400">QRIS events to review</div>
                     </a>
                 </div>
             </section>

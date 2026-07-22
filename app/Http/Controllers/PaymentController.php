@@ -57,9 +57,17 @@ class PaymentController extends Controller
                 return $this->pendingPaymentResponse($request, $pendingOrder);
             }
 
-            $paymentMethod = in_array($oldOrder->payment_method, ['crypto', 'binance_pay'], true)
+            $paymentMethod = in_array($oldOrder->payment_method, ['crypto', 'binance_pay', 'gopay_qris', 'pakasir'], true)
                 ? $oldOrder->payment_method
-                : 'pakasir';
+                : (config('services.gopay_qris.enabled') ? 'gopay_qris' : 'pakasir');
+
+            if ($paymentMethod === 'pakasir' && ! (bool) config('services.pakasir.checkout_enabled', false)) {
+                if (! (bool) config('services.gopay_qris.enabled')) {
+                    return $this->paymentErrorResponse($request, 'QRIS checkout is currently unavailable.');
+                }
+
+                $paymentMethod = 'gopay_qris';
+            }
             $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
             $binancePayToken = $this->retryBinancePayToken($oldOrder);
             $retryItems = $oldOrder->items()->with(['product', 'package'])->get();
@@ -98,6 +106,7 @@ class PaymentController extends Controller
                 'expired_at' => now()->addMinutes(max(1, (int) match ($paymentMethod) {
                     'crypto' => config('services.crypto_direct.expires_minutes', 10),
                     'binance_pay' => config('services.binance.pay.expires_minutes', 10),
+                    'gopay_qris' => config('services.gopay_qris.expires_minutes', 10),
                     default => config('services.pakasir.expires_minutes', 5),
                 })),
             ]);
@@ -105,6 +114,23 @@ class PaymentController extends Controller
             $oldOrder->update(['replaced_by' => $newOrder->id]);
 
             try {
+                if ($newOrder->payment_method === 'gopay_qris') {
+                    $payment = $hasStoredItems
+                        ? $this->paymentService->createCartGopayQrisPayment($user, $retryItems, $newOrder)
+                        : $this->paymentService->createGopayQrisPayment(
+                            $user,
+                            $newOrder->product_id,
+                            $newOrder->package_id,
+                            $newOrder
+                        );
+
+                    if ($this->wantsPaymentJson($request)) {
+                        return response()->json($this->gopayQrisCheckoutPayload($payment['order']));
+                    }
+
+                    return redirect('/orders');
+                }
+
                 if ($newOrder->payment_method === 'pakasir') {
                     $payment = $hasStoredItems
                         ? $this->paymentService->createCartPakasirPayment($user, $retryItems, $newOrder)
@@ -187,6 +213,10 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
 
+        if (! (bool) config('services.pakasir.checkout_enabled', false)) {
+            return $this->paymentErrorResponse($request, 'Pakasir checkout is disabled.');
+        }
+
         $request->validate([
             'package_id' => 'required|exists:packages,id',
             'quantity' => ['nullable', 'integer', 'min:1'],
@@ -226,6 +256,49 @@ class PaymentController extends Controller
         });
     }
 
+    public function payGopayQris(Request $request, $id)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'package_id' => 'required|exists:packages,id',
+            'quantity' => ['nullable', 'integer', 'min:1'],
+            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
+        ]);
+
+        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $id) {
+            if ($pendingOrder = $this->activePendingOrder($user->id)) {
+                return $this->pendingPaymentResponse($request, $pendingOrder);
+            }
+
+            if ($this->hasTooManyRecentOrders($user->id)) {
+                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
+            }
+
+            try {
+                $this->cancelPendingOrders($user->id);
+                $payment = $this->paymentService->createGopayQrisPayment(
+                    $user,
+                    $id,
+                    $request->package_id,
+                    null,
+                    $request->string('voucher_code')->toString() ?: null,
+                    $request->integer('quantity', 1)
+                );
+
+                if ($this->wantsPaymentJson($request)) {
+                    return response()->json($this->gopayQrisCheckoutPayload($payment['order']));
+                }
+
+                return redirect('/orders');
+            } catch (\Exception $error) {
+                Log::error('GOPAY QRIS CHECKOUT ERROR: '.$error->getMessage());
+
+                return $this->paymentErrorResponse($request, $error);
+            }
+        });
+    }
+
     /*
     |--------------------------------------------------------------------------
     | PAKASIR STATUS SYNC
@@ -258,6 +331,32 @@ class PaymentController extends Controller
         $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
 
         return $this->syncPaymentResponse($request, $result, $status);
+    }
+
+    public function syncGopayQrisOrder(Request $request, string $orderId)
+    {
+        $order = Order::where('order_id', $orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($order->payment_method !== 'gopay_qris') {
+            abort(404);
+        }
+
+        if ($order->status === 'pending' && $order->expired_at?->lte(now())) {
+            $this->pendingOrderExpirationService->expire((int) $order->user_id);
+            $order->refresh();
+        }
+
+        $payload = $this->withLicensePayload([
+            'order_id' => $order->order_id,
+            'status' => $order->status,
+            'message' => $order->status === 'paid'
+                ? 'Your QRIS payment has been verified.'
+                : 'Waiting for a matching GoPay Merchant notification.',
+        ], $order);
+
+        return $this->syncPaymentResponse($request, $payload, $order->status === 'paid' ? 200 : 202);
     }
 
     public function syncCryptoOrder(Request $request, string $orderId)
@@ -451,7 +550,7 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
         $validated = $request->validate([
-            'payment_method' => ['required', Rule::in(['pakasir', 'crypto', 'binance_pay'])],
+            'payment_method' => ['required', Rule::in(['pakasir', 'gopay_qris', 'crypto', 'binance_pay'])],
             'coin' => [
                 'nullable',
                 'string',
@@ -466,6 +565,13 @@ class PaymentController extends Controller
             ],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
+
+        if (
+            $validated['payment_method'] === 'pakasir' &&
+            ! (bool) config('services.pakasir.checkout_enabled', false)
+        ) {
+            return $this->paymentErrorResponse($request, 'Pakasir checkout is disabled.');
+        }
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $validated) {
             if ($pendingOrder = $this->activePendingOrder($user->id)) {
@@ -482,6 +588,20 @@ class PaymentController extends Controller
                 $this->cartService->validateForCheckout($items);
                 $this->cancelPendingOrders($user->id);
                 $voucherCode = $validated['voucher_code'] ?? null;
+
+                if ($validated['payment_method'] === 'gopay_qris') {
+                    $payment = $this->paymentService->createCartGopayQrisPayment(
+                        $user,
+                        $items,
+                        null,
+                        $voucherCode
+                    );
+                    $this->cartService->clear($user);
+
+                    return $this->wantsPaymentJson($request)
+                        ? response()->json($this->gopayQrisCheckoutPayload($payment['order']))
+                        : redirect('/orders');
+                }
 
                 if ($validated['payment_method'] === 'pakasir') {
                     $payment = $this->paymentService->createCartPakasirPayment(
@@ -598,6 +718,18 @@ class PaymentController extends Controller
         ];
     }
 
+    private function gopayQrisCheckoutPayload(Order $order): array
+    {
+        return [
+            'method' => 'gopay_qris',
+            'payment_url' => null,
+            'status_url' => url('/sync-gopay-qris-order/'.$order->order_id),
+            'order_id' => $order->order_id,
+            'quantity' => (int) $order->quantity,
+            'qris_payment' => $this->publicGopayQrisPaymentPayload($order),
+        ];
+    }
+
     private function cryptoCheckoutPayload(Order $order): array
     {
         return [
@@ -635,6 +767,28 @@ class PaymentController extends Controller
             'payment_method' => (string) ($payload['payment_method'] ?? 'qris'),
             'payment_number' => (string) $payload['payment_number'],
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
+            'remaining_seconds' => $this->remainingSeconds($order),
+            'quantity' => (int) $order->quantity,
+        ];
+    }
+
+    private function publicGopayQrisPaymentPayload(Order $order): ?array
+    {
+        $payload = $order->payment_payload;
+
+        if (! is_array($payload) || ($payload['type'] ?? null) !== 'gopay_qris_notification') {
+            return null;
+        }
+
+        return [
+            'qr_payload' => (string) ($payload['qr_payload'] ?? $payload['payment_number'] ?? ''),
+            'payment_number' => (string) ($payload['payment_number'] ?? $payload['qr_payload'] ?? ''),
+            'base_amount' => (int) ($payload['base_amount'] ?? 0),
+            'platform_fee' => (int) ($payload['platform_fee'] ?? 0),
+            'unique_amount' => (int) ($payload['unique_amount'] ?? 0),
+            'amount' => (int) ($payload['total_payment'] ?? $order->price),
+            'total_payment' => (int) ($payload['total_payment'] ?? $order->price),
+            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
             'remaining_seconds' => $this->remainingSeconds($order),
             'quantity' => (int) $order->quantity,
         ];
@@ -981,10 +1135,18 @@ class PaymentController extends Controller
             $message = 'Binance Pay checkout is not configured yet.';
         }
 
+        if (in_array($message, [
+            'GoPay QRIS checkout is not configured',
+            'GoPay QRIS merchant identity does not match',
+        ], true)) {
+            $message = 'QRIS checkout is not configured yet.';
+        }
+
         if (
             ! in_array($message, [
                 'Crypto checkout is not configured yet.',
                 'Binance Pay checkout is not configured yet.',
+                'QRIS checkout is not configured yet.',
                 'Invalid crypto amount',
             ], true) &&
             ! $this->isPublicCheckoutMessage($message) &&
@@ -1026,6 +1188,8 @@ class PaymentController extends Controller
             'Only ',
             'Automatic delivery does not have enough license stock',
             'Select at least one license key',
+            'Pakasir checkout is disabled.',
+            'QRIS checkout is currently unavailable.',
         ]);
     }
 }

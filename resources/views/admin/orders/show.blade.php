@@ -12,6 +12,7 @@
             'binance_pay' => 'Binance Pay',
             'crypto' => $isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto',
             'pakasir' => 'QRIS',
+            'gopay_qris' => 'GoPay QRIS',
             default => ucfirst($order->payment_method ?: 'Legacy'),
         };
         $cryptoAmount = (string) ($payload['amount'] ?? $order->price);
