@@ -15,12 +15,19 @@
             <button type="button" class="qris-close-button" data-qris-close aria-label="Close QRIS checkout">x</button>
         </div>
 
-        <div id="aksaQrisCanvasWrap" class="qris-canvas-wrap mt-5">
-            <canvas id="aksaQrisCanvas" width="256" height="256" aria-label="QRIS payment code"></canvas>
+        <div id="aksaQrisCanvasWrap" class="qris-canvas-wrap qris-canvas-wrap--styled mt-5">
+            <div id="aksaQrisCanvas" class="qris-styled-target" role="img" aria-label="QRIS payment code"></div>
             <div id="aksaQrisExpiredOverlay" class="qris-expired-overlay hidden">
                 <strong>QRIS Expired</strong>
                 <span>Do not pay this expired QR. Start a new checkout to get a fresh amount.</span>
             </div>
+        </div>
+
+        <div class="crypto-payment-warning mt-4" role="alert">
+            <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Enter the amount manually</p>
+            <p class="mt-1 text-xs leading-5 text-gray-300">
+                This is the original static QRIS from GoPay. After scanning, enter the exact total shown below. A different amount cannot be verified automatically.
+            </p>
         </div>
 
         <div class="mt-5 grid gap-3 text-sm">
@@ -42,7 +49,19 @@
             </div>
             <div class="qris-detail-row qris-total-row">
                 <span>Total payment</span>
-                <span id="aksaQrisAmount" class="qris-amount-value">-</span>
+                <div class="flex min-w-0 items-center gap-2">
+                    <span id="aksaQrisAmount" class="qris-amount-value">-</span>
+                    <button
+                        type="button"
+                        id="aksaQrisCopyAmount"
+                        class="order-action shrink-0 px-2 py-1 text-[11px]"
+                        data-copy-value=""
+                        data-copy-title="Amount copied"
+                        data-copy-message="Enter this exact amount after scanning the static QRIS."
+                    >
+                        Copy
+                    </button>
+                </div>
             </div>
             <div class="qris-detail-row">
                 <span>Time remaining</span>
@@ -51,7 +70,7 @@
         </div>
 
         <p class="mt-4 text-center text-xs leading-5 text-gray-400">
-            The exact amount is locked in this QR. Confirm the merchant name <strong class="text-gray-200">Aksa Xiterz</strong> before paying.
+            Confirm the merchant name <strong class="text-gray-200">Aksa Xiterz</strong>, then enter the exact total manually before paying.
         </p>
 
         <div class="mt-5">

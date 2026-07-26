@@ -41,7 +41,7 @@ class GopayQrisCheckoutTest extends TestCase
         ]);
     }
 
-    public function test_checkout_locks_exact_total_in_valid_dynamic_qris(): void
+    public function test_checkout_uses_original_static_qris_and_keeps_exact_total_for_manual_entry(): void
     {
         [$product, $package] = $this->catalogWithStock(2);
         $user = User::factory()->create();
@@ -69,8 +69,10 @@ class GopayQrisCheckoutTest extends TestCase
         $this->assertNull($order->payment_url);
         $this->assertNotNull($order->payment_match_key);
         $this->assertTrue(app(QrisPayloadService::class)->validate($payment['qr_payload']));
-        $this->assertSame('12', $this->topLevelTag($payment['qr_payload'], '01'));
-        $this->assertSame((string) $total, $this->topLevelTag($payment['qr_payload'], '54'));
+        $this->assertSame(self::STATIC_QRIS, $payment['qr_payload']);
+        $this->assertSame('11', $this->topLevelTag($payment['qr_payload'], '01'));
+        $this->assertNull($this->topLevelTag($payment['qr_payload'], '54'));
+        $this->assertTrue($payment['requires_manual_amount']);
 
         $reservation = LicenseStock::where('reserved_order_id', $order->id)->firstOrFail();
         $this->assertTrue($reservation->reserved_until->equalTo($order->expired_at));

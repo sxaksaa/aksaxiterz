@@ -788,6 +788,7 @@ class PaymentController extends Controller
             'unique_amount' => (int) ($payload['unique_amount'] ?? 0),
             'amount' => (int) ($payload['total_payment'] ?? $order->price),
             'total_payment' => (int) ($payload['total_payment'] ?? $order->price),
+            'requires_manual_amount' => (bool) ($payload['requires_manual_amount'] ?? true),
             'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expires_at'] ?? ''),
             'remaining_seconds' => $this->remainingSeconds($order),
             'quantity' => (int) $order->quantity,

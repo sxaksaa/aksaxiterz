@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import QRCodeStyling from 'qr-code-styling';
 
 let appToastTimer = null;
 let paymentSuccessRedirectTimer = null;
@@ -61,6 +62,63 @@ window.renderAksaQrCode = async function(target, value, options = {}) {
         context.imageSmoothingQuality = 'high';
         context.drawImage(logo, logoX, logoY, logoSize, logoSize);
         context.restore();
+    }
+
+    return true;
+};
+
+window.renderAksaStyledQrCode = async function(target, value, options = {}) {
+    const container = typeof target === 'string' ? document.querySelector(target) : target;
+
+    if (!container || !value) {
+        return false;
+    }
+
+    const size = options.width || 280;
+    const foreground = options.darkColor || '#171120';
+    const background = options.lightColor || '#eee7ff';
+
+    container.replaceChildren();
+
+    const qrCode = new QRCodeStyling({
+        width: size,
+        height: size,
+        type: 'canvas',
+        data: value,
+        margin: 16,
+        qrOptions: {
+            errorCorrectionLevel: 'H',
+        },
+        dotsOptions: {
+            color: foreground,
+            type: 'rounded',
+            roundSize: false,
+        },
+        cornersSquareOptions: {
+            color: foreground,
+            type: 'dot',
+        },
+        cornersDotOptions: {
+            color: foreground,
+            type: 'dot',
+        },
+        backgroundOptions: {
+            color: background,
+        },
+    });
+
+    qrCode.append(container);
+
+    if (options.logoUrl) {
+        const logoBadge = document.createElement('span');
+        const logo = document.createElement('img');
+
+        logoBadge.className = 'qris-logo-badge';
+        logo.src = options.logoUrl;
+        logo.alt = '';
+        logo.decoding = 'async';
+        logoBadge.append(logo);
+        container.append(logoBadge);
     }
 
     return true;
@@ -665,7 +723,12 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     document.getElementById('aksaQrisBaseAmount').innerText = formatIdr(payment.base_amount ?? payment.amount);
     document.getElementById('aksaQrisPlatformFee').innerText = formatIdr(payment.platform_fee ?? payment.fee ?? 0);
     document.getElementById('aksaQrisUniqueAmount').innerText = formatIdr(payment.unique_amount ?? 0);
-    document.getElementById('aksaQrisAmount').innerText = formatIdr(payment.total_payment ?? payment.amount);
+    const totalPayment = payment.total_payment ?? payment.amount;
+    document.getElementById('aksaQrisAmount').innerText = formatIdr(totalPayment);
+    const copyAmount = document.getElementById('aksaQrisCopyAmount');
+    if (copyAmount) {
+        copyAmount.dataset.copyValue = totalPayment || '';
+    }
     document.getElementById('aksaQrisExpiredOverlay')?.classList.add('hidden');
     const checkButton = document.getElementById('aksaQrisCheck');
     if (checkButton) setButtonLabel(checkButton, 'Check Payment');
@@ -675,11 +738,11 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
 
-    await window.renderAksaQrCode('#aksaQrisCanvas', qrPayload, {
-        width: 280,
+    await window.renderAksaStyledQrCode('#aksaQrisCanvas', qrPayload, {
+        width: 320,
         logoUrl: '/images/logo.png',
-        darkColor: '#121018',
-        lightColor: '#f8f7ff',
+        darkColor: '#171120',
+        lightColor: '#eee7ff',
     });
 
     if (options.startPolling !== false && qrisState.orderId) {

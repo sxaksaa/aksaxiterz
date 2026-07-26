@@ -4,40 +4,6 @@ namespace App\Services;
 
 class QrisPayloadService
 {
-    public function dynamic(string $staticPayload, int $amount): string
-    {
-        if ($amount < 1 || $amount > 10_000_000) {
-            throw new \InvalidArgumentException('Invalid QRIS amount');
-        }
-
-        $fields = $this->parse($staticPayload);
-
-        if (($fields['00'] ?? null) !== '01' || blank($fields['59'] ?? null)) {
-            throw new \InvalidArgumentException('Invalid QRIS merchant payload');
-        }
-
-        $fields['01'] = '12';
-        $fields['54'] = (string) $amount;
-        unset($fields['63']);
-        ksort($fields, SORT_STRING);
-
-        $payload = '';
-
-        foreach ($fields as $tag => $value) {
-            $length = strlen($value);
-
-            if ($length > 99) {
-                throw new \InvalidArgumentException("QRIS field {$tag} is too long");
-            }
-
-            $payload .= $tag.str_pad((string) $length, 2, '0', STR_PAD_LEFT).$value;
-        }
-
-        $payload .= '6304';
-
-        return $payload.$this->crc16($payload);
-    }
-
     public function merchantName(string $payload): string
     {
         return trim((string) ($this->parse($payload)['59'] ?? ''));

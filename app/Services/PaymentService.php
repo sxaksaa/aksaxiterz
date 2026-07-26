@@ -160,10 +160,7 @@ class PaymentService
             $platformFee = $amountBreakdown['platform_fee'];
             $uniqueAmount = $amountBreakdown['unique_amount'];
             $totalAmount = $amountBreakdown['total_amount'];
-            $qrPayload = app(QrisPayloadService::class)->dynamic(
-                (string) config('services.gopay_qris.static_payload'),
-                $totalAmount
-            );
+            $qrPayload = trim((string) config('services.gopay_qris.static_payload'));
 
             $order->update([
                 'price' => $totalAmount,
@@ -490,10 +487,7 @@ class PaymentService
             $platformFee = $amountBreakdown['platform_fee'];
             $uniqueAmount = $amountBreakdown['unique_amount'];
             $totalAmount = $amountBreakdown['total_amount'];
-            $qrPayload = app(QrisPayloadService::class)->dynamic(
-                (string) config('services.gopay_qris.static_payload'),
-                $totalAmount
-            );
+            $qrPayload = trim((string) config('services.gopay_qris.static_payload'));
             $payload = $this->normalizeGopayQrisPayment(
                 $order,
                 $baseAmount,
@@ -1651,6 +1645,7 @@ class PaymentService
             'unique_amount' => $uniqueAmount,
             'total_payment' => $totalAmount,
             'payment_method' => 'qris',
+            'requires_manual_amount' => true,
             'qr_payload' => $qrPayload,
             'payment_number' => $qrPayload,
             'quantity' => (int) $order->quantity,
