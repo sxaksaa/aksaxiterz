@@ -6,6 +6,7 @@
             'received' => 'Received',
             'matched' => 'Matched',
             'matched_delivery_pending' => 'Delivery pending',
+            'matched_delivery_failed' => 'Delivery failed',
             'unmatched' => 'Unmatched',
             'ambiguous' => 'Ambiguous',
             'stale' => 'Stale',
@@ -13,6 +14,7 @@
         $statusClasses = [
             'matched' => 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
             'matched_delivery_pending' => 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+            'matched_delivery_failed' => 'border-red-400/30 bg-red-400/10 text-red-200',
             'unmatched' => 'border-red-400/30 bg-red-400/10 text-red-200',
             'ambiguous' => 'border-red-400/30 bg-red-400/10 text-red-200',
             'stale' => 'border-gray-500/30 bg-gray-500/10 text-gray-300',

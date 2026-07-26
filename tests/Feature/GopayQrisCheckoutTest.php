@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\PaymentService;
 use App\Services\QrisPayloadService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use PDO;
 use Tests\TestCase;
 
@@ -33,7 +34,8 @@ class GopayQrisCheckoutTest extends TestCase
             'services.gopay_qris.merchant_name' => 'Aksa Xiterz',
             'services.gopay_qris.merchant_reference' => 'ID102432979310',
             'services.gopay_qris.expires_minutes' => 10,
-            'services.gopay_qris.recovery_hours' => 24,
+            'services.gopay_qris.recovery_hours' => 72,
+            'services.gopay_qris.amount_quarantine_hours' => 168,
             'services.gopay_qris.unique_max' => 999,
             'services.gopay_qris.webhook_token' => 'checkout-test-token',
             'services.gopay_qris.webhook_secret' => 'checkout-test-secret',
@@ -113,6 +115,27 @@ class GopayQrisCheckoutTest extends TestCase
         );
     }
 
+    public function test_config_verifier_requires_strong_distinct_webhook_credentials(): void
+    {
+        config([
+            'services.gopay_qris.webhook_token' => 'same-short-value',
+            'services.gopay_qris.webhook_secret' => 'same-short-value',
+        ]);
+
+        $this->assertSame(1, Artisan::call('payments:verify-gopay-config'));
+        $output = Artisan::output();
+        $this->assertStringContainsString('webhook_token must contain at least 32 characters', $output);
+        $this->assertStringContainsString('webhook_secret must contain at least 32 characters', $output);
+        $this->assertStringContainsString('webhook_token and webhook_secret must be different', $output);
+
+        config([
+            'services.gopay_qris.webhook_token' => str_repeat('t', 64),
+            'services.gopay_qris.webhook_secret' => str_repeat('s', 64),
+        ]);
+
+        $this->assertSame(0, Artisan::call('payments:verify-gopay-config'));
+    }
+
     public function test_recently_paid_amount_remains_reserved_during_reconciliation_window(): void
     {
         [$product, $package] = $this->catalogWithStock(2);
@@ -136,6 +159,69 @@ class GopayQrisCheckoutTest extends TestCase
 
         $this->assertNotNull($heldMatchKey);
         $this->assertSame($heldMatchKey, $paidOrder->fresh()->payment_match_key);
+    }
+
+    public function test_paid_amount_is_not_reused_after_recovery_ends_but_before_quarantine_ends(): void
+    {
+        [$product, $package] = $this->catalogWithStock(2);
+        $service = app(PaymentService::class);
+        $paidOrder = $service->createGopayQrisPayment(
+            User::factory()->create(),
+            $product->id,
+            $package->id
+        )['order'];
+        $paidOrder->update([
+            'status' => 'paid',
+            'paid_at' => now()->subHours(100),
+        ]);
+        $heldMatchKey = $paidOrder->payment_match_key;
+
+        $service->createGopayQrisPayment(
+            User::factory()->create(),
+            $product->id,
+            $package->id
+        );
+
+        $this->assertNotNull($heldMatchKey);
+        $this->assertSame($heldMatchKey, $paidOrder->fresh()->payment_match_key);
+    }
+
+    public function test_status_sync_distinguishes_waiting_closed_and_delivery_pending_states(): void
+    {
+        [$product, $package] = $this->catalogWithStock();
+        $user = User::factory()->create();
+        $order = app(PaymentService::class)->createGopayQrisPayment(
+            $user,
+            $product->id,
+            $package->id
+        )['order'];
+
+        $this->actingAs($user)
+            ->postJson('/sync-gopay-qris-order/'.$order->order_id)
+            ->assertStatus(202)
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('message', 'Waiting for a matching GoPay Merchant notification.');
+
+        $order->update([
+            'status' => 'cancelled',
+            'expired_at' => now()->subMinute(),
+        ]);
+
+        $this->postJson('/sync-gopay-qris-order/'.$order->order_id)
+            ->assertStatus(202)
+            ->assertJsonPath('status', 'cancelled')
+            ->assertJsonPath(
+                'message',
+                'This checkout is closed. An exact payment notification can still be recovered automatically for up to 72 hours.'
+            );
+
+        $order->update(['status' => 'paid']);
+
+        $this->postJson('/sync-gopay-qris-order/'.$order->order_id)
+            ->assertOk()
+            ->assertJsonPath('status', 'paid')
+            ->assertJsonPath('delivery_pending', true)
+            ->assertJsonPath('message', 'Payment verified. Your license delivery is being prepared.');
     }
 
     private function catalogWithStock(int $stockCount = 1): array

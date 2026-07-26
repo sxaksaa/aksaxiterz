@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\PendingGopayDeliveryService;
 use App\Services\StockReservationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,9 +42,10 @@ class GopayQrisWebhookTest extends TestCase
             'services.gopay_qris.merchant_name' => 'Aksa Xiterz',
             'services.gopay_qris.merchant_reference' => 'ID102432979310',
             'services.gopay_qris.webhook_max_skew_seconds' => 300,
-            'services.gopay_qris.notification_max_age_hours' => 24,
+            'services.gopay_qris.notification_max_age_hours' => 72,
             'services.gopay_qris.grace_minutes' => 2,
-            'services.gopay_qris.recovery_hours' => 24,
+            'services.gopay_qris.delayed_recovery_min_minutes' => 60,
+            'services.gopay_qris.recovery_hours' => 72,
         ]);
     }
 
@@ -170,13 +172,47 @@ class GopayQrisWebhookTest extends TestCase
 
     public function test_old_signed_notification_is_stored_as_stale_and_acknowledged(): void
     {
-        $postedAt = now()->subHours(25)->getTimestampMs();
+        $postedAt = now()->subHours(73)->getTimestampMs();
 
         $this->send($this->payload(50_123, $postedAt))
             ->assertStatus(202)
             ->assertJsonPath('status', 'stale');
 
         $this->assertDatabaseHas('gopay_notification_events', ['status' => 'stale']);
+    }
+
+    public function test_notification_delayed_for_more_than_a_day_recovers_exact_cancelled_order(): void
+    {
+        $paidAt = now()->subHours(25);
+        $expiry = $paidAt->copy()->addMinutes(10);
+        $notificationPostedAt = now()->getTimestampMs();
+        $order = $this->gopayOrder(
+            50_123,
+            $paidAt->getTimestampMs(),
+            $expiry,
+            'cancelled'
+        );
+        $this->stock($order, 'OFFLINE-DAY-GOPAY-LICENSE');
+        $payload = $this->payload(50_123, $notificationPostedAt);
+
+        $this->send($payload)
+            ->assertOk()
+            ->assertJsonPath('status', 'paid')
+            ->assertJsonPath('order_id', $order->order_id)
+            ->assertJsonPath('delayed_recovery', true);
+
+        $retryTimestamp = now()->addSecond()->getTimestampMs();
+        $payload['sent_at'] = $retryTimestamp;
+        $this->send($payload, $retryTimestamp)
+            ->assertOk()
+            ->assertJsonPath('duplicate', true)
+            ->assertJsonPath('delayed_recovery', true);
+
+        $freshOrder = $order->fresh();
+
+        $this->assertSame('paid', $freshOrder->status);
+        $this->assertSame('delayed_recovery', $freshOrder->payment_payload['scanner_match_mode'] ?? null);
+        $this->assertDatabaseHas('licenses', ['license_key' => 'OFFLINE-DAY-GOPAY-LICENSE']);
     }
 
     public function test_payment_posted_after_expiry_grace_does_not_match(): void
@@ -242,6 +278,42 @@ class GopayQrisWebhookTest extends TestCase
         ]);
     }
 
+    public function test_delivery_pending_payment_is_fulfilled_automatically_after_stock_arrives(): void
+    {
+        $postedAt = now()->getTimestampMs();
+        $order = $this->gopayOrder(50_123, $postedAt);
+
+        $this->send($this->payload(50_123, $postedAt))
+            ->assertOk()
+            ->assertJsonPath('delivery_pending', true);
+
+        $this->stock($order->fresh(), 'RESTOCKED-GOPAY-LICENSE');
+        $summary = app(PendingGopayDeliveryService::class)->retry();
+
+        $this->assertSame([
+            'checked' => 1,
+            'delivered' => 1,
+            'waiting_for_stock' => 0,
+            'failed' => 0,
+        ], $summary);
+        $this->assertDatabaseHas('licenses', [
+            'order_id' => $order->order_id,
+            'license_key' => 'RESTOCKED-GOPAY-LICENSE',
+        ]);
+        $this->assertDatabaseHas('gopay_notification_events', [
+            'matched_order_id' => $order->id,
+            'status' => 'matched',
+        ]);
+
+        $this->assertSame([
+            'checked' => 0,
+            'delivered' => 0,
+            'waiting_for_stock' => 0,
+            'failed' => 0,
+        ], app(PendingGopayDeliveryService::class)->retry());
+        $this->assertDatabaseCount('licenses', 1);
+    }
+
     public function test_second_distinct_notification_cannot_fulfill_the_same_order_twice(): void
     {
         $postedAt = now()->getTimestampMs();
@@ -255,6 +327,34 @@ class GopayQrisWebhookTest extends TestCase
 
         $this->assertDatabaseCount('gopay_notification_events', 2);
         $this->assertDatabaseCount('licenses', 1);
+    }
+
+    public function test_delivery_retry_stops_reprocessing_an_invalid_non_paid_match(): void
+    {
+        $postedAt = now()->getTimestampMs();
+        $order = $this->gopayOrder(50_123, $postedAt);
+        $payload = $this->payload(50_123, $postedAt);
+
+        GopayNotificationEvent::create([
+            'event_id' => $payload['event_id'],
+            'device_id' => $payload['device_id'],
+            'package_name' => $payload['package_name'],
+            'title' => $payload['title'],
+            'notification_text' => $payload['text'],
+            'amount_idr' => $payload['amount_idr'],
+            'notification_posted_at_ms' => $payload['notification_posted_at'],
+            'status' => 'matched_delivery_pending',
+            'matched_order_id' => $order->id,
+            'received_at' => now(),
+            'last_received_at' => now(),
+        ]);
+
+        $this->assertSame(1, app(PendingGopayDeliveryService::class)->retry()['failed']);
+        $this->assertDatabaseHas('gopay_notification_events', [
+            'matched_order_id' => $order->id,
+            'status' => 'matched_delivery_failed',
+        ]);
+        $this->assertSame(0, app(PendingGopayDeliveryService::class)->retry()['checked']);
     }
 
     public function test_final_event_remains_idempotent_when_matched_order_was_removed(): void

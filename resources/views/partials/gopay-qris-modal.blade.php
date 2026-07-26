@@ -2,7 +2,7 @@
     <div class="qris-modal-backdrop" data-qris-close></div>
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaQrisTitle">
-        <div class="flex items-start justify-between gap-4">
+        <div class="qris-dialog-header flex items-start justify-between gap-4">
             <div class="flex min-w-0 items-start gap-3">
                 <span class="payment-card-icon mt-0.5">
                     <x-ui.icon name="qr-code" class="h-5 w-5" />
@@ -26,8 +26,16 @@
         <div class="crypto-payment-warning mt-4" role="alert">
             <p class="text-[11px] font-semibold uppercase tracking-normal text-white">Enter the amount manually</p>
             <p class="mt-1 text-xs leading-5 text-gray-300">
-                This is the original static QRIS from GoPay. After scanning, enter the exact total shown below. A different amount cannot be verified automatically.
+                1. Scan the QRIS. 2. Enter the exact total below. 3. Confirm the merchant name <strong class="text-white">Aksa Xiterz</strong>. A different amount cannot be verified automatically.
             </p>
+        </div>
+
+        <div id="aksaQrisAutoStatus" class="qris-auto-status mt-3" data-state="waiting" role="status" aria-live="polite">
+            <span class="qris-auto-status-dot" aria-hidden="true"></span>
+            <div class="min-w-0">
+                <strong id="aksaQrisAutoStatusTitle">Automatic verification active</strong>
+                <span id="aksaQrisAutoStatusMessage">We check this payment securely every 15 seconds.</span>
+            </div>
         </div>
 
         <div class="mt-5 grid gap-3 text-sm">
@@ -48,7 +56,7 @@
                 <span id="aksaQrisUniqueAmount" class="font-semibold text-gray-200">-</span>
             </div>
             <div class="qris-detail-row qris-total-row">
-                <span>Total payment</span>
+                <span>Exact amount to enter</span>
                 <div class="flex min-w-0 items-center gap-2">
                     <span id="aksaQrisAmount" class="qris-amount-value">-</span>
                     <button
@@ -69,14 +77,10 @@
             </div>
         </div>
 
-        <p class="mt-4 text-center text-xs leading-5 text-gray-400">
-            Confirm the merchant name <strong class="text-gray-200">Aksa Xiterz</strong>, then enter the exact total manually before paying.
-        </p>
-
-        <div class="mt-5">
+        <div class="qris-dialog-footer mt-5">
             <button type="button" id="aksaQrisCheck" data-qris-check class="order-action w-full">
                 <x-ui.icon name="refresh-cw" class="h-4 w-4" />
-                <span data-button-label>Check Payment</span>
+                <span data-button-label>Check Now</span>
             </button>
         </div>
     </section>

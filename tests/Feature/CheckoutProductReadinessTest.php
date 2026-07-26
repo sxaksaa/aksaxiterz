@@ -32,7 +32,7 @@ class CheckoutProductReadinessTest extends TestCase
         $message = 'This product is not ready for automatic checkout.';
 
         foreach ([
-            ["/process-order/{$product->id}", [
+            ["/pay-gopay-qris/{$product->id}", [
                 'package_id' => $package->id,
                 'quantity' => 1,
             ]],
@@ -112,7 +112,7 @@ class CheckoutProductReadinessTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->postJson(route('cart.checkout'), ['payment_method' => 'pakasir'])
+            ->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris'])
             ->assertUnprocessable()
             ->assertJsonPath('message', 'This product is not ready for automatic checkout.');
 

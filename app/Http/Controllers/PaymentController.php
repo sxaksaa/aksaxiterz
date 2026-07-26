@@ -252,10 +252,19 @@ class PaymentController extends Controller
         $payload = $this->withLicensePayload([
             'order_id' => $order->order_id,
             'status' => $order->status,
-            'message' => $order->status === 'paid'
-                ? 'Your QRIS payment has been verified.'
-                : 'Waiting for a matching GoPay Merchant notification.',
+            'message' => match ($order->status) {
+                'paid' => 'Your QRIS payment has been verified.',
+                'cancelled', 'expired' => sprintf(
+                    'This checkout is closed. An exact payment notification can still be recovered automatically for up to %d hours.',
+                    max(1, (int) config('services.gopay_qris.recovery_hours', 72))
+                ),
+                default => 'Waiting for a matching GoPay Merchant notification.',
+            },
         ], $order);
+
+        if ($order->status === 'paid' && ($payload['delivery_pending'] ?? false)) {
+            $payload['message'] = 'Payment verified. Your license delivery is being prepared.';
+        }
 
         return $this->syncPaymentResponse($request, $payload, $order->status === 'paid' ? 200 : 202);
     }
@@ -719,6 +728,8 @@ class PaymentController extends Controller
         $licenses = License::where('order_id', $order->order_id)->oldest('id')->get();
         $payload['quantity'] = max(1, (int) $order->quantity);
         $payload['delivered_count'] = $licenses->count();
+        $payload['delivery_pending'] = ($payload['delivery_pending'] ?? false) ||
+            $licenses->count() < $payload['quantity'];
 
         if ($licenses->isEmpty()) {
             return $payload;

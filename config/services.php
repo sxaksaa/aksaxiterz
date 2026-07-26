@@ -1,5 +1,11 @@
 <?php
 
+$gopayRecoveryHours = max(72, min(168, (int) env('GOPAY_QRIS_RECOVERY_HOURS', 72)));
+$gopayNotificationMaxAgeHours = max(
+    $gopayRecoveryHours,
+    min(168, max(72, (int) env('GOPAY_QRIS_NOTIFICATION_MAX_AGE_HOURS', 72)))
+);
+
 return [
 
     /*
@@ -48,7 +54,9 @@ return [
         'merchant_reference' => env('GOPAY_QRIS_MERCHANT_REFERENCE', 'ID102432979310'),
         'expires_minutes' => (int) env('GOPAY_QRIS_EXPIRES_MINUTES', 10),
         'grace_minutes' => (int) env('GOPAY_QRIS_GRACE_MINUTES', 2),
-        'recovery_hours' => (int) env('GOPAY_QRIS_RECOVERY_HOURS', 24),
+        'delayed_recovery_min_minutes' => max(60, min(1440, (int) env('GOPAY_QRIS_DELAYED_RECOVERY_MIN_MINUTES', 60))),
+        'recovery_hours' => $gopayRecoveryHours,
+        'amount_quarantine_hours' => max(168, min(720, (int) env('GOPAY_QRIS_AMOUNT_QUARANTINE_HOURS', 168))),
         'unique_max' => (int) env('GOPAY_QRIS_UNIQUE_MAX', 999),
         'webhook_token' => env('GOPAY_QRIS_WEBHOOK_TOKEN'),
         'webhook_secret' => env('GOPAY_QRIS_WEBHOOK_SECRET'),
@@ -58,7 +66,7 @@ return [
         ))),
         'allowed_package' => env('GOPAY_QRIS_ALLOWED_PACKAGE', 'com.gojek.gopaymerchant'),
         'webhook_max_skew_seconds' => (int) env('GOPAY_QRIS_WEBHOOK_MAX_SKEW_SECONDS', 300),
-        'notification_max_age_hours' => (int) env('GOPAY_QRIS_NOTIFICATION_MAX_AGE_HOURS', 24),
+        'notification_max_age_hours' => $gopayNotificationMaxAgeHours,
     ],
 
     'payments' => [

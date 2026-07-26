@@ -12,13 +12,14 @@ use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use PDO;
 use Tests\TestCase;
 
 class StockReservationServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const STATIC_QRIS = '00020101021126610014COM.GO-JEK.WWW01189360091438659284520210G8659284520303UMI51440014ID.CO.QRIS.WWW0215ID10243297931020303UMI5204729953033605802ID5911Aksa Xiterz6006MALANG61056515362070703A0163045DEF';
 
     protected function setUp(): void
     {
@@ -42,7 +43,7 @@ class StockReservationServiceTest extends TestCase
         $service->reserve($secondOrder);
     }
 
-    public function test_expired_pending_qris_stock_stays_reserved_until_provider_invoice_is_closed(): void
+    public function test_expired_pending_qris_stock_stays_reserved_until_order_is_cancelled(): void
     {
         [$qrisOrder, $nextOrder] = $this->ordersSharingOneStock();
         $qrisOrder->update(['expired_at' => now()->subMinute()]);
@@ -216,44 +217,41 @@ class StockReservationServiceTest extends TestCase
         );
     }
 
-    public function test_pay_again_pakasir_uses_current_package_price(): void
+    public function test_reopened_gopay_qris_checkout_uses_current_package_price(): void
     {
         config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
-            'services.pakasir.expires_minutes' => 5,
+            'services.gopay_qris.enabled' => true,
+            'services.gopay_qris.static_payload' => self::STATIC_QRIS,
+            'services.gopay_qris.merchant_name' => 'Aksa Xiterz',
+            'services.gopay_qris.merchant_reference' => 'ID102432979310',
+            'services.gopay_qris.expires_minutes' => 5,
+            'services.gopay_qris.recovery_hours' => 72,
+            'services.gopay_qris.unique_max' => 999,
+            'services.gopay_qris.webhook_token' => 'reservation-checkout-token',
+            'services.gopay_qris.webhook_secret' => 'reservation-checkout-secret',
+            'services.gopay_qris.allowed_devices' => ['aksa-gopay-primary'],
             'services.payments.reservation_grace_minutes' => 0,
-        ]);
-
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncreate/qris' => Http::response([
-                'payment' => [
-                    'project' => 'aksaxiterz',
-                    'order_id' => 'ORDER-RESERVE-FIRST',
-                    'amount' => 20000,
-                    'fee' => 0,
-                    'total_payment' => 20000,
-                    'payment_method' => 'qris',
-                    'payment_number' => '000201010212',
-                    'expired_at' => now()->addHour()->toIso8601String(),
-                ],
-            ]),
         ]);
 
         [$order] = $this->ordersSharingOneStock();
         $order->package->update(['price' => 20000]);
         $startedAt = now();
 
-        $result = app(PaymentService::class)->createPakasirPayment(
+        $result = app(PaymentService::class)->createGopayQrisPayment(
             $order->user,
             $order->product_id,
             $order->package_id,
             $order
         );
 
-        $this->assertSame('20000.000000', $result['order']->price);
+        $payment = $result['gopay_qris_payment'];
+        $this->assertSame(20000, (int) $payment['base_amount']);
+        $this->assertSame((int) ceil(20000 / 0.993) - 20000, (int) $payment['platform_fee']);
+        $this->assertGreaterThanOrEqual(1, (int) $payment['unique_amount']);
+        $this->assertLessThanOrEqual(999, (int) $payment['unique_amount']);
+        $this->assertSame((int) $result['order']->price, (int) $payment['total_payment']);
+        $this->assertSame(self::STATIC_QRIS, $payment['qr_payload']);
+        $this->assertNull($result['payment_url']);
         $this->assertTrue($result['order']->expired_at->between(
             $startedAt->copy()->addMinutes(4)->addSeconds(55),
             $startedAt->copy()->addMinutes(5)->addSeconds(5)
@@ -264,9 +262,6 @@ class StockReservationServiceTest extends TestCase
                 ->reserved_until
                 ->equalTo($result['order']->expired_at)
         );
-        $this->assertStringContainsString('/pay/aksaxiterz/20000?', $result['payment_url']);
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://app.pakasir.test/api/transactioncreate/qris'
-            && $request['amount'] === 20000);
     }
 
     private function ordersSharingOneStock(): array
@@ -298,7 +293,7 @@ class StockReservationServiceTest extends TestCase
             'product_id' => $product->id,
             'package_id' => $package->id,
             'status' => 'pending',
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'price' => 10000,
             'expired_at' => now()->addHour(),
         ];

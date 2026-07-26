@@ -5,6 +5,7 @@ use App\Models\Order;
 use App\Services\BinancePayOrderVerifier;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PaymentService;
+use App\Services\PendingGopayDeliveryService;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Inspiring;
@@ -236,9 +237,104 @@ Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending o
     return self::SUCCESS;
 })->purpose('Cancel expired pending orders and release their reserved license stocks');
 
+Artisan::command('orders:retry-gopay-delivery {--limit=100 : Maximum paid QRIS orders to retry}', function () {
+    $limit = max(1, (int) $this->option('limit'));
+    $summary = app(PendingGopayDeliveryService::class)->retry($limit);
+
+    $this->info('GoPay delivery retry complete.');
+    $this->line("Checked: {$summary['checked']}");
+    $this->line("Delivered: {$summary['delivered']}");
+    $this->line("Waiting for stock: {$summary['waiting_for_stock']}");
+    $this->line("Failed: {$summary['failed']}");
+
+    return self::SUCCESS;
+})->purpose('Deliver licenses for verified QRIS payments after stock becomes available');
+
+Artisan::command('payments:verify-gopay-config', function () {
+    if (! (bool) config('services.gopay_qris.enabled')) {
+        $this->info('GoPay QRIS checkout is disabled.');
+
+        return self::SUCCESS;
+    }
+
+    $recoveryHours = (int) config('services.gopay_qris.recovery_hours');
+    $notificationMaxAgeHours = (int) config('services.gopay_qris.notification_max_age_hours');
+    $delayedRecoveryMinutes = (int) config('services.gopay_qris.delayed_recovery_min_minutes');
+    $amountQuarantineHours = (int) config('services.gopay_qris.amount_quarantine_hours');
+    $errors = [];
+
+    foreach ([
+        'static_payload',
+        'merchant_reference',
+        'webhook_token',
+        'webhook_secret',
+    ] as $key) {
+        if (blank(config("services.gopay_qris.{$key}"))) {
+            $errors[] = "services.gopay_qris.{$key} is empty";
+        }
+    }
+
+    $webhookToken = (string) config('services.gopay_qris.webhook_token');
+    $webhookSecret = (string) config('services.gopay_qris.webhook_secret');
+
+    if ($webhookToken !== '' && strlen($webhookToken) < 32) {
+        $errors[] = 'webhook_token must contain at least 32 characters';
+    }
+
+    if ($webhookSecret !== '' && strlen($webhookSecret) < 32) {
+        $errors[] = 'webhook_secret must contain at least 32 characters';
+    }
+
+    if ($webhookToken !== '' && $webhookSecret !== '' && hash_equals($webhookToken, $webhookSecret)) {
+        $errors[] = 'webhook_token and webhook_secret must be different';
+    }
+
+    if (empty(config('services.gopay_qris.allowed_devices'))) {
+        $errors[] = 'services.gopay_qris.allowed_devices is empty';
+    }
+
+    if ($recoveryHours < 72 || $recoveryHours > 168) {
+        $errors[] = 'recovery_hours must be between 72 and 168';
+    }
+
+    if ($notificationMaxAgeHours < $recoveryHours || $notificationMaxAgeHours > 168) {
+        $errors[] = 'notification_max_age_hours must cover recovery and cannot exceed 168';
+    }
+
+    if ($delayedRecoveryMinutes < 60 || $delayedRecoveryMinutes > 1440) {
+        $errors[] = 'delayed_recovery_min_minutes must be between 60 and 1440';
+    }
+
+    if ($amountQuarantineHours < 168 || $amountQuarantineHours > 720) {
+        $errors[] = 'amount_quarantine_hours must be between 168 and 720';
+    }
+
+    if ($errors !== []) {
+        foreach ($errors as $error) {
+            $this->error($error);
+        }
+
+        return self::FAILURE;
+    }
+
+    $this->info(sprintf(
+        'GoPay QRIS config verified: recovery=%dh, max_age=%dh, delayed_min=%dm, amount_quarantine=%dh.',
+        $recoveryHours,
+        $notificationMaxAgeHours,
+        $delayedRecoveryMinutes,
+        $amountQuarantineHours
+    ));
+
+    return self::SUCCESS;
+})->purpose('Validate non-secret GoPay QRIS reliability settings');
+
 Schedule::command('orders:expire-pending --limit=500')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('orders:retry-gopay-delivery --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping(10);
 
 Schedule::command('orders:scan-crypto --limit=100')
     ->everyMinute()

@@ -44,10 +44,16 @@ class GopayWebhookService
 
             if ($stored->matched_order_id || str_starts_with($stored->status, 'matched')) {
                 $order = Order::find($stored->matched_order_id);
+                $orderPayload = is_array($order?->payment_payload) ? $order->payment_payload : [];
 
                 return [
                     'http_status' => 200,
-                    'payload' => $this->matchedResponse($stored, $order, true),
+                    'payload' => $this->matchedResponse(
+                        $stored,
+                        $order,
+                        true,
+                        delayedRecovery: ($orderPayload['scanner_match_mode'] ?? null) === 'delayed_recovery'
+                    ),
                 ];
             }
 
@@ -65,6 +71,12 @@ class GopayWebhookService
             }
 
             $orders = $this->matchingOrders($event)->take(2);
+            $delayedRecovery = false;
+
+            if ($orders->isEmpty()) {
+                $orders = $this->delayedMatchingOrders($event)->take(2);
+                $delayedRecovery = $orders->count() === 1;
+            }
 
             if ($orders->count() !== 1) {
                 $status = $orders->isEmpty() ? 'unmatched' : 'ambiguous';
@@ -92,6 +104,7 @@ class GopayWebhookService
                 'UTC'
             )->timezone(config('app.timezone'))->toIso8601String();
             $orderPayload['notification_title'] = $stored->title;
+            $orderPayload['scanner_match_mode'] = $delayedRecovery ? 'delayed_recovery' : 'strict';
 
             $order->update([
                 'payment_reference' => $stored->event_id,
@@ -118,7 +131,13 @@ class GopayWebhookService
 
             return [
                 'http_status' => 200,
-                'payload' => $this->matchedResponse($stored->fresh(), $order->fresh(), false, $deliveryPending),
+                'payload' => $this->matchedResponse(
+                    $stored->fresh(),
+                    $order->fresh(),
+                    false,
+                    $deliveryPending,
+                    $delayedRecovery
+                ),
             ];
         }, 3);
     }
@@ -216,7 +235,7 @@ class GopayWebhookService
         }
 
         $postedAt = Carbon::createFromTimestampMs($postedAtMs, 'UTC')->timezone(config('app.timezone'));
-        $maxAgeHours = max(1, (int) config('services.gopay_qris.notification_max_age_hours', 24));
+        $maxAgeHours = max(1, (int) config('services.gopay_qris.notification_max_age_hours', 72));
 
         if ($postedAt->isAfter(now()->addMinutes(2))) {
             throw new HttpException(422, 'Payment notification is outside the accepted time window');
@@ -267,7 +286,7 @@ class GopayWebhookService
 
     private function matchingOrders(array $event)
     {
-        $recoveryHours = max(1, (int) config('services.gopay_qris.recovery_hours', 24));
+        $recoveryHours = max(1, (int) config('services.gopay_qris.recovery_hours', 72));
         $graceMinutes = max(0, (int) config('services.gopay_qris.grace_minutes', 2));
         $matchKey = hash('sha256', implode('|', [
             'gopay_qris',
@@ -294,18 +313,53 @@ class GopayWebhookService
             ->get();
     }
 
+    private function delayedMatchingOrders(array $event)
+    {
+        $recoveryHours = max(1, (int) config('services.gopay_qris.recovery_hours', 72));
+        $graceMinutes = max(0, (int) config('services.gopay_qris.grace_minutes', 2));
+        $minimumDelayMinutes = max(
+            $graceMinutes + 1,
+            (int) config('services.gopay_qris.delayed_recovery_min_minutes', 60)
+        );
+        $matchKey = hash('sha256', implode('|', [
+            'gopay_qris',
+            strtolower(trim((string) config('services.gopay_qris.merchant_reference'))),
+            $event['amount'],
+        ]));
+
+        return Order::query()
+            ->where('payment_method', 'gopay_qris')
+            ->whereIn('status', ['pending', 'cancelled'])
+            ->where('payment_match_key', $matchKey)
+            ->where('price', $event['amount'])
+            ->where('created_at', '<=', $event['postedAt'])
+            ->whereNotNull('expired_at')
+            ->where('expired_at', '<=', $event['postedAt']->copy()->subMinutes($minimumDelayMinutes))
+            ->where('expired_at', '>=', now()->subHours($recoveryHours))
+            ->latest('id')
+            ->lockForUpdate()
+            ->get();
+    }
+
     private function matchedResponse(
         GopayNotificationEvent $event,
         ?Order $order,
         bool $duplicate,
-        bool $deliveryPending = false
+        bool $deliveryPending = false,
+        bool $delayedRecovery = false
     ): array {
-        return [
+        $response = [
             'event_id' => $event->event_id,
             'status' => $order?->status ?? 'paid',
             'order_id' => $order?->order_id,
             'duplicate' => $duplicate,
             'delivery_pending' => $deliveryPending || $event->status === 'matched_delivery_pending',
         ];
+
+        if ($delayedRecovery) {
+            $response['delayed_recovery'] = true;
+        }
+
+        return $response;
     }
 }

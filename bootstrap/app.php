@@ -18,20 +18,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $trustedProxies = env('TRUSTED_PROXIES');
+        $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
 
-        if ($trustedProxies === null || $trustedProxies === '') {
-            $trustedProxies = env('APP_ENV', 'production') === 'production' ? '*' : null;
+        if ($trustedProxies !== '') {
+            $middleware->trustProxies(
+                at: $trustedProxies,
+                headers: HttpRequest::HEADER_X_FORWARDED_FOR |
+                    HttpRequest::HEADER_X_FORWARDED_HOST |
+                    HttpRequest::HEADER_X_FORWARDED_PORT |
+                    HttpRequest::HEADER_X_FORWARDED_PROTO |
+                    HttpRequest::HEADER_X_FORWARDED_PREFIX
+            );
         }
-
-        $middleware->trustProxies(
-            at: $trustedProxies,
-            headers: HttpRequest::HEADER_X_FORWARDED_FOR |
-                HttpRequest::HEADER_X_FORWARDED_HOST |
-                HttpRequest::HEADER_X_FORWARDED_PORT |
-                HttpRequest::HEADER_X_FORWARDED_PROTO |
-                HttpRequest::HEADER_X_FORWARDED_PREFIX
-        );
 
         $middleware->append([
             ExpirePendingOrdersFromTraffic::class,

@@ -134,14 +134,14 @@ class AdminProductCatalogTest extends TestCase
         $this->postJson(route('vouchers.preview'), [
             'code' => 'HIDDEN10',
             'package_id' => $package->id,
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'quantity' => 1,
         ])->assertNotFound();
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('This product is not available for purchase.');
 
-        app(PaymentService::class)->createPakasirPayment($buyer, $product->id, $package->id);
+        app(PaymentService::class)->createGopayQrisPayment($buyer, $product->id, $package->id);
     }
 
     public function test_hidden_product_cannot_receive_new_stock_but_remains_available_in_stock_management(): void
@@ -187,6 +187,7 @@ class AdminProductCatalogTest extends TestCase
             'is_sold' => false,
         ]);
 
+        // Historical Pakasir orders must continue protecting their catalog records.
         Order::create([
             'order_id' => 'ORDER-CATALOG-LOCK',
             'user_id' => $buyer->id,

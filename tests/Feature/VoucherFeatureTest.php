@@ -14,13 +14,14 @@ use App\Models\Voucher;
 use App\Services\PaymentService;
 use App\Services\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use PDO;
 use Tests\TestCase;
 
 class VoucherFeatureTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const STATIC_QRIS = '00020101021126610014COM.GO-JEK.WWW01189360091438659284520210G8659284520303UMI51440014ID.CO.QRIS.WWW0215ID10243297931020303UMI5204729953033605802ID5911Aksa Xiterz6006MALANG61056515362070703A0163045DEF';
 
     protected function setUp(): void
     {
@@ -89,7 +90,7 @@ class VoucherFeatureTest extends TestCase
             null,
             null,
             false,
-            'pakasir',
+            'gopay_qris',
             null,
             3
         );
@@ -195,7 +196,7 @@ class VoucherFeatureTest extends TestCase
         $this->actingAs($user)->postJson(route('vouchers.preview'), [
             'code' => 'AKSA10',
             'package_id' => $package->id,
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'quantity' => 2,
         ])
             ->assertUnprocessable()
@@ -211,7 +212,7 @@ class VoucherFeatureTest extends TestCase
         $this->actingAs($user)->postJson(route('vouchers.preview'), [
             'code' => 'AKSA10',
             'package_id' => $package->id,
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'quantity' => 1,
         ])
             ->assertUnprocessable()
@@ -229,7 +230,7 @@ class VoucherFeatureTest extends TestCase
             'package_id' => $package->id,
             'voucher_id' => $voucher->id,
             'status' => 'pending',
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'price' => 90000,
         ]);
 
@@ -247,38 +248,25 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame('cancelled', $order->fresh()->status);
     }
 
-    public function test_pakasir_invoice_uses_discounted_price_and_reserves_voucher(): void
+    public function test_gopay_qris_invoice_uses_discounted_price_and_reserves_voucher(): void
     {
         config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
+            'services.gopay_qris.enabled' => true,
+            'services.gopay_qris.static_payload' => self::STATIC_QRIS,
+            'services.gopay_qris.merchant_name' => 'Aksa Xiterz',
+            'services.gopay_qris.merchant_reference' => 'ID102432979310',
+            'services.gopay_qris.expires_minutes' => 10,
+            'services.gopay_qris.recovery_hours' => 72,
+            'services.gopay_qris.unique_max' => 999,
+            'services.gopay_qris.webhook_token' => 'voucher-checkout-token',
+            'services.gopay_qris.webhook_secret' => 'voucher-checkout-secret',
+            'services.gopay_qris.allowed_devices' => ['aksa-gopay-primary'],
         ]);
 
         [$user, $product, $package] = $this->makeCatalog(100000, 6, true);
         $voucher = $this->makeVoucher();
 
-        Http::fake(function ($request) {
-            if ($request->url() === 'https://app.pakasir.test/api/transactioncreate/qris') {
-                return Http::response([
-                    'payment' => [
-                        'project' => 'aksaxiterz',
-                        'order_id' => $request['order_id'],
-                        'amount' => 90000,
-                        'fee' => 0,
-                        'total_payment' => 90000,
-                        'payment_method' => 'qris',
-                        'payment_number' => '000201010212',
-                        'expired_at' => now()->addHour()->toIso8601String(),
-                    ],
-                ]);
-            }
-
-            return Http::response([], 404);
-        });
-
-        $result = app(PaymentService::class)->createPakasirPayment(
+        $result = app(PaymentService::class)->createGopayQrisPayment(
             $user,
             $product->id,
             $package->id,
@@ -286,9 +274,14 @@ class VoucherFeatureTest extends TestCase
             $voucher->code
         );
 
-        $this->assertSame('90000.000000', $result['order']->price);
+        $payment = $result['gopay_qris_payment'];
+        $this->assertSame(90000, (int) $payment['base_amount']);
+        $this->assertSame((int) ceil(90000 / 0.993) - 90000, (int) $payment['platform_fee']);
+        $this->assertGreaterThanOrEqual(1, (int) $payment['unique_amount']);
+        $this->assertLessThanOrEqual(999, (int) $payment['unique_amount']);
+        $this->assertSame((int) $result['order']->price, (int) $payment['total_payment']);
+        $this->assertSame(self::STATIC_QRIS, $payment['qr_payload']);
         $this->assertSame($voucher->id, $result['order']->voucher_id);
-        Http::assertSent(fn ($request): bool => $request['amount'] === 90000);
     }
 
     public function test_crypto_invoice_uses_same_effective_discount(): void
@@ -488,6 +481,7 @@ class VoucherFeatureTest extends TestCase
             'per_user_limit' => 0,
             'minimum_purchase' => 0,
         ]);
+        // Keep one historical Pakasir order in the admin usage report coverage.
         $qrisOrder = Order::create([
             'order_id' => 'ORDER-VOUCHER-IDR',
             'user_id' => $customer->id,

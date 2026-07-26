@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use PDO;
 use Tests\TestCase;
 
@@ -41,6 +40,9 @@ class PendingOrderExpirationServiceTest extends TestCase
         $summary = app(PendingOrderExpirationService::class)->expire();
 
         $this->assertSame(3, $summary['cancelled']);
+        $this->assertSame(1, $summary['gopay_qris']);
+        $this->assertSame(1, $summary['crypto']);
+        $this->assertSame(1, $summary['other']);
         $this->assertSame('cancelled', $qrisOrder->fresh()->status);
         $this->assertSame('cancelled', $cryptoOrder->fresh()->status);
         $this->assertSame('cancelled', $legacyOrder->fresh()->status);
@@ -49,62 +51,20 @@ class PendingOrderExpirationServiceTest extends TestCase
         $this->assertSame(0, LicenseStock::where('reserved_order_id', $cryptoInGrace->id)->count());
     }
 
-    public function test_expired_qris_is_not_released_when_provider_cancellation_fails(): void
+    public function test_expired_gopay_qris_is_cancelled_locally_and_releases_stock(): void
     {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-        ]);
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncancel' => Http::response([], 503),
-        ]);
-
         [$qrisOrder] = $this->orders();
-        $qrisOrder->update([
-            'payment_payload' => [
-                'payment_number' => '000201010212',
-            ],
-        ]);
         app(StockReservationService::class)->reserve($qrisOrder);
 
-        app(PendingOrderExpirationService::class)->expire();
+        $summary = app(PendingOrderExpirationService::class)->expire();
 
-        $this->assertSame('pending', $qrisOrder->fresh()->status);
-        $this->assertSame(1, LicenseStock::where('reserved_order_id', $qrisOrder->id)->reserved()->count());
-    }
-
-    public function test_hard_stale_qris_is_closed_locally_when_provider_no_longer_accepts_cancellation(): void
-    {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-            'services.payments.stale_pending_hours' => 24,
-        ]);
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncancel' => Http::response([], 404),
-        ]);
-
-        [$qrisOrder] = $this->orders();
-        $qrisOrder->update([
-            'expired_at' => now()->subHours(25),
-            'payment_payload' => [
-                'payment_number' => '000201010212',
-            ],
-        ]);
-        app(StockReservationService::class)->reserve($qrisOrder);
-
-        app(PendingOrderExpirationService::class)->expire();
-
+        $this->assertSame(1, $summary['gopay_qris']);
         $this->assertSame('cancelled', $qrisOrder->fresh()->status);
         $this->assertSame(0, LicenseStock::where('reserved_order_id', $qrisOrder->id)->count());
     }
 
-    public function test_expired_legacy_non_pakasir_order_does_not_call_pakasir_cancellation(): void
+    public function test_expired_legacy_non_qris_order_is_cancelled_locally(): void
     {
-        Http::fake();
-
         [$legacyOrder] = $this->orders();
         $legacyOrder->update([
             'payment_method' => 'midtrans',
@@ -119,35 +79,6 @@ class PendingOrderExpirationServiceTest extends TestCase
 
         $this->assertSame('cancelled', $legacyOrder->fresh()->status);
         $this->assertSame(0, LicenseStock::where('reserved_order_id', $legacyOrder->id)->count());
-        Http::assertNothingSent();
-    }
-
-    public function test_expired_qris_is_cancelled_at_provider_before_stock_is_released(): void
-    {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-        ]);
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncancel' => Http::response(['status' => 'success']),
-        ]);
-
-        [$qrisOrder] = $this->orders();
-        $qrisOrder->update([
-            'payment_payload' => [
-                'payment_number' => '000201010212',
-            ],
-        ]);
-        app(StockReservationService::class)->reserve($qrisOrder);
-
-        app(PendingOrderExpirationService::class)->expire();
-
-        $this->assertSame('cancelled', $qrisOrder->fresh()->status);
-        $this->assertSame('cancelled', $qrisOrder->fresh()->payment_payload['provider_status'] ?? null);
-        $this->assertSame(0, LicenseStock::where('reserved_order_id', $qrisOrder->id)->count());
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://app.pakasir.test/api/transactioncancel'
-            && $request['order_id'] === $qrisOrder->order_id);
     }
 
     private function orders(): array
@@ -175,6 +106,7 @@ class PendingOrderExpirationServiceTest extends TestCase
             'price' => 10000,
         ];
 
+        // A pre-migration Pakasir order without an expiry still needs stale cleanup.
         $legacyOrder = Order::create($attributes + [
             'order_id' => 'ORDER-LEGACY-NO-EXPIRY',
             'payment_method' => 'pakasir',
@@ -187,7 +119,7 @@ class PendingOrderExpirationServiceTest extends TestCase
         $orders = [
             Order::create($attributes + [
                 'order_id' => 'ORDER-EXPIRED-QRIS',
-                'payment_method' => 'pakasir',
+                'payment_method' => 'gopay_qris',
                 'expired_at' => now()->subMinute(),
             ]),
             Order::create($attributes + [

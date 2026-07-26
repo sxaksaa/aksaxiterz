@@ -133,7 +133,7 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('class="sync-crypto-form"', $html);
     }
 
-    public function test_pakasir_orders_render_check_and_continue_actions(): void
+    public function test_legacy_pakasir_orders_remain_readable_without_dead_provider_actions(): void
     {
         $order = $this->fakeOrder([
             'order_id' => 'ORDER-PAKASIR',
@@ -155,14 +155,49 @@ class PaymentPresentationTest extends TestCase
 
         $this->assertStringContainsString('QRIS', $html);
         $this->assertStringNotContainsString('QRIS (Pakasir)', $html);
-        $this->assertStringContainsString('class="sync-pakasir-form"', $html);
-        $this->assertStringContainsString('data-order-id="ORDER-PAKASIR"', $html);
-        $this->assertStringContainsString('View QRIS', $html);
-        $this->assertStringContainsString('data-pakasir-checkout=', $html);
+        $this->assertStringContainsString('ORDER-PAKASIR', $html);
+        $this->assertStringNotContainsString('sync-pakasir-form', $html);
+        $this->assertStringNotContainsString('data-pakasir-checkout=', $html);
+        $this->assertStringNotContainsString('app.pakasir.com', $html);
         $this->assertStringNotContainsString('Waiting for QRIS payment', $html);
         $this->assertStringNotContainsString('Need Help?', $html);
         $this->assertStringNotContainsString('Support message copied', $html);
         $this->assertStringNotContainsString('Pay Again', $html);
+    }
+
+    public function test_existing_order_progress_timeline_remains_the_single_status_display(): void
+    {
+        $pending = $this->fakeOrder([
+            'order_id' => 'ORDER-STATE-PENDING',
+            'payment_method' => 'gopay_qris',
+        ]);
+        $cancelled = $this->fakeOrder([
+            'order_id' => 'ORDER-STATE-CANCELLED',
+            'status' => 'cancelled',
+            'expired_at' => now()->addHour(),
+        ]);
+        $expired = $this->fakeOrder([
+            'order_id' => 'ORDER-STATE-EXPIRED',
+            'status' => 'cancelled',
+            'payment_method' => 'gopay_qris',
+            'expired_at' => now()->subMinute(),
+        ]);
+        $cancelled->updated_at = now();
+        $expired->updated_at = now();
+
+        $html = $this->renderOrders([$pending, $cancelled, $expired]);
+
+        $this->assertStringContainsString('ORDER-STATE-PENDING', $html);
+        $this->assertStringContainsString('aria-label="Order progress"', $html);
+        $this->assertStringContainsString('<span>Created</span>', $html);
+        $this->assertStringContainsString('<span>Closed</span>', $html);
+        $this->assertStringContainsString('<span>Paid</span>', $html);
+        $this->assertStringContainsString('<span>Delivered</span>', $html);
+        $this->assertStringNotContainsString('order-status-summary', $html);
+
+        $expiredHtml = $this->renderOrders([$expired]);
+        $this->assertStringContainsString('This invoice is closed. Start a new checkout when you are ready.', $expiredHtml);
+        $this->assertStringNotContainsString('This checkout was cancelled. No payment action is needed.', $expiredHtml);
     }
 
     public function test_binance_pay_orders_render_pay_id_and_automatic_verification_actions(): void
@@ -228,6 +263,22 @@ class PaymentPresentationTest extends TestCase
         $this->assertStringNotContainsString('View License', $html);
         $this->assertStringContainsString('Open Licenses', $html);
         $this->assertStringContainsString('/licenses?order=ORDER-TEST#license-ORDER-TEST', $html);
+    }
+
+    public function test_qris_renderer_preserves_scan_quiet_zone_and_order_redirect_copy(): void
+    {
+        $javascript = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertIsString($javascript);
+        $this->assertStringContainsString('margin: 20,', $javascript);
+        $this->assertStringContainsString(
+            "redirectUrl.startsWith('/orders') ? 'Orders' : 'My Licenses'",
+            $javascript
+        );
+        $this->assertStringContainsString(
+            'startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown, redirectLabel);',
+            $javascript
+        );
     }
 
     private function fakeOrder(array $attributes = []): Order

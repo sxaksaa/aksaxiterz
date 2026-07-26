@@ -17,13 +17,14 @@ use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
 use App\Services\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use PDO;
 use Tests\TestCase;
 
 class CartCheckoutFeatureTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const STATIC_QRIS = '00020101021126610014COM.GO-JEK.WWW01189360091438659284520210G8659284520303UMI51440014ID.CO.QRIS.WWW0215ID10243297931020303UMI5204729953033605802ID5911Aksa Xiterz6006MALANG61056515362070703A0163045DEF';
 
     protected function setUp(): void
     {
@@ -69,6 +70,7 @@ class CartCheckoutFeatureTest extends TestCase
 
     public function test_cart_page_disables_checkout_when_an_item_changes_to_updating(): void
     {
+        $this->enableGopayQris();
         [$user, $product, $package] = $this->catalogItem('Paused Product', 20000, 1.25, 1);
         CartItem::create([
             'user_id' => $user->id,
@@ -92,19 +94,14 @@ class CartCheckoutFeatureTest extends TestCase
             $response->getContent()
         );
         $this->assertMatchesRegularExpression(
-            '/data-cart-payment="pakasir"[^>]*disabled/s',
+            '/data-cart-payment="gopay_qris"[^>]*disabled/s',
             $response->getContent()
         );
     }
 
     public function test_cart_checkout_creates_one_discounted_invoice_and_delivers_every_item(): void
     {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
-        ]);
+        $this->enableGopayQris();
 
         [$user, $firstProduct, $firstPackage] = $this->catalogItem('Aurora', 50000, 3, 2);
         [, $secondProduct, $secondPackage] = $this->catalogItem('Drip', 100000, 6, 1, $user);
@@ -132,41 +129,29 @@ class CartCheckoutFeatureTest extends TestCase
             'quantity' => 1,
         ]);
 
-        Http::fake(function ($request) {
-            if ($request->url() === 'https://app.pakasir.test/api/transactioncreate/qris') {
-                return Http::response([
-                    'payment' => [
-                        'project' => 'aksaxiterz',
-                        'order_id' => $request['order_id'],
-                        'amount' => 180000,
-                        'fee' => 0,
-                        'total_payment' => 180000,
-                        'payment_method' => 'qris',
-                        'payment_number' => 'BUNDLE-QR',
-                        'expired_at' => now()->addMinutes(5)->toIso8601String(),
-                    ],
-                ]);
-            }
-
-            return Http::response([], 404);
-        });
-
         $response = $this->actingAs($user)
             ->postJson(route('cart.checkout'), [
-                'payment_method' => 'pakasir',
+                'payment_method' => 'gopay_qris',
                 'voucher_code' => $voucher->code,
                 'price' => 1,
                 'discount_idr' => 999999999,
                 'product_id' => $secondProduct->id,
             ])
             ->assertOk()
-            ->assertJsonPath('method', 'pakasir')
+            ->assertJsonPath('method', 'gopay_qris')
             ->assertJsonPath('quantity', 3);
 
         $order = Order::where('order_id', $response->json('order_id'))->firstOrFail();
+        $qrisPayment = $order->payment_payload;
         $this->assertSame(2, $order->items()->count());
         $this->assertSame(3, $order->quantity);
-        $this->assertSame('180000.000000', $order->price);
+        $this->assertSame('gopay_qris', $order->payment_method);
+        $this->assertSame(180000, (int) $qrisPayment['base_amount']);
+        $this->assertSame((int) ceil(180000 / 0.993) - 180000, (int) $qrisPayment['platform_fee']);
+        $this->assertGreaterThanOrEqual(1, (int) $qrisPayment['unique_amount']);
+        $this->assertLessThanOrEqual(999, (int) $qrisPayment['unique_amount']);
+        $this->assertSame((int) $order->price, (int) $qrisPayment['total_payment']);
+        $this->assertSame(self::STATIC_QRIS, $qrisPayment['qr_payload']);
         $this->assertSame($voucher->id, $order->voucher_id);
         $this->assertSame(3, LicenseStock::where('reserved_order_id', $order->id)->count());
         $this->assertSame(0, CartItem::where('user_id', $user->id)->count());
@@ -506,7 +491,7 @@ class CartCheckoutFeatureTest extends TestCase
             'package_id' => $firstPackage->id,
             'quantity' => 2,
             'status' => 'pending',
-            'payment_method' => 'pakasir',
+            'payment_method' => 'gopay_qris',
             'price' => 150000,
             'expired_at' => now()->addMinutes(5),
         ]);
@@ -720,6 +705,22 @@ class CartCheckoutFeatureTest extends TestCase
         }
 
         return [$user, $product, $package];
+    }
+
+    private function enableGopayQris(): void
+    {
+        config([
+            'services.gopay_qris.enabled' => true,
+            'services.gopay_qris.static_payload' => self::STATIC_QRIS,
+            'services.gopay_qris.merchant_name' => 'Aksa Xiterz',
+            'services.gopay_qris.merchant_reference' => 'ID102432979310',
+            'services.gopay_qris.expires_minutes' => 10,
+            'services.gopay_qris.recovery_hours' => 72,
+            'services.gopay_qris.unique_max' => 999,
+            'services.gopay_qris.webhook_token' => 'cart-checkout-token',
+            'services.gopay_qris.webhook_secret' => 'cart-checkout-secret',
+            'services.gopay_qris.allowed_devices' => ['aksa-gopay-primary'],
+        ]);
     }
 
     private function orderItem(Order $order, Product $product, Package $package, int $quantity): OrderItem

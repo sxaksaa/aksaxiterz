@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\GopayNotificationEvent;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
@@ -219,5 +220,30 @@ class AdminDashboardTest extends TestCase
             ->assertOk()
             ->assertSee('AAA Visible Product - Visible Package')
             ->assertDontSee('AAA Hidden Product - Hidden Package');
+    }
+
+    public function test_failed_gopay_delivery_is_counted_as_an_attention_event(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+
+        GopayNotificationEvent::create([
+            'event_id' => str_repeat('a', 64),
+            'device_id' => 'aksa-gopay-primary',
+            'package_name' => 'com.gojek.gopaymerchant',
+            'title' => 'Pembayaran QRIS statis diterima',
+            'notification_text' => 'Rp1.000 di Aksa Xiterz',
+            'amount_idr' => 1000,
+            'notification_posted_at_ms' => now()->getTimestampMs(),
+            'status' => 'matched_delivery_failed',
+            'received_at' => now(),
+            'last_received_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertViewHas('qrisEventStats', fn (array $stats): bool => $stats['attention'] === 1);
     }
 }

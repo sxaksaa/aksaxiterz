@@ -436,21 +436,39 @@
                 const result = await window.syncAksaGopayQrisOrder?.(orderId);
 
                 if (result?.status === 'paid') {
+                    const deliveryPending = result?.delivery_pending === true;
+
                     window.showAksaPaymentSuccess?.({
-                        message: 'Your QRIS payment has been verified and your license is ready.',
+                        message: result.message || (
+                            deliveryPending
+                                ? 'Payment verified. Your license delivery is being prepared.'
+                                : 'Your QRIS payment has been verified and your license is ready.'
+                        ),
                         licenseKey: result.license_key,
                         licenseKeys: result.license_keys,
                         orderId: result.order_id || orderId,
-                    }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                        primaryUrl: deliveryPending ? '/orders' : undefined,
+                        primaryText: deliveryPending ? 'Open Orders' : undefined,
+                        copyStatusText: deliveryPending ? 'Payment is safe. License delivery is still pending.' : undefined,
+                        redirectDelay: deliveryPending ? 8000 : undefined,
+                    }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment secured; delivery is pending.' : 'Your license is ready.', {
                         variant: 'success',
                     });
                     await refreshOrders();
                     return;
                 }
 
-                window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
-                    variant: 'warning',
-                });
+                const checkoutClosed = result?.status && result.status !== 'pending';
+
+                window.showAppToast?.(
+                    checkoutClosed ? 'Checkout closed' : 'Still waiting',
+                    result?.message || (
+                        checkoutClosed
+                            ? 'Start a new checkout when you are ready to pay.'
+                            : 'Payment is still being verified automatically.'
+                    ),
+                    { variant: 'warning' },
+                );
                 await refreshOrders();
             } catch (error) {
                 window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
@@ -612,62 +630,60 @@
             signal: ordersPageController.signal
         });
 
-        trackOrdersInterval(async () => {
+        async function pollLatestOrderStatus(options = {}) {
             if (orderStatusPolling || document.hidden) return;
 
             orderStatusPolling = true;
+            let shouldRefreshFragment = options.refreshFragment === true;
 
             try {
-                const response = await fetch('/check-order');
+                const response = await fetch('/check-order', {
+                    cache: 'no-store',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
                 const data = await response.json();
 
-                if (!data.status) return;
+                if (!data.status) {
+                    if (shouldRefreshFragment) await refreshOrders();
+                    return;
+                }
 
                 const qrisModalOpen = document.getElementById('aksaQrisModal')?.getAttribute('aria-hidden') === 'false';
                 const cryptoModalOpen = document.getElementById('aksaCryptoModal')?.getAttribute('aria-hidden') === 'false';
                 const binancePayModalOpen = document.getElementById('aksaBinancePayModal')?.getAttribute('aria-hidden') === 'false';
 
-                if (data.status === 'pending' && data.payment_method === 'gopay_qris' && data.order_id && !qrisModalOpen) {
-                    const result = await window.syncAksaGopayQrisOrder?.(data.order_id);
-
-                    if (result?.status === 'paid') {
-                        window.showAksaPaymentSuccess?.({
-                            message: 'Your QRIS payment has been verified and your license is ready.',
-                            licenseKey: result.license_key,
-                            licenseKeys: result.license_keys,
-                            orderId: result.order_id || data.order_id,
-                        }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
-                            variant: 'success',
-                        });
-                        refreshOrders();
-                        return;
-                    }
-
-                    if (result?.status && result.status !== lastPolledStatus) {
-                        lastPolledStatus = result.status;
-                        refreshOrders();
-                    }
-                }
-
                 if (data.can_sync_gopay_qris && data.payment_method === 'gopay_qris' && data.order_id && !qrisModalOpen) {
                     const result = await window.syncAksaGopayQrisOrder?.(data.order_id);
 
                     if (result?.status === 'paid') {
+                        const deliveryPending = result?.delivery_pending === true;
+
                         window.showAksaPaymentSuccess?.({
-                            message: result.message || 'Your QRIS payment has been verified and your license is ready.',
+                            message: result.message || (
+                                deliveryPending
+                                    ? 'Payment verified. Your license delivery is being prepared.'
+                                    : 'Your QRIS payment has been verified and your license is ready.'
+                            ),
                             licenseKey: result.license_key,
                             licenseKeys: result.license_keys,
                             orderId: result.order_id || data.order_id,
-                        }) || window.showAppToast?.('Payment successful', 'Your license is ready.', {
+                            primaryUrl: deliveryPending ? '/orders' : undefined,
+                            primaryText: deliveryPending ? 'Open Orders' : undefined,
+                            copyStatusText: deliveryPending ? 'Payment is safe. License delivery is still pending.' : undefined,
+                            redirectDelay: deliveryPending ? 8000 : undefined,
+                        }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment secured; delivery is pending.' : 'Your license is ready.', {
                             variant: 'success',
                         });
-                        refreshOrders();
+                        await refreshOrders();
                         return;
                     }
 
                     if (result?.status && result.status !== lastPolledStatus) {
                         lastPolledStatus = result.status;
-                        refreshOrders();
+                        shouldRefreshFragment = true;
                     }
                 }
 
@@ -689,13 +705,13 @@
                         }) || window.showAppToast?.('Payment successful', deliveryPending ? 'Payment verified. Manual delivery needed.' : 'Your license is ready.', {
                             variant: 'success',
                         });
-                        refreshOrders();
+                        await refreshOrders();
                         return;
                     }
 
                     if (result?.status && result.status !== lastPolledStatus) {
                         lastPolledStatus = result.status;
-                        refreshOrders();
+                        shouldRefreshFragment = true;
                     }
                 }
 
@@ -715,13 +731,13 @@
                             copyStatusText: deliveryPending ? 'Support will deliver this license manually.' : undefined,
                             redirectDelay: deliveryPending ? 8000 : undefined,
                         });
-                        refreshOrders();
+                        await refreshOrders();
                         return;
                     }
 
                     if (result?.status && result.status !== lastPolledStatus) {
                         lastPolledStatus = result.status;
-                        refreshOrders();
+                        shouldRefreshFragment = true;
                     }
                 }
 
@@ -729,14 +745,22 @@
                     lastPolledStatus = data.status;
 
                     if (data.status !== 'pending') {
-                        refreshOrders();
+                        shouldRefreshFragment = true;
                     }
+                }
+
+                if (shouldRefreshFragment) {
+                    await refreshOrders();
                 }
             } catch (error) {
                 // Polling is best-effort; manual payment checks remain available.
             } finally {
                 orderStatusPolling = false;
             }
+        }
+
+        trackOrdersInterval(() => {
+            void pollLatestOrderStatus();
         }, 15000);
 
         function updateCountdowns() {
@@ -767,12 +791,29 @@
         document.addEventListener('DOMContentLoaded', function() {
             showPaymentNoticeFromQuery();
             updateCountdowns();
+            void pollLatestOrderStatus();
         }, {
             signal: ordersPageController.signal
         });
 
-        window.addEventListener('pageshow', function() {
-            refreshOrders();
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                void pollLatestOrderStatus({ refreshFragment: true });
+            }
+        }, {
+            signal: ordersPageController.signal
+        });
+
+        window.addEventListener('online', function() {
+            void pollLatestOrderStatus({ refreshFragment: true });
+        }, {
+            signal: ordersPageController.signal
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                void pollLatestOrderStatus({ refreshFragment: true });
+            }
         }, {
             signal: ordersPageController.signal
         });

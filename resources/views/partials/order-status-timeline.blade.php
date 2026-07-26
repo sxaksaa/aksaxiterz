@@ -3,7 +3,13 @@
     $isPaid = $status === 'paid';
     $isPastDue = $status === 'pending' && $order->expired_at && now()->gte($order->expired_at);
     $isPending = $status === 'pending' && ! $isPastDue;
-    $isClosed = $isPastDue || in_array($status, ['cancelled', 'expired'], true);
+    $wasExpiredBySystem = $status === 'cancelled' &&
+        $order->expired_at &&
+        $order->updated_at &&
+        $order->updated_at->gte($order->expired_at);
+    $isExpired = $status === 'expired' || $isPastDue || $wasExpiredBySystem;
+    $isCancelled = $status === 'cancelled' && ! $isExpired;
+    $isClosed = $isExpired || $isCancelled;
     $deliveredCount = (int) ($order->licenses_count ?? 0);
     $quantity = max(1, (int) ($order->quantity ?? $order->total_quantity ?? 1));
     $isDelivered = $isPaid && $deliveredCount >= $quantity;

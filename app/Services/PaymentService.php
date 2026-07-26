@@ -1126,28 +1126,28 @@ class PaymentService
             throw new \Exception('Invalid GoPay QRIS amount');
         }
 
-        $recoveryHours = max(1, (int) config('services.gopay_qris.recovery_hours', 24));
+        $quarantineHours = max(168, (int) config('services.gopay_qris.amount_quarantine_hours', 168));
 
         Order::where('payment_method', 'gopay_qris')
             ->whereNotNull('payment_match_key')
-            ->where(function ($query) use ($recoveryHours): void {
-                $query->where(function ($paid) use ($recoveryHours): void {
+            ->where(function ($query) use ($quarantineHours): void {
+                $query->where(function ($paid) use ($quarantineHours): void {
                     $paid->where('status', 'paid')
-                        ->where(function ($settled) use ($recoveryHours): void {
-                            $settled->where('paid_at', '<=', now()->subHours($recoveryHours))
-                                ->orWhere(function ($missingPaidAt) use ($recoveryHours): void {
+                        ->where(function ($settled) use ($quarantineHours): void {
+                            $settled->where('paid_at', '<=', now()->subHours($quarantineHours))
+                                ->orWhere(function ($missingPaidAt) use ($quarantineHours): void {
                                     $missingPaidAt->whereNull('paid_at')
-                                        ->where('updated_at', '<=', now()->subHours($recoveryHours));
+                                        ->where('updated_at', '<=', now()->subHours($quarantineHours));
                                 });
                         });
                 })
-                    ->orWhere(function ($expired) use ($recoveryHours): void {
+                    ->orWhere(function ($expired) use ($quarantineHours): void {
                         $expired->where('status', 'cancelled')
-                            ->where(function ($deadline) use ($recoveryHours): void {
-                                $deadline->where('expired_at', '<=', now()->subHours($recoveryHours))
-                                    ->orWhere(function ($missingExpiry) use ($recoveryHours): void {
+                            ->where(function ($deadline) use ($quarantineHours): void {
+                                $deadline->where('expired_at', '<=', now()->subHours($quarantineHours))
+                                    ->orWhere(function ($missingExpiry) use ($quarantineHours): void {
                                         $missingExpiry->whereNull('expired_at')
-                                            ->where('created_at', '<=', now()->subHours($recoveryHours + 1));
+                                            ->where('created_at', '<=', now()->subHours($quarantineHours + 1));
                                     });
                             });
                     });
@@ -1934,5 +1934,4 @@ class PaymentService
             'curl' => $this->gatewayCurlOptions(),
         ];
     }
-
 }

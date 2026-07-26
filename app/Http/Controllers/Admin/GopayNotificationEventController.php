@@ -13,6 +13,7 @@ class GopayNotificationEventController extends Controller
         'ambiguous',
         'stale',
         'matched_delivery_pending',
+        'matched_delivery_failed',
     ];
 
     public function index(Request $request)
@@ -22,6 +23,7 @@ class GopayNotificationEventController extends Controller
             'attention' => 'Needs attention',
             'matched' => 'Matched',
             'matched_delivery_pending' => 'Delivery pending',
+            'matched_delivery_failed' => 'Delivery failed',
             'unmatched' => 'Unmatched',
             'ambiguous' => 'Ambiguous',
             'stale' => 'Stale',

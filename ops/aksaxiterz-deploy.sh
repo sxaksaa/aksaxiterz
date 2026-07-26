@@ -26,6 +26,104 @@ unexpected_env_file="$(find "${APP_DIR}" -maxdepth 1 -name '.env*' \
 [[ -z "${unexpected_env_file}" ]] || fail \
     "move the environment copy outside the application directory: $(basename -- "${unexpected_env_file}")"
 
+environment_errors="$(
+    php -r '
+        $values = parse_ini_file($argv[1], false, INI_SCANNER_RAW);
+
+        if (! is_array($values)) {
+            echo "unable to parse production .env";
+            exit;
+        }
+
+        $errors = [];
+        $truthy = static fn ($value): bool => in_array(
+            strtolower(trim((string) $value)),
+            ["1", "true", "yes", "on"],
+            true
+        );
+        $required = static function (array $keys) use ($values, &$errors): void {
+            foreach ($keys as $key) {
+                if (trim((string) ($values[$key] ?? "")) === "") {
+                    $errors[] = $key." is empty";
+                }
+            }
+        };
+
+        if (($values["APP_ENV"] ?? "") !== "production") {
+            $errors[] = "APP_ENV must be production";
+        }
+
+        if ($truthy($values["APP_DEBUG"] ?? false)) {
+            $errors[] = "APP_DEBUG must be false";
+        }
+
+        $required(["APP_KEY"]);
+
+        if (! str_starts_with((string) ($values["APP_URL"] ?? ""), "https://")) {
+            $errors[] = "APP_URL must use https";
+        }
+
+        if (trim((string) ($values["TRUSTED_PROXIES"] ?? "")) === "*") {
+            $errors[] = "TRUSTED_PROXIES cannot be wildcard";
+        }
+
+        if ($truthy($values["GOPAY_QRIS_ENABLED"] ?? false)) {
+            $required([
+                "GOPAY_QRIS_STATIC_PAYLOAD",
+                "GOPAY_QRIS_MERCHANT_REFERENCE",
+                "GOPAY_QRIS_WEBHOOK_TOKEN",
+                "GOPAY_QRIS_WEBHOOK_SECRET",
+                "GOPAY_QRIS_ALLOWED_DEVICES",
+            ]);
+
+            $webhookToken = (string) ($values["GOPAY_QRIS_WEBHOOK_TOKEN"] ?? "");
+            $webhookSecret = (string) ($values["GOPAY_QRIS_WEBHOOK_SECRET"] ?? "");
+
+            if ($webhookToken !== "" && strlen($webhookToken) < 32) {
+                $errors[] = "GOPAY_QRIS_WEBHOOK_TOKEN must contain at least 32 characters";
+            }
+
+            if ($webhookSecret !== "" && strlen($webhookSecret) < 32) {
+                $errors[] = "GOPAY_QRIS_WEBHOOK_SECRET must contain at least 32 characters";
+            }
+
+            if ($webhookToken !== "" && $webhookSecret !== "" && hash_equals($webhookToken, $webhookSecret)) {
+                $errors[] = "GOPAY_QRIS_WEBHOOK_TOKEN and GOPAY_QRIS_WEBHOOK_SECRET must be different";
+            }
+
+            if ((int) ($values["GOPAY_QRIS_RECOVERY_HOURS"] ?? 0) < 72) {
+                $errors[] = "GOPAY_QRIS_RECOVERY_HOURS must be at least 72";
+            }
+
+            if ((int) ($values["GOPAY_QRIS_RECOVERY_HOURS"] ?? 0) > 168) {
+                $errors[] = "GOPAY_QRIS_RECOVERY_HOURS cannot exceed 168";
+            }
+
+            $delayedRecoveryMinutes = (int) ($values["GOPAY_QRIS_DELAYED_RECOVERY_MIN_MINUTES"] ?? 0);
+
+            if ($delayedRecoveryMinutes < 60 || $delayedRecoveryMinutes > 1440) {
+                $errors[] = "GOPAY_QRIS_DELAYED_RECOVERY_MIN_MINUTES must be between 60 and 1440";
+            }
+
+            $notificationMaxAgeHours = (int) ($values["GOPAY_QRIS_NOTIFICATION_MAX_AGE_HOURS"] ?? 0);
+            $recoveryHours = (int) ($values["GOPAY_QRIS_RECOVERY_HOURS"] ?? 0);
+
+            if ($notificationMaxAgeHours < $recoveryHours || $notificationMaxAgeHours > 168) {
+                $errors[] = "GOPAY_QRIS_NOTIFICATION_MAX_AGE_HOURS must cover recovery and cannot exceed 168";
+            }
+
+            $amountQuarantineHours = (int) ($values["GOPAY_QRIS_AMOUNT_QUARANTINE_HOURS"] ?? 0);
+
+            if ($amountQuarantineHours < 168 || $amountQuarantineHours > 720) {
+                $errors[] = "GOPAY_QRIS_AMOUNT_QUARANTINE_HOURS must be between 168 and 720";
+            }
+        }
+
+        echo implode("; ", $errors);
+    ' "${APP_DIR}/.env"
+)"
+[[ -z "${environment_errors}" ]] || fail "${environment_errors}"
+
 safe_directories=""
 if safe_directories="$(git config --global --get-all safe.directory 2>/dev/null)"; then
     :
@@ -82,6 +180,14 @@ actual_storage_target="$(realpath -e -- "${storage_link}")" || fail "public/stor
 
 php artisan optimize:clear
 php artisan optimize
+php artisan payments:verify-gopay-config
+php artisan schedule:list >/dev/null
+
+readonly SCHEDULER_CRON_FILE="/etc/cron.d/aksaxiterz"
+[[ -f "${SCHEDULER_CRON_FILE}" ]] || fail "missing Laravel scheduler cron: ${SCHEDULER_CRON_FILE}"
+grep -Eq '^[^#].*artisan[[:space:]]+schedule:run' "${SCHEDULER_CRON_FILE}" || \
+    fail "Laravel scheduler cron does not run artisan schedule:run"
+systemctl is-active --quiet cron || fail "cron service is not active"
 
 # Application source is read-only to www-data; only Laravel runtime paths are writable.
 chown -R root:www-data "${APP_DIR}"
@@ -102,5 +208,9 @@ find "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" -type f -exec chmod 0664 
 
 systemctl reload "${PHP_FPM_SERVICE}"
 systemctl reload "${WEB_SERVICE}"
+
+install -o root -g root -m 0755 \
+    "${APP_DIR}/ops/aksaxiterz-deploy.sh" \
+    "/usr/local/bin/aksaxiterz-deploy"
 
 printf 'Deploy complete: %s\n' "$(git rev-parse --short HEAD)"

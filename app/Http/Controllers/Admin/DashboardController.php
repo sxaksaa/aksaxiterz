@@ -114,6 +114,7 @@ class DashboardController extends Controller
                 'ambiguous',
                 'stale',
                 'matched_delivery_pending',
+                'matched_delivery_failed',
             ])->count(),
         ];
 

@@ -1,10 +1,8 @@
 <nav id="navbar"
-    class="fixed top-0 left-0 w-full z-50 
-bg-[#111115]/80 backdrop-blur-md 
-border-b border-[#27272A] transition-transform duration-300 site-navbar">
+    class="site-navbar fixed inset-x-0 top-2 z-50 px-3 transition-transform duration-300 sm:top-3 sm:px-4 lg:top-4 lg:px-6">
 
-
-    <div class="page-shell grid grid-cols-[auto_1fr_auto] items-center py-4 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
+    <div
+        class="site-navbar-pill mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
         <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
@@ -52,7 +50,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
             @auth
                 <a href="{{ route('cart.index') }}"
-                    class="relative inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-white/[0.03] px-3 text-sm font-semibold text-gray-200 transition hover:border-aksa-accent-60 hover:text-white"
+                    class="nav-cart-link relative inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
                     aria-label="Open cart with {{ $cartCount }} items">
                     <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
                     <span>Cart</span>
@@ -73,7 +71,8 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
             </a>
 
             <!-- MOBILE MENU BUTTON -->
-            <button id="menuBtn" type="button" data-mobile-menu-toggle class="inline-flex items-center gap-2 p-2 text-sm text-white xl:hidden">
+            <button id="menuBtn" type="button" data-mobile-menu-toggle aria-controls="mobileMenu"
+                aria-expanded="false" class="nav-menu-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-white xl:hidden">
                 <x-ui.icon name="menu" class="h-5 w-5 text-aksa-accent" />
                 <span data-button-label>Menu</span>
             </button>
@@ -175,7 +174,7 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 
                 </div>
             @else
-                <a href="/auth/google" class="hidden items-center gap-2 text-gray-400 transition hover:text-white xl:inline-flex">
+                <a href="/auth/google" class="nav-login-link hidden items-center gap-2 rounded-full px-3 py-2 text-gray-400 transition hover:text-white xl:inline-flex">
                     <x-ui.icon name="log-in" class="h-4 w-4 text-aksa-accent" />
                     <span>Login</span>
                 </a>
@@ -189,14 +188,8 @@ border-b border-[#27272A] transition-transform duration-300 site-navbar">
 </nav>
 
 <div id="mobileMenu"
-    class="xl:hidden fixed top-[64px] left-0 w-full
-    bg-[#111115]/95 border-b border-[#27272A]
-    px-6 py-4 z-40
-    max-h-[calc(100vh-64px)] overflow-y-auto
-
-
-opacity-0 -translate-y-5 pointer-events-none
-transition-all duration-300 ease-out">
+    class="mobile-nav-panel fixed inset-x-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.25rem)] overflow-y-auto rounded-[1.35rem] border px-4 py-4 opacity-0 -translate-y-5 pointer-events-none transition-all duration-300 ease-out sm:left-auto sm:right-4 sm:w-[23rem] xl:hidden"
+    aria-hidden="true">
 
     <div class="flex flex-col gap-4 text-sm">
 
@@ -323,4 +316,4 @@ transition-all duration-300 ease-out">
 
 </div>
 
-<div class="h-20"></div>
+<div class="h-[5.5rem] sm:h-24" aria-hidden="true"></div>

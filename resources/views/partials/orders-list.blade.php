@@ -73,7 +73,13 @@
                 $binancePaySelfServiceEndsAt &&
                 $now->lt($binancePaySelfServiceEndsAt)
             );
-            $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
+            $wasExpiredBySystem = $order->status === 'cancelled' &&
+                $order->expired_at &&
+                $order->updated_at &&
+                $order->updated_at->gte($order->expired_at);
+            $isExpired = $order->status === 'expired' ||
+                ($order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at)) ||
+                $wasExpiredBySystem;
             $isPending = $order->status === 'pending' && ! $isExpired;
             $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
             $methodClass = $isQris ? 'method-pill-qris' : '';
@@ -386,7 +392,13 @@
                             $binancePaySelfServiceEndsAt &&
                             $now->lt($binancePaySelfServiceEndsAt)
                         );
-                        $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
+                        $wasExpiredBySystem = $order->status === 'cancelled' &&
+                            $order->expired_at &&
+                            $order->updated_at &&
+                            $order->updated_at->gte($order->expired_at);
+                        $isExpired = $order->status === 'expired' ||
+                            ($order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at)) ||
+                            $wasExpiredBySystem;
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
                         $methodClass = $isQris ? 'method-pill-qris' : '';

@@ -85,7 +85,7 @@ window.renderAksaStyledQrCode = async function(target, value, options = {}) {
         height: size,
         type: 'canvas',
         data: value,
-        margin: 16,
+        margin: 20,
         qrOptions: {
             errorCorrectionLevel: 'H',
         },
@@ -128,6 +128,8 @@ const qrisState = {
     orderId: null,
     statusUrl: null,
     pollTimer: null,
+    pollNow: null,
+    pollGeneration: 0,
     isChecking: false,
     expiryHandled: false,
 };
@@ -365,42 +367,90 @@ async function syncBinancePayOrder(orderId) {
 }
 
 function stopQrisPolling() {
+    qrisState.pollGeneration += 1;
+
     if (qrisState.pollTimer) {
         clearInterval(qrisState.pollTimer);
         qrisState.pollTimer = null;
     }
 
+    qrisState.pollNow = null;
     qrisState.isChecking = false;
+}
+
+function setQrisAutoStatus(state, title, message) {
+    const status = document.getElementById('aksaQrisAutoStatus');
+    const titleElement = document.getElementById('aksaQrisAutoStatusTitle');
+    const messageElement = document.getElementById('aksaQrisAutoStatusMessage');
+
+    if (!status) return;
+
+    if (status.dataset.state !== state) status.dataset.state = state;
+    if (titleElement && titleElement.textContent !== title) titleElement.textContent = title;
+    if (messageElement && messageElement.textContent !== message) messageElement.textContent = message;
+}
+
+function showQrisPaymentSuccess(result, fallbackOrderId) {
+    const deliveryPending = result?.delivery_pending === true;
+
+    showPaymentSuccess({
+        message: result?.message || (
+            deliveryPending
+                ? 'Payment verified. Your license delivery is being prepared.'
+                : 'Your QRIS payment has been verified and your license is ready.'
+        ),
+        licenseKey: result?.license_key,
+        licenseKeys: result?.license_keys,
+        orderId: result?.order_id || fallbackOrderId,
+        primaryUrl: deliveryPending ? '/orders' : undefined,
+        primaryText: deliveryPending ? 'Open Orders' : undefined,
+        copyStatusText: deliveryPending ? 'Payment is safe. License delivery is still pending.' : undefined,
+        redirectDelay: deliveryPending ? 8000 : undefined,
+    });
 }
 
 function startQrisPolling(orderId) {
     stopQrisPolling();
+    const generation = qrisState.pollGeneration;
+    const isCurrentOrder = () => (
+        qrisState.pollGeneration === generation &&
+        qrisState.orderId === orderId
+    );
 
-    qrisState.pollTimer = setInterval(async () => {
-        if (qrisState.isChecking || document.hidden) return;
+    const poll = async () => {
+        if (!isCurrentOrder() || qrisState.isChecking || document.hidden) return;
 
         qrisState.isChecking = true;
 
         try {
             const result = await syncQrisOrder(orderId);
 
+            if (!isCurrentOrder()) return;
+
             if (result?.status === 'paid') {
                 stopQrisPolling();
-                showPaymentSuccess({
-                    message: 'Your QRIS payment has been verified and your license is ready.',
-                    licenseKey: result.license_key,
-                    licenseKeys: result.license_keys,
-                    orderId: result.order_id || orderId,
-                });
+                setQrisAutoStatus('paid', 'Payment verified', result.message || 'Your payment has been secured.');
+                showQrisPaymentSuccess(result, orderId);
             } else if (result?.status && result.status !== 'pending') {
                 stopQrisPolling();
+                setQrisAutoStatus('closed', 'Checkout closed', result.message || 'This payment window is no longer active.');
+            } else {
+                setQrisAutoStatus('waiting', 'Waiting for payment', 'Automatic verification will check again in 15 seconds.');
             }
         } catch (error) {
-            // Keep polling after transient network/server errors.
+            if (isCurrentOrder()) {
+                setQrisAutoStatus('retrying', 'Connection interrupted', 'No action needed. We will retry automatically when the connection returns.');
+            }
         } finally {
-            qrisState.isChecking = false;
+            if (isCurrentOrder()) {
+                qrisState.isChecking = false;
+            }
         }
-    }, 15000);
+    };
+
+    qrisState.pollNow = poll;
+    qrisState.pollTimer = setInterval(poll, 15000);
+    void poll();
 }
 
 function stopQrisExpiryCountdown() {
@@ -444,31 +494,47 @@ async function handleQrisExpiry() {
         setButtonLabel(checkButton, 'Check Final Status');
     }
 
-    if (!qrisState.orderId) return;
+    if (!qrisState.orderId || qrisState.isChecking) return;
 
+    const checkingOrderId = qrisState.orderId;
+    const checkingGeneration = qrisState.pollGeneration;
     qrisState.isChecking = true;
 
     try {
-        const result = await syncQrisOrder(qrisState.orderId);
+        const result = await syncQrisOrder(checkingOrderId);
+
+        if (
+            qrisState.orderId !== checkingOrderId ||
+            qrisState.pollGeneration !== checkingGeneration
+        ) {
+            return;
+        }
 
         if (result?.status === 'paid') {
             stopQrisPolling();
-            showPaymentSuccess({
-                message: 'Your QRIS payment has been verified and your license is ready.',
-                licenseKey: result.license_key,
-                licenseKeys: result.license_keys,
-                orderId: result.order_id || qrisState.orderId,
-            });
+            setQrisAutoStatus('paid', 'Payment verified', result.message || 'Your payment has been secured.');
+            showQrisPaymentSuccess(result, checkingOrderId);
         } else if (result?.status && result.status !== 'pending') {
             stopQrisPolling();
-            window.showAppToast?.('QRIS expired', 'The expired payment was closed. Start a new checkout to pay.', {
+            setQrisAutoStatus('closed', 'Checkout closed', result.message || 'This payment window is no longer active.');
+            window.showAppToast?.('QRIS expired', result.message || 'The expired payment was closed. Start a new checkout to pay.', {
                 variant: 'warning',
             });
         }
     } catch (error) {
-        // Polling will retry after transient network or server errors.
+        if (
+            qrisState.orderId === checkingOrderId &&
+            qrisState.pollGeneration === checkingGeneration
+        ) {
+            setQrisAutoStatus('retrying', 'Connection interrupted', 'We will retry automatically when the connection returns.');
+        }
     } finally {
-        qrisState.isChecking = false;
+        if (
+            qrisState.orderId === checkingOrderId &&
+            qrisState.pollGeneration === checkingGeneration
+        ) {
+            qrisState.isChecking = false;
+        }
     }
 }
 
@@ -688,6 +754,7 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
         return false;
     }
 
+    stopQrisPolling();
     qrisState.orderId = checkout.order_id || null;
     qrisState.statusUrl = checkout.method === 'gopay_qris'
         ? (checkout.status_url || `/sync-gopay-qris-order/${encodeURIComponent(qrisState.orderId || '')}`)
@@ -706,8 +773,8 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     }
     document.getElementById('aksaQrisExpiredOverlay')?.classList.add('hidden');
     const checkButton = document.getElementById('aksaQrisCheck');
-    if (checkButton) setButtonLabel(checkButton, 'Check Payment');
-    startQrisExpiryCountdown(payment.expired_at, payment.remaining_seconds);
+    if (checkButton) setButtonLabel(checkButton, 'Check Now');
+    setQrisAutoStatus('waiting', 'Automatic verification active', 'We check this payment securely every 15 seconds.');
 
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -724,6 +791,8 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
         startQrisPolling(qrisState.orderId);
     }
 
+    startQrisExpiryCountdown(payment.expired_at, payment.remaining_seconds);
+
     return true;
 };
 
@@ -736,6 +805,7 @@ window.closeAksaQrisModal = function() {
     stopQrisExpiryCountdown();
     qrisState.orderId = null;
     qrisState.statusUrl = null;
+    setQrisAutoStatus('waiting', 'Automatic verification active', 'We check this payment securely every 15 seconds.');
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('overflow-hidden');
@@ -895,6 +965,9 @@ function licenseUrlForOrder(orderId) {
 function showPaymentSuccess(options = {}) {
     const modal = document.getElementById('aksaPaymentSuccessModal');
     const redirectUrl = options.primaryUrl || licenseUrlForOrder(options.orderId);
+    const redirectLabel = options.redirectLabel || (
+        redirectUrl.startsWith('/orders') ? 'Orders' : 'My Licenses'
+    );
     const licenseKeys = Array.isArray(options.licenseKeys)
         ? options.licenseKeys.filter((key) => typeof key === 'string' && key !== '')
         : (options.licenseKey ? [options.licenseKey] : []);
@@ -939,7 +1012,7 @@ function showPaymentSuccess(options = {}) {
     }
 
     if (countdown) {
-        countdown.innerText = `Redirecting to My Licenses in ${Math.ceil(redirectDelay / 1000)}s.`;
+        countdown.innerText = `Redirecting to ${redirectLabel} in ${Math.ceil(redirectDelay / 1000)}s.`;
     }
 
     modal.classList.remove('hidden');
@@ -947,7 +1020,7 @@ function showPaymentSuccess(options = {}) {
     document.body.classList.add('overflow-hidden');
 
     copyLicenseKeys(licenseKeys, copyStatus);
-    startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown);
+    startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown, redirectLabel);
 
     return true;
 }
@@ -997,21 +1070,21 @@ async function copyLicenseKeys(licenseKeys, statusElement) {
     }
 }
 
-function startPaymentSuccessRedirect(url, delay, countdownElement) {
+function startPaymentSuccessRedirect(url, delay, countdownElement, redirectLabel = 'My Licenses') {
     let remaining = Math.max(1, Math.ceil(delay / 1000));
 
     clearTimeout(paymentSuccessRedirectTimer);
     clearInterval(paymentSuccessCountdownTimer);
 
     if (countdownElement) {
-        countdownElement.innerText = `Redirecting to My Licenses in ${remaining}s.`;
+        countdownElement.innerText = `Redirecting to ${redirectLabel} in ${remaining}s.`;
     }
 
     paymentSuccessCountdownTimer = setInterval(() => {
         remaining -= 1;
 
         if (countdownElement) {
-            countdownElement.innerText = `Redirecting to My Licenses in ${Math.max(0, remaining)}s.`;
+            countdownElement.innerText = `Redirecting to ${redirectLabel} in ${Math.max(0, remaining)}s.`;
         }
 
         if (remaining <= 0) {
@@ -1739,12 +1812,16 @@ function setNavButtonLabel(button, label) {
 function openMobileMenu() {
     const menu = mobileMenu();
     const button = navButton();
+    const navbar = document.getElementById('navbar');
 
     if (!menu || !button) return;
 
     mobileMenuOpen = true;
+    navbar?.classList.remove('nav-hidden');
     menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
     menu.classList.add('opacity-100', 'translate-y-0');
+    menu.setAttribute('aria-hidden', 'false');
+    button.setAttribute('aria-expanded', 'true');
     setNavButtonLabel(button, 'Close');
 }
 
@@ -1757,6 +1834,8 @@ function closeMobileMenu() {
     mobileMenuOpen = false;
     menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
     menu.classList.remove('opacity-100', 'translate-y-0');
+    menu.setAttribute('aria-hidden', 'true');
+    button.setAttribute('aria-expanded', 'false');
     setNavButtonLabel(button, 'Menu');
 }
 
@@ -1774,6 +1853,13 @@ function updateNavbarOnScroll() {
     if (!navbar) return;
 
     const currentScroll = window.pageYOffset;
+
+    if (mobileMenuOpen) {
+        navbar.classList.remove('nav-hidden');
+        lastNavbarScroll = currentScroll;
+        return;
+    }
+
     navbar.classList.toggle('nav-hidden', currentScroll > lastNavbarScroll && currentScroll > 50);
     lastNavbarScroll = currentScroll;
 }
@@ -2402,6 +2488,19 @@ document.addEventListener('click', (event) => {
     }
 });
 
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+
+    closeMobileMenu();
+    closeProfileDropdown();
+});
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1280 && mobileMenuOpen) {
+        closeMobileMenu();
+    }
+}, { passive: true });
+
 window.addEventListener('scroll', updateNavbarOnScroll, { passive: true });
 
 document.addEventListener('click', (event) => {
@@ -2565,38 +2664,81 @@ document.addEventListener('click', async (event) => {
 
     if (!button || !qrisState.orderId) return;
 
-    const originalText = getButtonLabel(button);
+    if (qrisState.isChecking) {
+        window.showAppToast?.('Already checking', 'Automatic verification is already in progress.');
+        return;
+    }
 
+    const originalText = getButtonLabel(button);
+    const checkingOrderId = qrisState.orderId;
+    const checkingGeneration = qrisState.pollGeneration;
+
+    qrisState.isChecking = true;
     button.disabled = true;
     setButtonLabel(button, 'Checking...');
     button.classList.add('opacity-60', 'pointer-events-none');
+    setQrisAutoStatus('checking', 'Checking payment', 'Reading the latest secure payment status.');
 
     try {
-        const result = await syncQrisOrder(qrisState.orderId);
+        const result = await syncQrisOrder(checkingOrderId);
 
-        if (result?.status === 'paid') {
-            stopQrisPolling();
-            showPaymentSuccess({
-                message: 'Your QRIS payment has been verified and your license is ready.',
-                licenseKey: result.license_key,
-                licenseKeys: result.license_keys,
-                orderId: result.order_id || qrisState.orderId,
-            });
+        if (
+            qrisState.orderId !== checkingOrderId ||
+            qrisState.pollGeneration !== checkingGeneration
+        ) {
             return;
         }
 
-        window.showAppToast?.('Still pending', result?.message || 'Payment is still being verified.', {
-            variant: 'warning',
-        });
+        if (result?.status === 'paid') {
+            stopQrisPolling();
+            setQrisAutoStatus('paid', 'Payment verified', result.message || 'Your payment has been secured.');
+            showQrisPaymentSuccess(result, checkingOrderId);
+            return;
+        }
+
+        if (result?.status && result.status !== 'pending') {
+            stopQrisPolling();
+            setQrisAutoStatus('closed', 'Checkout closed', result.message || 'This payment window is no longer active.');
+            window.showAppToast?.('Checkout closed', result.message || 'Start a new checkout when you are ready to pay.', {
+                variant: 'warning',
+            });
+        } else {
+            setQrisAutoStatus('waiting', 'Waiting for payment', 'Automatic verification will check again in 15 seconds.');
+            window.showAppToast?.('Still waiting', result?.message || 'Payment is still being verified automatically.', {
+                variant: 'warning',
+            });
+        }
     } catch (error) {
-        window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
-            variant: 'error',
-        });
+        if (
+            qrisState.orderId === checkingOrderId &&
+            qrisState.pollGeneration === checkingGeneration
+        ) {
+            setQrisAutoStatus('retrying', 'Connection interrupted', 'No action needed. We will retry automatically when the connection returns.');
+            window.showAppToast?.('Payment check failed', error.message || 'Please try again in a moment.', {
+                variant: 'error',
+            });
+        }
     } finally {
+        if (
+            qrisState.orderId === checkingOrderId &&
+            qrisState.pollGeneration === checkingGeneration
+        ) {
+            qrisState.isChecking = false;
+        }
         button.disabled = false;
-        setButtonLabel(button, originalText || 'Check Payment');
+        setButtonLabel(button, originalText || 'Check Now');
         button.classList.remove('opacity-60', 'pointer-events-none');
     }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        void qrisState.pollNow?.();
+    }
+});
+
+window.addEventListener('online', () => {
+    void qrisState.pollNow?.();
 });
 
 document.addEventListener('click', async (event) => {
