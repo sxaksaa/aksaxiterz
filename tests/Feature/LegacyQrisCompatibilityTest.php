@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Http;
 use PDO;
 use Tests\TestCase;
 
-class PakasirCheckoutToggleTest extends TestCase
+class LegacyQrisCompatibilityTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -23,66 +23,12 @@ class PakasirCheckoutToggleTest extends TestCase
     protected function setUp(): void
     {
         if (! in_array('sqlite', PDO::getAvailableDrivers(), true)) {
-            $this->markTestSkipped('pdo_sqlite is required for Pakasir checkout toggle tests.');
+            $this->markTestSkipped('pdo_sqlite is required for legacy QRIS compatibility tests.');
         }
 
         parent::setUp();
 
-        config([
-            'services.pakasir.checkout_enabled' => false,
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
-        ]);
-
         Http::fake();
-    }
-
-    public function test_disabled_pakasir_rejects_new_single_product_invoice_without_side_effects(): void
-    {
-        [$user, $product, $package] = $this->catalogWithStock();
-
-        $this->actingAs($user)
-            ->postJson("/process-order/{$product->id}", [
-                'package_id' => $package->id,
-                'quantity' => 1,
-            ])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Pakasir checkout is disabled.');
-
-        $this->assertDatabaseCount('orders', 0);
-        $this->assertDatabaseHas('license_stocks', [
-            'package_id' => $package->id,
-            'is_sold' => false,
-            'reserved_order_id' => null,
-        ]);
-        Http::assertNothingSent();
-    }
-
-    public function test_disabled_pakasir_rejects_new_cart_invoice_and_keeps_cart_intact(): void
-    {
-        [$user, $product, $package] = $this->catalogWithStock();
-        CartItem::create([
-            'user_id' => $user->id,
-            'product_id' => $product->id,
-            'package_id' => $package->id,
-            'quantity' => 1,
-        ]);
-
-        $this->actingAs($user)
-            ->postJson(route('cart.checkout'), ['payment_method' => 'pakasir'])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Pakasir checkout is disabled.');
-
-        $this->assertDatabaseCount('orders', 0);
-        $this->assertDatabaseCount('cart_items', 1);
-        $this->assertDatabaseHas('license_stocks', [
-            'package_id' => $package->id,
-            'is_sold' => false,
-            'reserved_order_id' => null,
-        ]);
-        Http::assertNothingSent();
     }
 
     public function test_pay_again_remaps_legacy_pakasir_order_to_enabled_gopay_qris(): void

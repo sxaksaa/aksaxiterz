@@ -13,12 +13,9 @@
             filled(config('services.binance.pay.api_key')) &&
             filled(config('services.binance.pay.api_secret'));
         $binancePayAvailable = app()->environment('local') || $binancePayConfigured;
-        $qrisMethod = config('services.gopay_qris.enabled')
-            ? 'gopay_qris'
-            : (config('services.pakasir.checkout_enabled', false) ? 'pakasir' : null);
+        $qrisMethod = config('services.gopay_qris.enabled') ? 'gopay_qris' : null;
         $qrisCheckoutUrl = match ($qrisMethod) {
             'gopay_qris' => route('gopay-qris.pay', $product->id),
-            'pakasir' => url('/process-order/'.$product->id),
             default => '#',
         };
         $qrisCheckoutAvailable = $checkoutAvailable && filled($qrisMethod);
@@ -190,7 +187,7 @@
 
         <div class="grid grid-cols-1 {{ $binancePayAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} gap-3 md:gap-4 mb-8">
 
-            <div id="btnPakasir" data-payment-method="{{ $qrisMethod }}"
+            <div id="btnQris" data-payment-method="{{ $qrisMethod }}"
                 aria-disabled="{{ $qrisCheckoutAvailable ? 'false' : 'true' }}"
                 class="checkout-card p-5 payment-card flex flex-col gap-1 {{ $qrisCheckoutAvailable ? 'cursor-pointer' : 'pointer-events-none cursor-not-allowed opacity-60' }}">
 
@@ -526,12 +523,12 @@
 
                 </button>
             </div>
-            <!-- PAKASIR FORM -->
-            <form id="pakasirForm" method="POST" action="{{ $qrisCheckoutUrl }}" class="hidden">
+            <!-- GOPAY QRIS FORM -->
+            <form id="qrisForm" method="POST" action="{{ $qrisCheckoutUrl }}" class="hidden">
                 @csrf
-                <input type="hidden" name="package_id" id="pakasir_package">
-                <input type="hidden" name="quantity" id="pakasir_quantity" value="1">
-                <input type="hidden" name="voucher_code" id="pakasir_voucher">
+                <input type="hidden" name="package_id" id="qris_package">
+                <input type="hidden" name="quantity" id="qris_quantity" value="1">
+                <input type="hidden" name="voucher_code" id="qris_voucher">
             </form>
 
             <!-- CRYPTO FORM -->
@@ -555,7 +552,7 @@
         </div>
     </div>
 
-    @include('partials.pakasir-qris-modal')
+    @include('partials.gopay-qris-modal')
     @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
@@ -1095,8 +1092,7 @@
             const target = {
                 crypto: 'btnCrypto',
                 binance_pay: 'btnBinancePay',
-                pakasir: 'btnPakasir',
-                gopay_qris: 'btnPakasir',
+                gopay_qris: 'btnQris',
             }[type];
             const el = document.getElementById(target);
 
@@ -1222,7 +1218,7 @@
             const subtotalIdr = selectedPrice * selectedQuantity;
             const subtotalUsd = selectedUsd * selectedQuantity;
 
-            if (selectedPayment === 'pakasir' || selectedPayment === 'gopay_qris') {
+            if (selectedPayment === 'gopay_qris') {
                 subtotal = formatIdr(subtotalIdr);
                 total = voucherQuote ? formatIdr(voucherQuote.final_idr) : subtotal;
                 discount = voucherQuote ? `-${formatIdr(voucherQuote.discount_idr)}` : '-';
@@ -1281,7 +1277,7 @@
             document.getElementById('quantityLimit').innerText = `Max: ${selectedPackageStock}`;
             minusButton.disabled = !selectedPackageId || selectedQuantity <= 1;
             plusButton.disabled = !selectedPackageId || selectedPackageStock <= 0 || selectedQuantity >= maxQuantity;
-            document.getElementById('pakasir_quantity').value = selectedQuantity;
+            document.getElementById('qris_quantity').value = selectedQuantity;
             document.getElementById('crypto_quantity').value = selectedQuantity;
             const binanceQuantity = document.getElementById('binance_pay_quantity');
             if (binanceQuantity) binanceQuantity.value = selectedQuantity;
@@ -1380,7 +1376,7 @@
             voucherRequestSequence++;
             voucherQuote = null;
             appliedVoucherCode = null;
-            document.getElementById('pakasir_voucher').value = '';
+            document.getElementById('qris_voucher').value = '';
             document.getElementById('crypto_voucher').value = '';
             const binanceVoucher = document.getElementById('binance_pay_voucher');
             if (binanceVoucher) binanceVoucher.value = '';
@@ -1454,7 +1450,7 @@
                 voucherQuote = quote;
                 appliedVoucherCode = voucherQuote.code;
                 document.getElementById('voucherCode').value = appliedVoucherCode;
-                document.getElementById('pakasir_voucher').value = appliedVoucherCode;
+                document.getElementById('qris_voucher').value = appliedVoucherCode;
                 document.getElementById('crypto_voucher').value = appliedVoucherCode;
                 const binanceVoucher = document.getElementById('binance_pay_voucher');
                 if (binanceVoucher) binanceVoucher.value = appliedVoucherCode;
@@ -1512,7 +1508,7 @@
                 }
 
                 voucherQuote = quote;
-                document.getElementById('pakasir_voucher').value = appliedVoucherCode;
+                document.getElementById('qris_voucher').value = appliedVoucherCode;
                 document.getElementById('crypto_voucher').value = appliedVoucherCode;
                 const binanceVoucher = document.getElementById('binance_pay_voucher');
                 if (binanceVoucher) binanceVoucher.value = appliedVoucherCode;
@@ -1828,12 +1824,12 @@
             this.classList.add('bg-gray-500', 'cursor-not-allowed', 'pointer-events-none')
             this.disabled = true;
 
-            if (selectedPayment === 'pakasir' || selectedPayment === 'gopay_qris') {
+            if (selectedPayment === 'gopay_qris') {
 
-                document.getElementById('pakasir_package').value = selectedPackageId;
-                document.getElementById('pakasir_quantity').value = selectedQuantity;
+                document.getElementById('qris_package').value = selectedPackageId;
+                document.getElementById('qris_quantity').value = selectedQuantity;
 
-                const form = document.getElementById('pakasirForm');
+                const form = document.getElementById('qrisForm');
                 sessionStorage.setItem('last_product', window.location.href);
 
                 try {

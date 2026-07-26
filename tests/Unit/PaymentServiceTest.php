@@ -10,78 +10,6 @@ use Tests\TestCase;
 
 class PaymentServiceTest extends TestCase
 {
-    public function test_pakasir_payment_url_uses_order_amount_redirect_and_qris_flag(): void
-    {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.url' => 'https://app.pakasir.com',
-            'services.pakasir.return_url' => 'https://aksaxiterz.test/orders',
-            'services.pakasir.qris_only' => true,
-        ]);
-
-        $service = new PaymentService;
-        $method = new ReflectionMethod($service, 'pakasirPaymentUrl');
-        $method->setAccessible(true);
-
-        $url = $method->invoke($service, 'ORDER-ABC123', 22000);
-        $parts = parse_url($url);
-
-        parse_str($parts['query'] ?? '', $query);
-
-        $this->assertSame('https', $parts['scheme']);
-        $this->assertSame('app.pakasir.com', $parts['host']);
-        $this->assertSame('/pay/aksaxiterz/22000', $parts['path']);
-        $this->assertSame('ORDER-ABC123', $query['order_id'] ?? null);
-        $this->assertSame('https://aksaxiterz.test/orders', $query['redirect'] ?? null);
-        $this->assertSame('1', (string) ($query['qris_only'] ?? null));
-    }
-
-    public function test_pakasir_expiry_is_converted_from_utc_to_application_timezone(): void
-    {
-        config(['app.timezone' => 'Asia/Jakarta']);
-
-        $method = new ReflectionMethod(PaymentService::class, 'pakasirExpiredAt');
-        $expiresAt = $method->invoke(new PaymentService, '2026-06-09T18:34:00.123456789Z');
-
-        $this->assertSame('Asia/Jakarta', $expiresAt->timezoneName);
-        $this->assertSame('2026-06-10T01:34:00+07:00', $expiresAt->toIso8601String());
-        $this->assertSame('2026-06-10 01:34:00', (new Order)->fromDateTime($expiresAt));
-    }
-
-    public function test_pakasir_cancel_calls_provider_and_remembers_status(): void
-    {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-        ]);
-
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncancel' => Http::response(['status' => 'success']),
-        ]);
-
-        $order = new Order([
-            'order_id' => 'ORDER-CANCEL-QRIS',
-            'payment_method' => 'pakasir',
-            'price' => 30000,
-            'payment_payload' => [
-                'payment_number' => '000201010212',
-            ],
-        ]);
-
-        (new PaymentService)->cancelPakasir($order);
-
-        $this->assertSame('cancelled', $order->payment_payload['provider_status'] ?? null);
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'POST' &&
-                $request->url() === 'https://app.pakasir.test/api/transactioncancel' &&
-                $request['project'] === 'aksaxiterz' &&
-                $request['order_id'] === 'ORDER-CANCEL-QRIS' &&
-                $request['amount'] === 30000 &&
-                $request['api_key'] === 'test-key';
-        });
-    }
-
     public function test_direct_crypto_amount_adds_small_unique_suffix(): void
     {
         config([
@@ -319,37 +247,6 @@ class PaymentServiceTest extends TestCase
         $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
 
         $this->assertNull($transfer);
-    }
-
-    public function test_pakasir_create_rejects_response_for_a_different_order(): void
-    {
-        config([
-            'services.pakasir.slug' => 'aksaxiterz',
-            'services.pakasir.api_key' => 'test-key',
-            'services.pakasir.url' => 'https://app.pakasir.test',
-        ]);
-
-        Http::fake([
-            'https://app.pakasir.test/api/transactioncreate/qris' => Http::response([
-                'payment' => [
-                    'project' => 'different-project',
-                    'order_id' => 'WRONG-ORDER',
-                    'amount' => 99999,
-                    'payment_number' => 'WRONG-QR',
-                ],
-            ]),
-        ]);
-
-        $order = new Order([
-            'order_id' => 'ORDER-EXPECTED',
-            'price' => 10000,
-        ]);
-        $method = new ReflectionMethod(PaymentService::class, 'createPakasirQrisTransaction');
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Unable to create Pakasir QRIS payment');
-
-        $method->invoke(new PaymentService, $order);
     }
 
     public function test_direct_bep20_scanner_uses_rpc_logs_without_etherscan(): void

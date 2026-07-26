@@ -294,28 +294,6 @@ function formatCryptoAmount(amount, token = 'USDT') {
     })} ${token}`;
 }
 
-async function syncPakasirOrder(orderId) {
-    if (!orderId) return null;
-
-    const response = await window.aksaFetchWithCsrf(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-        },
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok && response.status !== 202) {
-        const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
-        error.status = response.status;
-        throw error;
-    }
-
-    return data;
-}
-
 async function syncGopayQrisOrder(orderId, statusUrl = null) {
     if (!orderId) return null;
 
@@ -339,9 +317,7 @@ async function syncGopayQrisOrder(orderId, statusUrl = null) {
 }
 
 async function syncQrisOrder(orderId) {
-    return qrisState.statusUrl
-        ? syncGopayQrisOrder(orderId, qrisState.statusUrl)
-        : syncPakasirOrder(orderId);
+    return syncGopayQrisOrder(orderId, qrisState.statusUrl);
 }
 
 async function syncCryptoOrder(orderId) {
@@ -490,13 +466,12 @@ async function handleQrisExpiry() {
             });
         }
     } catch (error) {
-        // Polling will retry while Pakasir confirms the final invoice status.
+        // Polling will retry after transient network or server errors.
     } finally {
         qrisState.isChecking = false;
     }
 }
 
-window.syncAksaPakasirOrder = syncPakasirOrder;
 window.syncAksaGopayQrisOrder = syncGopayQrisOrder;
 window.syncAksaCryptoOrder = syncCryptoOrder;
 window.syncAksaBinancePayOrder = syncBinancePayOrder;
@@ -706,7 +681,7 @@ function startBinancePayExpiryCountdown(value, remainingSeconds) {
 
 window.openAksaQrisModal = async function(checkout, options = {}) {
     const modal = document.getElementById('aksaQrisModal');
-    const payment = checkout?.qris_payment || checkout?.pakasir_payment;
+    const payment = checkout?.qris_payment;
     const qrPayload = payment?.qr_payload || payment?.payment_number;
 
     if (!modal || !qrPayload) {
@@ -1846,12 +1821,10 @@ function shouldSoftNavigateLink(link, event) {
     return ![
         '/auth/',
         '/logout',
-        '/process-order/',
         '/pay-crypto/',
         '/pay-binance/',
         '/sync-',
         '/cancel-order/',
-        '/pakasir-callback',
     ].some((blockedPath) => url.pathname.startsWith(blockedPath));
 }
 

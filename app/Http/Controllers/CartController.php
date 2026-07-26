@@ -138,7 +138,7 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
-            'payment_method' => ['required', Rule::in(['pakasir', 'gopay_qris', 'crypto', 'binance_pay'])],
+            'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
             'coin' => [
                 'nullable',
                 'string',

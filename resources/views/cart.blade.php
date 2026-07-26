@@ -2,9 +2,7 @@
 
 @section('content')
     @php
-        $qrisMethod = config('services.gopay_qris.enabled')
-            ? 'gopay_qris'
-            : (config('services.pakasir.checkout_enabled', false) ? 'pakasir' : null);
+        $qrisMethod = config('services.gopay_qris.enabled') ? 'gopay_qris' : null;
         $qrisUnavailable = blank($qrisMethod);
     @endphp
     <div class="page-shell py-6 md:py-10">
@@ -271,7 +269,7 @@
         @endif
     </div>
 
-    @include('partials.pakasir-qris-modal')
+    @include('partials.gopay-qris-modal')
     @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
@@ -324,7 +322,7 @@
 
                 function updateTotals() {
                     const stablecoin = paymentMethod === 'crypto' || paymentMethod === 'binance_pay';
-                    const isQris = paymentMethod === 'pakasir' || paymentMethod === 'gopay_qris';
+                    const isQris = paymentMethod === 'gopay_qris';
                     const subtotal = stablecoin ? formatUsd(subtotalUsdt) : (isQris ? formatIdr(subtotalIdr) : 'Select payment');
                     const total = stablecoin
                         ? `${formatUsd(voucherQuote ? voucherQuote.final_usdt : subtotalUsdt)} + unique amount`
@@ -582,7 +580,7 @@
                         }
 
                         let opened = false;
-                        if (paymentMethod === 'pakasir' || paymentMethod === 'gopay_qris') opened = await window.openAksaQrisModal?.(data);
+                        if (paymentMethod === 'gopay_qris') opened = await window.openAksaQrisModal?.(data);
                         if (paymentMethod === 'binance_pay') opened = await window.openAksaBinancePayModal?.(data, { startPolling: true });
                         if (paymentMethod === 'crypto') opened = await window.openAksaCryptoModal?.(data, { startPolling: true });
 

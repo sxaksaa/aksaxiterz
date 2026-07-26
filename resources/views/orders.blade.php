@@ -26,7 +26,7 @@
 
     </div>
 
-    @include('partials.pakasir-qris-modal')
+    @include('partials.gopay-qris-modal')
     @include('partials.binance-pay-modal')
     @include('partials.direct-crypto-modal')
     @include('partials.payment-success-modal')
@@ -126,29 +126,6 @@
             }
         }
 
-        async function syncPakasirOrder(orderId) {
-            if (!orderId) return null;
-
-            const response = await fetch(`/sync-pakasir-order/${encodeURIComponent(orderId)}`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok && response.status !== 202) {
-                const error = new Error(data.error || data.message || `Payment check failed (${response.status})`);
-                error.status = response.status;
-                throw error;
-            }
-
-            return data;
-        }
-
         async function syncCryptoOrder(orderId) {
             if (!orderId) return null;
 
@@ -244,16 +221,6 @@
 
                 if (!opened) {
                     await refreshOrders();
-                }
-
-                return;
-            }
-
-            if (data.method === 'pakasir' && data.payment_url) {
-                const opened = await window.openAksaQrisModal?.(data);
-
-                if (!opened) {
-                    openHostedPayment(data.payment_url);
                 }
 
                 return;
@@ -362,7 +329,7 @@
         });
 
         document.addEventListener('click', async function(e) {
-            const button = e.target.closest('.open-pakasir-qris-button');
+            const button = e.target.closest('.open-gopay-qris-button');
             if (!button) return;
 
             e.preventDefault();
@@ -370,16 +337,13 @@
             let checkout = null;
 
             try {
-                checkout = JSON.parse(button.dataset.pakasirCheckout || '{}');
+                checkout = JSON.parse(button.dataset.qrisCheckout || '{}');
             } catch (error) {
                 checkout = null;
             }
 
             const opened = await window.openAksaQrisModal?.(checkout);
 
-            if (!opened && checkout?.payment_url) {
-                openHostedPayment(checkout.payment_url);
-            }
         }, {
             signal: ordersPageController.signal
         });
@@ -453,14 +417,13 @@
         });
 
         document.addEventListener('submit', async function(e) {
-            const form = e.target.closest('.sync-pakasir-form, .sync-qris-form');
+            const form = e.target.closest('.sync-qris-form');
             if (!form) return;
 
             e.preventDefault();
 
             const button = form.querySelector('.sync-qris-button');
             const orderId = button?.dataset.orderId;
-            const qrisMethod = button?.dataset.qrisMethod || 'pakasir';
             const originalText = getButtonLabel(button);
 
             button.disabled = true;
@@ -470,9 +433,7 @@
             window.showAppToast?.('Payment check', 'Checking your QRIS payment status.');
 
             try {
-                const result = qrisMethod === 'gopay_qris'
-                    ? await window.syncAksaGopayQrisOrder?.(orderId)
-                    : await syncPakasirOrder(orderId);
+                const result = await window.syncAksaGopayQrisOrder?.(orderId);
 
                 if (result?.status === 'paid') {
                     window.showAksaPaymentSuccess?.({
@@ -666,8 +627,8 @@
                 const cryptoModalOpen = document.getElementById('aksaCryptoModal')?.getAttribute('aria-hidden') === 'false';
                 const binancePayModalOpen = document.getElementById('aksaBinancePayModal')?.getAttribute('aria-hidden') === 'false';
 
-                if (data.status === 'pending' && data.payment_method === 'pakasir' && data.order_id && !qrisModalOpen) {
-                    const result = await syncPakasirOrder(data.order_id);
+                if (data.status === 'pending' && data.payment_method === 'gopay_qris' && data.order_id && !qrisModalOpen) {
+                    const result = await window.syncAksaGopayQrisOrder?.(data.order_id);
 
                     if (result?.status === 'paid') {
                         window.showAksaPaymentSuccess?.({

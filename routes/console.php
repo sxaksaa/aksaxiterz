@@ -4,7 +4,6 @@ use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Services\BinancePayOrderVerifier;
 use App\Services\DirectCryptoOrderVerifier;
-use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
@@ -215,19 +214,6 @@ Artisan::command('orders:diagnose-binance {orderId : Existing direct-crypto orde
     return self::FAILURE;
 })->purpose('Read-only diagnosis of an existing order against Binance deposit history');
 
-Artisan::command('orders:scan-pakasir {--limit=50 : Maximum recent Pakasir orders to reconcile}', function () {
-    $limit = max(1, (int) $this->option('limit'));
-    $summary = app(PakasirOrderVerifier::class)->scanRecent($limit);
-
-    $this->info('Pakasir reconciliation complete.');
-    $this->line("Checked: {$summary['checked']}");
-    $this->line("Paid: {$summary['paid']}");
-    $this->line("Cancelled: {$summary['cancelled']}");
-    $this->line("Still pending: {$summary['pending']}");
-
-    return self::SUCCESS;
-})->purpose('Reconcile recent Pakasir transactions with the provider status API');
-
 Artisan::command('orders:release-expired-reservations', function () {
     $released = app(StockReservationService::class)->releaseExpiredReservations();
 
@@ -242,7 +228,7 @@ Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending o
 
     $this->info('Expired pending order cleanup complete.');
     $this->line("Cancelled: {$summary['cancelled']}");
-    $this->line("QRIS: {$summary['pakasir']}");
+    $this->line("Other/legacy: {$summary['other']}");
     $this->line("GoPay QRIS: {$summary['gopay_qris']}");
     $this->line("Crypto: {$summary['crypto']}");
     $this->line("Binance Pay: {$summary['binance_pay']}");
@@ -251,10 +237,6 @@ Artisan::command('orders:expire-pending {--limit=500 : Maximum expired pending o
 })->purpose('Cancel expired pending orders and release their reserved license stocks');
 
 Schedule::command('orders:expire-pending --limit=500')
-    ->everyMinute()
-    ->withoutOverlapping();
-
-Schedule::command('orders:scan-pakasir --limit=100')
     ->everyMinute()
     ->withoutOverlapping();
 

@@ -10,7 +10,6 @@ use App\Services\BinancePayOrderVerifier;
 use App\Services\CartService;
 use App\Services\CheckoutLockService;
 use App\Services\DirectCryptoOrderVerifier;
-use App\Services\PakasirOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
@@ -30,7 +29,6 @@ class PaymentController extends Controller
         private readonly CheckoutLockService $checkoutLockService,
         private readonly BinancePayOrderVerifier $binancePayOrderVerifier,
         private readonly DirectCryptoOrderVerifier $directCryptoOrderVerifier,
-        private readonly PakasirOrderVerifier $pakasirOrderVerifier,
         private readonly PendingOrderExpirationService $pendingOrderExpirationService,
         private readonly StockReservationService $stockReservationService,
         private readonly CartService $cartService
@@ -57,16 +55,12 @@ class PaymentController extends Controller
                 return $this->pendingPaymentResponse($request, $pendingOrder);
             }
 
-            $paymentMethod = in_array($oldOrder->payment_method, ['crypto', 'binance_pay', 'gopay_qris', 'pakasir'], true)
+            $paymentMethod = in_array($oldOrder->payment_method, ['crypto', 'binance_pay', 'gopay_qris'], true)
                 ? $oldOrder->payment_method
-                : (config('services.gopay_qris.enabled') ? 'gopay_qris' : 'pakasir');
+                : 'gopay_qris';
 
-            if ($paymentMethod === 'pakasir' && ! (bool) config('services.pakasir.checkout_enabled', false)) {
-                if (! (bool) config('services.gopay_qris.enabled')) {
-                    return $this->paymentErrorResponse($request, 'QRIS checkout is currently unavailable.');
-                }
-
-                $paymentMethod = 'gopay_qris';
+            if ($paymentMethod === 'gopay_qris' && ! (bool) config('services.gopay_qris.enabled')) {
+                return $this->paymentErrorResponse($request, 'QRIS checkout is currently unavailable.');
             }
             $cryptoNetwork = $this->retryCryptoNetwork($oldOrder);
             $binancePayToken = $this->retryBinancePayToken($oldOrder);
@@ -106,8 +100,7 @@ class PaymentController extends Controller
                 'expired_at' => now()->addMinutes(max(1, (int) match ($paymentMethod) {
                     'crypto' => config('services.crypto_direct.expires_minutes', 10),
                     'binance_pay' => config('services.binance.pay.expires_minutes', 10),
-                    'gopay_qris' => config('services.gopay_qris.expires_minutes', 10),
-                    default => config('services.pakasir.expires_minutes', 5),
+                    default => config('services.gopay_qris.expires_minutes', 10),
                 })),
             ]);
 
@@ -129,23 +122,6 @@ class PaymentController extends Controller
                     }
 
                     return redirect('/orders');
-                }
-
-                if ($newOrder->payment_method === 'pakasir') {
-                    $payment = $hasStoredItems
-                        ? $this->paymentService->createCartPakasirPayment($user, $retryItems, $newOrder)
-                        : $this->paymentService->createPakasirPayment(
-                            $user,
-                            $newOrder->product_id,
-                            $newOrder->package_id,
-                            $newOrder
-                        );
-
-                    if ($this->wantsPaymentJson($request)) {
-                        return response()->json($this->pakasirCheckoutPayload($payment['order']));
-                    }
-
-                    return redirect($payment['payment_url']);
                 }
 
                 if ($newOrder->payment_method === 'binance_pay') {
@@ -205,56 +181,9 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | PAKASIR (PAY)
+    | GOPAY QRIS (PAY)
     |--------------------------------------------------------------------------
     */
-
-    public function payPakasir(Request $request, $id)
-    {
-        $user = Auth::user();
-
-        if (! (bool) config('services.pakasir.checkout_enabled', false)) {
-            return $this->paymentErrorResponse($request, 'Pakasir checkout is disabled.');
-        }
-
-        $request->validate([
-            'package_id' => 'required|exists:packages,id',
-            'quantity' => ['nullable', 'integer', 'min:1'],
-            'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
-        ]);
-
-        return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $id) {
-            if ($pendingOrder = $this->activePendingOrder($user->id)) {
-                return $this->pendingPaymentResponse($request, $pendingOrder);
-            }
-
-            if ($this->hasTooManyRecentOrders($user->id)) {
-                return $this->paymentErrorResponse($request, 'Too many requests. Please try again later.', 429);
-            }
-
-            try {
-                $this->cancelPendingOrders($user->id);
-                $payment = $this->paymentService->createPakasirPayment(
-                    $user,
-                    $id,
-                    $request->package_id,
-                    null,
-                    $request->string('voucher_code')->toString() ?: null,
-                    $request->integer('quantity', 1)
-                );
-
-                if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->pakasirCheckoutPayload($payment['order']));
-                }
-
-                return redirect($payment['payment_url']);
-            } catch (\Exception $e) {
-                Log::error('PAKASIR ERROR: '.$e->getMessage());
-
-                return $this->paymentErrorResponse($request, $e);
-            }
-        });
-    }
 
     public function payGopayQris(Request $request, $id)
     {
@@ -301,37 +230,9 @@ class PaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | PAKASIR STATUS SYNC
+    | GOPAY QRIS STATUS SYNC
     |--------------------------------------------------------------------------
     */
-
-    public function syncPakasirOrder(Request $request, string $orderId)
-    {
-        $order = Order::where('order_id', $orderId)
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
-
-        if ($order->payment_method !== 'pakasir') {
-            abort(404);
-        }
-
-        if ($order->status === 'paid') {
-            return $this->syncPaymentResponse($request, $this->withLicensePayload([
-                'order_id' => $order->order_id,
-                'status' => $order->status,
-            ], $order));
-        }
-
-        if ($order->status === 'pending' && $order->expired_at?->lte(now())) {
-            $this->pendingOrderExpirationService->expire((int) $order->user_id);
-            $order->refresh();
-        }
-
-        $result = $this->pakasirOrderVerifier->verify($order);
-        $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
-
-        return $this->syncPaymentResponse($request, $result, $status);
-    }
 
     public function syncGopayQrisOrder(Request $request, string $orderId)
     {
@@ -419,30 +320,6 @@ class PaymentController extends Controller
         $status = ($result['status'] ?? null) === 'paid' ? 200 : 202;
 
         return $this->syncPaymentResponse($request, $result, $status);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PAKASIR CALLBACK
-    |--------------------------------------------------------------------------
-    */
-
-    public function pakasirCallback(Request $request)
-    {
-        try {
-            $order = Order::where('order_id', $request->order_id)
-                ->firstOrFail();
-
-            if (! $this->pakasirOrderVerifier->validPayload($order, $request->all())) {
-                return response()->json(['error' => 'Invalid amount'], 403);
-            }
-
-            return response()->json($this->pakasirOrderVerifier->verify($order));
-        } catch (\Exception $e) {
-            Log::error('PAKASIR CALLBACK ERROR: '.$e->getMessage());
-
-            return response()->json(['error' => 'failed'], 500);
-        }
     }
 
     /*
@@ -550,7 +427,7 @@ class PaymentController extends Controller
     {
         $user = Auth::user();
         $validated = $request->validate([
-            'payment_method' => ['required', Rule::in(['pakasir', 'gopay_qris', 'crypto', 'binance_pay'])],
+            'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
             'coin' => [
                 'nullable',
                 'string',
@@ -565,13 +442,6 @@ class PaymentController extends Controller
             ],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
-
-        if (
-            $validated['payment_method'] === 'pakasir' &&
-            ! (bool) config('services.pakasir.checkout_enabled', false)
-        ) {
-            return $this->paymentErrorResponse($request, 'Pakasir checkout is disabled.');
-        }
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $validated) {
             if ($pendingOrder = $this->activePendingOrder($user->id)) {
@@ -601,20 +471,6 @@ class PaymentController extends Controller
                     return $this->wantsPaymentJson($request)
                         ? response()->json($this->gopayQrisCheckoutPayload($payment['order']))
                         : redirect('/orders');
-                }
-
-                if ($validated['payment_method'] === 'pakasir') {
-                    $payment = $this->paymentService->createCartPakasirPayment(
-                        $user,
-                        $items,
-                        null,
-                        $voucherCode
-                    );
-                    $this->cartService->clear($user);
-
-                    return $this->wantsPaymentJson($request)
-                        ? response()->json($this->pakasirCheckoutPayload($payment['order']))
-                        : redirect($payment['payment_url']);
                 }
 
                 if ($validated['payment_method'] === 'binance_pay') {
@@ -664,32 +520,6 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        if (
-            $order->payment_method === 'pakasir' &&
-            is_array($order->payment_payload) &&
-            filled($order->payment_payload['payment_number'] ?? null)
-        ) {
-            try {
-                $this->paymentService->cancelPakasir($order);
-            } catch (\Exception $e) {
-                $result = $this->pakasirOrderVerifier->verify($order);
-
-                if (($result['status'] ?? null) === 'paid') {
-                    return $this->syncPaymentResponse($request, $result);
-                }
-
-                if (in_array(($result['provider_status'] ?? null), ['cancelled', 'canceled', 'expired', 'failed'], true)) {
-                    return $this->cancelOrderResponse($request, $this->cancelPendingOrder($order));
-                }
-
-                return $this->orderActionResponse($request, [
-                    'order_id' => $order->order_id,
-                    'status' => $order->fresh()->status,
-                    'message' => 'The QRIS payment could not be cancelled yet. Please check its status and try again.',
-                ], 409);
-            }
-        }
-
         if ($order->payment_method === 'binance_pay') {
             $result = $this->binancePayOrderVerifier->verify($order);
 
@@ -706,17 +536,6 @@ class PaymentController extends Controller
     | CORE LOGIC
     |--------------------------------------------------------------------------
     */
-
-    private function pakasirCheckoutPayload(Order $order): array
-    {
-        return [
-            'method' => 'pakasir',
-            'payment_url' => $order->payment_url,
-            'order_id' => $order->order_id,
-            'quantity' => (int) $order->quantity,
-            'pakasir_payment' => $this->publicPakasirPaymentPayload($order),
-        ];
-    }
 
     private function gopayQrisCheckoutPayload(Order $order): array
     {
@@ -749,26 +568,6 @@ class PaymentController extends Controller
             'order_id' => $order->order_id,
             'quantity' => (int) $order->quantity,
             'binance_pay_payment' => $this->publicBinancePayPaymentPayload($order),
-        ];
-    }
-
-    private function publicPakasirPaymentPayload(Order $order): ?array
-    {
-        $payload = $order->payment_payload;
-
-        if (! is_array($payload) || blank($payload['payment_number'] ?? null)) {
-            return null;
-        }
-
-        return [
-            'amount' => (int) ($payload['amount'] ?? $order->price),
-            'fee' => (int) ($payload['fee'] ?? 0),
-            'total_payment' => (int) ($payload['total_payment'] ?? $payload['amount'] ?? $order->price),
-            'payment_method' => (string) ($payload['payment_method'] ?? 'qris'),
-            'payment_number' => (string) $payload['payment_number'],
-            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($payload['expired_at'] ?? ''),
-            'remaining_seconds' => $this->remainingSeconds($order),
-            'quantity' => (int) $order->quantity,
         ];
     }
 
@@ -955,22 +754,6 @@ class PaymentController extends Controller
                 }
             }
 
-            if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
-                $result = $this->pakasirOrderVerifier->verify($order);
-
-                if (($result['status'] ?? null) === 'paid') {
-                    throw new \Exception('A previous payment was already completed');
-                }
-
-                if (! array_key_exists('provider_status', $result)) {
-                    throw new \Exception('Unable to verify the previous Pakasir payment');
-                }
-
-                if (! in_array($result['provider_status'], ['cancelled', 'canceled', 'expired', 'failed'], true)) {
-                    $this->paymentService->cancelPakasir($order);
-                }
-            }
-
             if (
                 $order->payment_method === 'crypto' &&
                 $order->expired_at &&
@@ -1000,22 +783,6 @@ class PaymentController extends Controller
             }
         }
 
-        if ($order->payment_method === 'pakasir' && is_array($order->payment_payload)) {
-            $result = $this->pakasirOrderVerifier->verify($order);
-
-            if (($result['status'] ?? null) === 'paid' || ! array_key_exists('provider_status', $result)) {
-                return false;
-            }
-
-            if (! in_array($result['provider_status'], ['cancelled', 'canceled', 'expired', 'failed'], true)) {
-                try {
-                    $this->paymentService->cancelPakasir($order);
-                } catch (\Exception $e) {
-                    return false;
-                }
-            }
-        }
-
         return $this->cancelPendingOrder($order)->status === 'cancelled';
     }
 
@@ -1032,8 +799,8 @@ class PaymentController extends Controller
                         $activeCrypto->where('payment_method', 'crypto')
                             ->where('expired_at', '>', $cryptoGraceCutoff);
                     })
-                    ->orWhere(function ($activePakasir): void {
-                        $activePakasir->where('payment_method', '!=', 'crypto')
+                    ->orWhere(function ($activeNonCrypto): void {
+                        $activeNonCrypto->where('payment_method', '!=', 'crypto')
                             ->where('expired_at', '>', now());
                     });
             })
@@ -1189,7 +956,6 @@ class PaymentController extends Controller
             'Only ',
             'Automatic delivery does not have enough license stock',
             'Select at least one license key',
-            'Pakasir checkout is disabled.',
             'QRIS checkout is currently unavailable.',
         ]);
     }

@@ -276,14 +276,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/cancel-order/{id}', [PaymentController::class, 'cancelOrder'])
         ->middleware('throttle:20,1');
 
-    // Pakasir
-    Route::post('/process-order/{id}', [PaymentController::class, 'payPakasir'])
-        ->middleware('throttle:20,1');
     Route::post('/pay-gopay-qris/{id}', [PaymentController::class, 'payGopayQris'])
         ->middleware('throttle:20,1')
         ->name('gopay-qris.pay');
-    Route::post('/sync-pakasir-order/{orderId}', [PaymentController::class, 'syncPakasirOrder'])
-        ->middleware('throttle:10,1');
     Route::post('/sync-gopay-qris-order/{orderId}', [PaymentController::class, 'syncGopayQrisOrder'])
         ->middleware('throttle:30,1')
         ->name('gopay-qris.sync');
@@ -555,9 +550,6 @@ Route::get('/login', function () {
 | CALLBACKS
 |--------------------------------------------------------------------------
 */
-
-Route::post('/pakasir-callback', [PaymentController::class, 'pakasirCallback'])
-    ->middleware('throttle:120,1');
 
 Route::get('/success', function () {
     return redirect('/licenses');

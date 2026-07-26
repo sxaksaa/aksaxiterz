@@ -4,13 +4,11 @@ namespace App\Services;
 
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class PendingOrderExpirationService
 {
     public function __construct(
-        private readonly StockReservationService $stockReservationService,
-        private readonly PaymentService $paymentService
+        private readonly StockReservationService $stockReservationService
     ) {}
 
     public function expire(?int $userId = null, int $limit = 500): array
@@ -47,17 +45,13 @@ class PendingOrderExpirationService
 
         $summary = [
             'cancelled' => 0,
-            'pakasir' => 0,
+            'other' => 0,
             'gopay_qris' => 0,
             'crypto' => 0,
             'binance_pay' => 0,
         ];
 
         foreach ($orders as $order) {
-            if (! $this->closeExpiredPakasirInvoice($order)) {
-                continue;
-            }
-
             DB::transaction(function () use ($order, $now, &$summary): void {
                 $lockedOrder = Order::whereKey($order->id)
                     ->lockForUpdate()
@@ -74,7 +68,7 @@ class PendingOrderExpirationService
                     'crypto' => 'crypto',
                     'binance_pay' => 'binance_pay',
                     'gopay_qris' => 'gopay_qris',
-                    default => 'pakasir',
+                    default => 'other',
                 };
                 $summary['cancelled']++;
                 $summary[$method]++;
@@ -82,53 +76,6 @@ class PendingOrderExpirationService
         }
 
         return $summary;
-    }
-
-    private function closeExpiredPakasirInvoice(Order $order): bool
-    {
-        if ($order->payment_method !== 'pakasir' || ! is_array($order->payment_payload)) {
-            return true;
-        }
-
-        $providerStatus = strtolower((string) ($order->payment_payload['provider_status'] ?? ''));
-
-        if (in_array($providerStatus, ['cancelled', 'canceled', 'expired', 'failed'], true)) {
-            return true;
-        }
-
-        try {
-            $this->paymentService->cancelPakasir($order);
-
-            return true;
-        } catch (\Throwable $error) {
-            if ($this->isHardStalePakasirOrder($order)) {
-                Log::warning('HARD STALE PAKASIR ORDER CLOSED LOCALLY: '.$error->getMessage(), [
-                    'order_id' => $order->order_id,
-                ]);
-
-                return true;
-            }
-
-            $this->stockReservationService->holdFor($order, 1);
-
-            Log::warning('EXPIRED PAKASIR CANCELLATION ERROR: '.$error->getMessage(), [
-                'order_id' => $order->order_id,
-            ]);
-
-            return false;
-        }
-    }
-
-    private function isHardStalePakasirOrder(Order $order): bool
-    {
-        if ($order->payment_method !== 'pakasir') {
-            return false;
-        }
-
-        $referenceTime = $order->expired_at ?: $order->created_at;
-
-        return $referenceTime &&
-            $referenceTime->copy()->addHours($this->stalePendingHours())->lte(now());
     }
 
     private function shouldExpire(Order $order, $now): bool

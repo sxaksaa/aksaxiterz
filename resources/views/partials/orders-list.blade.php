@@ -76,34 +76,31 @@
             $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
             $isPending = $order->status === 'pending' && ! $isExpired;
             $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
-            $methodClass = $isQris ? 'method-pill-pakasir' : '';
+            $methodClass = $isQris ? 'method-pill-qris' : '';
             $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
             $priceLabel = ($isCrypto || $isBinancePay)
                 ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
                 : 'Rp ' . number_format($order->price);
             $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
             $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
-            $canSyncPakasir = $isPending && $isQris && (bool) $order->order_id;
-            $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-            $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+            $canSyncQris = $isPending && $isGopayQris && (bool) $order->order_id;
+            $qrisPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
             $publicQrisPayload = [
-                'qr_payload' => (string) ($pakasirPayload['qr_payload'] ?? $pakasirPayload['payment_number'] ?? ''),
-                'payment_number' => (string) ($pakasirPayload['payment_number'] ?? $pakasirPayload['qr_payload'] ?? ''),
-                'base_amount' => (int) ($pakasirPayload['base_amount'] ?? $pakasirPayload['amount'] ?? $order->price),
-                'platform_fee' => (int) ($pakasirPayload['platform_fee'] ?? $pakasirPayload['fee'] ?? 0),
-                'unique_amount' => (int) ($pakasirPayload['unique_amount'] ?? 0),
-                'amount' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
-                'total_payment' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
-                'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expires_at'] ?? $pakasirPayload['expired_at'] ?? ''),
+                'qr_payload' => (string) ($qrisPayload['qr_payload'] ?? $qrisPayload['payment_number'] ?? ''),
+                'payment_number' => (string) ($qrisPayload['payment_number'] ?? $qrisPayload['qr_payload'] ?? ''),
+                'base_amount' => (int) ($qrisPayload['base_amount'] ?? $qrisPayload['amount'] ?? $order->price),
+                'platform_fee' => (int) ($qrisPayload['platform_fee'] ?? $qrisPayload['fee'] ?? 0),
+                'unique_amount' => (int) ($qrisPayload['unique_amount'] ?? 0),
+                'amount' => (int) ($qrisPayload['total_payment'] ?? $qrisPayload['amount'] ?? $order->price),
+                'total_payment' => (int) ($qrisPayload['total_payment'] ?? $qrisPayload['amount'] ?? $order->price),
+                'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($qrisPayload['expires_at'] ?? $qrisPayload['expired_at'] ?? ''),
                 'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
             ];
-            $pakasirCheckout = [
-                'method' => $isGopayQris ? 'gopay_qris' : 'pakasir',
+            $qrisCheckout = [
+                'method' => 'gopay_qris',
                 'order_id' => $order->order_id,
-                'payment_url' => $order->payment_url,
-                'status_url' => $isGopayQris ? url('/sync-gopay-qris-order/'.$order->order_id) : null,
+                'status_url' => url('/sync-gopay-qris-order/'.$order->order_id),
                 'qris_payment' => $publicQrisPayload,
-                'pakasir_payment' => $publicQrisPayload,
             ];
             $cryptoCheckout = [
                 'method' => 'crypto',
@@ -138,11 +135,11 @@
                 ],
             ];
             $canOpenBinancePay = $isBinancePayInvoiceActive && filled($cryptoPayload['pay_id'] ?? null);
-            $canOpenPakasirQris = $isPending && $isQris && filled($publicQrisPayload['payment_number']);
+            $canOpenQris = $isPending && $isGopayQris && filled($publicQrisPayload['payment_number']);
             $canCancel = $order->status === 'pending';
             $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                 $canOpenBinancePay || $canSyncBinancePay ||
-                $canSyncPakasir || $canContinuePakasir || $canCancel;
+                $canSyncQris || $canCancel;
             $canVerifySentPayment = ($canSyncCrypto && ! $isCryptoInvoiceActive) ||
                 ($canSyncBinancePay && ! $isBinancePayInvoiceActive);
             $paymentHint = $isPaid
@@ -269,21 +266,16 @@
                             <x-ui.icon name="external-link" class="h-4 w-4" />
                             <span>Continue Payment</span>
                         </a>
-                    @elseif ($canSyncPakasir)
-                        @if ($canOpenPakasirQris)
-                            <button type="button" class="order-action open-pakasir-qris-button w-full" data-pakasir-checkout='@json($pakasirCheckout)'>
+                    @elseif ($canSyncQris)
+                        @if ($canOpenQris)
+                            <button type="button" class="order-action open-gopay-qris-button w-full" data-qris-checkout='@json($qrisCheckout)'>
                                 <x-ui.icon name="qr-code" class="h-4 w-4" />
                                 <span>View QRIS</span>
                             </button>
-                        @elseif ($canContinuePakasir)
-                            <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
-                                <x-ui.icon name="external-link" class="h-4 w-4" />
-                                <span>Open QRIS Page</span>
-                            </a>
                         @endif
-                        <form action="{{ $isGopayQris ? '/sync-gopay-qris-order/'.$order->order_id : '/sync-pakasir-order/'.$order->order_id }}" method="POST" class="{{ $isPakasir ? 'sync-pakasir-form' : 'sync-qris-form' }}">
+                        <form action="/sync-gopay-qris-order/{{ $order->order_id }}" method="POST" class="sync-qris-form">
                             @csrf
-                            <button type="submit" class="order-action sync-qris-button {{ $isPakasir ? 'sync-pakasir-button' : '' }} w-full" data-order-id="{{ $order->order_id }}" data-qris-method="{{ $isGopayQris ? 'gopay_qris' : 'pakasir' }}">
+                            <button type="submit" class="order-action sync-qris-button w-full" data-order-id="{{ $order->order_id }}">
                                 <x-ui.icon name="refresh-cw" class="h-4 w-4" />
                                 <span data-button-label>Check Payment</span>
                             </button>
@@ -397,34 +389,31 @@
                         $isExpired = $order->status === 'pending' && $order->expired_at && $now->gte($order->expired_at);
                         $isPending = $order->status === 'pending' && ! $isExpired;
                         $methodLabel = $isBinancePay ? 'Binance Pay' : ($isCrypto ? ($isDirectCrypto ? $cryptoToken . ' Address' : 'Crypto') : 'QRIS');
-                        $methodClass = $isQris ? 'method-pill-pakasir' : '';
+                        $methodClass = $isQris ? 'method-pill-qris' : '';
                         $cryptoAmount = (string) ($cryptoPayload['amount'] ?? $order->price);
                         $priceLabel = ($isCrypto || $isBinancePay)
                             ? rtrim(rtrim(number_format((float) $cryptoAmount, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
                             : 'Rp ' . number_format($order->price);
                         $canContinueCrypto = $isPending && $isCrypto && ! $isDirectCrypto && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
                         $canOpenCryptoAddress = $isCryptoInvoiceActive && filled($cryptoPayload['address'] ?? null);
-                        $canSyncPakasir = $isPending && $isQris && (bool) $order->order_id;
-                        $canContinuePakasir = $isPending && $isPakasir && $order->payment_url && $order->expired_at && $now->lt($order->expired_at);
-                        $pakasirPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+                        $canSyncQris = $isPending && $isGopayQris && (bool) $order->order_id;
+                        $qrisPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
                         $publicQrisPayload = [
-                            'qr_payload' => (string) ($pakasirPayload['qr_payload'] ?? $pakasirPayload['payment_number'] ?? ''),
-                            'payment_number' => (string) ($pakasirPayload['payment_number'] ?? $pakasirPayload['qr_payload'] ?? ''),
-                            'base_amount' => (int) ($pakasirPayload['base_amount'] ?? $pakasirPayload['amount'] ?? $order->price),
-                            'platform_fee' => (int) ($pakasirPayload['platform_fee'] ?? $pakasirPayload['fee'] ?? 0),
-                            'unique_amount' => (int) ($pakasirPayload['unique_amount'] ?? 0),
-                            'amount' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
-                            'total_payment' => (int) ($pakasirPayload['total_payment'] ?? $pakasirPayload['amount'] ?? $order->price),
-                            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($pakasirPayload['expires_at'] ?? $pakasirPayload['expired_at'] ?? ''),
+                            'qr_payload' => (string) ($qrisPayload['qr_payload'] ?? $qrisPayload['payment_number'] ?? ''),
+                            'payment_number' => (string) ($qrisPayload['payment_number'] ?? $qrisPayload['qr_payload'] ?? ''),
+                            'base_amount' => (int) ($qrisPayload['base_amount'] ?? $qrisPayload['amount'] ?? $order->price),
+                            'platform_fee' => (int) ($qrisPayload['platform_fee'] ?? $qrisPayload['fee'] ?? 0),
+                            'unique_amount' => (int) ($qrisPayload['unique_amount'] ?? 0),
+                            'amount' => (int) ($qrisPayload['total_payment'] ?? $qrisPayload['amount'] ?? $order->price),
+                            'total_payment' => (int) ($qrisPayload['total_payment'] ?? $qrisPayload['amount'] ?? $order->price),
+                            'expired_at' => $order->expired_at?->toIso8601String() ?: (string) ($qrisPayload['expires_at'] ?? $qrisPayload['expired_at'] ?? ''),
                             'remaining_seconds' => $order->expired_at ? max(0, (int) now()->diffInSeconds($order->expired_at, false)) : 0,
                         ];
-                        $pakasirCheckout = [
-                            'method' => $isGopayQris ? 'gopay_qris' : 'pakasir',
+                        $qrisCheckout = [
+                            'method' => 'gopay_qris',
                             'order_id' => $order->order_id,
-                            'payment_url' => $order->payment_url,
-                            'status_url' => $isGopayQris ? url('/sync-gopay-qris-order/'.$order->order_id) : null,
+                            'status_url' => url('/sync-gopay-qris-order/'.$order->order_id),
                             'qris_payment' => $publicQrisPayload,
-                            'pakasir_payment' => $publicQrisPayload,
                         ];
                         $cryptoCheckout = [
                             'method' => 'crypto',
@@ -459,11 +448,11 @@
                             ],
                         ];
                         $canOpenBinancePay = $isBinancePayInvoiceActive && filled($cryptoPayload['pay_id'] ?? null);
-                        $canOpenPakasirQris = $isPending && $isQris && filled($publicQrisPayload['payment_number']);
+                        $canOpenQris = $isPending && $isGopayQris && filled($publicQrisPayload['payment_number']);
                         $canCancel = $order->status === 'pending';
                         $hasPaymentAction = $canOpenCryptoAddress || $canSyncCrypto || $canContinueCrypto ||
                             $canOpenBinancePay || $canSyncBinancePay ||
-                            $canSyncPakasir || $canContinuePakasir || $canCancel;
+                            $canSyncQris || $canCancel;
                         $canVerifySentPayment = ($canSyncCrypto && ! $isCryptoInvoiceActive) ||
                             ($canSyncBinancePay && ! $isBinancePayInvoiceActive);
                         $paymentHint = $isPaid
@@ -570,21 +559,16 @@
                                         <x-ui.icon name="external-link" class="h-4 w-4" />
                                         <span>Continue</span>
                                     </a>
-                                @elseif ($canSyncPakasir)
-                                    @if ($canOpenPakasirQris)
-                                        <button type="button" class="order-action open-pakasir-qris-button" data-pakasir-checkout='@json($pakasirCheckout)'>
+                                @elseif ($canSyncQris)
+                                    @if ($canOpenQris)
+                                        <button type="button" class="order-action open-gopay-qris-button" data-qris-checkout='@json($qrisCheckout)'>
                                             <x-ui.icon name="qr-code" class="h-4 w-4" />
                                             <span>QRIS</span>
                                         </button>
-                                    @elseif ($canContinuePakasir)
-                                        <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
-                                            <x-ui.icon name="external-link" class="h-4 w-4" />
-                                            <span>QRIS</span>
-                                        </a>
                                     @endif
-                                    <form action="{{ $isGopayQris ? '/sync-gopay-qris-order/'.$order->order_id : '/sync-pakasir-order/'.$order->order_id }}" method="POST" class="{{ $isPakasir ? 'sync-pakasir-form' : 'sync-qris-form' }} inline">
+                                    <form action="/sync-gopay-qris-order/{{ $order->order_id }}" method="POST" class="sync-qris-form inline">
                                         @csrf
-                                        <button type="submit" class="order-action sync-qris-button {{ $isPakasir ? 'sync-pakasir-button' : '' }}" data-order-id="{{ $order->order_id }}" data-qris-method="{{ $isGopayQris ? 'gopay_qris' : 'pakasir' }}">
+                                        <button type="submit" class="order-action sync-qris-button" data-order-id="{{ $order->order_id }}">
                                             <x-ui.icon name="refresh-cw" class="h-4 w-4" />
                                             <span data-button-label>Check</span>
                                         </button>

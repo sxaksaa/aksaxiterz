@@ -17,7 +17,7 @@ class VoucherService
         ?int $voucherId = null,
         ?int $excludeOrderId = null,
         bool $lock = false,
-        string $paymentMethod = 'pakasir',
+        string $paymentMethod = 'gopay_qris',
         ?string $coin = null,
         int $quantity = 1
     ): array {
@@ -56,7 +56,7 @@ class VoucherService
         ?int $voucherId = null,
         ?int $excludeOrderId = null,
         bool $lock = false,
-        string $paymentMethod = 'pakasir',
+        string $paymentMethod = 'gopay_qris',
         ?string $coin = null
     ): array {
         $baseIdr = (int) $items->sum(fn ($item) => (
@@ -106,7 +106,7 @@ class VoucherService
     ): array {
         $paymentMethod = strtolower($paymentMethod);
 
-        if (! in_array($paymentMethod, ['pakasir', 'gopay_qris', 'crypto', 'binance_pay'], true)) {
+        if (! in_array($paymentMethod, ['gopay_qris', 'crypto', 'binance_pay'], true)) {
             throw new VoucherException('Unsupported voucher payment method.');
         }
 

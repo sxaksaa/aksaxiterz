@@ -36,83 +36,6 @@ class PaymentService
         $this->voucherService = $voucherService ?: app(VoucherService::class);
     }
 
-    public function createPakasir($user, $productId, $packageId, ?Order $order = null)
-    {
-        return $this->createPakasirPayment($user, $productId, $packageId, $order)['payment_url'];
-    }
-
-    public function createPakasirPayment(
-        $user,
-        $productId,
-        $packageId,
-        ?Order $order = null,
-        ?string $voucherCode = null,
-        int $quantity = 1
-    ): array {
-        $this->ensurePakasirCheckoutEnabled();
-        $product = Product::findOrFail($productId);
-        $this->ensureProductPurchasable($product);
-        $this->ensurePakasirConfigured();
-
-        $package = Package::where('id', $packageId)
-            ->where('product_id', $productId)
-            ->firstOrFail();
-
-        if ($order) {
-            $this->ensurePayableOrder($order, $user, $product->id, $package->id, 'pakasir');
-        }
-
-        $quantity = $this->checkoutQuantity($order ? max(1, (int) ($order->quantity ?: 1)) : $quantity);
-        $stockCount = $this->availableStockCount($product, $package, $order);
-
-        if ($stockCount < $quantity) {
-            throw new \Exception('Automatic delivery does not have enough license stock for this quantity.');
-        }
-
-        $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
-        $order = $this->prepareOrder(
-            $user,
-            $product,
-            $package,
-            'pakasir',
-            $order,
-            $voucherCode,
-            $localExpiresAt,
-            null,
-            null,
-            $quantity
-        );
-
-        $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
-
-        try {
-            $this->stockReservationService->reserve($order);
-            $payment = $this->createPakasirQrisTransaction($order);
-
-            $providerExpiresAt = $this->pakasirExpiredAt($payment['expired_at'] ?? null);
-            $expiresAt = $providerExpiresAt && $providerExpiresAt->lt($localExpiresAt)
-                ? $providerExpiresAt
-                : $localExpiresAt;
-
-            $order->update([
-                'payment_url' => $paymentUrl,
-                'payment_payload' => $this->normalizePakasirPayment($payment),
-                'expired_at' => $expiresAt,
-            ]);
-            $this->stockReservationService->reserve($order->fresh());
-        } catch (\Exception $e) {
-            $this->cancelPendingOrder($order);
-
-            throw $e;
-        }
-
-        return [
-            'payment_url' => $paymentUrl,
-            'pakasir_payment' => $order->fresh()->payment_payload,
-            'order' => $order->fresh(),
-        ];
-    }
-
     public function createGopayQrisPayment(
         $user,
         $productId,
@@ -189,57 +112,6 @@ class PaymentService
             $this->cancelPendingOrder($order);
 
             throw $error;
-        }
-    }
-
-    public function getPakasirStatus(Order $order): array
-    {
-        $this->ensurePakasirConfigured();
-
-        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
-
-        $response = $this->pakasirHttp()
-            ->get($baseUrl.'/api/transactiondetail', [
-                'project' => config('services.pakasir.slug'),
-                'amount' => $this->idrAmount($order->price),
-                'order_id' => $order->order_id,
-                'api_key' => config('services.pakasir.api_key'),
-            ]);
-
-        if (! $response->successful()) {
-            throw new \Exception('Unable to verify Pakasir payment');
-        }
-
-        return $response->json() ?: [];
-    }
-
-    public function cancelPakasir(Order $order): void
-    {
-        $this->ensurePakasirConfigured();
-
-        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
-        $response = $this->pakasirHttp()
-            ->asJson()
-            ->post($baseUrl.'/api/transactioncancel', [
-                'project' => config('services.pakasir.slug'),
-                'order_id' => $order->order_id,
-                'amount' => $this->idrAmount($order->price),
-                'api_key' => config('services.pakasir.api_key'),
-            ]);
-
-        if (! $response->successful()) {
-            throw new \Exception('Unable to cancel Pakasir payment');
-        }
-
-        $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
-        $payload['provider_status'] = 'cancelled';
-        $payload['cancelled_at'] = now()->toIso8601String();
-        $payload['last_checked_at'] = now()->toIso8601String();
-
-        if ($order->exists) {
-            $order->update(['payment_payload' => $payload]);
-        } else {
-            $order->payment_payload = $payload;
         }
     }
 
@@ -416,50 +288,6 @@ class PaymentService
 
             throw $e;
         }
-    }
-
-    public function createCartPakasirPayment(
-        $user,
-        Collection $items,
-        ?Order $order = null,
-        ?string $voucherCode = null
-    ): array {
-        $this->ensurePakasirCheckoutEnabled();
-        $this->ensureCartProductsPurchasable($items);
-        $this->ensurePakasirConfigured();
-        $localExpiresAt = now()->addMinutes(max(1, (int) config('services.pakasir.expires_minutes', 5)));
-        $order = $this->prepareCartOrder($user, $items, 'pakasir', $order, $voucherCode, $localExpiresAt);
-        $paymentUrl = $this->pakasirPaymentUrl($order->order_id, $order->price);
-
-        try {
-            $this->stockReservationService->reserve($order);
-            $payment = $this->createPakasirQrisTransaction($order);
-            $providerExpiresAt = $this->pakasirExpiredAt($payment['expired_at'] ?? null);
-            $expiresAt = $providerExpiresAt && $providerExpiresAt->lt($localExpiresAt)
-                ? $providerExpiresAt
-                : $localExpiresAt;
-
-            $payload = $this->normalizePakasirPayment($payment);
-            $payload['quantity'] = $order->total_quantity;
-            $payload['item_count'] = $order->item_count;
-
-            $order->update([
-                'payment_url' => $paymentUrl,
-                'payment_payload' => $payload,
-                'expired_at' => $expiresAt,
-            ]);
-            $this->stockReservationService->reserve($order->fresh());
-        } catch (\Exception $error) {
-            $this->cancelPendingOrder($order);
-
-            throw $error;
-        }
-
-        return [
-            'payment_url' => $paymentUrl,
-            'pakasir_payment' => $order->fresh()->payment_payload,
-            'order' => $order->fresh(['items']),
-        ];
     }
 
     public function createCartGopayQrisPayment(
@@ -1704,115 +1532,6 @@ class PaymentService
             ->count();
     }
 
-    private function pakasirPaymentUrl(string $orderId, $amount): string
-    {
-        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
-        $slug = trim((string) config('services.pakasir.slug'));
-        $query = [
-            'order_id' => $orderId,
-            'redirect' => config('services.pakasir.return_url') ?: url('/orders'),
-        ];
-
-        if ((bool) config('services.pakasir.qris_only', false)) {
-            $query['qris_only'] = 1;
-        }
-
-        return sprintf(
-            '%s/pay/%s/%d?%s',
-            $baseUrl,
-            rawurlencode($slug),
-            $this->idrAmount($amount),
-            http_build_query($query)
-        );
-    }
-
-    private function createPakasirQrisTransaction(Order $order): array
-    {
-        $baseUrl = rtrim(config('services.pakasir.url') ?: 'https://app.pakasir.com', '/');
-
-        $response = $this->pakasirHttp()
-            ->asJson()
-            ->post($baseUrl.'/api/transactioncreate/qris', [
-                'project' => config('services.pakasir.slug'),
-                'order_id' => $order->order_id,
-                'amount' => $this->idrAmount($order->price),
-                'api_key' => config('services.pakasir.api_key'),
-            ]);
-
-        $payload = $response->json() ?: [];
-        $payment = $payload['payment'] ?? null;
-
-        if (! $response->successful() || ! is_array($payment) || ! $this->validPakasirCreatedPayment($order, $payment)) {
-            Log::warning('Pakasir QRIS response does not match the requested order', [
-                'order_id' => $order->order_id,
-                'status' => $response->status(),
-                'body' => $payload ?: $response->body(),
-            ]);
-
-            throw new \Exception('Unable to create Pakasir QRIS payment');
-        }
-
-        return $payment;
-    }
-
-    private function validPakasirCreatedPayment(Order $order, array $payment): bool
-    {
-        $project = $payment['project'] ?? null;
-        $orderId = $payment['order_id'] ?? null;
-        $amount = $payment['amount'] ?? null;
-
-        return is_scalar($project) &&
-            hash_equals((string) config('services.pakasir.slug'), (string) $project) &&
-            is_scalar($orderId) &&
-            hash_equals($order->order_id, (string) $orderId) &&
-            is_numeric($amount) &&
-            $this->idrAmount($amount) === $this->idrAmount($order->price) &&
-            filled($payment['payment_number'] ?? null);
-    }
-
-    private function normalizePakasirPayment(array $payment): array
-    {
-        return [
-            'project' => (string) ($payment['project'] ?? config('services.pakasir.slug')),
-            'order_id' => (string) ($payment['order_id'] ?? ''),
-            'amount' => $this->idrAmount($payment['amount'] ?? 0),
-            'fee' => $this->idrAmount($payment['fee'] ?? 0),
-            'total_payment' => $this->idrAmount($payment['total_payment'] ?? ($payment['amount'] ?? 0)),
-            'payment_method' => (string) ($payment['payment_method'] ?? 'qris'),
-            'payment_number' => (string) ($payment['payment_number'] ?? ''),
-            'expired_at' => (string) ($payment['expired_at'] ?? ''),
-        ];
-    }
-
-    private function pakasirExpiredAt(?string $expiredAt): ?Carbon
-    {
-        if (! $expiredAt) {
-            return null;
-        }
-
-        $normalized = preg_replace('/\.(\d{6})\d+(Z|[+-]\d{2}:\d{2})$/', '.$1$2', $expiredAt);
-
-        try {
-            return Carbon::parse($normalized)->timezone(config('app.timezone'));
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
-    private function ensurePakasirConfigured(): void
-    {
-        if (! config('services.pakasir.slug') || ! config('services.pakasir.api_key')) {
-            throw new \Exception('Pakasir is not configured');
-        }
-    }
-
-    private function ensurePakasirCheckoutEnabled(): void
-    {
-        if (! (bool) config('services.pakasir.checkout_enabled', false)) {
-            throw new \Exception('Pakasir checkout is disabled.');
-        }
-    }
-
     private function ensureGopayQrisConfigured(): void
     {
         $config = config('services.gopay_qris', []);
@@ -2216,10 +1935,4 @@ class PaymentService
         ];
     }
 
-    private function pakasirHttp()
-    {
-        return Http::withOptions($this->gatewayHttpOptions())
-            ->connectTimeout(3)
-            ->timeout(8);
-    }
 }

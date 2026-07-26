@@ -41,16 +41,6 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'pakasir' => [
-        'checkout_enabled' => (bool) env('PAKASIR_CHECKOUT_ENABLED', false),
-        'slug' => env('PAKASIR_SLUG'),
-        'api_key' => env('PAKASIR_API_KEY'),
-        'url' => env('PAKASIR_URL', 'https://app.pakasir.com'),
-        'return_url' => env('PAKASIR_RETURN_URL'),
-        'qris_only' => (bool) env('PAKASIR_QRIS_ONLY', true),
-        'expires_minutes' => (int) env('PAKASIR_EXPIRES_MINUTES', 5),
-    ],
-
     'gopay_qris' => [
         'enabled' => (bool) env('GOPAY_QRIS_ENABLED', false),
         'static_payload' => env('GOPAY_QRIS_STATIC_PAYLOAD'),

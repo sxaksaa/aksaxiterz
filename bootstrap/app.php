@@ -43,9 +43,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.activity' => LogAdminActivity::class,
         ]);
 
-        $middleware->validateCsrfTokens(except: [
-            'pakasir-callback',
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

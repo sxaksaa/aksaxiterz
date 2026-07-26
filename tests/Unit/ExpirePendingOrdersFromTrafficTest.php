@@ -25,7 +25,7 @@ class ExpirePendingOrdersFromTrafficTest extends TestCase
             $mock->shouldReceive('expire')
                 ->once()
                 ->with(null, 20)
-                ->andReturn(['cancelled' => 0, 'pakasir' => 0, 'crypto' => 0]);
+                ->andReturn(['cancelled' => 0, 'other' => 0, 'crypto' => 0]);
         });
         $middleware = new ExpirePendingOrdersFromTraffic($service);
         $next = fn () => new Response('ok');

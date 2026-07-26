@@ -15,7 +15,7 @@ class VoucherController extends Controller
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
-            'payment_method' => ['required', Rule::in(['pakasir', 'gopay_qris', 'crypto', 'binance_pay'])],
+            'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'coin' => [
                 'nullable',
