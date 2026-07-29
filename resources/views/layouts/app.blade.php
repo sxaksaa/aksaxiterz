@@ -26,7 +26,7 @@
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
-    <script data-currency-prepaint>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}" data-currency-prepaint>
         (() => {
             const root = document.documentElement;
             const supportedCurrencies = new Set(['idr', 'usd']);

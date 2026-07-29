@@ -58,6 +58,10 @@ class DisplayCurrencyPresentationTest extends TestCase
             ->assertSee('data-currency-text-usd="From 7 days"', false);
 
         $this->assertSame(2, substr_count($home->getContent(), 'data-currency-switcher'));
+        $this->assertMatchesRegularExpression(
+            '/<script nonce="[A-Za-z0-9]{32}" data-currency-prepaint>/',
+            $home->getContent()
+        );
 
         $this->get(route('products.show', $product))
             ->assertOk()
