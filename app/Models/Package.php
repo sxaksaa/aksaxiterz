@@ -2,10 +2,22 @@
 
 namespace App\Models;
 
+use App\Support\StorefrontCache;
 use Illuminate\Database\Eloquent\Model;
 
 class Package extends Model
 {
+    protected static function booted(): void
+    {
+        $forget = function (Package $package): void {
+            StorefrontCache::forgetStock((int) $package->product_id);
+            StorefrontCache::forgetRecentPurchasesForProduct((int) $package->product_id);
+        };
+
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     protected $fillable = [
         'product_id',
         'name',

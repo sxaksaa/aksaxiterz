@@ -592,7 +592,7 @@
         const addToCartUrl = @json(route('cart.items.store', $product, false));
         const productDetailRoot = document.getElementById('content');
         const productStockEndpoint = productDetailRoot?.dataset.productStockEndpoint || '';
-        const productStockPollingInterval = 20000;
+        const productStockPollingInterval = 30000;
         const currentProductId = @json((int) $product->id);
         let productStockPollingTimer = null;
         let productStockRequestController = null;

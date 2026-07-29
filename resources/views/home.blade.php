@@ -104,7 +104,7 @@
             let currentCategory = @json(request('category', ''));
             const productEndpoint = @json(route('products.fragment', [], false));
             const productStockEndpoint = @json(route('products.stocks', [], false));
-            const stockPollingInterval = 20000;
+            const stockPollingInterval = 30000;
 
             const searchInput = document.getElementById('searchInput');
             const container = document.getElementById('productContainer');

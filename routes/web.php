@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Models\Voucher as VoucherModel;
 use App\Services\LicenseResetManager;
 use App\Services\PendingOrderExpirationService;
+use App\Support\OrderStats;
 use App\Support\ProductSalesSignals;
 use App\Support\RecentPurchaseFeed;
 use Carbon\Carbon;
@@ -359,11 +360,7 @@ Route::middleware('auth')->group(function () {
             ])
             ->all();
 
-        $orderStats = [
-            'total' => Order::where('user_id', auth()->id())->count(),
-            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
-            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
-        ];
+        $orderStats = OrderStats::forUser((int) auth()->id());
 
         return view('licenses', compact('licenses', 'orderStats', 'licenseResetStates'));
     });
@@ -375,11 +372,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders', function (PendingOrderExpirationService $pendingOrderExpirationService) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
-        $orderStats = [
-            'total' => Order::where('user_id', auth()->id())->count(),
-            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
-            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
-        ];
+        $orderStats = OrderStats::forUser((int) auth()->id());
 
         $orders = Order::with(['product', 'package', 'items.product', 'items.package'])
             ->withCount('licenses')
@@ -394,11 +387,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders-fragment', function (PendingOrderExpirationService $pendingOrderExpirationService) {
         $pendingOrderExpirationService->expire((int) auth()->id());
 
-        $orderStats = [
-            'total' => Order::where('user_id', auth()->id())->count(),
-            'paid' => Order::where('user_id', auth()->id())->where('status', 'paid')->count(),
-            'pending' => Order::where('user_id', auth()->id())->where('status', 'pending')->count(),
-        ];
+        $orderStats = OrderStats::forUser((int) auth()->id());
 
         $orders = Order::with(['product', 'package', 'items.product', 'items.package'])
             ->withCount('licenses')

@@ -2,10 +2,21 @@
 
 namespace App\Models;
 
+use App\Support\StorefrontCache;
 use Illuminate\Database\Eloquent\Model;
 
 class LicenseStock extends Model
 {
+    protected static function booted(): void
+    {
+        $forget = fn (LicenseStock $stock) => StorefrontCache::forgetStock(
+            (int) $stock->product_id
+        );
+
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     protected $fillable = [
         'license_key',
         'product_id',

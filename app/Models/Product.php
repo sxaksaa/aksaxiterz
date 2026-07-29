@@ -2,11 +2,23 @@
 
 namespace App\Models;
 
+use App\Support\StorefrontCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    protected static function booted(): void
+    {
+        $forget = function (Product $product): void {
+            StorefrontCache::forgetStock((int) $product->id);
+            StorefrontCache::forgetRecentPurchasesForProduct((int) $product->id);
+        };
+
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     public const STATUS_READY = 'ready';
 
     public const STATUS_UPDATING = 'updating';

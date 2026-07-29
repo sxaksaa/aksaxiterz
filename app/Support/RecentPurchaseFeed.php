@@ -6,11 +6,25 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class RecentPurchaseFeed
 {
     public function storefront(?Product $product = null, int $limit = 6): Collection
+    {
+        $cacheKey = StorefrontCache::RECENT_PURCHASES_PREFIX.(
+            $product ? 'product:'.$product->id : 'all'
+        );
+
+        return Cache::remember(
+            $cacheKey,
+            now()->addMinute(),
+            fn () => $this->queryStorefront($product, $limit)
+        );
+    }
+
+    private function queryStorefront(?Product $product, int $limit): Collection
     {
         $orders = Order::query()
             ->with(['items.product', 'items.package', 'package', 'product', 'user'])

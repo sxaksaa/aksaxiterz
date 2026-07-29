@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\OrderItem;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class ProductSalesSignals
 {
@@ -13,8 +14,16 @@ class ProductSalesSignals
             return $products;
         }
 
-        $allTime = $this->paidQuantities();
-        $recent = $this->paidQuantities(now()->subDays(30));
+        $allTime = Cache::remember(
+            StorefrontCache::SALES_ALL_TIME,
+            now()->addMinutes(5),
+            fn () => $this->paidQuantities()
+        );
+        $recent = Cache::remember(
+            StorefrontCache::SALES_RECENT,
+            now()->addMinutes(5),
+            fn () => $this->paidQuantities(now()->subDays(30))
+        );
         $topAllTimeId = $allTime->filter(fn ($quantity) => $quantity > 0)->keys()->first();
         $topRecentId = $recent->filter(fn ($quantity) => $quantity > 0)->keys()->first();
 

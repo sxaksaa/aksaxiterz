@@ -2,11 +2,28 @@
 
 namespace App\Models;
 
+use App\Support\StorefrontCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
 class Order extends Model
 {
+    protected static function booted(): void
+    {
+        static::saved(function (Order $order): void {
+            if (
+                $order->wasRecentlyCreated ||
+                $order->wasChanged(['status', 'paid_at', 'product_id'])
+            ) {
+                StorefrontCache::forgetRecentPurchasesForProduct((int) $order->product_id);
+            }
+        });
+
+        static::deleted(fn (Order $order) => StorefrontCache::forgetRecentPurchasesForProduct(
+            (int) $order->product_id
+        ));
+    }
+
     protected $fillable = [
         'order_id',
         'product_id',

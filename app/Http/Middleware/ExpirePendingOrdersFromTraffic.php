@@ -21,7 +21,9 @@ class ExpirePendingOrdersFromTraffic
             return $next($request);
         }
 
-        $interval = max(10, (int) config('services.payments.traffic_cleanup_seconds', 30));
+        // The scheduler is the primary cleanup path. This request-based pass is
+        // only a low-frequency fallback for hosts where cron is temporarily down.
+        $interval = max(300, (int) config('services.payments.traffic_cleanup_seconds', 300));
         $limit = max(1, (int) config('services.payments.traffic_cleanup_limit', 20));
         $cacheStore = (string) config('services.payments.traffic_cleanup_cache_store', 'file');
 

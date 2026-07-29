@@ -2,10 +2,21 @@
 
 namespace App\Models;
 
+use App\Support\StorefrontCache;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderItem extends Model
 {
+    protected static function booted(): void
+    {
+        $forget = fn (OrderItem $item) => StorefrontCache::forgetRecentPurchasesForProduct(
+            (int) $item->product_id
+        );
+
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     protected $fillable = [
         'order_id',
         'product_id',
