@@ -1,11 +1,19 @@
 @forelse ($products as $product)
     @php
-        $minPackage = $product->packages->sortBy('price')->first();
+        $minPackageIdr = $product->packages->sortBy('price')->first();
+        $minPackageUsd = $product->packages
+            ->filter(fn ($package) => $package->price_usdt !== null && (float) $package->price_usdt > 0)
+            ->sortBy('price_usdt')
+            ->first();
         $stock = $product->available_license_stocks_count ?? 0;
-        $durationDays = $minPackage?->durationDays();
-        $durationLabel = $durationDays
-            ? $durationDays . ' ' . \Illuminate\Support\Str::plural('day', $durationDays)
+        $durationDaysIdr = $minPackageIdr?->durationDays();
+        $durationDaysUsd = $minPackageUsd?->durationDays();
+        $durationLabelIdr = $durationDaysIdr
+            ? $durationDaysIdr . ' ' . \Illuminate\Support\Str::plural('day', $durationDaysIdr)
             : 'Package';
+        $durationLabelUsd = $durationDaysUsd
+            ? $durationDaysUsd . ' ' . \Illuminate\Support\Str::plural('day', $durationDaysUsd)
+            : 'USD unavailable';
         $categoryName = $product->category->name ?? 'Product';
         $categoryKey = strtolower(trim($categoryName));
         $categoryIcon = match ($categoryKey) {
@@ -59,7 +67,11 @@
         <div class="product-card-facts">
             <span class="product-card-fact">
                 <x-ui.icon name="calendar" class="h-4 w-4" />
-                <span>From {{ $durationLabel }}</span>
+                <span data-currency-text
+                    data-currency-text-idr="From {{ $durationLabelIdr }}"
+                    data-currency-text-usd="{{ $minPackageUsd ? 'From '.$durationLabelUsd : $durationLabelUsd }}">
+                    From {{ $durationLabelIdr }}
+                </span>
             </span>
             <span class="product-card-fact" data-product-availability>
                 <x-ui.icon name="key-round" class="h-4 w-4 {{ $hasReadyStock ? '' : 'hidden' }}"
@@ -73,9 +85,14 @@
         <div class="mt-auto flex items-end justify-between gap-4">
             <div>
                 <div class="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Start from</div>
-                <span class="product-card-price">
-                    @if ($minPackage)
-                        Rp {{ number_format($minPackage->price) }} / ${{ rtrim(rtrim($minPackage->price_usdt, '0'), '.') }}
+                <span class="product-card-price"
+                    @if ($minPackageIdr)
+                        data-display-price
+                        data-price-idr="{{ (int) $minPackageIdr->price }}"
+                        data-price-usd="{{ $minPackageUsd ? (float) $minPackageUsd->price_usdt : '' }}"
+                    @endif>
+                    @if ($minPackageIdr)
+                        Rp {{ number_format($minPackageIdr->price, 0, ',', '.') }}
                     @else
                         -
                     @endif

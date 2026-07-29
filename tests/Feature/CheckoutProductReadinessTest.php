@@ -124,7 +124,7 @@ class CheckoutProductReadinessTest extends TestCase
     {
         [, $product] = $this->updatingCatalogItem();
 
-        $this->get(route('products.show', $product))
+        $response = $this->get(route('products.show', $product))
             ->assertOk()
             ->assertSee('data-product-checkout-ready="false"', false)
             ->assertSee('data-checkout-paused', false)
@@ -132,6 +132,15 @@ class CheckoutProductReadinessTest extends TestCase
             ->assertSee('data-package-checkout-enabled="false"', false)
             ->assertSee('data-request-mode="update-alert"', false)
             ->assertDontSee('data-package-checkout-enabled="true"', false);
+
+        $this->assertMatchesRegularExpression(
+            '/id="addToCartBtn"[^>]*disabled/s',
+            $response->getContent()
+        );
+        $this->assertMatchesRegularExpression(
+            '/id="buyNowBtn"[^>]*disabled/s',
+            $response->getContent()
+        );
     }
 
     private function retryOrder(User $user, int $productId, Package $package, string $orderId): Order

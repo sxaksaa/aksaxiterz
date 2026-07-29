@@ -11,8 +11,10 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\LicenseResetController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentInstructionController;
 use App\Http\Controllers\VoucherController;
 use App\Models\Category;
 use App\Models\DownloadItem;
@@ -249,6 +251,14 @@ Route::get('/product/{product}', function (string $product) use ($activePromoVou
 */
 Route::middleware('auth')->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::get('/checkout', [CheckoutController::class, 'cart'])->name('checkout.cart');
+    Route::get('/checkout/{product}', [CheckoutController::class, 'product'])
+        ->where('product', '[A-Za-z0-9-]+')
+        ->name('checkout.product');
+    Route::post('/checkout/{product}', [PaymentController::class, 'checkoutProduct'])
+        ->where('product', '[A-Za-z0-9-]+')
+        ->middleware('throttle:20,1')
+        ->name('checkout.product.process');
     Route::post('/cart/items/{product}', [CartController::class, 'store'])
         ->middleware('throttle:30,1')
         ->name('cart.items.store');
@@ -267,6 +277,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/cart/checkout', [PaymentController::class, 'checkoutCart'])
         ->middleware('throttle:20,1')
         ->name('cart.checkout');
+    Route::get('/orders/{orderId}/payment', [PaymentInstructionController::class, 'show'])
+        ->where('orderId', 'ORDER-[A-Za-z0-9-]+')
+        ->name('orders.payment');
 
     Route::post('/voucher/preview', [VoucherController::class, 'preview'])
         ->middleware('throttle:10,1')

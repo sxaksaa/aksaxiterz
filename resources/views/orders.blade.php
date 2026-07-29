@@ -211,6 +211,11 @@
         }
 
         async function handlePaymentResponse(data) {
+            if (data.instruction_url) {
+                window.location.href = data.instruction_url;
+                return;
+            }
+
             if (data.redirect_url) {
                 window.location.href = data.redirect_url;
                 return;

@@ -81,8 +81,21 @@ class LegacyQrisCompatibilityTest extends TestCase
 
         $this->get("/product/{$product->slug}")
             ->assertOk()
-            ->assertSee('data-payment-method=""', false)
-            ->assertSee('QRIS checkout is temporarily unavailable');
+            ->assertDontSee('name="payment_method"', false)
+            ->assertDontSee('aksaQrisModal', false);
+
+        $directCheckout = $this->actingAs($user)
+            ->get(route('checkout.product', [
+                'product' => $product,
+                'package' => $package->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Temporarily unavailable');
+
+        $this->assertMatchesRegularExpression(
+            '/name="payment_method"\s+value="gopay_qris"[^>]*disabled/s',
+            $directCheckout->getContent()
+        );
 
         CartItem::create([
             'user_id' => $user->id,
@@ -94,8 +107,18 @@ class LegacyQrisCompatibilityTest extends TestCase
         $this->actingAs($user)
             ->get(route('cart.index'))
             ->assertOk()
-            ->assertSee('data-cart-payment="" disabled', false)
-            ->assertSee('QRIS checkout is temporarily unavailable');
+            ->assertSee('Continue to Checkout')
+            ->assertDontSee('name="payment_method"', false);
+
+        $cartCheckout = $this->actingAs($user)
+            ->get(route('checkout.cart'))
+            ->assertOk()
+            ->assertSee('Temporarily unavailable');
+
+        $this->assertMatchesRegularExpression(
+            '/name="payment_method"\s+value="gopay_qris"[^>]*disabled/s',
+            $cartCheckout->getContent()
+        );
     }
 
     private function enableGopayQris(): void

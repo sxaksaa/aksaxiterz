@@ -113,6 +113,15 @@ class VoucherService
         $usesStablecoin = in_array($paymentMethod, ['crypto', 'binance_pay'], true);
         $token = $usesStablecoin ? $this->cryptoToken($coin) : null;
 
+        if (
+            $usesStablecoin &&
+            ($baseUsdt <= 0 || $discountLines->contains(
+                fn (array $line): bool => (float) ($line['unit_usdt'] ?? 0) <= 0
+            ))
+        ) {
+            throw new VoucherException('USD payment is unavailable for one or more selected packages.');
+        }
+
         if (blank($code) && ! $voucherId) {
             return $this->emptyQuote($baseIdr, $baseUsdt, $paymentMethod, $token, $quantity);
         }

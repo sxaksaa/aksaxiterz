@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\VoucherException;
 use App\Models\Package;
+use App\Services\CartService;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +17,7 @@ class VoucherController extends Controller
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
-            'quantity' => ['nullable', 'integer', 'min:1'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
             'coin' => [
                 'nullable',
                 'string',

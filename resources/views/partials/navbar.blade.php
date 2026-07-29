@@ -12,7 +12,7 @@
         </a>
 
         <!-- MENU DESKTOP -->
-        <div id="navMenu" class="relative hidden justify-self-center gap-8 text-sm 2xl:gap-10 xl:flex">
+        <div id="navMenu" class="relative hidden justify-self-center whitespace-nowrap text-sm xl:flex">
 
             <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
                 <x-ui.icon name="box" class="nav-icon" />
@@ -43,14 +43,18 @@
         </div>
 
         <!-- RIGHT -->
-        <div class="flex items-center justify-end gap-3">
+        <div data-navbar-actions class="flex min-w-max justify-self-end items-center justify-end gap-2">
             @php
                 $discordUrl = config('links.discord_url');
             @endphp
 
+            @if ($showDisplayCurrencySwitcher ?? false)
+                @include('partials.currency-switcher', ['compact' => true])
+            @endif
+
             @auth
                 <a href="{{ route('cart.index') }}"
-                    class="nav-cart-link relative inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
+                    class="nav-cart-link relative inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
                     aria-label="Open cart with {{ $cartCount }} items">
                     <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
                     <span>Cart</span>
@@ -62,17 +66,14 @@
             @endauth
 
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
+                data-desktop-discord aria-label="Open Discord support" title="Discord support"
                 class="discord-nav-cta {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                <x-ui.icon name="discord" class="h-4 w-4" />
-                <span>Discord</span>
-                <span class="hidden rounded-md bg-white/[0.12] px-2 py-1 text-[10px] font-semibold text-white/90 lg:inline">
-                    Support
-                </span>
+                <x-ui.icon name="discord" class="discord-nav-icon shrink-0" />
             </a>
 
             <!-- MOBILE MENU BUTTON -->
             <button id="menuBtn" type="button" data-mobile-menu-toggle aria-controls="mobileMenu"
-                aria-expanded="false" class="nav-menu-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-white xl:hidden">
+                aria-expanded="false" class="nav-menu-button inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm text-white xl:hidden">
                 <x-ui.icon name="menu" class="h-5 w-5 text-aksa-accent" />
                 <span data-button-label>Menu</span>
             </button>
@@ -80,18 +81,18 @@
             <!-- DESKTOP PROFILE -->
             @auth
                 @php $user = auth()->user(); @endphp
-                <div class="relative hidden xl:block">
+                <div class="relative hidden shrink-0 xl:block">
 
                     <button type="button" data-profile-toggle
-                        class="flex items-center gap-2 text-gray-300 hover:text-white transition">
+                        class="flex shrink-0 items-center gap-2 text-gray-300 transition hover:text-white">
 
                         @if ($user->avatar)
                             <img src="{{ $user->avatar }}" alt="{{ $user->name }}"
-                                class="w-8 h-8 rounded-full object-cover border border-aksa-accent-40">
+                                class="h-8 w-8 max-w-none shrink-0 rounded-full border border-aksa-accent-40 object-cover">
                         @else
                             <span
-                                class="w-8 h-8 flex items-center justify-center
-                bg-aksa-accent-20 text-aksa-accent rounded-full text-xs font-bold">
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full
+                bg-aksa-accent-20 text-xs font-bold text-aksa-accent">
                                 {{ strtoupper(substr($user->name, 0, 1)) }}
                             </span>
                         @endif
@@ -174,7 +175,7 @@
 
                 </div>
             @else
-                <a href="/auth/google" class="nav-login-link hidden items-center gap-2 rounded-full px-3 py-2 text-gray-400 transition hover:text-white xl:inline-flex">
+                <a href="/auth/google" class="nav-login-link hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-gray-400 transition hover:text-white xl:inline-flex">
                     <x-ui.icon name="log-in" class="h-4 w-4 text-aksa-accent" />
                     <span>Login</span>
                 </a>
@@ -192,6 +193,10 @@
     aria-hidden="true">
 
     <div class="flex flex-col gap-4 text-sm">
+
+        @if ($showDisplayCurrencySwitcher ?? false)
+            @include('partials.currency-switcher')
+        @endif
 
         <a href="/" data-mobile-menu-link class="nav-item">
             <x-ui.icon name="box" class="nav-icon" />

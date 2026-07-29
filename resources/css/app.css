@@ -39,6 +39,26 @@
         scrollbar-width: thin;
     }
 
+    html[data-display-currency="idr"] [data-currency-option="idr"],
+    html[data-display-currency="usd"] [data-currency-option="usd"] {
+        background-color: var(--aksa-purple-strong);
+        color: #ffffff;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    html[data-display-currency="idr"] [data-currency-option="usd"],
+    html[data-display-currency="usd"] [data-currency-option="idr"] {
+        background-color: transparent;
+        color: #9ca3af;
+        box-shadow: none;
+    }
+
+    html[data-display-currency="usd"][data-currency-ready="false"] [data-display-price],
+    html[data-display-currency="usd"][data-currency-ready="false"] [data-currency-text],
+    html[data-display-currency="usd"][data-currency-ready="false"] [data-currency-visibility] {
+        visibility: hidden;
+    }
+
     * {
         scrollbar-color: rgba(180, 155, 255, 0.44) var(--aksa-bg);
         scrollbar-width: thin;
@@ -914,7 +934,7 @@
     }
 
     .discord-nav-cta {
-        @apply hidden items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition xl:inline-flex;
+        @apply hidden h-10 w-10 shrink-0 items-center justify-center rounded-full p-0 text-xs font-bold transition xl:inline-flex;
         border-radius: 999px;
         background:
             linear-gradient(180deg, rgba(180, 155, 255, 0.16), rgba(167, 139, 250, 0.08)),
@@ -942,10 +962,10 @@
         color: inherit;
     }
 
-    .discord-nav-cta > span:last-child {
-        background: rgba(180, 155, 255, 0.14);
-        color: #ddd3ff;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    .discord-nav-icon {
+        width: 1.125rem;
+        height: 1.125rem;
+        transform: translate(-1px, 1px);
     }
 
     .discord-panel {

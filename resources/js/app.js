@@ -250,6 +250,179 @@ function formatIdr(amount) {
     return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
 }
 
+const DISPLAY_CURRENCY_STORAGE_KEY = 'aksa_display_currency';
+const DISPLAY_CURRENCIES = new Set(['idr', 'usd']);
+const INDONESIAN_TIMEZONES = new Set([
+    'Asia/Jakarta',
+    'Asia/Pontianak',
+    'Asia/Makassar',
+    'Asia/Ujung_Pandang',
+    'Asia/Jayapura',
+]);
+let activeDisplayCurrency = null;
+
+function normalizedDisplayCurrency(currency) {
+    const normalized = String(currency || '').trim().toLowerCase();
+
+    return DISPLAY_CURRENCIES.has(normalized) ? normalized : null;
+}
+
+function storedDisplayCurrency() {
+    try {
+        return normalizedDisplayCurrency(window.localStorage.getItem(DISPLAY_CURRENCY_STORAGE_KEY));
+    } catch (error) {
+        return null;
+    }
+}
+
+function detectedDisplayCurrency() {
+    const savedCurrency = storedDisplayCurrency();
+
+    if (savedCurrency) return savedCurrency;
+
+    const visitorCountry = String(document.documentElement.dataset.visitorCountry || '').toUpperCase();
+
+    if (/^[A-Z]{2}$/.test(visitorCountry)) {
+        return visitorCountry === 'ID' ? 'idr' : 'usd';
+    }
+
+    const browserLanguages = Array.isArray(navigator.languages) && navigator.languages.length > 0
+        ? navigator.languages
+        : [navigator.language];
+    const usesIndonesian = /^id(?:-|$)/i.test(String(browserLanguages[0] || ''));
+
+    if (usesIndonesian) return 'idr';
+
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    return INDONESIAN_TIMEZONES.has(browserTimezone) ? 'idr' : 'usd';
+}
+
+function formatDisplayUsd(amount) {
+    const numericAmount = Number(amount || 0);
+
+    return `$${numericAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+    })}`;
+}
+
+function formatDisplayPrice(idrAmount, usdAmount, currency = activeDisplayCurrency) {
+    return normalizedDisplayCurrency(currency) === 'usd'
+        ? formatDisplayUsd(usdAmount)
+        : formatIdr(idrAmount);
+}
+
+function refreshDisplayCurrency(root = document) {
+    const currency = activeDisplayCurrency || detectedDisplayCurrency();
+    const scope = root?.querySelectorAll ? root : document;
+
+    scope.querySelectorAll('[data-display-price]').forEach(element => {
+        const idrAmount = element.dataset.priceIdr;
+        const usdAmount = element.dataset.priceUsd;
+
+        if (idrAmount === undefined) return;
+
+        const prefix = element.dataset.pricePrefix || '';
+        const suffix = element.dataset.priceSuffix || '';
+
+        if (currency === 'usd' && (usdAmount === undefined || usdAmount === '')) {
+            element.textContent = element.dataset.priceUsdFallback || 'USD unavailable';
+            return;
+        }
+
+        element.textContent = `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+    });
+
+    scope.querySelectorAll('[data-currency-text]').forEach(element => {
+        const value = currency === 'usd'
+            ? element.dataset.currencyTextUsd
+            : element.dataset.currencyTextIdr;
+
+        if (value !== undefined) element.textContent = value;
+    });
+
+    scope.querySelectorAll('[data-currency-visibility]').forEach(element => {
+        const visible = currency === 'usd'
+            ? element.dataset.currencyVisibleUsd === 'true'
+            : element.dataset.currencyVisibleIdr === 'true';
+
+        element.classList.toggle('hidden', !visible);
+    });
+
+    document.querySelectorAll('[data-currency-option]').forEach(button => {
+        const selected = button.dataset.currencyOption === currency;
+
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.classList.toggle('bg-aksa-accent', selected);
+        button.classList.toggle('text-white', selected);
+        button.classList.toggle('shadow-sm', selected);
+        button.classList.toggle('text-gray-400', !selected);
+    });
+
+    document.querySelectorAll('[data-currency-switcher]').forEach(switcher => {
+        switcher.dataset.selectedCurrency = currency;
+    });
+
+    document.documentElement.dataset.displayCurrency = currency;
+    document.documentElement.dataset.currencyReady = 'true';
+}
+
+function notifyDisplayCurrencyChanged(source = 'automatic') {
+    window.dispatchEvent(new CustomEvent('aksa:currency-change', {
+        detail: {
+            currency: activeDisplayCurrency,
+            source,
+        },
+    }));
+}
+
+function initializeDisplayCurrency(root = document) {
+    activeDisplayCurrency = activeDisplayCurrency || detectedDisplayCurrency();
+    refreshDisplayCurrency(root);
+    notifyDisplayCurrencyChanged('automatic');
+}
+
+window.getAksaDisplayCurrency = () => activeDisplayCurrency || detectedDisplayCurrency();
+window.formatAksaDisplayPrice = (idrAmount, usdAmount, currency = null) => formatDisplayPrice(
+    idrAmount,
+    usdAmount,
+    currency || window.getAksaDisplayCurrency(),
+);
+window.refreshAksaDisplayCurrency = (root = document) => refreshDisplayCurrency(root);
+window.setAksaDisplayCurrency = (currency, options = {}) => {
+    const normalized = normalizedDisplayCurrency(currency);
+
+    if (!normalized) return false;
+
+    activeDisplayCurrency = normalized;
+
+    if (options.persist !== false) {
+        try {
+            window.localStorage.setItem(DISPLAY_CURRENCY_STORAGE_KEY, normalized);
+        } catch (error) {
+            // The selection still applies to this page when storage is unavailable.
+        }
+    }
+
+    refreshDisplayCurrency(document);
+    notifyDisplayCurrencyChanged(options.source || 'manual');
+
+    return true;
+};
+window.addEventListener('storage', event => {
+    if (event.key !== DISPLAY_CURRENCY_STORAGE_KEY) return;
+
+    const currency = normalizedDisplayCurrency(event.newValue);
+
+    if (currency) {
+        window.setAksaDisplayCurrency(currency, {
+            persist: false,
+            source: 'storage',
+        });
+    }
+});
+
 function countdownDeadline(value, remainingSeconds) {
     const seconds = Number(remainingSeconds);
 
@@ -2286,6 +2459,7 @@ async function softNavigate(url, options = {}) {
         }
 
         executeSoftPageScripts(nextDocument);
+        initializeDisplayCurrency(document);
         initializeCustomSelects(nextContent);
         initializeRecentPurchaseToast(nextContent);
         closeMobileMenu();
@@ -2444,6 +2618,7 @@ function initializeDownloadAccordions(root = document) {
 }
 
 function initializeGlobalPageEnhancements(root = document) {
+    initializeDisplayCurrency(root);
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
@@ -2456,6 +2631,16 @@ if (document.readyState === 'loading') {
 }
 
 document.addEventListener('click', (event) => {
+    const currencyOption = event.target.closest('[data-currency-option]');
+
+    if (currencyOption) {
+        event.preventDefault();
+        window.setAksaDisplayCurrency(currencyOption.dataset.currencyOption, {
+            source: 'manual',
+        });
+        return;
+    }
+
     const mobileToggle = event.target.closest('[data-mobile-menu-toggle]');
 
     if (mobileToggle) {

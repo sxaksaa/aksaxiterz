@@ -194,6 +194,7 @@
                         if (requestSequence !== productRequestSequence) return;
 
                         container.innerHTML = html.trim() || emptyProductsHtml();
+                        window.refreshAksaDisplayCurrency?.(container);
                         refreshProductStocks();
                     })
                     .catch(error => {

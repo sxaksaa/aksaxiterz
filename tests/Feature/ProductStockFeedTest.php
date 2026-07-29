@@ -356,7 +356,8 @@ class ProductStockFeedTest extends TestCase
             ->assertSee('data-manual-order', false)
             ->assertSee('data-manual-order-label', false)
             ->assertSee('id="addToCartBtn"', false)
-            ->assertSee('id="payMainBtn"', false)
+            ->assertSee('id="buyNowBtn"', false)
+            ->assertDontSee('id="payMainBtn"', false)
             ->assertDontSee('DETAIL-MARKER-KEY-1')
             ->assertDontSee('DETAIL-MARKER-KEY-2');
 

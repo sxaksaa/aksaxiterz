@@ -122,6 +122,17 @@ class CartService
         }
     }
 
+    public function signature(Collection $items): string
+    {
+        return hash(
+            'sha256',
+            $items
+                ->map(fn ($item): string => (int) $item->package_id.':'.(int) $item->quantity)
+                ->sort()
+                ->implode('|')
+        );
+    }
+
     private function ensureSellable(Product $product, Package $package): void
     {
         if ((int) $package->product_id !== (int) $product->id) {

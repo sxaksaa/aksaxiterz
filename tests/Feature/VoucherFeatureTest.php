@@ -385,7 +385,7 @@ class VoucherFeatureTest extends TestCase
             'services.binance.pay.api_secret' => 'test-secret',
         ]);
         $admin = User::factory()->create(['email' => 'admin@example.com']);
-        [, $product] = $this->makeCatalog(20000, 1.25);
+        [, $product, $firstPackage] = $this->makeCatalog(20000, 1.25);
         Package::create([
             'product_id' => $product->id,
             'name' => '30 Days',
@@ -429,16 +429,24 @@ class VoucherFeatureTest extends TestCase
         $this->get(route('products.show', $product))
             ->assertOk()
             ->assertSee('Best Value')
-            ->assertSee('Save Rp 350,000')
-            ->assertSee('data-usd="Save $22.50"', false)
+            ->assertSee('Save Rp 350.000')
             ->assertSee('58% vs daily')
-            ->assertSee('data-usd="60% vs daily"', false)
-            ->assertSee('data-usd="$0.50 per day"', false)
-            ->assertSee('Enter voucher code')
-            ->assertSee('data-binance-pay-token="usdt"', false)
-            ->assertSee('data-binance-pay-token="usdc"', false)
-            ->assertSee('name="token" id="binance_pay_token"', false)
-            ->assertSee('Join our Discord server to get promo codes.');
+            ->assertSee('data-price-usd="15"', false)
+            ->assertDontSee('Enter voucher code')
+            ->assertDontSee('name="payment_method"', false)
+            ->assertSee('Discord member promo')
+            ->assertSee('Claim on Discord');
+
+        $this->actingAs($admin)
+            ->get(route('checkout.product', [
+                'product' => $product,
+                'package' => $firstPackage->id,
+            ]))
+            ->assertOk()
+            ->assertSee('id="checkoutVoucherCode"', false)
+            ->assertSee('name="payment_method" value="binance_pay"', false)
+            ->assertSee('name="token" value="usdt"', false)
+            ->assertSee('name="token" value="usdc"', false);
     }
 
     public function test_admin_can_create_bundle_specific_voucher(): void

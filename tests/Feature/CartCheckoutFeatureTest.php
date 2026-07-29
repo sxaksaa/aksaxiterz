@@ -65,6 +65,9 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertSee('Custom Bundle')
             ->assertSee('Decrease Aurora quantity')
             ->assertSee('Increase Aurora quantity')
+            ->assertSee('Continue to Checkout')
+            ->assertDontSee('name="payment_method"', false)
+            ->assertDontSee('id="checkoutVoucherCode"', false)
             ->assertDontSee('>Update<', false);
     }
 
@@ -85,16 +88,13 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('data-cart-checkout-paused', false)
             ->assertSee('data-cart-item-checkout-ready="false"', false)
-            ->assertSee('This product is not available for checkout')
-            ->assertSee('Remove the paused items before checkout.')
-            ->assertSee('Checkout Paused');
+            ->assertSee('This selection needs to be reviewed')
+            ->assertSee('Review Unavailable Items')
+            ->assertDontSee('Continue to Checkout')
+            ->assertDontSee('href="'.route('checkout.cart').'"', false);
 
         $this->assertMatchesRegularExpression(
-            '/id="cartCheckoutButton"[^>]*disabled/s',
-            $response->getContent()
-        );
-        $this->assertMatchesRegularExpression(
-            '/data-cart-payment="gopay_qris"[^>]*disabled/s',
+            '/<button[^>]*disabled[^>]*>.*Review Unavailable Items.*<\/button>/s',
             $response->getContent()
         );
     }

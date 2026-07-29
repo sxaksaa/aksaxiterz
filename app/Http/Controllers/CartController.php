@@ -6,14 +6,17 @@ use App\Models\CartItem;
 use App\Models\Package;
 use App\Models\Product;
 use App\Services\CartService;
+use App\Services\CheckoutLockService;
 use App\Services\VoucherService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class CartController extends Controller
 {
     public function __construct(
-        private readonly CartService $cartService
+        private readonly CartService $cartService,
+        private readonly CheckoutLockService $checkoutLockService
     ) {}
 
     public function index(Request $request)
@@ -21,7 +24,8 @@ class CartController extends Controller
         $items = $this->cartService->items($request->user());
         $this->attachAvailability($items);
         $hasUnavailableItems = $items->contains(
-            fn ($item): bool => ! (bool) $item->is_checkout_available
+            fn ($item): bool => ! (bool) $item->is_checkout_available ||
+                (int) $item->available_stock < (int) $item->quantity
         );
 
         return view('cart', [
@@ -29,11 +33,9 @@ class CartController extends Controller
             'hasUnavailableItems' => $hasUnavailableItems,
             'subtotalIdr' => (int) $items->sum(fn ($item) => $item->package->price * $item->quantity),
             'subtotalUsdt' => round((float) $items->sum(fn ($item) => $item->package->price_usdt * $item->quantity), 6),
-            'binancePayAvailable' => app()->environment('local') || (
-                (bool) config('services.binance.pay.enabled') &&
-                filled(config('services.binance.pay.pay_id')) &&
-                filled(config('services.binance.pay.api_key')) &&
-                filled(config('services.binance.pay.api_secret'))
+            'stablecoinPricingAvailable' => $items->every(
+                fn ($item): bool => $item->package->price_usdt !== null &&
+                    (float) $item->package->price_usdt > 0
             ),
         ]);
     }
@@ -48,22 +50,24 @@ class CartController extends Controller
             ->where('product_id', $product->id)
             ->firstOrFail();
 
-        try {
-            $item = $this->cartService->add(
-                $request->user(),
-                $product,
-                $package,
-                (int) ($validated['quantity'] ?? 1)
-            );
-        } catch (\Exception $error) {
-            return $this->errorResponse($request, $error->getMessage());
-        }
+        return $this->runCartMutation($request, function () use ($request, $product, $package, $validated) {
+            try {
+                $item = $this->cartService->add(
+                    $request->user(),
+                    $product,
+                    $package,
+                    (int) ($validated['quantity'] ?? 1)
+                );
+            } catch (\Exception $error) {
+                return $this->errorResponse($request, $error->getMessage());
+            }
 
-        return $this->successResponse($request, [
-            'message' => $product->name.' - '.$package->name.' was added to your cart.',
-            'cart_count' => (int) $request->user()->cartItems()->sum('quantity'),
-            'item_id' => $item->id,
-        ]);
+            return $this->successResponse($request, [
+                'message' => $product->name.' - '.$package->name.' was added to your cart.',
+                'cart_count' => (int) $request->user()->cartItems()->sum('quantity'),
+                'item_id' => $item->id,
+            ]);
+        });
     }
 
     public function update(Request $request, CartItem $cartItem)
@@ -74,64 +78,72 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
         ]);
 
-        try {
-            $item = $this->cartService->update($request->user(), $cartItem, (int) $validated['quantity']);
-        } catch (\Exception $error) {
-            return $this->errorResponse($request, $error->getMessage());
-        }
+        return $this->runCartMutation($request, function () use ($request, $cartItem, $validated) {
+            try {
+                $item = $this->cartService->update($request->user(), $cartItem, (int) $validated['quantity']);
+            } catch (\Exception $error) {
+                return $this->errorResponse($request, $error->getMessage());
+            }
 
-        $items = $this->cartService->items($request->user());
-        $availableStock = $item->package->availableLicenseStocks()->count();
-        $otherCartQuantity = (int) $items->where('id', '!=', $item->id)->sum('quantity');
-        $maxQuantity = min(
-            $availableStock,
-            max(1, CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity)
-        );
-        $totalQuantity = (int) $items->sum('quantity');
-        $itemLimits = $items->map(function ($cartItem) use ($totalQuantity): array {
-            $availableStock = $cartItem->package->availableLicenseStocks()->count();
-            $otherCartQuantity = $totalQuantity - $cartItem->quantity;
+            $items = $this->cartService->items($request->user());
+            $availableStock = $item->package->availableLicenseStocks()->count();
+            $otherCartQuantity = (int) $items->where('id', '!=', $item->id)->sum('quantity');
+            $maxQuantity = min(
+                $availableStock,
+                max(1, CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity)
+            );
+            $totalQuantity = (int) $items->sum('quantity');
+            $itemLimits = $items->map(function ($cartItem) use ($totalQuantity): array {
+                $availableStock = $cartItem->package->availableLicenseStocks()->count();
+                $otherCartQuantity = $totalQuantity - $cartItem->quantity;
 
-            return [
-                'id' => $cartItem->id,
-                'max_quantity' => min(
-                    $availableStock,
-                    max(1, CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity)
-                ),
-            ];
-        })->values();
+                return [
+                    'id' => $cartItem->id,
+                    'max_quantity' => min(
+                        $availableStock,
+                        max(1, CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity)
+                    ),
+                ];
+            })->values();
 
-        return $this->successResponse($request, [
-            'message' => 'Cart quantity updated.',
-            'item' => [
-                'id' => $item->id,
-                'quantity' => $item->quantity,
-                'line_total_idr' => (int) $item->package->price * $item->quantity,
-                'line_total_usdt' => round((float) $item->package->price_usdt * $item->quantity, 6),
-                'max_quantity' => $maxQuantity,
-            ],
-            'cart' => [
-                'distinct_items' => $items->count(),
-                'quantity' => $totalQuantity,
-                'subtotal_idr' => (int) $items->sum(fn ($cartItem) => $cartItem->package->price * $cartItem->quantity),
-                'subtotal_usdt' => round((float) $items->sum(fn ($cartItem) => $cartItem->package->price_usdt * $cartItem->quantity), 6),
-                'item_limits' => $itemLimits,
-            ],
-        ]);
+            return $this->successResponse($request, [
+                'message' => 'Cart quantity updated.',
+                'item' => [
+                    'id' => $item->id,
+                    'quantity' => $item->quantity,
+                    'line_total_idr' => (int) $item->package->price * $item->quantity,
+                    'line_total_usdt' => round((float) $item->package->price_usdt * $item->quantity, 6),
+                    'max_quantity' => $maxQuantity,
+                ],
+                'cart' => [
+                    'distinct_items' => $items->count(),
+                    'quantity' => $totalQuantity,
+                    'subtotal_idr' => (int) $items->sum(fn ($cartItem) => $cartItem->package->price * $cartItem->quantity),
+                    'subtotal_usdt' => round((float) $items->sum(
+                        fn ($cartItem) => $cartItem->package->price_usdt * $cartItem->quantity
+                    ), 6),
+                    'item_limits' => $itemLimits,
+                ],
+            ]);
+        });
     }
 
     public function destroy(Request $request, CartItem $cartItem)
     {
-        $this->cartService->remove($request->user(), $cartItem);
+        return $this->runCartMutation($request, function () use ($request, $cartItem) {
+            $this->cartService->remove($request->user(), $cartItem);
 
-        return $this->successResponse($request, ['message' => 'Item removed from your cart.']);
+            return $this->successResponse($request, ['message' => 'Item removed from your cart.']);
+        });
     }
 
     public function clear(Request $request)
     {
-        $this->cartService->clear($request->user());
+        return $this->runCartMutation($request, function () use ($request) {
+            $this->cartService->clear($request->user());
 
-        return $this->successResponse($request, ['message' => 'Your cart is now empty.']);
+            return $this->successResponse($request, ['message' => 'Your cart is now empty.']);
+        });
     }
 
     public function previewVoucher(Request $request, VoucherService $voucherService)
@@ -176,7 +188,8 @@ class CartController extends Controller
             $item->setAttribute('available_stock', $item->package->availableLicenseStocks()->count());
             $item->setAttribute(
                 'is_checkout_available',
-                (bool) $item->product?->isReadyForAutomaticCheckout()
+                (bool) $item->product?->isReadyForAutomaticCheckout() &&
+                    $item->available_stock >= (int) $item->quantity
             );
         }
     }
@@ -190,10 +203,23 @@ class CartController extends Controller
         return back()->with('info', $payload['message']);
     }
 
-    private function errorResponse(Request $request, string $message)
+    private function runCartMutation(Request $request, callable $callback)
+    {
+        try {
+            return $this->checkoutLockService->run((int) $request->user()->id, $callback);
+        } catch (LockTimeoutException) {
+            return $this->errorResponse(
+                $request,
+                'Checkout is updating your cart. Wait a moment and try again.',
+                409
+            );
+        }
+    }
+
+    private function errorResponse(Request $request, string $message, int $status = 422)
     {
         if ($request->expectsJson()) {
-            return response()->json(['message' => $message], 422);
+            return response()->json(['message' => $message], $status);
         }
 
         return back()->withErrors(['cart' => $message]);

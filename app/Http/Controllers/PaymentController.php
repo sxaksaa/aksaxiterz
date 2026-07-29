@@ -117,11 +117,11 @@ class PaymentController extends Controller
                             $newOrder
                         );
 
-                    if ($this->wantsPaymentJson($request)) {
-                        return response()->json($this->gopayQrisCheckoutPayload($payment['order']));
-                    }
-
-                    return redirect('/orders');
+                    return $this->checkoutSuccessResponse(
+                        $request,
+                        $payment['order'],
+                        $this->gopayQrisCheckoutPayload($payment['order'])
+                    );
                 }
 
                 if ($newOrder->payment_method === 'binance_pay') {
@@ -142,11 +142,11 @@ class PaymentController extends Controller
                             $binancePayToken
                         );
 
-                    if ($this->wantsPaymentJson($request)) {
-                        return response()->json($this->binancePayCheckoutPayload($payment['order']));
-                    }
-
-                    return redirect('/orders');
+                    return $this->checkoutSuccessResponse(
+                        $request,
+                        $payment['order'],
+                        $this->binancePayCheckoutPayload($payment['order'])
+                    );
                 }
 
                 $payment = $hasStoredItems
@@ -164,11 +164,11 @@ class PaymentController extends Controller
                         $newOrder
                     );
 
-                if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->cryptoCheckoutPayload($payment['order']));
-                }
-
-                return redirect('/orders');
+                return $this->checkoutSuccessResponse(
+                    $request,
+                    $payment['order'],
+                    $this->cryptoCheckoutPayload($payment['order'])
+                );
             } catch (\Exception $e) {
                 $this->cancelPendingOrder($newOrder);
 
@@ -185,13 +185,28 @@ class PaymentController extends Controller
     |--------------------------------------------------------------------------
     */
 
+    public function checkoutProduct(Request $request, Product $product)
+    {
+        abort_unless($product->is_visible, 404);
+
+        $validated = $request->validate([
+            'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
+        ]);
+
+        return match ($validated['payment_method']) {
+            'gopay_qris' => $this->payGopayQris($request, $product->id),
+            'binance_pay' => $this->payBinance($request, $product->id),
+            'crypto' => $this->payCrypto($request, $product->id),
+        };
+    }
+
     public function payGopayQris(Request $request, $id)
     {
         $user = Auth::user();
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
-            'quantity' => ['nullable', 'integer', 'min:1'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
 
@@ -215,11 +230,11 @@ class PaymentController extends Controller
                     $request->integer('quantity', 1)
                 );
 
-                if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->gopayQrisCheckoutPayload($payment['order']));
-                }
-
-                return redirect('/orders');
+                return $this->checkoutSuccessResponse(
+                    $request,
+                    $payment['order'],
+                    $this->gopayQrisCheckoutPayload($payment['order'])
+                );
             } catch (\Exception $error) {
                 Log::error('GOPAY QRIS CHECKOUT ERROR: '.$error->getMessage());
 
@@ -343,7 +358,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
-            'quantity' => ['nullable', 'integer', 'min:1'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
             'coin' => [
                 'required',
                 'string',
@@ -374,11 +389,11 @@ class PaymentController extends Controller
                     $request->integer('quantity', 1)
                 );
 
-                if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->cryptoCheckoutPayload($payment['order']));
-                }
-
-                return redirect('/orders');
+                return $this->checkoutSuccessResponse(
+                    $request,
+                    $payment['order'],
+                    $this->cryptoCheckoutPayload($payment['order'])
+                );
             } catch (\Exception $e) {
                 Log::error('CRYPTO ERROR: '.$e->getMessage());
 
@@ -393,7 +408,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'package_id' => 'required|exists:packages,id',
-            'quantity' => ['nullable', 'integer', 'min:1'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
             'token' => ['required', 'string', Rule::in(['usdt', 'usdc'])],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
         ]);
@@ -419,11 +434,11 @@ class PaymentController extends Controller
                     $request->string('token')->toString()
                 );
 
-                if ($this->wantsPaymentJson($request)) {
-                    return response()->json($this->binancePayCheckoutPayload($payment['order']));
-                }
-
-                return redirect('/orders');
+                return $this->checkoutSuccessResponse(
+                    $request,
+                    $payment['order'],
+                    $this->binancePayCheckoutPayload($payment['order'])
+                );
             } catch (\Exception $e) {
                 Log::error('BINANCE PAY ERROR: '.$e->getMessage());
 
@@ -450,6 +465,7 @@ class PaymentController extends Controller
                 Rule::in(['usdt', 'usdc']),
             ],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'cart_signature' => ['nullable', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
         ]);
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $validated) {
@@ -464,6 +480,20 @@ class PaymentController extends Controller
             $items = $this->cartService->items($user);
 
             try {
+                if (
+                    filled($validated['cart_signature'] ?? null) &&
+                    ! hash_equals(
+                        (string) $validated['cart_signature'],
+                        $this->cartService->signature($items)
+                    )
+                ) {
+                    return $this->paymentErrorResponse(
+                        $request,
+                        'Your cart changed in another tab. Review it again before paying.',
+                        409
+                    );
+                }
+
                 $this->cartService->validateForCheckout($items);
                 $this->cancelPendingOrders($user->id);
                 $voucherCode = $validated['voucher_code'] ?? null;
@@ -477,9 +507,11 @@ class PaymentController extends Controller
                     );
                     $this->cartService->clear($user);
 
-                    return $this->wantsPaymentJson($request)
-                        ? response()->json($this->gopayQrisCheckoutPayload($payment['order']))
-                        : redirect('/orders');
+                    return $this->checkoutSuccessResponse(
+                        $request,
+                        $payment['order'],
+                        $this->gopayQrisCheckoutPayload($payment['order'])
+                    );
                 }
 
                 if ($validated['payment_method'] === 'binance_pay') {
@@ -492,9 +524,11 @@ class PaymentController extends Controller
                     );
                     $this->cartService->clear($user);
 
-                    return $this->wantsPaymentJson($request)
-                        ? response()->json($this->binancePayCheckoutPayload($payment['order']))
-                        : redirect('/orders');
+                    return $this->checkoutSuccessResponse(
+                        $request,
+                        $payment['order'],
+                        $this->binancePayCheckoutPayload($payment['order'])
+                    );
                 }
 
                 $payment = $this->paymentService->createCartCryptoPayment(
@@ -506,9 +540,11 @@ class PaymentController extends Controller
                 );
                 $this->cartService->clear($user);
 
-                return $this->wantsPaymentJson($request)
-                    ? response()->json($this->cryptoCheckoutPayload($payment['order']))
-                    : redirect('/orders');
+                return $this->checkoutSuccessResponse(
+                    $request,
+                    $payment['order'],
+                    $this->cryptoCheckoutPayload($payment['order'])
+                );
             } catch (\Exception $error) {
                 Log::error('CART CHECKOUT ERROR: '.$error->getMessage());
 
@@ -864,6 +900,18 @@ class PaymentController extends Controller
         return $request->expectsJson() || $request->ajax();
     }
 
+    private function checkoutSuccessResponse(Request $request, Order $order, array $payload)
+    {
+        $instructionUrl = route('orders.payment', ['orderId' => $order->order_id]);
+        $payload['instruction_url'] = $instructionUrl;
+
+        if ($this->wantsPaymentJson($request)) {
+            return response()->json($payload);
+        }
+
+        return redirect()->to($instructionUrl);
+    }
+
     private function runCheckoutLocked(Request $request, int $userId, callable $callback)
     {
         try {
@@ -879,8 +927,10 @@ class PaymentController extends Controller
 
     private function pendingPaymentResponse(Request $request, Order $order)
     {
-        $message = 'You already have an unfinished payment. Continue, verify, or cancel it from Orders first.';
-        $redirectUrl = url('/orders?payment_notice=pending-order');
+        $message = 'You already have an unfinished payment. Continue or cancel it before starting another checkout.';
+        $redirectUrl = filled($order->order_id)
+            ? route('orders.payment', ['orderId' => $order->order_id])
+            : url('/orders?payment_notice=pending-order');
 
         if ($this->wantsPaymentJson($request)) {
             return response()->json([
@@ -968,6 +1018,7 @@ class PaymentController extends Controller
             'Automatic delivery does not have enough license stock',
             'Select at least one license key',
             'QRIS checkout is currently unavailable.',
+            'Your cart changed in another tab.',
         ]);
     }
 }
