@@ -101,7 +101,7 @@
 
             <span class="product-card-cta">
                 <x-ui.icon name="shopping-cart" class="h-4 w-4" />
-                <span>View</span>
+                <span>View Packages</span>
             </span>
         </div>
 

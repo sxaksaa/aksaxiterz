@@ -30,7 +30,7 @@
                     </span>
                     <span class="support-pill">
                         <x-ui.icon name="key-round" class="h-4 w-4" />
-                        <span>{{ $totalQuantity }} {{ \Illuminate\Support\Str::plural('key', $totalQuantity) }}</span>
+                        <span>{{ $totalQuantity }} {{ \Illuminate\Support\Str::plural('license', $totalQuantity) }}</span>
                     </span>
                 </div>
             </div>
@@ -60,33 +60,47 @@
 
             <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div class="grid gap-6">
-                    <section class="product-section fade-up">
-                        <div class="mb-4">
-                            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 1</p>
-                            <h2 class="mt-1 text-xl font-semibold text-white">Order review</h2>
-                        </div>
+                    <section class="checkout-order-review product-section fade-up">
+                        <button id="checkoutOrderReviewToggle" type="button" class="checkout-order-review-toggle"
+                            aria-expanded="false" aria-controls="checkoutOrderReviewItems">
+                            <span>
+                                <span class="block text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 1</span>
+                                <span class="mt-1 block text-left text-xl font-semibold text-white">Order review</span>
+                            </span>
+                            <span class="inline-flex items-center gap-2 text-sm text-gray-400">
+                                <span>{{ $itemCount }} {{ \Illuminate\Support\Str::plural('package', $itemCount) }}</span>
+                                <x-ui.icon name="chevron-down" class="checkout-order-review-chevron h-4 w-4" />
+                            </span>
+                        </button>
 
-                        <div class="grid gap-3">
-                            @foreach ($checkoutItems as $item)
-                                <article class="rounded-xl border border-[#27272A] bg-black/15 p-4">
-                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <div class="min-w-0">
-                                            <h3 class="truncate font-semibold text-white">{{ $item['product_name'] }}</h3>
-                                            <p class="mt-1 text-sm text-gray-400">
-                                                {{ $item['package_name'] }} · {{ $item['quantity'] }}
-                                                {{ \Illuminate\Support\Str::plural('key', $item['quantity']) }}
-                                            </p>
-                                            <p class="mt-2 text-xs {{ $item['is_available'] ? 'text-aksa-accent' : 'text-amber-200' }}">
-                                                {{ $item['is_available'] ? $item['available_stock'].' keys ready for automatic delivery' : 'Selection needs to be reviewed' }}
-                                            </p>
-                                        </div>
-                                        <div class="text-left sm:text-right">
-                                            <div class="font-semibold text-white" data-display-price
-                                                data-price-idr="{{ (int) $item['line_total_idr'] }}"
-                                                data-price-usd="{{ ($item['has_usd_price'] ?? false) ? (float) $item['line_total_usdt'] : '' }}">
-                                                Rp {{ number_format($item['line_total_idr'], 0, ',', '.') }}
+                        <div id="checkoutOrderReviewItems" class="checkout-order-review-items mt-4 gap-3">
+                            @foreach ($checkoutItems->groupBy('product_slug') as $productItems)
+                                <article class="checkout-product-group rounded-xl border border-[#27272A] bg-black/15">
+                                    <div class="border-b border-white/5 px-4 py-3">
+                                        <h3 class="truncate font-semibold text-white">{{ $productItems->first()['product_name'] }}</h3>
+                                        <p class="mt-1 text-xs text-gray-400">
+                                            {{ $productItems->count() }} {{ \Illuminate\Support\Str::plural('package', $productItems->count()) }}
+                                        </p>
+                                    </div>
+                                    <div class="divide-y divide-white/5">
+                                        @foreach ($productItems as $item)
+                                            <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-semibold text-white">
+                                                        {{ $item['package_name'] }} · {{ $item['quantity'] }}
+                                                        {{ \Illuminate\Support\Str::plural('license', $item['quantity']) }}
+                                                    </p>
+                                                    <p class="mt-1 text-xs {{ $item['is_available'] ? 'text-aksa-accent' : 'text-amber-200' }}">
+                                                        {{ $item['is_available'] ? $item['available_stock'].' licenses ready for automatic delivery' : 'Selection needs to be reviewed' }}
+                                                    </p>
+                                                </div>
+                                                <div class="font-semibold text-white" data-display-price
+                                                    data-price-idr="{{ (int) $item['line_total_idr'] }}"
+                                                    data-price-usd="{{ ($item['has_usd_price'] ?? false) ? (float) $item['line_total_usdt'] : '' }}">
+                                                    Rp {{ number_format($item['line_total_idr'], 0, ',', '.') }}
+                                                </div>
                                             </div>
-                                        </div>
+                                        @endforeach
                                     </div>
                                 </article>
                             @endforeach
@@ -249,7 +263,7 @@
                     </section>
                 </div>
 
-                <aside class="product-section fade-up lg:sticky lg:top-24">
+                <aside id="checkoutFinalSummary" class="product-section fade-up lg:sticky lg:top-24">
                     <div class="mb-5">
                         <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 3</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Final summary</h2>
@@ -349,6 +363,24 @@
             function setButtonLabel(button, label) {
                 const target = button?.querySelector('[data-button-label]');
                 if (target) target.textContent = label;
+            }
+
+            function revealFinalSummaryWhenReady() {
+                if (!window.matchMedia('(max-width: 1023px)').matches) return;
+
+                const method = paymentMethod();
+                const selectionReady = method === 'gopay_qris' ||
+                    (method === 'binance_pay' && Boolean(selectedToken())) ||
+                    (method === 'crypto' && Boolean(selectedCoin()));
+
+                if (!selectionReady) return;
+
+                window.requestAnimationFrame(() => {
+                    document.getElementById('checkoutFinalSummary')?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                    });
+                });
             }
 
             function voucherFeedback(message, variant = 'success') {
@@ -557,6 +589,8 @@
                     if (appliedVoucherCode) {
                         refreshVoucher().catch(handleVoucherRefreshError);
                     }
+
+                    revealFinalSummaryWhenReady();
                 });
             });
 
@@ -576,6 +610,8 @@
                     if (appliedVoucherCode) {
                         refreshVoucher().catch(handleVoucherRefreshError);
                     }
+
+                    revealFinalSummaryWhenReady();
                 });
             });
 
@@ -613,7 +649,16 @@
                     if (appliedVoucherCode) {
                         refreshVoucher().catch(handleVoucherRefreshError);
                     }
+
+                    revealFinalSummaryWhenReady();
                 });
+            });
+
+            document.getElementById('checkoutOrderReviewToggle')?.addEventListener('click', function() {
+                const review = this.closest('.checkout-order-review');
+                const expanded = this.getAttribute('aria-expanded') === 'true';
+                this.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                review?.classList.toggle('is-open', !expanded);
             });
 
             document.getElementById('checkoutApplyVoucher')?.addEventListener('click', async function() {

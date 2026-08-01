@@ -223,6 +223,7 @@
                         data-stock="{{ $packageStock }}"
                         data-package-checkout-enabled="{{ $packageCheckoutAvailable ? 'true' : 'false' }}"
                         aria-disabled="{{ $packageCheckoutAvailable ? 'false' : 'true' }}"
+                        role="button" tabindex="{{ $packageCheckoutAvailable ? '0' : '-1' }}"
                         class="package-card package relative p-4 transition {{ $packageCheckoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
                         @if ($badgeIdr || $badgeUsd)
                             <div class="badge {{ $badgeIdr ? '' : 'hidden' }}" data-currency-visibility
@@ -306,13 +307,13 @@
             </div>
         </section>
 
-        <section id="summaryBox" class="product-summary-card hidden fade-up">
-            <div class="mb-4">
+        <section id="summaryBox" class="product-summary-card product-summary-sticky hidden fade-up">
+            <div class="product-summary-heading mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 2</p>
-                <h2 class="mt-1 text-xl font-semibold text-white">Package summary</h2>
+                <h2 class="mt-1 text-xl font-semibold text-white">Ready to checkout</h2>
             </div>
 
-            <div class="summary-row mb-2">
+            <div class="summary-row summary-product-row mb-2">
                 <span>Product</span>
                 <span>{{ $product->name }}</span>
             </div>
@@ -338,7 +339,7 @@
                 <span id="selectedSubtotal">-</span>
             </div>
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <div class="product-summary-actions mt-5 grid grid-cols-2 gap-2 sm:gap-3">
                 <button id="addToCartBtn" type="button"
                     class="btn-footer-secondary min-h-12 w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
                     @disabled(! $checkoutAvailable)>
@@ -349,11 +350,11 @@
                     class="btn-main w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
                     @disabled(! $checkoutAvailable)>
                     <x-ui.icon name="arrow-right" class="h-4 w-4" />
-                    <span data-button-label>{{ $checkoutAvailable ? 'Buy Now' : 'Unavailable' }}</span>
+                    <span data-button-label>{{ $checkoutAvailable ? 'Continue to Checkout' : 'Unavailable' }}</span>
                 </button>
             </div>
-            <p class="mt-3 text-xs text-gray-500">
-                Buy Now opens a focused checkout page. Add to Cart lets you combine packages first.
+            <p class="product-summary-helper mt-3 text-xs text-gray-500">
+                Continue to Checkout opens payment options. Add to Cart lets you combine packages first.
             </p>
         </section>
     </div>
@@ -458,7 +459,7 @@
                 if (!addRequestPending) {
                     buttonLabel(addButton, available ? 'Add to Cart' : 'Unavailable');
                 }
-                buttonLabel(buyButton, available ? 'Buy Now' : 'Unavailable');
+                buttonLabel(buyButton, available ? 'Continue to Checkout' : 'Unavailable');
             }
 
             function choosePackage(card) {
@@ -648,6 +649,11 @@
             document.querySelectorAll('[data-package-card]').forEach(card => {
                 card.addEventListener('click', event => {
                     if (event.target.closest('[data-manual-order]')) return;
+                    choosePackage(card);
+                }, { signal: pageController.signal });
+                card.addEventListener('keydown', event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
                     choosePackage(card);
                 }, { signal: pageController.signal });
             });

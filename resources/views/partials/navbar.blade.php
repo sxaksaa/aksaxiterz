@@ -5,7 +5,7 @@
         class="site-navbar-pill mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
-        <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home">
+        <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
             <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
                 class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
                 width="612" height="195" draggable="false">
@@ -13,28 +13,29 @@
 
         <!-- MENU DESKTOP -->
         <div id="navMenu" class="relative hidden justify-self-center whitespace-nowrap text-sm xl:flex">
+            <span class="nav-active-glider" data-nav-glider aria-hidden="true"></span>
 
-            <a href="/" class="nav-item {{ request()->is('/') ? 'active' : '' }}">
+            <a href="/" data-soft-nav class="nav-item {{ request()->is('/') ? 'active' : '' }}">
                 <x-ui.icon name="box" class="nav-icon" />
                 <span>Products</span>
             </a>
 
-            <a href="{{ route('guides.index') }}" class="nav-item {{ request()->is('guides*') ? 'active' : '' }}">
+            <a href="{{ route('guides.index') }}" data-soft-nav class="nav-item {{ request()->is('guides*') ? 'active' : '' }}">
                 <x-ui.icon name="book-open" class="nav-icon" />
                 <span>Guides</span>
             </a>
 
-            <a href="/downloads" class="nav-item {{ request()->is('downloads*') ? 'active' : '' }}">
+            <a href="/downloads" data-soft-nav class="nav-item {{ request()->is('downloads*') ? 'active' : '' }}">
                 <x-ui.icon name="download" class="nav-icon" />
                 <span>Downloads</span>
             </a>
 
             @auth
-                <a href="/orders" class="nav-item {{ request()->is('orders*') ? 'active' : '' }}">
+                <a href="/orders" data-soft-nav class="nav-item {{ request()->is('orders*') ? 'active' : '' }}">
                     <x-ui.icon name="receipt" class="nav-icon" />
                     <span>Orders</span>
                 </a>
-                <a href="/licenses" class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
+                <a href="/licenses" data-soft-nav class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
                     <x-ui.icon name="key-round" class="nav-icon" />
                     <span>Licenses</span>
                 </a>
@@ -198,15 +199,15 @@
             @include('partials.currency-switcher')
         @endif
 
-        <a href="/" data-mobile-menu-link class="nav-item">
+        <a href="/" data-mobile-menu-link data-soft-nav class="nav-item">
             <x-ui.icon name="box" class="nav-icon" />
             <span>Products</span>
         </a>
-        <a href="{{ route('guides.index') }}" data-mobile-menu-link class="nav-item">
+        <a href="{{ route('guides.index') }}" data-mobile-menu-link data-soft-nav class="nav-item">
             <x-ui.icon name="book-open" class="nav-icon" />
             <span>Guides</span>
         </a>
-        <a href="/downloads" data-mobile-menu-link class="nav-item">
+        <a href="/downloads" data-mobile-menu-link data-soft-nav class="nav-item">
             <x-ui.icon name="download" class="nav-icon" />
             <span>Downloads</span>
         </a>
@@ -216,11 +217,11 @@
                 <x-ui.icon name="shopping-cart" class="nav-icon" />
                 <span>Cart{{ $cartCount > 0 ? ' (' . $cartCount . ')' : '' }}</span>
             </a>
-            <a href="/orders" data-mobile-menu-link class="nav-item">
+            <a href="/orders" data-mobile-menu-link data-soft-nav class="nav-item">
                 <x-ui.icon name="receipt" class="nav-icon" />
                 <span>Orders</span>
             </a>
-            <a href="/licenses" data-mobile-menu-link class="nav-item">
+            <a href="/licenses" data-mobile-menu-link data-soft-nav class="nav-item">
                 <x-ui.icon name="key-round" class="nav-icon" />
                 <span>Licenses</span>
             </a>

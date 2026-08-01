@@ -38,6 +38,32 @@
         let orderStatusPolling = false;
         const ordersPageController = new AbortController();
         const ordersPageTimers = [];
+        let activeOrderFilter = 'active';
+
+        function applyOrderFilter(filter = activeOrderFilter) {
+            activeOrderFilter = filter;
+            let visibleCount = 0;
+            document.querySelectorAll('[data-order-entry]').forEach(entry => {
+                const status = entry.dataset.orderStatus;
+                const visible = filter === 'all' ||
+                    (filter === 'active' && status === 'pending') ||
+                    (filter === 'previous' && status !== 'pending') ||
+                    status === filter;
+                entry.classList.toggle('hidden', !visible);
+                if (visible) visibleCount += 1;
+            });
+            document.querySelector('[data-order-filter-empty]')?.classList.toggle('hidden', visibleCount > 0);
+            document.querySelectorAll('[data-order-filter]').forEach(button => {
+                button.classList.toggle('active', button.dataset.orderFilter === filter);
+                button.setAttribute('aria-pressed', button.dataset.orderFilter === filter ? 'true' : 'false');
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-order-filter]');
+            if (!button || !document.getElementById('ordersContent')?.contains(button)) return;
+            applyOrderFilter(button.dataset.orderFilter || 'active');
+        }, { signal: ordersPageController.signal });
 
         function trackOrdersInterval(callback, delay) {
             const timer = setInterval(callback, delay);
@@ -119,12 +145,15 @@
                 if (ordersContent) {
                     ordersContent.innerHTML = await response.text();
                 }
+                applyOrderFilter();
                 updateCountdowns();
             } finally {
                 ordersRefreshing = false;
                 ordersContent?.classList.remove('content-is-refreshing');
             }
         }
+
+        applyOrderFilter();
 
         async function syncCryptoOrder(orderId) {
             if (!orderId) return null;

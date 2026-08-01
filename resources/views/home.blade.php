@@ -1,20 +1,17 @@
 @extends('layouts.app')
 
 @section('content')
-    <section class="page-shell pb-12 pt-12 md:pb-16 md:pt-20">
-        <div class="home-hero fade-up">
+    <section class="page-shell pb-7 pt-7 md:pb-10 md:pt-11">
+        <div class="home-hero home-hero-compact fade-up">
             <h1 class="hero-title">
-                Premium tools with <span class="hero-accent">instant license</span> access.
+                <span class="block">Sharpen your aim.</span>
+                <span class="hero-accent block">Elevate your gameplay.</span>
             </h1>
-            <p class="hero-copy">
-                Browse trusted digital tools, pay securely, and get quick access to license keys, setup guides, and
-                customer support.
-            </p>
 
             <div class="hero-actions">
                 <a href="#products" class="btn-main px-5 py-3">
                     <x-ui.icon name="boxes" class="h-4 w-4" />
-                    <span>Browse Products</span>
+                    <span>Explore Products</span>
                 </a>
             </div>
 
@@ -50,7 +47,6 @@
         <div class="home-toolbar fade-up">
             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Products</p>
                     <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
                     <p class="mt-1 text-sm text-gray-400">Search by product name or filter by category.</p>
                 </div>
@@ -61,7 +57,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex flex-wrap gap-2 md:gap-3">
+            <div class="category-filter-row mt-4 flex gap-2 md:gap-3" aria-label="Product categories">
                 <a href="#" data-category-filter data-category=""
                     class="category-chip {{ !$active ? 'active' : '' }}">
                     <x-ui.icon name="boxes" class="h-4 w-4" />
@@ -77,21 +73,14 @@
                 @endforeach
             </div>
         </div>
-    </section>
-
-    <div class="page-shell pb-16 md:pb-20">
-        <div class="mb-5 flex flex-col gap-2 text-center md:text-left">
-            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Storefront</p>
-            <h2 class="text-2xl font-semibold text-white">Available products</h2>
-        </div>
 
         <div id="productContainer"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 transition-opacity duration-200">
+            class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 transition-opacity duration-200">
 
             @include('partials.product-card', ['products' => $products])
 
         </div>
-    </div>
+    </section>
 
     @include('partials.recent-purchase-toast', [
         'recentPurchases' => $recentPurchases ?? collect(),

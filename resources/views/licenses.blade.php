@@ -5,11 +5,6 @@
         $licenseCount = $licenses->count();
         $latestLicense = $licenses->first();
         $licenseResetStates = $licenseResetStates ?? [];
-        $orderStats = $orderStats ?? [
-            'total' => 0,
-            'paid' => 0,
-            'pending' => 0,
-        ];
         $selectedOrderId = request()->query('order');
         $selectedOrderId = is_string($selectedOrderId) ? trim($selectedOrderId) : '';
         $formatDuration = static fn ($duration) => str_replace(
@@ -17,30 +12,37 @@
             ['1 Day', '7 Days', '30 Days', 'Days'],
             (string) $duration,
         );
-        $licenseGroups = $licenses->groupBy(static function ($license) {
-            $orderId = trim((string) $license->order_id);
-
-            return $orderId !== '' ? 'order:' . $orderId : 'license:' . $license->id;
-        });
+        $licenseGroups = $licenses->groupBy(static fn ($license) =>
+            'product:' . ($license->product_id ?: 'unknown-' . $license->id)
+        );
+        $licenseProducts = $licenseGroups->map(static fn ($group) => [
+            'id' => (string) ($group->first()->product_id ?: 'unknown'),
+            'name' => (string) ($group->first()->product->name ?? 'Product'),
+        ])->sortBy('name')->values();
+        $renderedOrderAnchors = [];
         $licenseSummaryStats = [
-            ['value' => $licenseCount, 'label' => 'Active'],
-            ['value' => $orderStats['paid'] ?? 0, 'label' => 'Paid orders'],
-            ['value' => $orderStats['pending'] ?? 0, 'label' => 'Pending'],
+            ['value' => $licenseCount, 'label' => 'Licenses'],
             ['value' => $latestLicense?->created_at?->format('d M') ?? '-', 'label' => 'Latest'],
         ];
     @endphp
 
     <div class="page-shell public-account-page py-7 md:py-12">
 
-        <section class="license-hero account-hero mb-8 fade-up">
+        <section class="license-hero account-hero mb-5 fade-up">
             <div class="account-hero-layout">
                 <div class="account-hero-copy">
                     <p class="account-eyebrow">License Vault</p>
                     <h1 class="account-title">My Licenses</h1>
-                    <p class="account-copy">
-                        Your paid license keys are stored here. Copy the key you need and download the matching tools
-                        when you are ready to set up.
-                    </p>
+                    <p class="account-copy">Manage and copy your purchased license keys.</p>
+                </div>
+
+                <div class="license-summary-strip" aria-label="License summary">
+                    @foreach ($licenseSummaryStats as $summaryStat)
+                        <div class="license-summary-stat">
+                            <strong>{{ $summaryStat['value'] }}</strong>
+                            <span>{{ $summaryStat['label'] }}</span>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </section>
@@ -59,34 +61,30 @@
             </div>
         @endif
 
-        <div class="license-section-header fade-up">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Keys</p>
-                <h2 class="mt-1 text-2xl font-semibold text-white">Available licenses</h2>
+        @if ($licenses->isNotEmpty())
+            <div class="license-toolbar fade-up">
+                <input id="licenseSearch" type="search" class="search-bar" placeholder="Search product or order..."
+                    autocomplete="off">
+                <select id="licenseProductFilter" class="search-bar" aria-label="Filter licenses by product">
+                    <option value="">All products</option>
+                    @foreach ($licenseProducts as $licenseProduct)
+                        <option value="{{ $licenseProduct['id'] }}">{{ $licenseProduct['name'] }}</option>
+                    @endforeach
+                </select>
             </div>
+        @endif
 
-            <div class="license-summary-strip" aria-label="License summary">
-                @foreach ($licenseSummaryStats as $summaryStat)
-                    <div class="license-summary-stat">
-                        <strong>{{ $summaryStat['value'] }}</strong>
-                        <span>{{ $summaryStat['label'] }}</span>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-
-        <div class="grid gap-4 md:gap-6">
+        <div id="licenseGroups" class="grid gap-4 md:gap-6">
 
             @forelse($licenseGroups as $orderLicenses)
                 @php
                     $firstLicense = $orderLicenses->first();
-                    $licenseOrderId = trim((string) $firstLicense->order_id);
-                    $licenseAnchor = $licenseOrderId !== ''
-                        ? 'license-' . $licenseOrderId
-                        : 'license-' . $firstLicense->id;
-                    $isSelectedOrder = $selectedOrderId !== ''
-                        && $licenseOrderId !== ''
-                        && hash_equals($selectedOrderId, $licenseOrderId);
+                    $productId = (string) ($firstLicense->product_id ?: 'unknown');
+                    $productName = (string) ($firstLicense->product->name ?? 'Product');
+                    $licenseAnchor = 'license-product-' . $productId;
+                    $isSelectedOrder = $selectedOrderId !== '' && $orderLicenses->contains(
+                        fn ($license) => hash_equals($selectedOrderId, trim((string) $license->order_id))
+                    );
                     $copyAllValue = $orderLicenses->map(static function ($license) use ($formatDuration) {
                         $productName = trim((string) ($license->product->name ?? 'Product'));
 
@@ -96,7 +94,8 @@
                     })->implode("\n");
                 @endphp
 
-                <div id="{{ $licenseAnchor }}" data-license-order="{{ $licenseOrderId }}"
+                <div id="{{ $licenseAnchor }}" data-license-group data-license-product="{{ $productId }}"
+                    data-license-search="{{ Str::lower($productName.' '.$orderLicenses->pluck('order_id')->implode(' ')) }}"
                     class="license-card motion-card scroll-mt-28 p-4 md:p-6 {{ $isSelectedOrder ? 'license-card-selected' : '' }}">
 
                     <!-- TOP -->
@@ -104,7 +103,7 @@
 
                         <div>
                             <h2 class="flex flex-wrap items-center gap-2 text-base font-semibold sm:text-lg">
-                                {{ $orderLicenses->count() }} {{ Str::plural('license', $orderLicenses->count()) }} in this order
+                                {{ $productName }}
 
                                 @if ($loop->first)
                                     <span class="text-[10px] sm:text-xs bg-aksa-accent-20 text-aksa-accent px-2 py-1 rounded">
@@ -119,27 +118,19 @@
                                 @endif
                             </h2>
 
-                            @if ($licenseOrderId !== '')
-                                <p class="mt-1 font-mono text-[10px] sm:text-xs text-gray-500">
-                                    Order: {{ $licenseOrderId }}
-                                </p>
-                            @endif
-
                             <p class="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                Purchased: {{ $firstLicense->created_at->format('d M Y, H:i') }}
+                                {{ $orderLicenses->count() }} {{ Str::plural('license', $orderLicenses->count()) }} · latest purchase {{ $firstLicense->created_at->format('d M Y, H:i') }}
                             </p>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="status-pill status-pill-paid">Active</span>
-
                             @if ($orderLicenses->count() > 1)
                                 <button type="button" data-copy-value="{{ $copyAllValue }}"
-                                    data-copy-title="Order licenses copied"
-                                    data-copy-message="All keys and durations are ready to paste."
+                                    data-copy-title="Product licenses copied"
+                                    data-copy-message="All licenses and durations for this product are ready to paste."
                                     class="order-action btn-press">
                                     <x-ui.icon name="copy" class="h-4 w-4" />
-                                    <span data-button-label>Copy All</span>
+                                    <span data-button-label>Copy {{ $orderLicenses->count() }} Keys</span>
                                 </button>
                             @endif
                         </div>
@@ -173,9 +164,18 @@
                                 $resetWaitLabel = $resetHours > 0
                                     ? $resetHours . 'h' . ($resetMinuteRemainder > 0 ? ' ' . $resetMinuteRemainder . 'm' : '')
                                     : $resetMinuteRemainder . 'm';
+                                $rawLicenseKey = (string) $license->license_key;
+                                $maskedLicenseKey = strlen($rawLicenseKey) > 8
+                                    ? substr($rawLicenseKey, 0, 4) . str_repeat('•', strlen($rawLicenseKey) - 8) . substr($rawLicenseKey, -4)
+                                    : str_repeat('•', max(4, strlen($rawLicenseKey)));
                             @endphp
-                            <div class="license-key-box flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="license-key-box flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between {{ $orderLicenses->count() > 3 && ! $isSelectedOrder && $loop->iteration > 3 ? 'hidden' : '' }}"
+                                @if ($orderLicenses->count() > 3 && ! $isSelectedOrder && $loop->iteration > 3) data-license-extra @endif>
                                 <div class="min-w-0">
+                                    @if (filled($license->order_id) && ! isset($renderedOrderAnchors[$license->order_id]))
+                                        @php($renderedOrderAnchors[$license->order_id] = true)
+                                        <span id="license-{{ $license->order_id }}" class="block h-0 scroll-mt-28" aria-hidden="true"></span>
+                                    @endif
                                     <div class="mb-2 flex flex-wrap items-center gap-2">
                                         <span class="text-sm font-semibold text-white">
                                             {{ $license->product->name ?? 'Product' }}
@@ -185,9 +185,11 @@
                                         </span>
                                     </div>
                                     <span id="key-{{ $license->id }}"
+                                        data-license-key-value="{{ $license->license_key }}" data-license-masked="true"
                                         class="break-all font-mono text-xs text-gray-300 sm:text-sm">
-                                        {{ $license->license_key }}
+                                        {{ $maskedLicenseKey }}
                                     </span>
+                                    <p class="mt-1 font-mono text-[10px] text-gray-500">Order: {{ $license->order_id }}</p>
 
                                     @if ($resetState['supported'] && $resetIdentifier)
                                         <p class="mt-2 text-[11px] text-gray-500">
@@ -197,6 +199,11 @@
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-end gap-2 self-end shrink-0 sm:self-auto">
+                                    <button type="button" data-reveal-license="{{ $license->id }}" class="order-action btn-press"
+                                        aria-controls="key-{{ $license->id }}" aria-pressed="false">
+                                        <x-ui.icon name="eye" class="h-4 w-4" />
+                                        <span data-button-label>Reveal</span>
+                                    </button>
                                     @if ($resetState['supported'])
                                         @if ($resetState['can_reset'])
                                             <form method="POST" action="{{ route('licenses.reset-hwid', $license) }}"
@@ -240,6 +247,15 @@
                             </div>
                         @endforeach
                     </div>
+
+                    @if ($orderLicenses->count() > 3 && ! $isSelectedOrder)
+                        <button type="button" class="license-show-all btn-press" data-license-show-all
+                            data-collapsed-label="Show {{ $orderLicenses->count() - 3 }} more"
+                            aria-expanded="false">
+                            <span data-button-label>Show {{ $orderLicenses->count() - 3 }} more</span>
+                            <x-ui.icon name="chevron-down" class="h-4 w-4 transition-transform" data-show-all-chevron />
+                        </button>
+                    @endif
 
                 </div>
 

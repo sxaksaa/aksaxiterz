@@ -10,14 +10,15 @@
         <span class="sr-only">Display prices</span>
     @endif
 
-    <span class="inline-flex rounded-full bg-black/25 p-0.5" role="group" aria-label="Display currency">
+    <span class="currency-toggle-track" role="group" aria-label="Display currency">
+        <span class="currency-active-glider" aria-hidden="true"></span>
         <button type="button" data-currency-option="idr" aria-pressed="true"
-            class="rounded-full bg-aksa-accent px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm transition"
+            class="currency-toggle-option"
             title="Show catalog prices in Indonesian rupiah">
             IDR
         </button>
         <button type="button" data-currency-option="usd" aria-pressed="false"
-            class="rounded-full px-2.5 py-1.5 text-[11px] font-bold text-gray-400 transition hover:text-white"
+            class="currency-toggle-option"
             title="Show catalog prices in US dollars">
             USD
         </button>

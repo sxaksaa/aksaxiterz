@@ -63,8 +63,8 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertSee('Aurora')
             ->assertSee('Drip')
             ->assertSee('Custom Bundle')
-            ->assertSee('Decrease Aurora quantity')
-            ->assertSee('Increase Aurora quantity')
+            ->assertSee('Decrease Aurora 30 Days quantity')
+            ->assertSee('Increase Aurora 30 Days quantity')
             ->assertSee('Continue to Checkout')
             ->assertDontSee('name="payment_method"', false)
             ->assertDontSee('id="checkoutVoucherCode"', false)
@@ -173,11 +173,12 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('Aurora')
             ->assertSee('Drip')
-            ->assertSee('3 licenses in this order')
-            ->assertSee('Copy All');
+            ->assertSee('2 licenses · latest purchase')
+            ->assertSee('1 license · latest purchase')
+            ->assertSee('Copy 2 Keys');
 
         $licenseHtml = $licenseResponse->getContent();
-        $this->assertSame(1, substr_count($licenseHtml, 'data-license-order="'.$order->order_id.'"'));
+        $this->assertSame(1, substr_count($licenseHtml, 'id="license-'.$order->order_id.'"'));
         $this->assertSame(3, substr_count($licenseHtml, 'data-copy-license='));
 
         config(['admin.emails' => [$user->email]]);

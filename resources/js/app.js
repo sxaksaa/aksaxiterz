@@ -354,9 +354,7 @@ function refreshDisplayCurrency(root = document) {
         const selected = button.dataset.currencyOption === currency;
 
         button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-        button.classList.toggle('bg-aksa-accent', selected);
         button.classList.toggle('text-white', selected);
-        button.classList.toggle('shadow-sm', selected);
         button.classList.toggle('text-gray-400', !selected);
     });
 
@@ -1305,7 +1303,7 @@ window.showAppToast = function(title, message = '', options = {}) {
 };
 
 const RECENT_PURCHASE_SNOOZE_KEY = 'aksa_recent_purchase_snoozed_until';
-const RECENT_PURCHASE_VISIBLE_MS = 8200;
+const RECENT_PURCHASE_VISIBLE_MS = window.matchMedia('(max-width: 639px)').matches ? 5200 : 8200;
 const RECENT_PURCHASE_GAP_MS = 14500;
 const RECENT_PURCHASE_INITIAL_DELAY_MS = 1800;
 const RECENT_PURCHASE_NEW_DELAY_MS = 350;
@@ -1874,7 +1872,7 @@ function enhanceCustomSelect(select) {
     const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const chevronPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     const panel = document.createElement('div');
-    const section = select.closest('.product-section');
+    const section = select.closest('.product-section, .license-toolbar');
     const overflowSurface = select.closest('.license-card, .order-mobile-card');
 
     select.dataset.aksaSelectEnhanced = 'true';
@@ -2041,6 +2039,61 @@ function pageContentShell() {
     return document.querySelector('[data-aksa-page-content]');
 }
 
+function updateNavGlider(previewLink = null) {
+    const menu = document.getElementById('navMenu');
+    const glider = menu?.querySelector('[data-nav-glider]');
+    const activeLink = previewLink?.closest('#navMenu') === menu
+        ? previewLink
+        : menu?.querySelector('.nav-item.active');
+
+    if (!menu || !glider || !activeLink) {
+        glider?.classList.remove('is-visible');
+        return;
+    }
+
+    const firstPosition = glider.dataset.ready !== 'true';
+
+    if (firstPosition) glider.style.transition = 'none';
+    glider.style.width = `${activeLink.offsetWidth}px`;
+    glider.style.transform = `translate3d(${activeLink.offsetLeft}px, 0, 0)`;
+    glider.classList.add('is-visible');
+
+    if (firstPosition) {
+        glider.dataset.ready = 'true';
+        glider.getBoundingClientRect();
+        requestAnimationFrame(() => glider.style.removeProperty('transition'));
+    }
+}
+
+function navItemFromEvent(event) {
+    return event.target instanceof Element ? event.target.closest('#navMenu .nav-item') : null;
+}
+
+function syncPersistentNavigation(nextDocument) {
+    const currentMenu = document.getElementById('navMenu');
+    const nextMenu = nextDocument.getElementById('navMenu');
+
+    if (currentMenu && nextMenu) {
+        const nextLinks = Array.from(nextMenu.querySelectorAll('.nav-item'));
+
+        currentMenu.querySelectorAll('.nav-item').forEach((link, index) => {
+            const active = nextLinks[index]?.classList.contains('active') === true;
+            link.classList.toggle('active', active);
+            active ? link.setAttribute('aria-current', 'page') : link.removeAttribute('aria-current');
+        });
+    }
+
+    const currentActions = document.querySelector('[data-navbar-actions]');
+    const nextActions = nextDocument.querySelector('[data-navbar-actions]');
+
+    if (currentActions && nextActions) currentActions.replaceWith(nextActions);
+
+    const currentMobileMenu = document.getElementById('mobileMenu');
+    const nextMobileMenu = nextDocument.getElementById('mobileMenu');
+
+    if (currentMobileMenu && nextMobileMenu) currentMobileMenu.replaceWith(nextMobileMenu);
+}
+
 function samePageHashNavigation(url) {
     return url.origin === window.location.origin
         && url.pathname === window.location.pathname
@@ -2050,9 +2103,11 @@ function samePageHashNavigation(url) {
 }
 
 function linkAllowsSafeSoftNavigation(link, url) {
-    return link.dataset.dashboardRangeLink !== undefined
+    return link.dataset.softNav !== undefined || (
+        link.dataset.dashboardRangeLink !== undefined
         && window.location.pathname === '/admin'
-        && url.pathname === '/admin';
+        && url.pathname === '/admin'
+    );
 }
 
 function shouldSoftNavigateLink(link, event) {
@@ -2440,7 +2495,7 @@ async function softNavigate(url, options = {}) {
             return;
         }
 
-        replaceOptionalShell('[data-aksa-nav-shell]', nextDocument);
+        syncPersistentNavigation(nextDocument);
         replaceOptionalShell('[data-aksa-footer-shell]', nextDocument);
         currentContent.replaceWith(nextContent);
         updateDocumentMeta(nextDocument);
@@ -2462,13 +2517,15 @@ async function softNavigate(url, options = {}) {
         initializeDisplayCurrency(document);
         initializeCustomSelects(nextContent);
         initializeRecentPurchaseToast(nextContent);
+        initializeDownloadAccordions(nextContent);
         closeMobileMenu();
         closeProfileDropdown();
         scrollAfterSoftNavigation(nextUrl);
 
         requestAnimationFrame(() => {
+            updateNavGlider();
             nextContent.classList.add('aksa-soft-nav-entered');
-            window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 260);
+            window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 380);
         });
     } catch (error) {
         if (error.name === 'AbortError') return;
@@ -2622,6 +2679,7 @@ function initializeGlobalPageEnhancements(root = document) {
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
+    updateNavGlider();
 }
 
 if (document.readyState === 'loading') {
@@ -2684,6 +2742,8 @@ window.addEventListener('resize', () => {
     if (window.innerWidth >= 1280 && mobileMenuOpen) {
         closeMobileMenu();
     }
+
+    updateNavGlider();
 }, { passive: true });
 
 window.addEventListener('scroll', updateNavbarOnScroll, { passive: true });
@@ -2717,6 +2777,10 @@ window.addEventListener('popstate', (event) => {
 });
 
 document.addEventListener('pointerover', (event) => {
+    const navItem = navItemFromEvent(event);
+
+    if (navItem) updateNavGlider(navItem);
+
     const point = dashboardChartPointFromEvent(event);
 
     if (point) {
@@ -2733,6 +2797,13 @@ document.addEventListener('pointermove', (event) => {
 });
 
 document.addEventListener('pointerout', (event) => {
+    const navItem = navItemFromEvent(event);
+    const nextNavItem = event.relatedTarget instanceof Element
+        ? event.relatedTarget.closest('#navMenu .nav-item')
+        : null;
+
+    if (navItem && nextNavItem !== navItem) updateNavGlider();
+
     const point = dashboardChartPointFromEvent(event);
 
     if (!point) return;
@@ -2747,6 +2818,10 @@ document.addEventListener('pointerout', (event) => {
 });
 
 document.addEventListener('focusin', (event) => {
+    const navItem = navItemFromEvent(event);
+
+    if (navItem) updateNavGlider(navItem);
+
     const point = dashboardChartPointFromEvent(event);
 
     if (point) {
@@ -2755,6 +2830,10 @@ document.addEventListener('focusin', (event) => {
 });
 
 document.addEventListener('focusout', (event) => {
+    const navItem = navItemFromEvent(event);
+
+    if (navItem) updateNavGlider();
+
     const point = dashboardChartPointFromEvent(event);
 
     if (point) {
@@ -2916,6 +2995,56 @@ document.addEventListener('click', async (event) => {
     }
 });
 
+function filterLicenseGroups() {
+    const search = String(document.getElementById('licenseSearch')?.value || '').trim().toLowerCase();
+    const product = String(document.getElementById('licenseProductFilter')?.value || '');
+
+    document.querySelectorAll('[data-license-group]').forEach(group => {
+        const matchesSearch = !search || String(group.dataset.licenseSearch || '').includes(search);
+        const matchesProduct = !product || group.dataset.licenseProduct === product;
+        group.classList.toggle('hidden', !matchesSearch || !matchesProduct);
+    });
+}
+
+document.addEventListener('input', (event) => {
+    if (event.target.matches('#licenseSearch')) filterLicenseGroups();
+
+    if (event.target.matches('#downloadSearch')) {
+        const search = String(event.target.value || '').trim().toLowerCase();
+        document.querySelectorAll('[data-download-search]').forEach(card => {
+            card.classList.toggle('hidden', search && !String(card.dataset.downloadSearch || '').includes(search));
+        });
+    }
+});
+
+document.addEventListener('change', (event) => {
+    if (event.target.matches('#licenseProductFilter')) filterLicenseGroups();
+});
+
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-order-filter]');
+    const root = button?.closest('#ordersContent');
+    if (!button || !root) return;
+
+    const filter = button.dataset.orderFilter || 'active';
+    let visibleCount = 0;
+    root.querySelectorAll('[data-order-entry]').forEach(entry => {
+        const status = entry.dataset.orderStatus;
+        const visible = filter === 'all' ||
+            (filter === 'active' && status === 'pending') ||
+            (filter === 'previous' && status !== 'pending') ||
+            status === filter;
+        entry.classList.toggle('hidden', !visible);
+        if (visible) visibleCount += 1;
+    });
+    root.querySelector('[data-order-filter-empty]')?.classList.toggle('hidden', visibleCount > 0);
+    root.querySelectorAll('[data-order-filter]').forEach(option => {
+        const selected = option === button;
+        option.classList.toggle('active', selected);
+        option.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+});
+
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         void qrisState.pollNow?.();
@@ -3016,12 +3145,45 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('click', async (event) => {
+    const revealButton = event.target.closest('[data-reveal-license]');
+
+    if (revealButton) {
+        const key = document.getElementById(`key-${revealButton.dataset.revealLicense}`);
+        const fullValue = key?.dataset.licenseKeyValue || '';
+        const masked = key?.dataset.licenseMasked === 'true';
+
+        if (key && fullValue) {
+            clearTimeout(revealButton._licenseHideTimeout);
+            key.textContent = masked
+                ? fullValue
+                : (fullValue.length > 8
+                    ? `${fullValue.slice(0, 4)}${'•'.repeat(fullValue.length - 8)}${fullValue.slice(-4)}`
+                    : '•'.repeat(Math.max(4, fullValue.length)));
+            key.dataset.licenseMasked = masked ? 'false' : 'true';
+            revealButton.setAttribute('aria-pressed', masked ? 'true' : 'false');
+            setButtonLabel(revealButton, masked ? 'Hide' : 'Reveal');
+
+            if (masked) {
+                revealButton._licenseHideTimeout = setTimeout(() => {
+                    const latestValue = key.dataset.licenseKeyValue || '';
+                    key.textContent = latestValue.length > 8
+                        ? `${latestValue.slice(0, 4)}${'•'.repeat(latestValue.length - 8)}${latestValue.slice(-4)}`
+                        : '•'.repeat(Math.max(4, latestValue.length));
+                    key.dataset.licenseMasked = 'true';
+                    revealButton.setAttribute('aria-pressed', 'false');
+                    setButtonLabel(revealButton, 'Reveal');
+                }, 30000);
+            }
+        }
+        return;
+    }
+
     const button = event.target.closest('[data-copy-license]');
 
     if (!button) return;
 
     const key = document.getElementById(`key-${button.dataset.copyLicense}`);
-    const text = key?.innerText?.trim();
+    const text = key?.dataset.licenseKeyValue?.trim();
 
     if (!text) return;
 
@@ -3029,7 +3191,7 @@ document.addEventListener('click', async (event) => {
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, 'Copied!');
+        setButtonLabel(button, 'Copied ✓');
         button.classList.add('text-green-400');
         window.showAppToast?.('License copied', 'The license key is ready to paste.', {
             variant: 'success',
@@ -3042,7 +3204,7 @@ document.addEventListener('click', async (event) => {
         setTimeout(() => {
             setButtonLabel(button, originalText || 'Copy');
             button.classList.remove('text-green-400');
-        }, 1200);
+        }, 1800);
     }
 });
 
@@ -3059,7 +3221,7 @@ document.addEventListener('click', async (event) => {
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, 'Copied!');
+        setButtonLabel(button, 'Copied ✓');
         button.classList.add('text-green-400');
         window.showAppToast?.(
             button.dataset.copyTitle || 'Copied',
@@ -3075,6 +3237,19 @@ document.addEventListener('click', async (event) => {
         setTimeout(() => {
             setButtonLabel(button, originalText || 'Copy');
             button.classList.remove('text-green-400');
-        }, 1200);
+        }, 1800);
     }
+});
+
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-license-show-all]');
+    const group = button?.closest('[data-license-group]');
+
+    if (!button || !group) return;
+
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    group.querySelectorAll('[data-license-extra]').forEach(row => row.classList.toggle('hidden', expanded));
+    button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    setButtonLabel(button, expanded ? button.dataset.collapsedLabel : 'Show less');
+    button.querySelector('[data-show-all-chevron]')?.classList.toggle('rotate-180', !expanded);
 });

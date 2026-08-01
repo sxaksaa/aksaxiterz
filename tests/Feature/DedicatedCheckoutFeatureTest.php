@@ -64,7 +64,7 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('Buy Now Target')
             ->assertSee($package->name)
-            ->assertSee('2 keys')
+            ->assertSee('2 licenses')
             ->assertSee('Rp 40.000')
             ->assertSee('data-price-usd="2.5"', false)
             ->assertSee('platform fee + unique amount')
@@ -443,7 +443,7 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertDontSee('href="'.route('checkout.cart').'"', false);
 
         $this->assertMatchesRegularExpression(
-            '/name="quantity"\s+value="1"[^>]*aria-label="Decrease Low Stock Cart quantity"(?![^>]*disabled)/s',
+            '/name="quantity"\s+value="1"[^>]*aria-label="Decrease Low Stock Cart 30 Days quantity"(?![^>]*disabled)/s',
             $cart->getContent()
         );
 

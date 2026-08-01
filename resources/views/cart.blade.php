@@ -12,10 +12,11 @@
                     </p>
                 </div>
                 @if ($cartItems->isNotEmpty())
-                    <form method="POST" action="{{ route('cart.clear') }}">
+                    <form method="POST" action="{{ route('cart.clear') }}"
+                        data-confirm="Clear every item from your cart?">
                         @csrf
                         @method('DELETE')
-                        <button class="btn-footer-secondary" type="submit">
+                        <button class="cart-clear-button" type="submit">
                             <x-ui.icon name="trash-2" class="h-4 w-4" />
                             <span>Clear Cart</span>
                         </button>
@@ -58,84 +59,91 @@
         @else
             <div class="grid gap-6 lg:grid-cols-[1.35fr_0.65fr] lg:items-start">
                 <section class="grid gap-4">
-                    @foreach ($cartItems as $item)
+                    @foreach ($cartItems->groupBy('product_id') as $productItems)
                         @php
-                            $otherCartQuantity = $cartItems->sum('quantity') - $item->quantity;
-                            $remainingCartCapacity = max(1, \App\Services\CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity);
-                            $maxItemQuantity = min($item->available_stock, $remainingCartCapacity);
-                            $itemCheckoutAvailable = (bool) $item->is_checkout_available &&
-                                $item->available_stock >= $item->quantity;
-                            $decreaseQuantityTarget = max(
-                                1,
-                                min((int) $item->quantity - 1, (int) $item->available_stock)
+                            $groupProduct = $productItems->first()->product;
+                            $groupNeedsReview = $productItems->contains(fn ($groupItem) =>
+                                ! $groupItem->is_checkout_available || $groupItem->available_stock < $groupItem->quantity
                             );
-                            $canDecreaseQuantity = $item->product?->isReadyForAutomaticCheckout() &&
-                                $item->quantity > 1 &&
-                                $item->available_stock >= 1;
                         @endphp
-                        <article class="panel-card motion-card p-5 {{ $itemCheckoutAvailable ? '' : 'border-amber-400/30' }}"
-                            data-cart-item="{{ $item->id }}"
-                            data-cart-item-checkout-ready="{{ $itemCheckoutAvailable ? 'true' : 'false' }}">
-                            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="min-w-0">
-                                    <p class="text-xs uppercase tracking-normal text-aksa-accent">
-                                        {{ $item->product->category?->name ?? 'Product' }}
-                                    </p>
-                                    <a href="{{ route('products.show', $item->product) }}"
-                                        class="mt-1 block truncate text-lg font-semibold text-white transition hover:text-aksa-accent">
-                                        {{ $item->product->name }}
-                                    </a>
-                                    <p class="mt-1 text-sm text-gray-400">{{ $item->package->name }}</p>
-                                    <p class="mt-2 text-xs {{ $itemCheckoutAvailable ? 'text-aksa-accent' : 'text-amber-200' }}">
-                                        {{ $itemCheckoutAvailable ? $item->available_stock.' keys currently available' : 'This selection needs to be reviewed' }}
-                                    </p>
-                                </div>
+                        <article class="panel-card motion-card overflow-hidden {{ $groupNeedsReview ? 'border-amber-400/30' : '' }}">
+                            <div class="border-b border-white/5 px-5 py-4">
+                                <p class="text-xs uppercase tracking-normal text-aksa-accent">
+                                    {{ $groupProduct->category?->name ?? 'Product' }}
+                                </p>
+                                <a href="{{ route('products.show', $groupProduct) }}"
+                                    class="mt-1 block truncate text-lg font-semibold text-white transition hover:text-aksa-accent">
+                                    {{ $groupProduct->name }}
+                                </a>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    {{ $productItems->count() }} {{ \Illuminate\Support\Str::plural('package', $productItems->count()) }} selected
+                                </p>
+                            </div>
 
-                                <div class="flex flex-wrap items-center gap-3 sm:justify-end">
-                                    <div class="text-right">
-                                        <div class="font-semibold text-white" data-display-price
-                                            data-price-idr="{{ (int) $item->package->price * (int) $item->quantity }}"
-                                            data-price-usd="{{ $item->package->price_usdt !== null && (float) $item->package->price_usdt > 0 ? (float) $item->package->price_usdt * (int) $item->quantity : '' }}">
-                                            Rp {{ number_format($item->package->price * $item->quantity, 0, ',', '.') }}
+                            <div class="divide-y divide-white/5">
+                                @foreach ($productItems as $item)
+                                    @php
+                                        $otherCartQuantity = $cartItems->sum('quantity') - $item->quantity;
+                                        $remainingCartCapacity = max(1, \App\Services\CartService::MAX_TOTAL_QUANTITY - $otherCartQuantity);
+                                        $maxItemQuantity = min($item->available_stock, $remainingCartCapacity);
+                                        $itemCheckoutAvailable = (bool) $item->is_checkout_available &&
+                                            $item->available_stock >= $item->quantity;
+                                        $decreaseQuantityTarget = max(1, min((int) $item->quantity - 1, (int) $item->available_stock));
+                                        $canDecreaseQuantity = $item->product?->isReadyForAutomaticCheckout() &&
+                                            $item->quantity > 1 && $item->available_stock >= 1;
+                                    @endphp
+                                    <div class="cart-package-row px-5 py-4"
+                                        data-cart-item="{{ $item->id }}"
+                                        data-cart-item-checkout-ready="{{ $itemCheckoutAvailable ? 'true' : 'false' }}">
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-white">{{ $item->package->name }}</p>
+                                            <p class="mt-1 text-xs {{ $itemCheckoutAvailable ? 'text-aksa-accent' : 'text-amber-200' }}">
+                                                {{ $itemCheckoutAvailable ? $item->available_stock.' licenses currently available' : 'This selection needs to be reviewed' }}
+                                            </p>
+                                        </div>
+
+                                        <div class="cart-package-actions">
+                                            <div class="font-semibold text-white" data-display-price
+                                                data-price-idr="{{ (int) $item->package->price * (int) $item->quantity }}"
+                                                data-price-usd="{{ $item->package->price_usdt !== null && (float) $item->package->price_usdt > 0 ? (float) $item->package->price_usdt * (int) $item->quantity : '' }}">
+                                                Rp {{ number_format($item->package->price * $item->quantity, 0, ',', '.') }}
+                                            </div>
+
+                                            <form method="POST" action="{{ route('cart.items.update', $item) }}"
+                                                class="quantity-stepper" aria-label="Quantity for {{ $item->product->name }} {{ $item->package->name }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" name="quantity" value="{{ $decreaseQuantityTarget }}"
+                                                    class="quantity-stepper-button"
+                                                    aria-label="Decrease {{ $item->product->name }} {{ $item->package->name }} quantity"
+                                                    @disabled(! $canDecreaseQuantity)>−</button>
+                                                <output class="quantity-stepper-value" aria-live="polite">{{ $item->quantity }}</output>
+                                                <button type="submit" name="quantity" value="{{ $item->quantity + 1 }}"
+                                                    class="quantity-stepper-button"
+                                                    aria-label="Increase {{ $item->product->name }} {{ $item->package->name }} quantity"
+                                                    @disabled(! $itemCheckoutAvailable || $item->quantity >= $maxItemQuantity)>+</button>
+                                            </form>
+
+                                            <form method="POST" action="{{ route('cart.items.destroy', $item) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="cart-remove-button" aria-label="Remove {{ $item->package->name }}">
+                                                    <x-ui.icon name="trash-2" class="h-4 w-4" />
+                                                    <span class="sr-only">Remove</span>
+                                                </button>
+                                            </form>
                                         </div>
                                     </div>
-
-                                    <form method="POST" action="{{ route('cart.items.update', $item) }}"
-                                        class="quantity-stepper" aria-label="Quantity for {{ $item->product->name }}">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button type="submit" name="quantity" value="{{ $decreaseQuantityTarget }}"
-                                            class="quantity-stepper-button"
-                                            aria-label="Decrease {{ $item->product->name }} quantity"
-                                            @disabled(! $canDecreaseQuantity)>−</button>
-                                        <output class="quantity-stepper-value" aria-live="polite">{{ $item->quantity }}</output>
-                                        <button type="submit" name="quantity" value="{{ $item->quantity + 1 }}"
-                                            class="quantity-stepper-button"
-                                            aria-label="Increase {{ $item->product->name }} quantity"
-                                            @disabled(! $itemCheckoutAvailable || $item->quantity >= $maxItemQuantity)>+</button>
-                                    </form>
-
-                                    <form method="POST" action="{{ route('cart.items.destroy', $item) }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit"
-                                            class="h-11 rounded-xl border border-red-500/30 px-3 text-sm text-red-300 transition hover:bg-red-500/10">
-                                            <span class="inline-flex items-center gap-2">
-                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
-                                                <span>Remove</span>
-                                            </span>
-                                        </button>
-                                    </form>
-                                </div>
+                                @endforeach
                             </div>
                         </article>
                     @endforeach
                 </section>
 
-                <aside class="product-section fade-up lg:sticky lg:top-24">
+                <aside class="cart-summary-sticky product-section fade-up lg:sticky lg:top-24">
                     <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Cart Summary</p>
                     <h2 id="cartBundleCount" class="mt-1 text-xl font-semibold text-white">
-                        {{ $cartItems->count() }} packages · {{ $cartItems->sum('quantity') }} keys
+                        {{ $cartItems->count() }} packages · {{ $cartItems->sum('quantity') }} licenses
                     </h2>
 
                     <div class="mt-5 summary-row">

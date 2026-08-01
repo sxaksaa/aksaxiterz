@@ -20,6 +20,8 @@
             <p class="max-w-2xl text-sm leading-6 text-gray-400">
                 Open a product, then pick the exact file, video, or setup resource you need.
             </p>
+            <input id="downloadSearch" type="search" class="search-bar mt-3" placeholder="Search downloads..."
+                autocomplete="off">
         </div>
 
         <div class="mx-auto grid max-w-5xl gap-4" data-download-accordion-group>
@@ -64,7 +66,8 @@
                     };
                 @endphp
 
-                <details class="download-card download-accordion motion-card text-left" data-download-accordion>
+                <details class="download-card download-accordion motion-card text-left" data-download-accordion
+                    data-download-search="{{ Str::lower($download['name'].' '.$links->pluck('label')->implode(' ')) }}">
                     <summary class="download-accordion-summary">
                         <span class="min-w-0">
                             <span class="block truncate text-lg font-semibold text-white">{{ $download['name'] }}</span>

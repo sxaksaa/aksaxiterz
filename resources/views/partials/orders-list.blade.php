@@ -13,6 +13,20 @@
     ];
 @endphp
 
+<div class="orders-filter-bar" data-orders-filter-bar>
+    <button type="button" class="category-chip active" data-order-filter="active">Active</button>
+    <button type="button" class="category-chip" data-order-filter="all">All</button>
+    <button type="button" class="category-chip" data-order-filter="paid">Paid</button>
+    <button type="button" class="category-chip" data-order-filter="closed">Closed</button>
+    <button type="button" class="orders-previous-toggle" data-order-filter="previous">
+        Previous orders
+    </button>
+</div>
+<div class="empty-state mb-4 hidden" data-order-filter-empty>
+    <span class="empty-state-title">No orders in this view</span>
+    <p class="empty-state-copy">Choose another filter or open Previous orders.</p>
+</div>
+
 <div class="orders-mobile-summary lg:hidden" aria-label="Order summary">
     @foreach ($orderSummaryStats as $summaryStat)
         <div class="orders-summary-chip">
@@ -167,7 +181,8 @@
                 : '/licenses';
         @endphp
 
-        <article class="order-mobile-card motion-card">
+        <article class="order-mobile-card motion-card" data-order-entry
+            data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
@@ -230,7 +245,7 @@
                 <span>{{ $paymentHint }}</span>
             </div>
 
-            @if ($hasPaymentAction || $isPaid)
+            @if ($hasPaymentAction || $isPaid || (! $isPending && ! $isPaid))
                 <div class="mt-4 flex flex-col gap-2">
                     @if ($isPaid && ! $hasPaymentAction)
                         <a href="{{ $licenseTargetUrl }}" class="order-action w-full">
@@ -294,6 +309,16 @@
                             <button type="submit" class="order-action order-action-danger cancel-order-button w-full">
                                 <x-ui.icon name="x" class="h-4 w-4" />
                                 <span data-button-label>Cancel Order</span>
+                            </button>
+                        </form>
+                    @endif
+
+                    @if (! $isPending && ! $isPaid && ! $canVerifySentPayment)
+                        <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form">
+                            @csrf
+                            <button type="submit" class="order-action w-full">
+                                <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                <span data-button-label>Buy Again</span>
                             </button>
                         </form>
                     @endif
@@ -486,7 +511,8 @@
                             : '/licenses';
                     @endphp
 
-                    <tr class="orders-table-row">
+                    <tr class="orders-table-row" data-order-entry
+                        data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
                         <td class="p-4">
                             <div class="flex max-w-[210px] items-center gap-2">
                                 <span class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</span>
@@ -593,6 +619,16 @@
                                         <button type="submit" class="order-action order-action-danger cancel-order-button">
                                             <x-ui.icon name="x" class="h-4 w-4" />
                                             <span data-button-label>Cancel</span>
+                                        </button>
+                                    </form>
+                                @endif
+
+                                @if (! $isPending && ! $isPaid && ! $canVerifySentPayment)
+                                    <form action="/pay-again/{{ $order->id }}" method="POST" class="pay-again-form inline">
+                                        @csrf
+                                        <button type="submit" class="order-action">
+                                            <x-ui.icon name="refresh-cw" class="h-4 w-4" />
+                                            <span data-button-label>Buy Again</span>
                                         </button>
                                     </form>
                                 @endif
