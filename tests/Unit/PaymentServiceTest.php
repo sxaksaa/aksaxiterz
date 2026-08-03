@@ -23,8 +23,9 @@ class PaymentServiceTest extends TestCase
         $amount = $method->invoke($service, 10.00, 'ORDER-ABC123', 'usdttrc20');
 
         $this->assertGreaterThan(10.00, $amount);
-        $this->assertLessThan(10.01, $amount);
-        $this->assertEquals(round($amount, 6), $amount);
+        $this->assertLessThan(10.1, $amount);
+        $this->assertEquals(round($amount, 5), $amount);
+        $this->assertMatchesRegularExpression('/^10\.\d{5}$/', number_format($amount, 5, '.', ''));
     }
 
     public function test_direct_crypto_amount_attempts_produce_distinct_suffixes(): void
@@ -40,6 +41,19 @@ class PaymentServiceTest extends TestCase
         $second = $method->invoke($service, 10.00, 'ORDER-COLLISION', 'usdcbsc', 1);
 
         $this->assertNotSame($first, $second);
+    }
+
+    public function test_binance_pay_amount_uses_at_most_five_decimal_places(): void
+    {
+        $service = new PaymentService;
+        $method = new ReflectionMethod($service, 'binancePayAmount');
+
+        $amount = $method->invoke($service, 15.00, 'ORDER-BINANCE', 'USDT', 0, 9999);
+
+        $this->assertGreaterThan(15.00, $amount);
+        $this->assertLessThan(15.1, $amount);
+        $this->assertEquals(round($amount, 5), $amount);
+        $this->assertMatchesRegularExpression('/^15\.\d{5}$/', number_format($amount, 5, '.', ''));
     }
 
     public function test_binance_pay_history_uses_signed_personal_pay_endpoint(): void

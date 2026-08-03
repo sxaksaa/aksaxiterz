@@ -5,7 +5,7 @@
         class="site-navbar-pill mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
-        <a href="/" class="flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
+        <a href="/" class="site-brand-link flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
             <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
                 class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
                 width="612" height="195" draggable="false">

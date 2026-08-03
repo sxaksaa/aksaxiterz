@@ -462,7 +462,7 @@ function formatCryptoAmount(amount, token = 'USDT') {
     }
 
     return `${numericAmount.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
+        minimumFractionDigits: 2,
         maximumFractionDigits: 6,
     })} ${token}`;
 }

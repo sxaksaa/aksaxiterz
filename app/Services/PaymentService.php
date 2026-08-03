@@ -16,6 +16,8 @@ use Illuminate\Support\Str;
 
 class PaymentService
 {
+    private const CRYPTO_PAYMENT_PRECISION = 5;
+
     private StockReservationService $stockReservationService;
 
     private VoucherService $voucherService;
@@ -170,7 +172,7 @@ class PaymentService
             $coin,
             $quantity
         );
-        $baseAmount = (float) $order->price;
+        $baseAmount = round((float) $order->price, self::CRYPTO_PAYMENT_PRECISION);
 
         try {
             $this->stockReservationService->reserve($order);
@@ -255,7 +257,7 @@ class PaymentService
             $coin,
             $quantity
         );
-        $baseAmount = (float) $order->price;
+        $baseAmount = round((float) $order->price, self::CRYPTO_PAYMENT_PRECISION);
 
         try {
             $this->stockReservationService->reserve($order);
@@ -376,7 +378,7 @@ class PaymentService
             $expiresAt,
             $coin
         );
-        $baseAmount = (float) $order->price;
+        $baseAmount = round((float) $order->price, self::CRYPTO_PAYMENT_PRECISION);
 
         try {
             $this->stockReservationService->reserve($order);
@@ -439,7 +441,7 @@ class PaymentService
             $expiresAt,
             strtolower($token)
         );
-        $baseAmount = (float) $order->price;
+        $baseAmount = round((float) $order->price, self::CRYPTO_PAYMENT_PRECISION);
 
         try {
             $this->stockReservationService->reserve($order);
@@ -1019,9 +1021,9 @@ class PaymentService
         $uniqueMax = max(1, min(9999, (int) config('services.crypto_direct.unique_max', 9999)));
         $hash = (int) sprintf('%u', crc32($orderId.'|'.$coin));
         $uniqueUnits = (($hash + max(0, $attempt)) % $uniqueMax) + 1;
-        $uniqueAmount = $uniqueUnits / 1000000;
+        $uniqueAmount = $uniqueUnits / (10 ** self::CRYPTO_PAYMENT_PRECISION);
 
-        return round($baseAmount + $uniqueAmount, 6);
+        return round($baseAmount + $uniqueAmount, self::CRYPTO_PAYMENT_PRECISION);
     }
 
     private function claimDirectCryptoAmount(Order $order, array $network, string $coin, float $baseAmount): float
@@ -1097,7 +1099,7 @@ class PaymentService
                 'binance_pay',
                 strtolower(trim($payId)),
                 strtolower($token),
-                number_format($amount, 6, '.', ''),
+                number_format($amount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
             ]));
 
             try {
@@ -1203,7 +1205,10 @@ class PaymentService
         $hash = (int) sprintf('%u', crc32($orderId.'|binance-pay|'.$token));
         $uniqueUnits = (($hash + max(0, $attempt)) % $uniqueMax) + 1;
 
-        return round($baseAmount + ($uniqueUnits / 1000000), 6);
+        return round(
+            $baseAmount + ($uniqueUnits / (10 ** self::CRYPTO_PAYMENT_PRECISION)),
+            self::CRYPTO_PAYMENT_PRECISION
+        );
     }
 
     private function directCryptoMatchKey(array $network, string $coin, float $amount): string
@@ -1212,7 +1217,7 @@ class PaymentService
             strtolower($coin),
             strtolower(trim((string) ($network['address'] ?? ''))),
             strtolower(trim((string) ($network['contract'] ?? ''))),
-            number_format($amount, 6, '.', ''),
+            number_format($amount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
         ]));
     }
 
@@ -1422,10 +1427,10 @@ class PaymentService
             'network_short_label' => (string) ($network['short_label'] ?? strtoupper($coin)),
             'address' => trim((string) ($network['address'] ?? '')),
             'contract' => trim((string) ($network['contract'] ?? '')),
-            'amount' => number_format($amount, 6, '.', ''),
-            'base_amount' => number_format($baseAmount, 6, '.', ''),
+            'amount' => number_format($amount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
+            'base_amount' => number_format($baseAmount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
             'quantity' => (int) $order->quantity,
-            'unique_amount' => number_format(max(0, $amount - $baseAmount), 6, '.', ''),
+            'unique_amount' => number_format(max(0, $amount - $baseAmount), self::CRYPTO_PAYMENT_PRECISION, '.', ''),
             'decimals' => (int) ($network['decimals'] ?? 6),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
@@ -1444,10 +1449,10 @@ class PaymentService
             'token' => strtoupper(trim((string) ($pay['token'] ?? 'USDT'))),
             'pay_id' => trim((string) ($pay['pay_id'] ?? '')),
             'qr_content' => trim((string) ($pay['qr_content'] ?? '')),
-            'amount' => number_format($amount, 6, '.', ''),
-            'base_amount' => number_format($baseAmount, 6, '.', ''),
+            'amount' => number_format($amount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
+            'base_amount' => number_format($baseAmount, self::CRYPTO_PAYMENT_PRECISION, '.', ''),
             'quantity' => (int) $order->quantity,
-            'unique_amount' => number_format(max(0, $amount - $baseAmount), 6, '.', ''),
+            'unique_amount' => number_format(max(0, $amount - $baseAmount), self::CRYPTO_PAYMENT_PRECISION, '.', ''),
             'created_at' => $order->created_at?->toIso8601String() ?: now()->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
             'scanner_status' => 'pending',

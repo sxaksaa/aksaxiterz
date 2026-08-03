@@ -153,9 +153,9 @@
                                         <span class="font-semibold text-gray-200">Rp {{ number_format($payment['unique_amount']) }}</span>
                                     </div>
                                     <div class="qris-detail-row qris-total-row">
-                                        <span>Exact amount to enter</span>
-                                        <span class="flex items-center gap-2">
-                                            <strong class="qris-amount-value">Rp {{ number_format($payment['amount']) }}</strong>
+                                        <span class="min-w-0">Exact amount to enter</span>
+                                        <span class="flex shrink-0 items-center gap-2">
+                                            <strong class="qris-amount-value whitespace-nowrap">Rp {{ number_format($payment['amount']) }}</strong>
                                             <button type="button" class="order-action shrink-0 px-2 py-1 text-[11px]"
                                                 data-copy-payment="{{ $payment['amount'] }}"
                                                 data-copy-label="Amount">

@@ -305,7 +305,7 @@ class VoucherFeatureTest extends TestCase
         );
 
         $this->assertSame($voucher->id, $result['order']->voucher_id);
-        $this->assertSame('14.750000', $result['crypto_payment']['base_amount']);
+        $this->assertSame('14.75000', $result['crypto_payment']['base_amount']);
         $this->assertGreaterThan(14.75, (float) $result['order']->price);
     }
 
@@ -340,7 +340,7 @@ class VoucherFeatureTest extends TestCase
         $this->assertSame('USDC', $result['binance_pay_payment']['token']);
         $this->assertSame('123456789', $result['binance_pay_payment']['pay_id']);
         $this->assertSame('binance-pay-usdc-qr-content', $result['binance_pay_payment']['qr_content']);
-        $this->assertSame('14.600000', $result['binance_pay_payment']['base_amount']);
+        $this->assertSame('14.60000', $result['binance_pay_payment']['base_amount']);
         $this->assertGreaterThan(14.6, (float) $result['binance_pay_payment']['amount']);
         $this->assertNotNull($result['order']->payment_match_key);
     }

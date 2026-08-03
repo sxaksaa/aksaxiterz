@@ -347,6 +347,10 @@
         transform-origin: left center;
     }
 
+    .site-brand-link.is-soft-nav-pending::after {
+        content: none;
+    }
+
     @keyframes aksa-soft-page-in {
         from {
             opacity: 0.45;

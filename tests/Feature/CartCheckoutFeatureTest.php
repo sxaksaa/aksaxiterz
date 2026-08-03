@@ -540,7 +540,7 @@ class CartCheckoutFeatureTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('binance_pay_payment.token', 'USDC')
-            ->assertJsonPath('binance_pay_payment.base_amount', '9.000000');
+            ->assertJsonPath('binance_pay_payment.base_amount', '9.00000');
         $binanceOrder = Order::where('order_id', $binanceResponse->json('order_id'))->firstOrFail();
         $this->assertGreaterThan(9, (float) $binanceOrder->price);
         $binanceOrder->update(['status' => 'cancelled']);
@@ -562,7 +562,7 @@ class CartCheckoutFeatureTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('crypto_payment.token', 'USDC')
-            ->assertJsonPath('crypto_payment.base_amount', '9.000000');
+            ->assertJsonPath('crypto_payment.base_amount', '9.00000');
         $cryptoOrder = Order::where('order_id', $cryptoResponse->json('order_id'))->firstOrFail();
         $this->assertSame(2, $cryptoOrder->items()->count());
         $this->assertSame(2, LicenseStock::where('reserved_order_id', $cryptoOrder->id)->count());
