@@ -1,5 +1,8 @@
 @extends('layouts.app')
 
+@section('seo_title', 'Setup Guides - Aksa Xiterz')
+@section('seo_description', 'Read practical setup, troubleshooting, and product usage guides from Aksa Xiterz.')
+
 @section('content')
     <section class="page-shell pb-10 pt-10 md:pb-14 md:pt-16">
         <div class="download-hero mx-auto max-w-5xl fade-up">

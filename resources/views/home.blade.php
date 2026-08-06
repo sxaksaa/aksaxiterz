@@ -1,5 +1,8 @@
 @extends('layouts.app')
 
+@section('seo_title', 'Aksa Xiterz - Digital Game Licenses')
+@section('seo_description', 'Browse ready-stock digital game licenses with clear prices, automatic delivery, and secure payment verification.')
+
 @section('content')
     <section class="page-shell pb-7 pt-7 md:pb-10 md:pt-11">
         <div class="home-hero home-hero-compact fade-up">

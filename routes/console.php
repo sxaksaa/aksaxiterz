@@ -3,6 +3,7 @@
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Services\BinancePayOrderVerifier;
+use App\Services\DatabaseBackupService;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\PendingGopayDeliveryService;
@@ -16,6 +17,19 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('ops:backup-database', function (DatabaseBackupService $backupService) {
+    if (! config('backup.enabled')) {
+        $this->warn('Database backup is disabled.');
+
+        return self::SUCCESS;
+    }
+
+    $path = $backupService->create();
+    $this->info('Database backup created: '.$path);
+
+    return self::SUCCESS;
+})->purpose('Create a timestamped database backup and prune expired backups');
 
 Artisan::command('license-stocks:purge-unsold {--execute : Delete the matching unsold license stocks} {--seeded-only : Only target known placeholder stock prefixes}', function () {
     $query = LicenseStock::query()->available();
@@ -347,3 +361,8 @@ Schedule::command('orders:scan-binance-pay --limit=100')
 Schedule::command('orders:release-expired-reservations')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('ops:backup-database')
+    ->dailyAt('02:30')
+    ->withoutOverlapping(60)
+    ->onOneServer();

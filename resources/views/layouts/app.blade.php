@@ -1,4 +1,12 @@
 @php
+    $seoTitle = trim($__env->yieldContent('seo_title', config('seo.title')));
+    $seoDescription = trim($__env->yieldContent('seo_description', config('seo.description')));
+    $seoCanonical = trim($__env->yieldContent('seo_canonical', url()->current()));
+    $seoImagePath = trim($__env->yieldContent('seo_image', config('seo.image')));
+    $seoImage = str_starts_with($seoImagePath, 'http') ? $seoImagePath : url($seoImagePath);
+    $seoType = trim($__env->yieldContent('seo_type', 'website'));
+    $privatePage = request()->is('admin', 'admin/*', 'cart', 'checkout', 'checkout/*', 'orders', 'orders/*', 'licenses', 'auth/*');
+    $seoRobots = trim($__env->yieldContent('seo_robots', $privatePage ? 'noindex, nofollow' : 'index, follow'));
     $visitorCountry = collect([
         request()->header('CF-IPCountry'),
         request()->header('CloudFront-Viewer-Country'),
@@ -22,10 +30,32 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Aksa Xiterz</title>
+    <title>{{ $seoTitle }}</title>
+    <meta name="description" content="{{ $seoDescription }}">
+    <meta name="robots" content="{{ $seoRobots }}">
+    <link rel="canonical" href="{{ $seoCanonical }}">
+    <meta property="og:site_name" content="Aksa Xiterz">
+    <meta property="og:type" content="{{ $seoType }}">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDescription }}">
+    <meta property="og:url" content="{{ $seoCanonical }}">
+    <meta property="og:image" content="{{ $seoImage }}">
+    <meta name="twitter:card" content="{{ config('seo.twitter_card') }}">
+    <meta name="twitter:title" content="{{ $seoTitle }}">
+    <meta name="twitter:description" content="{{ $seoDescription }}">
+    <meta name="twitter:image" content="{{ $seoImage }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
+    @if (! $privatePage)
+        <script type="application/ld+json" nonce="{{ request()->attributes->get('csp_nonce') }}">{!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => 'Aksa Xiterz',
+            'url' => url('/'),
+            'description' => config('seo.description'),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+    @endif
     <script nonce="{{ request()->attributes->get('csp_nonce') }}" data-currency-prepaint>
         (() => {
             const root = document.documentElement;

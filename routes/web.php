@@ -150,6 +150,39 @@ $productsFragment = function (Request $request) {
 Route::get('/products-fragment', $productsFragment)->name('products.fragment');
 Route::get('/api/products', $productsFragment);
 
+Route::get('/sitemap.xml', function () {
+    $urls = collect([
+        ['loc' => url('/'), 'lastmod' => null],
+        ['loc' => route('guides.index'), 'lastmod' => config('guides.updated_at')],
+        ['loc' => url('/downloads'), 'lastmod' => null],
+        ['loc' => route('terms'), 'lastmod' => config('legal.updated_at')],
+        ['loc' => route('privacy'), 'lastmod' => config('legal.updated_at')],
+        ['loc' => route('refund-policy'), 'lastmod' => config('legal.updated_at')],
+        ['loc' => route('faq'), 'lastmod' => config('legal.updated_at')],
+        ['loc' => route('contact'), 'lastmod' => config('legal.updated_at')],
+    ]);
+
+    Product::query()->visible()->select(['slug', 'updated_at'])->orderBy('id')->each(
+        fn (Product $product) => $urls->push([
+            'loc' => route('products.show', $product->slug),
+            'lastmod' => $product->updated_at?->toDateString(),
+        ])
+    );
+
+    collect(config('guides.items', []))->each(function (array $guide) use ($urls): void {
+        if (filled($guide['slug'] ?? null)) {
+            $urls->push([
+                'loc' => route('guides.show', $guide['slug']),
+                'lastmod' => config('guides.updated_at'),
+            ]);
+        }
+    });
+
+    return response()
+        ->view('sitemap', ['urls' => $urls])
+        ->header('Content-Type', 'application/xml; charset=UTF-8');
+})->name('sitemap');
+
 Route::get('/csrf-token', fn () => response()->json([
     'token' => csrf_token(),
 ]))->name('csrf-token');

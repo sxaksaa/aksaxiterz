@@ -57,6 +57,10 @@ environment_errors="$(
             $errors[] = "APP_DEBUG must be false";
         }
 
+        if (strtolower(trim((string) ($values["LOG_LEVEL"] ?? ""))) === "debug") {
+            $errors[] = "LOG_LEVEL cannot be debug in production";
+        }
+
         $required(["APP_KEY"]);
 
         if (! str_starts_with((string) ($values["APP_URL"] ?? ""), "https://")) {
@@ -152,6 +156,7 @@ export COMPOSER_ALLOW_SUPERUSER=1
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 npm ci
 npm run build
+php artisan ops:backup-database
 php artisan migrate --force
 
 # A pre-existing storage path must be the expected symlink.

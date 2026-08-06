@@ -1,5 +1,8 @@
 @extends('layouts.app')
 
+@section('seo_title', $title.' - Aksa Xiterz')
+@section('seo_description', \Illuminate\Support\Str::limit(strip_tags($intro ?? $title), 155))
+
 @section('content')
     @php
         $business = config('links.business', []);

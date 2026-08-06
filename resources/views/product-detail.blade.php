@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@section('seo_title', $product->name.' License - Aksa Xiterz')
+@section('seo_description', \Illuminate\Support\Str::limit(strip_tags($product->description), 155))
+@section('seo_type', 'product')
+
 @section('content')
     @php
         $stock = $product->available_license_stocks_count ?? 0;

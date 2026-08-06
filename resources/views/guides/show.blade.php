@@ -1,5 +1,8 @@
 @extends('layouts.app')
 
+@section('seo_title', $guide['title'].' - Aksa Xiterz')
+@section('seo_description', \Illuminate\Support\Str::limit(strip_tags($guide['summary'] ?? $guide['title']), 155))
+
 @section('content')
     <section class="page-shell pb-8 pt-6 md:pt-10">
         <div class="download-hero mx-auto max-w-5xl fade-up">
