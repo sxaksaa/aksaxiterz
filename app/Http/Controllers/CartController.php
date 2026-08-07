@@ -40,6 +40,19 @@ class CartController extends Controller
         ]);
     }
 
+    public function preview(Request $request)
+    {
+        $items = $this->cartService->items($request->user());
+        $this->attachAvailability($items);
+
+        return response()->json([
+            'cart_count' => (int) $items->sum('quantity'),
+            'html' => view('partials.mini-cart-content', [
+                'miniCartItems' => $items,
+            ])->render(),
+        ]);
+    }
+
     public function store(Request $request, Product $product)
     {
         $validated = $request->validate([
@@ -66,6 +79,11 @@ class CartController extends Controller
                 'message' => $product->name.' - '.$package->name.' was added to your cart.',
                 'cart_count' => (int) $request->user()->cartItems()->sum('quantity'),
                 'item_id' => $item->id,
+                'cart_preview_html' => view('partials.mini-cart-content', [
+                    'miniCartItems' => tap($this->cartService->items($request->user()), function ($items): void {
+                        $this->attachAvailability($items);
+                    }),
+                ])->render(),
             ]);
         });
     }

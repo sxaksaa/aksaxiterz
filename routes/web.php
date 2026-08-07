@@ -284,6 +284,7 @@ Route::get('/product/{product}', function (string $product) use ($activePromoVou
 */
 Route::middleware('auth')->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::get('/cart/preview', [CartController::class, 'preview'])->name('cart.preview');
     Route::get('/checkout', [CheckoutController::class, 'cart'])->name('checkout.cart');
     Route::get('/checkout/{product}', [CheckoutController::class, 'product'])
         ->where('product', '[A-Za-z0-9-]+')

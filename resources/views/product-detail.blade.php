@@ -620,6 +620,9 @@
                         badge.textContent = data.cart_count;
                         badge.classList.toggle('hidden', Number(data.cart_count) < 1);
                     });
+                    window.refreshAksaMiniCart?.(data.cart_preview_html, data.cart_count, {
+                        autoOpen: true,
+                    });
                     toast('Added to cart', data.message, 'success');
                     buttonLabel(this, 'Added');
                     setTimeout(() => {

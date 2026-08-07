@@ -71,6 +71,49 @@ class CartCheckoutFeatureTest extends TestCase
             ->assertDontSee('>Update<', false);
     }
 
+    public function test_customer_can_load_a_checkout_ready_mini_cart_preview(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Aurora Preview', 20000, 1.25, 3);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'quantity' => 2,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson(route('cart.preview'))
+            ->assertOk()
+            ->assertJsonPath('cart_count', 2);
+
+        $html = $response->json('html');
+        $this->assertStringContainsString('Aurora Preview', $html);
+        $this->assertMatchesRegularExpression('/2\s+licenses/', $html);
+        $this->assertStringContainsString('data-price-idr="40000"', $html);
+        $this->assertStringContainsString('href="'.route('checkout.cart').'"', $html);
+        $this->assertStringContainsString('Checkout', $html);
+    }
+
+    public function test_mini_cart_sends_unavailable_items_to_cart_review(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Paused Preview', 20000, 1.25, 1);
+        CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'quantity' => 1,
+        ]);
+        $product->update(['status' => Product::STATUS_UPDATING]);
+
+        $html = $this->actingAs($user)
+            ->getJson(route('cart.preview'))
+            ->assertOk()
+            ->json('html');
+
+        $this->assertStringContainsString('Review Cart', $html);
+        $this->assertStringNotContainsString('href="'.route('checkout.cart').'"', $html);
+    }
+
     public function test_cart_page_disables_checkout_when_an_item_changes_to_updating(): void
     {
         $this->enableGopayQris();

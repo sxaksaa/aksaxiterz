@@ -1963,6 +1963,7 @@ window.initializeAksaPageEnhancements = function(root = document) {
 };
 
 let mobileMenuOpen = false;
+let miniCartAutoCloseTimer = null;
 let lastNavbarScroll = window.pageYOffset || 0;
 let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
@@ -2017,6 +2018,86 @@ function toggleProfileDropdown() {
 function closeProfileDropdown() {
     document.getElementById('dropdown')?.classList.add('hidden');
 }
+
+function miniCartRoot() {
+    return document.querySelector('[data-mini-cart-root]');
+}
+
+function setMiniCartOpen(open, { auto = false } = {}) {
+    const root = miniCartRoot();
+    const trigger = root?.querySelector('[data-mini-cart-trigger]');
+
+    if (!root || !trigger) return;
+
+    clearTimeout(miniCartAutoCloseTimer);
+    root.classList.toggle('is-open', open);
+    root.classList.toggle('is-auto-open', open && auto);
+    trigger.setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('mini-cart-sheet-open', open && window.innerWidth < 1280);
+
+    if (open && auto) {
+        miniCartAutoCloseTimer = window.setTimeout(() => {
+            setMiniCartOpen(false);
+        }, 2800);
+    }
+}
+
+function closeMiniCart() {
+    setMiniCartOpen(false);
+}
+
+async function ensureMiniCartLoaded() {
+    const root = miniCartRoot();
+
+    if (!root || root.dataset.miniCartLoaded === 'true' || root.dataset.miniCartLoading === 'true') return;
+
+    root.dataset.miniCartLoading = 'true';
+
+    try {
+        const response = await fetch(root.dataset.miniCartUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) throw new Error(data.message || 'Cart preview is unavailable.');
+
+        window.refreshAksaMiniCart?.(data.html, data.cart_count);
+        root.dataset.miniCartLoaded = 'true';
+    } catch (error) {
+        const loading = root.querySelector('[data-mini-cart-content]');
+        if (loading) loading.innerHTML = '<p class="mini-cart-load-error">Open the cart to review your items.</p>';
+    } finally {
+        root.dataset.miniCartLoading = 'false';
+    }
+}
+
+window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
+    const root = miniCartRoot();
+    const panel = root?.querySelector('[data-mini-cart-panel]');
+
+    if (!root || !panel || typeof html !== 'string') return;
+
+    const currentContent = panel.querySelector('[data-mini-cart-content]');
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const nextContent = template.content.querySelector('[data-mini-cart-content]');
+
+    if (currentContent && nextContent) currentContent.replaceWith(nextContent);
+
+    root.querySelector('[data-mini-cart-trigger]')?.setAttribute(
+        'aria-label',
+        `Open cart with ${Number(cartCount || 0)} items`
+    );
+    initializeDisplayCurrency(root);
+    root.classList.remove('mini-cart-bump');
+    void root.offsetWidth;
+    root.classList.add('mini-cart-bump');
+
+    if (options.autoOpen) setMiniCartOpen(true, { auto: true });
+};
 
 function updateNavbarOnScroll() {
     const navbar = document.getElementById('navbar');
@@ -2711,6 +2792,24 @@ document.addEventListener('click', (event) => {
         closeMobileMenu();
     }
 
+    const miniCartTrigger = event.target.closest('[data-mini-cart-trigger]');
+
+    if (miniCartTrigger && window.innerWidth < 1280) {
+        event.preventDefault();
+        event.stopPropagation();
+        setMiniCartOpen(!miniCartRoot()?.classList.contains('is-open'));
+        ensureMiniCartLoaded();
+        closeMobileMenu();
+        closeProfileDropdown();
+        return;
+    }
+
+    if (event.target.closest('[data-mini-cart-close]')) {
+        event.preventDefault();
+        closeMiniCart();
+        return;
+    }
+
     const profileToggle = event.target.closest('[data-profile-toggle]');
 
     if (profileToggle) {
@@ -2729,6 +2828,10 @@ document.addEventListener('click', (event) => {
     if (!event.target.closest('#dropdown') && !event.target.closest('[data-profile-toggle]')) {
         closeProfileDropdown();
     }
+
+    if (!event.target.closest('[data-mini-cart-root]')) {
+        closeMiniCart();
+    }
 });
 
 document.addEventListener('keydown', (event) => {
@@ -2736,12 +2839,15 @@ document.addEventListener('keydown', (event) => {
 
     closeMobileMenu();
     closeProfileDropdown();
+    closeMiniCart();
 });
 
 window.addEventListener('resize', () => {
     if (window.innerWidth >= 1280 && mobileMenuOpen) {
         closeMobileMenu();
     }
+
+    if (window.innerWidth >= 1280) closeMiniCart();
 
     updateNavGlider();
 }, { passive: true });
@@ -2777,6 +2883,10 @@ window.addEventListener('popstate', (event) => {
 });
 
 document.addEventListener('pointerover', (event) => {
+    if (event.target.closest('[data-mini-cart-root]') && window.innerWidth >= 1280) {
+        ensureMiniCartLoaded();
+    }
+
     const navItem = navItemFromEvent(event);
 
     if (navItem) updateNavGlider(navItem);
@@ -2818,6 +2928,8 @@ document.addEventListener('pointerout', (event) => {
 });
 
 document.addEventListener('focusin', (event) => {
+    if (event.target.closest('[data-mini-cart-root]')) ensureMiniCartLoaded();
+
     const navItem = navItemFromEvent(event);
 
     if (navItem) updateNavGlider(navItem);
@@ -2857,6 +2969,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('aksa:before-page-swap', () => {
     hideDashboardChartTooltip();
     clearRecentPurchaseToast();
+    closeMiniCart();
 });
 
 document.addEventListener('click', (event) => {

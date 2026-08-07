@@ -54,16 +54,31 @@
             @endif
 
             @auth
-                <a href="{{ route('cart.index') }}"
-                    class="nav-cart-link relative inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
-                    aria-label="Open cart with {{ $cartCount }} items">
-                    <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
-                    <span>Cart</span>
-                    <span data-cart-count
-                        class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-aksa-accent px-2 py-0.5 text-[10px] font-bold text-white">
-                        {{ $cartCount }}
-                    </span>
-                </a>
+                <div class="mini-cart-root relative" data-mini-cart-root
+                    data-mini-cart-url="{{ route('cart.preview') }}" data-mini-cart-loaded="false">
+                    <a href="{{ route('cart.index') }}" data-mini-cart-trigger
+                        class="nav-cart-link relative inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
+                        aria-label="Open cart with {{ $cartCount }} items" aria-haspopup="dialog" aria-expanded="false">
+                        <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
+                        <span>Cart</span>
+                        <span data-cart-count
+                            class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-aksa-accent px-2 py-0.5 text-[10px] font-bold text-white">
+                            {{ $cartCount }}
+                        </span>
+                    </a>
+
+                    <button type="button" class="mini-cart-backdrop" data-mini-cart-close aria-label="Close cart preview"></button>
+                    <div class="mini-cart-panel" data-mini-cart-panel role="dialog" aria-label="Cart preview">
+                        <div class="mini-cart-mobile-handle" aria-hidden="true"></div>
+                        <button type="button" class="mini-cart-close" data-mini-cart-close aria-label="Close cart preview">
+                            <x-ui.icon name="x" class="h-4 w-4" />
+                        </button>
+                        <div data-mini-cart-content class="mini-cart-loading" role="status">
+                            <span class="mini-cart-loading-dot" aria-hidden="true"></span>
+                            <span>Loading cart...</span>
+                        </div>
+                    </div>
+                </div>
             @endauth
 
             <a href="{{ $discordUrl ?: '#' }}" @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
