@@ -326,12 +326,18 @@ function refreshDisplayCurrency(root = document) {
         const prefix = element.dataset.pricePrefix || '';
         const suffix = element.dataset.priceSuffix || '';
 
-        if (currency === 'usd' && (usdAmount === undefined || usdAmount === '')) {
-            element.textContent = element.dataset.priceUsdFallback || 'USD unavailable';
-            return;
+        const nextText = currency === 'usd' && (usdAmount === undefined || usdAmount === '')
+            ? (element.dataset.priceUsdFallback || 'USD unavailable')
+            : `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+
+        if (element.textContent !== nextText && document.documentElement.dataset.currencyReady === 'true') {
+            element.classList.remove('aksa-price-changing');
+            void element.offsetWidth;
+            element.classList.add('aksa-price-changing');
+            window.setTimeout(() => element.classList.remove('aksa-price-changing'), 300);
         }
 
-        element.textContent = `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+        element.textContent = nextText;
     });
 
     scope.querySelectorAll('[data-currency-text]').forEach(element => {
@@ -2029,6 +2035,8 @@ function setMiniCartOpen(open, { auto = false } = {}) {
 
     if (!root || !trigger) return;
 
+    if (open) document.getElementById('navbar')?.classList.remove('nav-hidden');
+
     clearTimeout(miniCartAutoCloseTimer);
     root.classList.toggle('is-open', open);
     root.classList.toggle('is-auto-open', open && auto);
@@ -2085,7 +2093,11 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
     template.innerHTML = html.trim();
     const nextContent = template.content.querySelector('[data-mini-cart-content]');
 
-    if (currentContent && nextContent) currentContent.replaceWith(nextContent);
+    if (currentContent && nextContent) {
+        nextContent.classList.add('mini-cart-content-enter');
+        currentContent.replaceWith(nextContent);
+        window.setTimeout(() => nextContent.classList.remove('mini-cart-content-enter'), 420);
+    }
 
     root.querySelector('[data-mini-cart-trigger]')?.setAttribute(
         'aria-label',
@@ -2099,6 +2111,40 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
     if (options.autoOpen) setMiniCartOpen(true, { auto: true });
 };
 
+window.animateAksaCartTransfer = async function(source) {
+    const navbar = document.getElementById('navbar');
+    const target = document.querySelector('[data-mini-cart-trigger]');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    navbar?.classList.remove('nav-hidden');
+    if (!(source instanceof Element) || !(target instanceof Element) || reduceMotion) return;
+
+    await new Promise(resolve => window.setTimeout(resolve, 180));
+    const sourceRect = source.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const token = document.createElement('span');
+    token.className = 'aksa-cart-fly-token';
+    token.textContent = '✦';
+    token.style.left = `${sourceRect.left + sourceRect.width / 2}px`;
+    token.style.top = `${sourceRect.top + Math.min(sourceRect.height / 2, 42)}px`;
+    document.body.appendChild(token);
+
+    const deltaX = targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2);
+    const deltaY = targetRect.top + targetRect.height / 2 - (sourceRect.top + Math.min(sourceRect.height / 2, 42));
+    const animation = token.animate([
+        { transform: 'translate(-50%, -50%) scale(0.7)', opacity: 0 },
+        { transform: `translate(calc(-50% + ${deltaX * 0.46}px), calc(-50% + ${deltaY * 0.18 - 52}px)) scale(1.08)`, opacity: 1, offset: 0.42 },
+        { transform: `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(0.42)`, opacity: 0.2 },
+    ], {
+        duration: 560,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        fill: 'forwards',
+    });
+
+    await animation.finished.catch(() => {});
+    token.remove();
+};
+
 function updateNavbarOnScroll() {
     const navbar = document.getElementById('navbar');
 
@@ -2106,7 +2152,7 @@ function updateNavbarOnScroll() {
 
     const currentScroll = window.pageYOffset;
 
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || miniCartRoot()?.classList.contains('is-open') || miniCartRoot()?.classList.contains('is-auto-open')) {
         navbar.classList.remove('nav-hidden');
         lastNavbarScroll = currentScroll;
         return;
@@ -2761,6 +2807,15 @@ function initializeGlobalPageEnhancements(root = document) {
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
     updateNavGlider();
+
+    const pageContent = root === document
+        ? document.querySelector('[data-aksa-page-content]')
+        : root.closest?.('[data-aksa-page-content]') || root.querySelector?.('[data-aksa-page-content]');
+    if (pageContent && pageContent.dataset.pageEntered !== 'true') {
+        pageContent.dataset.pageEntered = 'true';
+        pageContent.classList.add('aksa-page-entered');
+        window.setTimeout(() => pageContent.classList.remove('aksa-page-entered'), 420);
+    }
 }
 
 if (document.readyState === 'loading') {

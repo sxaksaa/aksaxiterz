@@ -351,12 +351,19 @@
                 const displayCurrency = window.getAksaDisplayCurrency?.() ||
                     document.documentElement.dataset.displayCurrency ||
                     'idr';
-                document.getElementById('selectedSubtotal').textContent =
-                    displayCurrency === 'usd'
+                const subtotal = document.getElementById('selectedSubtotal');
+                const nextSubtotal = displayCurrency === 'usd'
                         ? (selectedPackage.priceUsdt > 0
                             ? formatUsd(selectedPackage.priceUsdt * selectedQuantity)
                             : 'USD unavailable')
                         : formatIdr(selectedPackage.price * selectedQuantity);
+                if (subtotal.textContent !== nextSubtotal && subtotal.textContent !== '-') {
+                    subtotal.classList.remove('aksa-price-changing');
+                    void subtotal.offsetWidth;
+                    subtotal.classList.add('aksa-price-changing');
+                    setTimeout(() => subtotal.classList.remove('aksa-price-changing'), 300);
+                }
+                subtotal.textContent = nextSubtotal;
 
                 const available = selectionAvailable();
                 const addButton = document.getElementById('addToCartBtn');
@@ -398,6 +405,10 @@
                 document.querySelectorAll('[data-package-card]').forEach(item => {
                     item.classList.toggle('active', item === card);
                 });
+                card.classList.remove('package-selection-pop');
+                void card.offsetWidth;
+                card.classList.add('package-selection-pop');
+                setTimeout(() => card.classList.remove('package-selection-pop'), 420);
                 renderSelection();
                 document.getElementById('summaryBox')?.scrollIntoView({
                     behavior: 'smooth',
@@ -620,6 +631,9 @@
                         badge.textContent = data.cart_count;
                         badge.classList.toggle('hidden', Number(data.cart_count) < 1);
                     });
+                    await window.animateAksaCartTransfer?.(
+                        document.querySelector('[data-package-card].active') || this
+                    );
                     window.refreshAksaMiniCart?.(data.cart_preview_html, data.cart_count, {
                         autoOpen: true,
                     });
