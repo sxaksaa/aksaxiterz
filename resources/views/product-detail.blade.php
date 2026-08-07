@@ -13,11 +13,6 @@
         $checkoutAvailable = $hasAutoDelivery;
         $dailyPackage = $product->packages->first(fn ($package) => $package->durationDays() === 1);
         $formatIdr = fn ($amount) => 'Rp '.number_format((int) $amount, 0, ',', '.');
-        $minPackageIdr = $product->packages->sortBy('price')->first();
-        $minPackageUsd = $product->packages
-            ->filter(fn ($package) => $package->price_usdt !== null && (float) $package->price_usdt > 0)
-            ->sortBy('price_usdt')
-            ->first();
         $categoryName = $product->category?->name ?? 'Product';
         $categoryKey = strtolower(trim($categoryName));
         $categoryIcon = match ($categoryKey) {
@@ -31,14 +26,6 @@
             : 'product-status-badge-ready';
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
-        $startDurationDaysIdr = $minPackageIdr?->durationDays();
-        $startDurationDaysUsd = $minPackageUsd?->durationDays();
-        $startDurationLabelIdr = $startDurationDaysIdr
-            ? $startDurationDaysIdr.' '.\Illuminate\Support\Str::plural('day', $startDurationDaysIdr).' access'
-            : 'Duration access';
-        $startDurationLabelUsd = $startDurationDaysUsd
-            ? $startDurationDaysUsd.' '.\Illuminate\Support\Str::plural('day', $startDurationDaysUsd).' access'
-            : 'USD price unavailable';
         $packageSavings = $product->packages->mapWithKeys(function ($package) use ($dailyPackage) {
             $days = $package->durationDays();
             $comparisonPrice = $dailyPackage && $days ? ((int) $dailyPackage->price * $days) : 0;
@@ -84,72 +71,28 @@
         data-product-checkout-ready="{{ $checkoutAvailable ? 'true' : 'false' }}"
         data-product-stock-endpoint="{{ route('products.stock-detail', $product, false) }}">
         <div class="product-hero mb-6 fade-up">
-            <div class="grid gap-5 md:grid-cols-[1fr_340px] md:items-stretch">
-                <div class="flex min-w-0 flex-col justify-between gap-5">
-                    <div>
-                        <a href="/" class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <span class="support-pill product-hero-pill">
-                                <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
-                                <span>{{ $categoryName }}</span>
-                            </span>
-                            <span data-product-status-badge
-                                class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
-                                {{ $product->status_label }}
-                            </span>
-                            @if ($salesBadgeLabel)
-                                <span class="sales-signal-badge sales-signal-badge-{{ $salesBadgeVariant }}">
-                                    <x-ui.icon name="sparkles" class="h-3.5 w-3.5" />
-                                    <span>{{ $salesBadgeLabel }}</span>
-                                </span>
-                            @endif
-                        </div>
-                        <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
-                        <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                            {{ $product->description }}
-                        </p>
-                    </div>
+            <div>
+                <a href="/" class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="support-pill product-hero-pill">
+                        <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />
+                        <span>{{ $categoryName }}</span>
+                    </span>
+                    <span data-product-status-badge
+                        class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                        {{ $product->status_label }}
+                    </span>
+                    @if ($salesBadgeLabel)
+                        <span class="sales-signal-badge sales-signal-badge-{{ $salesBadgeVariant }}">
+                            <x-ui.icon name="sparkles" class="h-3.5 w-3.5" />
+                            <span>{{ $salesBadgeLabel }}</span>
+                        </span>
+                    @endif
                 </div>
-
-                <div class="grid gap-3">
-                    <div class="product-stat product-stat-featured">
-                        <div class="text-xs uppercase text-gray-500">Starts from</div>
-                        <div class="mt-2 text-2xl font-bold text-aksa-accent-soft"
-                            @if ($minPackageIdr)
-                                data-display-price
-                                data-price-idr="{{ (int) $minPackageIdr->price }}"
-                                data-price-usd="{{ $minPackageUsd ? (float) $minPackageUsd->price_usdt : '' }}"
-                            @endif>
-                            {{ $minPackageIdr ? $formatIdr($minPackageIdr->price) : '-' }}
-                        </div>
-                        <div class="mt-1 text-sm text-gray-400"
-                            @if ($minPackageIdr)
-                                data-currency-text
-                                data-currency-text-idr="{{ $startDurationLabelIdr }}"
-                                data-currency-text-usd="{{ $startDurationLabelUsd }}"
-                            @endif>
-                            {{ $minPackageIdr ? $startDurationLabelIdr : 'No package yet' }}
-                        </div>
-                    </div>
-
-                    <div class="product-stat">
-                        <div class="mb-2 text-xs uppercase text-gray-500">Availability</div>
-                        <div class="flex items-end justify-between gap-4">
-                            <div>
-                                <div data-product-availability-value
-                                    class="text-2xl font-bold {{ $hasAutoDelivery ? 'text-aksa-accent' : 'text-amber-300' }}">
-                                    {{ ! $isProductReady ? 'Updating' : ($hasAutoDelivery ? $stock : 'Manual') }}
-                                </div>
-                                <div data-product-availability-caption class="text-sm text-gray-400">
-                                    {{ ! $isProductReady ? 'update alerts on Discord' : ($hasAutoDelivery ? 'license ready' : 'order via Discord') }}
-                                </div>
-                            </div>
-                            <div data-product-availability-note class="text-right text-xs text-gray-500">
-                                {{ ! $isProductReady ? 'Join Discord for update alerts' : ($hasAutoDelivery ? 'Auto delivery after paid' : 'Join Discord to order') }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
+                <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+                    {{ $product->description }}
+                </p>
             </div>
         </div>
 
@@ -168,36 +111,11 @@
             </div>
         @endif
 
-        <div class="discord-mini-panel mb-6 fade-up">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">Need help before buying?</h2>
-                    <p class="mt-1 text-sm text-gray-400">
-                        Join Discord for vouchers, restock alerts, setup guidance, and checkout help.
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <a href="/downloads"
-                        class="inline-flex items-center justify-center rounded-lg border border-[#27272A] px-3 py-2 text-xs font-semibold text-gray-300 transition hover:text-white">
-                        <x-ui.icon name="download" class="h-4 w-4" />
-                        <span>Downloads</span>
-                    </a>
-                    <a href="{{ $discordUrl ?: '#' }}"
-                        @if ($discordUrl) target="_blank" rel="noopener noreferrer" @endif
-                        class="discord-cta px-3 py-2 text-xs {{ $discordUrl ? '' : 'cursor-not-allowed opacity-50' }}">
-                        <x-ui.icon name="discord" class="h-4 w-4" />
-                        <span>Join Discord</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
         <section class="product-section mb-6 fade-up">
             <div class="mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 1</p>
-                <h2 class="mt-1 text-xl font-semibold text-white">Select package</h2>
+                <h2 class="text-xl font-semibold text-white">Select package</h2>
                 <p class="mt-1 text-sm text-gray-400">
-                    Pick a package and quantity here. Payment method and voucher are selected on the checkout page.
+                    Choose a package to continue to checkout.
                 </p>
             </div>
 
@@ -243,15 +161,11 @@
                             </span>
                             <div class="min-w-0 pr-8">
                                 <p class="truncate text-sm font-semibold text-white">{{ $packageName }}</p>
-                                <p class="mt-0.5 text-xs text-gray-500">
-                                    {{ ($saving['days'] ?? null) ? $saving['days'].' '.\Illuminate\Support\Str::plural('day', $saving['days']).' access' : 'Duration access' }}
-                                </p>
                             </div>
                         </div>
 
                         <div class="package-price-row">
                             <div class="min-w-0">
-                                <div class="text-[10px] uppercase tracking-normal text-gray-500">Price</div>
                                 <p class="price-text package-price" data-display-price
                                     data-price-idr="{{ (int) $package->price }}"
                                     data-price-usd="{{ $package->price_usdt !== null && (float) $package->price_usdt > 0 ? (float) $package->price_usdt : '' }}">
@@ -269,23 +183,15 @@
                         </div>
 
                         @if (($saving['saving'] ?? 0) > 0 || ($saving['saving_usdt'] ?? 0) > 0)
-                            <div class="package-saving {{ ($saving['saving'] ?? 0) > 0 ? '' : 'hidden' }}"
+                            <div class="mt-3 {{ ($saving['saving'] ?? 0) > 0 ? '' : 'hidden' }}"
                                 data-currency-visibility
                                 data-currency-visible-idr="{{ ($saving['saving'] ?? 0) > 0 ? 'true' : 'false' }}"
                                 data-currency-visible-usd="{{ ($saving['saving_usdt'] ?? 0) > 0 ? 'true' : 'false' }}">
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="text-xs font-semibold text-aksa-accent" data-display-price
-                                        data-price-idr="{{ (int) $saving['saving'] }}"
-                                        data-price-usd="{{ $saving['saving_usdt'] !== null ? (float) $saving['saving_usdt'] : '' }}"
-                                        data-price-prefix="Save ">
-                                        Save {{ $formatIdr($saving['saving']) }}
-                                    </p>
-                                    <span class="package-saving-badge" data-currency-text
-                                        data-currency-text-idr="{{ $saving['percent'] }}% vs daily"
-                                        data-currency-text-usd="{{ (int) ($saving['percent_usdt'] ?? 0) }}% vs daily">
-                                        {{ $saving['percent'] }}% vs daily
-                                    </span>
-                                </div>
+                                <span class="package-saving-badge" data-currency-text
+                                    data-currency-text-idr="Save {{ $saving['percent'] }}% vs daily"
+                                    data-currency-text-usd="Save {{ (int) ($saving['percent_usdt'] ?? 0) }}% vs daily">
+                                    Save {{ $saving['percent'] }}% vs daily
+                                </span>
                             </div>
                         @endif
 
@@ -516,22 +422,6 @@
                     statusBadge.classList.toggle('product-status-badge-ready', productReady);
                     statusBadge.classList.toggle('product-status-badge-updating', !productReady);
                 }
-
-                const hasAutomaticDelivery = productReady && availableStock > 0;
-                const availabilityValue = document.querySelector('[data-product-availability-value]');
-                const availabilityCaption = document.querySelector('[data-product-availability-caption]');
-                const availabilityNote = document.querySelector('[data-product-availability-note]');
-                availabilityValue.textContent = productUnavailable
-                    ? 'Unavailable'
-                    : (productReady ? (availableStock > 0 ? String(availableStock) : 'Manual') : 'Updating');
-                availabilityValue.classList.toggle('text-aksa-accent', hasAutomaticDelivery);
-                availabilityValue.classList.toggle('text-amber-300', !hasAutomaticDelivery);
-                availabilityCaption.textContent = productUnavailable
-                    ? 'not currently available'
-                    : (productReady ? (availableStock > 0 ? 'license ready' : 'order via Discord') : 'update alerts on Discord');
-                availabilityNote.textContent = productUnavailable
-                    ? 'Browse other products'
-                    : (productReady ? (availableStock > 0 ? 'Auto delivery after paid' : 'Join Discord to order') : 'Join Discord for update alerts');
 
                 const paused = document.querySelector('[data-checkout-paused]');
                 paused.classList.toggle('hidden', productReady);

@@ -1039,8 +1039,7 @@
             0 0 40px rgba(167, 139, 250, 0.08);
     }
 
-    .discord-panel::before,
-    .discord-mini-panel::before {
+    .discord-panel::before {
         content: "";
         position: absolute;
         inset: 0;
@@ -1049,16 +1048,7 @@
         pointer-events: none;
     }
 
-    .discord-mini-panel {
-        @apply relative overflow-hidden rounded-xl border p-4;
-        background: rgba(255, 255, 255, 0.03);
-        border-color: rgba(167, 139, 250, 0.15);
-        backdrop-filter: blur(8px);
-        box-shadow: 0 0 40px rgba(167, 139, 250, 0.08);
-    }
-
-    .discord-panel > *,
-    .discord-mini-panel > * {
+    .discord-panel > * {
         position: relative;
         z-index: 1;
     }
@@ -1280,25 +1270,16 @@
         transform: translateX(120%);
     }
 
-    .product-stat,
     .license-stat {
         @apply rounded-xl border p-4 transition;
         background: rgba(20, 17, 34, 0.42);
         border-color: rgba(180, 155, 255, 0.08);
     }
 
-    .product-stat:hover,
     .license-stat:hover {
         border-color: rgba(180, 155, 255, 0.28);
         background: rgba(180, 155, 255, 0.06);
         transform: translateY(-2px);
-    }
-
-    .product-stat-featured {
-        background:
-            linear-gradient(135deg, rgba(180, 155, 255, 0.14), rgba(20, 17, 34, 0.5)),
-            rgba(20, 17, 34, 0.42);
-        border-color: rgba(180, 155, 255, 0.4);
     }
 
     .product-hero-pill {
@@ -1393,12 +1374,6 @@
         color: #a1a1aa;
         font-size: 0.72rem;
         font-weight: 700;
-    }
-
-    .package-saving {
-        @apply mt-3 rounded-lg border px-3 py-2;
-        background: var(--aksa-success-bg);
-        border-color: rgba(var(--aksa-success-rgb) / 0.2);
     }
 
     .package-saving-badge {
@@ -3303,7 +3278,6 @@
 
     .home-panel,
     .home-stat,
-    .product-stat,
     .license-stat,
     .order-stat,
     .download-feature,
@@ -3337,7 +3311,6 @@
 
     .home-panel:hover,
     .home-stat:hover,
-    .product-stat:hover,
     .license-stat:hover,
     .order-stat:hover,
     .download-feature:hover,

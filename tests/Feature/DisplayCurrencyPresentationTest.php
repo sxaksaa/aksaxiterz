@@ -67,8 +67,6 @@ class DisplayCurrencyPresentationTest extends TestCase
             ->assertOk()
             ->assertSee('data-price-idr="10000"', false)
             ->assertSee('data-price-usd="1"', false)
-            ->assertSee('data-currency-text-idr="1 day access"', false)
-            ->assertSee('data-currency-text-usd="7 days access"', false)
             ->assertSee('data-price-usdt="2"', false)
             ->assertSee('data-price-usdt="1"', false);
 

@@ -319,7 +319,7 @@ class ProductStockFeedTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_product_detail_renders_live_stock_endpoint_and_total_and_package_targets(): void
+    public function test_product_detail_renders_live_stock_endpoint_and_package_targets(): void
     {
         $category = Category::create(['name' => 'Detail Markers', 'slug' => 'detail-stock-markers']);
         [$product, $package] = $this->productWithPackage(
@@ -344,9 +344,8 @@ class ProductStockFeedTest extends TestCase
                 false
             )
             ->assertSee('data-product-status-badge', false)
-            ->assertSee('data-product-availability-value', false)
-            ->assertSee('data-product-availability-caption', false)
-            ->assertSee('data-product-availability-note', false)
+            ->assertDontSee('Starts from')
+            ->assertDontSee('data-product-availability-value', false)
             ->assertSee('data-package-card', false)
             ->assertSee('data-package-id="'.$package->id.'"', false)
             ->assertSee('data-stock="2"', false)
@@ -361,10 +360,6 @@ class ProductStockFeedTest extends TestCase
             ->assertDontSee('DETAIL-MARKER-KEY-1')
             ->assertDontSee('DETAIL-MARKER-KEY-2');
 
-        $this->assertMatchesRegularExpression(
-            '/data-product-availability-value[^>]*>\s*2\s*</',
-            $response->getContent()
-        );
     }
 
     public function test_home_and_fragment_list_ready_products_before_updating_products(): void
