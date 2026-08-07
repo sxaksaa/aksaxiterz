@@ -190,9 +190,19 @@ php artisan schedule:list >/dev/null
 
 readonly SCHEDULER_CRON_FILE="/etc/cron.d/aksaxiterz"
 [[ -f "${SCHEDULER_CRON_FILE}" ]] || fail "missing Laravel scheduler cron: ${SCHEDULER_CRON_FILE}"
+
+# Debian cron ignores a cron.d file when its final line is not newline-terminated.
+cron_last_byte="$(tail -c 1 "${SCHEDULER_CRON_FILE}" | od -An -t x1 | tr -d '[:space:]')"
+if [[ -s "${SCHEDULER_CRON_FILE}" && "${cron_last_byte}" != "0a" ]]; then
+    printf '\n' >> "${SCHEDULER_CRON_FILE}"
+fi
+
+chown root:root "${SCHEDULER_CRON_FILE}"
+chmod 0644 "${SCHEDULER_CRON_FILE}"
 grep -Eq '^[^#].*artisan[[:space:]]+schedule:run' "${SCHEDULER_CRON_FILE}" || \
     fail "Laravel scheduler cron does not run artisan schedule:run"
 systemctl is-active --quiet cron || fail "cron service is not active"
+systemctl reload cron
 
 # Application source is read-only to www-data; only Laravel runtime paths are writable.
 chown -R root:www-data "${APP_DIR}"

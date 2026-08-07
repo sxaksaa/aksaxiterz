@@ -12,6 +12,20 @@ For critical log alerts, set `LOG_STACK=daily,slack` and `LOG_SLACK_WEBHOOK_URL`
 
 The deploy script creates a backup before applying migrations. Production must have `mysqldump` installed and the scheduler cron active. Keep `storage/app/backups` private and periodically copy backups to a separate server or encrypted cloud storage.
 
+To download the newest application-managed backup manually from Windows PowerShell, first list the newest filename:
+
+```text
+ssh aksaxiterz-vps "find /var/www/aksaxiterz/storage/app/backups -maxdepth 1 -type f -name 'database-*.sql.gz' -printf '%f\n' | sort | tail -1"
+```
+
+Then replace `<filename>` with that result and choose a local destination:
+
+```text
+scp aksaxiterz-vps:/var/www/aksaxiterz/storage/app/backups/<filename> D:\Backup\Aksaxiterz\
+```
+
+The laptop only needs to be on during this manual download; scheduled VPS backups do not depend on the laptop.
+
 To inspect a backup without touching production:
 
 1. Copy the `.sql.gz` file to a safe test machine.
