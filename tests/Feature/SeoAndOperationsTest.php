@@ -6,7 +6,6 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class SeoAndOperationsTest extends TestCase
@@ -57,28 +56,5 @@ class SeoAndOperationsTest extends TestCase
             ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
             ->assertSee(route('products.show', $visible->slug), false)
             ->assertDontSee('hidden-product');
-    }
-
-    public function test_sqlite_backup_command_creates_a_copy(): void
-    {
-        $source = storage_path('framework/testing/backup-source.sqlite');
-        $destination = storage_path('framework/testing/backups');
-        File::ensureDirectoryExists(dirname($source));
-        File::put($source, 'sqlite-backup-test');
-
-        config([
-            'database.default' => 'sqlite',
-            'database.connections.sqlite.database' => $source,
-            'backup.path' => $destination,
-        ]);
-
-        $this->artisan('ops:backup-database')->assertSuccessful();
-
-        $backups = File::glob($destination.'/database-*.sqlite');
-        $this->assertCount(1, $backups);
-        $this->assertSame('sqlite-backup-test', File::get($backups[0]));
-
-        File::delete($source);
-        File::deleteDirectory($destination);
     }
 }

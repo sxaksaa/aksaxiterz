@@ -8,20 +8,22 @@ For critical log alerts, set `LOG_STACK=daily,slack` and `LOG_SLACK_WEBHOOK_URL`
 
 ## Database backups
 
-`php artisan ops:backup-database` creates a compressed, timestamped database dump. The scheduler runs it daily at 02:30 and deletes backups older than `BACKUP_RETENTION_DAYS`.
+Production uses one VPS-managed backup system: `/usr/local/sbin/aksaxiterz-backup`. It creates a compressed database dump, a compressed application-files archive, SHA-256 checksums, and a status file under `/var/backups/aksaxiterz/auto`.
 
-The deploy script creates a backup before applying migrations. Production must have `mysqldump` installed and the scheduler cron active. Keep `storage/app/backups` private and periodically copy backups to a separate server or encrypted cloud storage.
+The VPS cron runs the backup daily at 03:10 WIB and keeps 14 days. The deploy script runs the same complete backup before applying migrations. Laravel Scheduler remains responsible only for payment, order-expiration, and stock-reservation jobs.
 
-To download the newest application-managed backup manually from Windows PowerShell, first list the newest filename:
+To list the latest database and application-files backups from Windows PowerShell:
 
 ```text
-ssh aksaxiterz-vps "find /var/www/aksaxiterz/storage/app/backups -maxdepth 1 -type f -name 'database-*.sql.gz' -printf '%f\n' | sort | tail -1"
+ssh aksaxiterz-vps "find /var/backups/aksaxiterz/auto/db -type f -name '*.sql.gz' -printf '%f\n' | sort | tail -1"
+ssh aksaxiterz-vps "find /var/backups/aksaxiterz/auto/files -type f -name '*.tar.gz' -printf '%f\n' | sort | tail -1"
 ```
 
-Then replace `<filename>` with that result and choose a local destination:
+Then replace the placeholders with those results and choose a local destination:
 
 ```text
-scp aksaxiterz-vps:/var/www/aksaxiterz/storage/app/backups/<filename> D:\Backup\Aksaxiterz\
+scp aksaxiterz-vps:/var/backups/aksaxiterz/auto/db/<database-filename> D:\Backup\Aksaxiterz\
+scp aksaxiterz-vps:/var/backups/aksaxiterz/auto/files/<files-filename> D:\Backup\Aksaxiterz\
 ```
 
 The laptop only needs to be on during this manual download; scheduled VPS backups do not depend on the laptop.
@@ -41,7 +43,7 @@ Run these checks after every production deployment:
 
 ```text
 php artisan schedule:list
-php artisan ops:backup-database
+/usr/local/sbin/aksaxiterz-backup
 curl --fail https://aksaxiterz.com/up
 curl --fail https://aksaxiterz.com/sitemap.xml
 ```

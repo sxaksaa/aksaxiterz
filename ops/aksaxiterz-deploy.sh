@@ -6,6 +6,7 @@ readonly EXPECTED_APP_DIR="/var/www/aksaxiterz"
 readonly DEPLOY_BRANCH="main"
 readonly PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
 readonly WEB_SERVICE="${WEB_SERVICE:-nginx}"
+readonly VPS_BACKUP_SCRIPT="/usr/local/sbin/aksaxiterz-backup"
 
 fail() {
     printf 'Deploy failed: %s\n' "$1" >&2
@@ -20,6 +21,7 @@ readonly APP_DIR
 [[ "${APP_DIR}" == "${EXPECTED_APP_DIR}" ]] || fail "app directory must resolve exactly to ${EXPECTED_APP_DIR}"
 [[ -d "${APP_DIR}/.git" ]] || fail "app directory is not a Git checkout"
 [[ -f "${APP_DIR}/.env" ]] || fail "missing ${APP_DIR}/.env"
+[[ -x "${VPS_BACKUP_SCRIPT}" ]] || fail "missing executable VPS backup script: ${VPS_BACKUP_SCRIPT}"
 
 unexpected_env_file="$(find "${APP_DIR}" -maxdepth 1 -name '.env*' \
     ! -name '.env' ! -name '.env.example' -print -quit)"
@@ -156,7 +158,7 @@ export COMPOSER_ALLOW_SUPERUSER=1
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 npm ci
 npm run build
-php artisan ops:backup-database
+"${VPS_BACKUP_SCRIPT}"
 php artisan migrate --force
 
 # A pre-existing storage path must be the expected symlink.
