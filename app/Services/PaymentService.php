@@ -547,9 +547,21 @@ class PaymentService
         if ($binanceFirst) {
             $binanceInspection = $this->inspectDirectBinanceDeposits($order, $payload);
 
-            if (! empty($binanceInspection['transfer'])) {
+            // A primary Binance deposit-history verifier is authoritative. Do not
+            // fall through to public chain RPCs when Binance reports no match or
+            // a provider error; the next scheduler run will retry Binance safely.
+            if ($binanceInspection !== null) {
                 return $binanceInspection;
             }
+
+            return [
+                'transfer' => null,
+                'mismatches' => [],
+                'binance_diagnostics' => [
+                    'status' => 'unsupported_payment_payload',
+                    'returned_records' => 0,
+                ],
+            ];
         }
 
         try {

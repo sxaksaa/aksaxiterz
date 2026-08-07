@@ -741,6 +741,7 @@ class PaymentServiceTest extends TestCase
         $this->assertSame(1, $inspection['binance_diagnostics']['rejections']['network'] ?? null);
         $this->assertSame(1, $inspection['binance_diagnostics']['closest_record']['wallet_type'] ?? null);
         $this->assertSame('Off-chain Transfer 381464465096', $inspection['binance_diagnostics']['closest_record']['reference'] ?? null);
+        Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'https://bsc-rpc.test/'));
     }
 
     public function test_direct_crypto_scanner_reports_binance_api_rejection(): void
@@ -786,6 +787,7 @@ class PaymentServiceTest extends TestCase
             'Invalid API-key, IP, or permissions for action.',
             $inspection['binance_diagnostics']['message'] ?? null
         );
+        Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'https://bsc-rpc.test/'));
     }
 
     private function fakeBscRpcTransfer(

@@ -526,6 +526,23 @@ Route::get('/auth/google', function (Request $request) use ($isSafeLoginRedirect
 })->middleware('throttle:60,1');
 
 Route::get('/auth/google/callback', function (Request $request) use ($isSafeLoginRedirect) {
+    if ($request->filled('error') || ! $request->filled('code')) {
+        $cancelled = $request->string('error')->toString() === 'access_denied';
+
+        Log::notice('Google login callback rejected before token exchange', [
+            'reason' => $cancelled ? 'access_denied' : 'missing_authorization_code',
+            'host' => $request->getHost(),
+        ]);
+
+        session()->forget('login_redirect');
+        Cookie::queue(Cookie::forget('login_redirect'));
+
+        return redirect('/')->withErrors([
+            'auth' => $cancelled
+                ? 'Google sign-in was cancelled. Please try again when you are ready.'
+                : 'Google did not return a valid sign-in response. Please try again.',
+        ]);
+    }
 
     try {
         $googleUser = Socialite::driver('google')->user();
@@ -536,6 +553,7 @@ Route::get('/auth/google/callback', function (Request $request) use ($isSafeLogi
         ]);
 
         Cookie::queue(Cookie::forget('login_redirect'));
+        session()->forget('login_redirect');
 
         return redirect('/')->withErrors([
             'auth' => 'Login session expired. Please try signing in again.',
