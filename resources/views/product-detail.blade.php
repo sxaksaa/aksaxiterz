@@ -308,6 +308,7 @@
             let stockTimer = null;
             let stockRequest = null;
             let addRequestPending = false;
+            let quantityDirection = null;
 
             const formatIdr = value => `Rp ${Number(value).toLocaleString('id-ID')}`;
             const formatUsd = value => `$${Number(value).toLocaleString(undefined, {
@@ -360,7 +361,15 @@
                     normalizedPackageName(selectedPackage.name);
                 document.getElementById('mobileSelectedPackage').textContent =
                     normalizedPackageName(selectedPackage.name);
-                document.getElementById('quantityValue').textContent = selectedQuantity;
+                const quantityValue = document.getElementById('quantityValue');
+                quantityValue.textContent = selectedQuantity;
+                if (quantityDirection) {
+                    quantityValue.classList.remove('quantity-change-up', 'quantity-change-down');
+                    void quantityValue.offsetWidth;
+                    quantityValue.classList.add(`quantity-change-${quantityDirection}`);
+                    setTimeout(() => quantityValue.classList.remove('quantity-change-up', 'quantity-change-down'), 280);
+                    quantityDirection = null;
+                }
                 document.getElementById('quantityLimit').textContent = `Max: ${maxQuantity}`;
                 document.getElementById('quantityMinus').disabled = selectedQuantity <= 1;
                 document.getElementById('quantityPlus').disabled = selectedQuantity >= maxQuantity;
@@ -592,12 +601,14 @@
             });
 
             document.getElementById('quantityMinus')?.addEventListener('click', () => {
+                quantityDirection = 'down';
                 selectedQuantity = Math.max(1, selectedQuantity - 1);
                 renderSelection();
             }, { signal: pageController.signal });
 
             document.getElementById('quantityPlus')?.addEventListener('click', () => {
                 if (!selectedPackage) return;
+                quantityDirection = 'up';
                 selectedQuantity = Math.min(
                     selectedPackage.stock,
                     maxCheckoutQuantity,
@@ -606,18 +617,23 @@
                 renderSelection();
             }, { signal: pageController.signal });
 
-            document.getElementById('buyNowBtn')?.addEventListener('click', () => {
+            document.getElementById('buyNowBtn')?.addEventListener('click', event => {
                 if (!selectionAvailable()) return;
                 const url = new URL(checkoutUrl, window.location.origin);
                 url.searchParams.set('package', String(selectedPackage.id));
                 url.searchParams.set('quantity', String(selectedQuantity));
-                window.location.href = isAuthenticated
-                    ? url.toString()
-                    : `/auth/google?redirect=${encodeURIComponent(url.pathname + url.search)}`;
+                window.pulseAksaSuccess?.(event.currentTarget);
+                setTimeout(() => {
+                    window.location.href = isAuthenticated
+                        ? url.toString()
+                        : `/auth/google?redirect=${encodeURIComponent(url.pathname + url.search)}`;
+                }, 240);
             }, { signal: pageController.signal });
 
             document.getElementById('mobileBuyNowBtn')?.addEventListener('click', () => {
-                document.getElementById('buyNowBtn')?.click();
+                const mobileButton = document.getElementById('mobileBuyNowBtn');
+                window.pulseAksaSuccess?.(mobileButton);
+                setTimeout(() => document.getElementById('buyNowBtn')?.click(), 120);
             }, { signal: pageController.signal });
 
             document.getElementById('addToCartBtn')?.addEventListener('click', async function() {
@@ -652,6 +668,7 @@
                         throw new Error(data.message || 'The package could not be added to your cart.');
                     }
 
+                    const previousCartCount = Number(document.querySelector('[data-cart-count]')?.textContent || 0);
                     document.querySelectorAll('[data-cart-count]').forEach(badge => {
                         badge.textContent = data.cart_count;
                         badge.classList.toggle('hidden', Number(data.cart_count) < 1);
@@ -661,9 +678,11 @@
                     );
                     window.refreshAksaMiniCart?.(data.cart_preview_html, data.cart_count, {
                         autoOpen: true,
+                        firstItem: previousCartCount === 0 && Number(data.cart_count) > 0,
                     });
                     toast('Added to cart', data.message, 'success');
                     buttonLabel(this, 'Added');
+                    window.pulseAksaSuccess?.(this);
                     setTimeout(() => {
                         addRequestPending = false;
                         renderSelection();

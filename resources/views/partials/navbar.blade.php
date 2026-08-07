@@ -35,7 +35,7 @@
                     <x-ui.icon name="receipt" class="nav-icon" />
                     <span>Orders</span>
                     @if (($pendingOrderCount ?? 0) > 0)
-                        <span class="nav-pending-dot" title="{{ $pendingOrderCount }} payment waiting"
+                        <span class="nav-pending-dot {{ request()->is('orders*') ? 'is-viewed' : '' }}" title="{{ $pendingOrderCount }} payment waiting"
                             data-pending-label="{{ $pendingOrderCount }} payment waiting"
                             aria-label="{{ $pendingOrderCount }} payment waiting"></span>
                     @endif

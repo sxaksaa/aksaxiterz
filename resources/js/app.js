@@ -1150,6 +1150,7 @@ function showPaymentSuccess(options = {}) {
         : (options.licenseKey ? [options.licenseKey] : []);
 
     if (!modal) {
+        launchPaymentCelebration(document.body);
         window.showAppToast?.('Payment successful', options.message || 'Your payment has been verified.', {
             variant: 'success',
         });
@@ -1195,11 +1196,35 @@ function showPaymentSuccess(options = {}) {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
+    launchPaymentCelebration(modal);
 
     copyLicenseKeys(licenseKeys, copyStatus);
     startPaymentSuccessRedirect(redirectUrl, redirectDelay, countdown, redirectLabel);
 
     return true;
+}
+
+function launchPaymentCelebration(container) {
+    if (!(container instanceof Element) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    container.querySelector('[data-payment-confetti]')?.remove();
+    const burst = document.createElement('div');
+    burst.dataset.paymentConfetti = '';
+    burst.className = 'payment-confetti';
+
+    for (let index = 0; index < 14; index += 1) {
+        const piece = document.createElement('span');
+        const angle = (360 / 14) * index;
+        const distance = 72 + (index % 4) * 12;
+        piece.style.setProperty('--confetti-x', `${Math.cos(angle * Math.PI / 180) * distance}px`);
+        piece.style.setProperty('--confetti-y', `${Math.sin(angle * Math.PI / 180) * distance}px`);
+        piece.style.setProperty('--confetti-delay', `${(index % 3) * 24}ms`);
+        piece.style.setProperty('--confetti-rotate', `${120 + index * 27}deg`);
+        burst.appendChild(piece);
+    }
+
+    container.appendChild(burst);
+    window.setTimeout(() => burst.remove(), 1050);
 }
 
 window.showAksaPaymentSuccess = showPaymentSuccess;
@@ -2108,7 +2133,22 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
     void root.offsetWidth;
     root.classList.add('mini-cart-bump');
 
+    if (options.firstItem) {
+        root.classList.remove('mini-cart-first-item');
+        void root.offsetWidth;
+        root.classList.add('mini-cart-first-item');
+        window.setTimeout(() => root.classList.remove('mini-cart-first-item'), 650);
+    }
+
     if (options.autoOpen) setMiniCartOpen(true, { auto: true });
+};
+
+window.pulseAksaSuccess = function(button) {
+    if (!(button instanceof Element)) return;
+    button.classList.remove('aksa-action-success');
+    void button.offsetWidth;
+    button.classList.add('aksa-action-success');
+    window.setTimeout(() => button.classList.remove('aksa-action-success'), 900);
 };
 
 window.animateAksaCartTransfer = async function(source) {
@@ -3361,6 +3401,11 @@ document.addEventListener('click', async (event) => {
         await navigator.clipboard.writeText(text);
         setButtonLabel(button, 'Copied ✓');
         button.classList.add('text-green-400');
+        button.classList.add('is-copy-success');
+        const licenseBox = button.closest('.license-key-box');
+        licenseBox?.classList.remove('license-copy-success');
+        if (licenseBox) void licenseBox.offsetWidth;
+        licenseBox?.classList.add('license-copy-success');
         window.showAppToast?.('License copied', 'The license key is ready to paste.', {
             variant: 'success',
         });
@@ -3372,6 +3417,8 @@ document.addEventListener('click', async (event) => {
         setTimeout(() => {
             setButtonLabel(button, originalText || 'Copy');
             button.classList.remove('text-green-400');
+            button.classList.remove('is-copy-success');
+            button.closest('.license-key-box')?.classList.remove('license-copy-success');
         }, 1800);
     }
 });
