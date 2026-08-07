@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
-use App\Support\OrderStats;
+use App\Models\Order;
 use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -27,19 +27,40 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        View::composer('partials.navbar', function ($view): void {
-            $cartCount = 0;
-            $pendingOrderCount = 0;
+        View::composer(['partials.navbar', 'partials.pending-payment-reminder'], function ($view): void {
+            $context = request()->attributes->get('storefront_user_context');
 
-            if (Auth::check()) {
-                $cartCount = (int) CartItem::where('user_id', Auth::id())->sum('quantity');
-                $pendingOrderCount = OrderStats::forUser((int) Auth::id())['pending'];
+            if (! is_array($context)) {
+                $context = [
+                    'cartCount' => 0,
+                    'pendingOrderCount' => 0,
+                    'pendingOrder' => null,
+                ];
+
+                if (Auth::check()) {
+                    $pendingOrders = Order::query()
+                        ->where('user_id', Auth::id())
+                        ->where('status', 'pending')
+                        ->where(fn ($query) => $query
+                            ->whereNull('expired_at')
+                            ->orWhere('expired_at', '>', now()))
+                        ->latest()
+                        ->get(['id', 'order_id', 'payment_method', 'expired_at']);
+
+                    $context = [
+                        'cartCount' => (int) CartItem::where('user_id', Auth::id())->sum('quantity'),
+                        'pendingOrderCount' => $pendingOrders->count(),
+                        'pendingOrder' => $pendingOrders->first(),
+                    ];
+                }
+
+                request()->attributes->set('storefront_user_context', $context);
             }
 
-            $view->with([
-                'cartCount' => $cartCount,
-                'pendingOrderCount' => $pendingOrderCount,
-            ]);
+            $view->with(array_merge(
+                $context,
+                array_intersect_key($view->getData(), $context)
+            ));
         });
 
         Event::listen(DiagnosingHealth::class, function (): void {

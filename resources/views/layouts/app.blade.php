@@ -112,6 +112,10 @@
         @include('partials.navbar')
     </div>
 
+    @auth
+        @include('partials.pending-payment-reminder')
+    @endauth
+
     <main id="aksaPageContent" data-aksa-page-content>
         @yield('content')
     </main>

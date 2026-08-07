@@ -64,4 +64,17 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('Admin Dashboard', $html);
         $this->assertStringContainsString('action="/logout"', $html);
     }
+
+    public function test_pending_payment_reminder_stays_compact_and_links_to_the_invoice(): void
+    {
+        $html = view('partials.pending-payment-reminder', [
+            'pendingOrderCount' => 1,
+            'pendingOrder' => (object) ['order_id' => 'ORDER-PENDING-REMINDER'],
+        ])->render();
+
+        $this->assertStringContainsString('1 payment', $html);
+        $this->assertStringContainsString('is waiting', $html);
+        $this->assertStringContainsString('Continue Payment', $html);
+        $this->assertStringContainsString('/orders/ORDER-PENDING-REMINDER/payment', $html);
+    }
 }
