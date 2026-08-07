@@ -1640,6 +1640,7 @@
     }
 
     .site-navbar-pill {
+        min-height: 4.28125rem;
         pointer-events: auto;
         background:
             radial-gradient(circle at 18% 0%, rgba(180, 155, 255, 0.12), transparent 18rem),
