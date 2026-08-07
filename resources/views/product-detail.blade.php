@@ -146,7 +146,7 @@
                         data-package-checkout-enabled="{{ $packageCheckoutAvailable ? 'true' : 'false' }}"
                         aria-disabled="{{ $packageCheckoutAvailable ? 'false' : 'true' }}"
                         role="button" tabindex="{{ $packageCheckoutAvailable ? '0' : '-1' }}"
-                        class="package-card package relative p-4 transition {{ $packageCheckoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
+                        class="package-card package relative flex flex-col p-4 transition {{ $packageCheckoutAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-75' }}">
                         @if ($badgeIdr || $badgeUsd)
                             <div class="badge {{ $badgeIdr ? '' : 'hidden' }}" data-currency-visibility
                                 data-currency-visible-idr="{{ $badgeIdr ? 'true' : 'false' }}"
@@ -196,10 +196,10 @@
                         @endif
 
                         <p data-package-availability
-                            class="package-availability {{ $packageCheckoutAvailable ? 'package-availability-ready' : 'package-availability-manual' }}">
+                            class="package-availability mt-auto border-t border-white/5 pt-3 {{ $packageCheckoutAvailable ? 'package-availability-ready' : 'package-availability-manual' }}">
                             <span class="package-availability-dot" aria-hidden="true"></span>
                             <span data-package-availability-label>
-                                {{ ! $isProductReady ? 'Checkout paused during update' : ($packageStock > 0 ? $packageStock.' licenses ready' : 'Manual order via Discord') }}
+                                {{ ! $isProductReady ? 'Checkout paused during update' : ($packageStock > 0 ? $packageStock.' available · Auto delivery' : 'Manual order via Discord') }}
                             </span>
                         </p>
 
@@ -452,7 +452,7 @@
                         ? 'Product unavailable'
                         : (!productReady
                             ? 'Checkout paused during update'
-                            : (packageStock > 0 ? `${packageStock} licenses ready` : 'Manual order via Discord'));
+                            : (packageStock > 0 ? `${packageStock} available · Auto delivery` : 'Manual order via Discord'));
 
                     const manual = card.querySelector('[data-manual-order]');
                     manual.classList.toggle('hidden', enabled);

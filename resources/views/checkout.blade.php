@@ -63,7 +63,7 @@
                     <section class="checkout-order-review product-section fade-up">
                         <button id="checkoutOrderReviewToggle" type="button" class="checkout-order-review-toggle"
                             aria-expanded="false" aria-controls="checkoutOrderReviewItems">
-                            <span>
+                            <span class="text-left">
                                 <span class="block text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 1</span>
                                 <span class="mt-1 block text-left text-xl font-semibold text-white">Order review</span>
                             </span>

@@ -1337,6 +1337,10 @@
         gap: 0.7rem;
     }
 
+    .package-card {
+        min-height: 12rem;
+    }
+
     .package-card-icon {
         display: inline-flex;
         width: 2rem;
@@ -1384,7 +1388,7 @@
     }
 
     .package-availability {
-        @apply mt-3 flex items-center gap-2 text-xs;
+        @apply flex items-center gap-2 text-xs;
     }
 
     .package-availability-dot {

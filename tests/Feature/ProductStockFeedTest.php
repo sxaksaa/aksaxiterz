@@ -351,7 +351,7 @@ class ProductStockFeedTest extends TestCase
             ->assertSee('data-stock="2"', false)
             ->assertSee('data-package-checkout-enabled="true"', false)
             ->assertSee('data-package-availability', false)
-            ->assertSee('2 licenses ready')
+            ->assertSee('2 available · Auto delivery')
             ->assertSee('data-manual-order', false)
             ->assertSee('data-manual-order-label', false)
             ->assertSee('id="addToCartBtn"', false)
