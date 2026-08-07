@@ -44,6 +44,7 @@ class CartController extends Controller
     {
         $items = $this->cartService->items($request->user());
         $this->attachAvailability($items);
+        $this->loadRecommendationData($items);
 
         return response()->json([
             'cart_count' => (int) $items->sum('quantity'),
@@ -82,10 +83,18 @@ class CartController extends Controller
                 'cart_preview_html' => view('partials.mini-cart-content', [
                     'miniCartItems' => tap($this->cartService->items($request->user()), function ($items): void {
                         $this->attachAvailability($items);
+                        $this->loadRecommendationData($items);
                     }),
                 ])->render(),
             ]);
         });
+    }
+
+    private function loadRecommendationData($items): void
+    {
+        $items->loadMissing([
+            'product.packages' => fn ($query) => $query->withCount('availableLicenseStocks'),
+        ]);
     }
 
     public function update(Request $request, CartItem $cartItem)

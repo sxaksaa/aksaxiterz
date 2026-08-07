@@ -34,6 +34,11 @@
                 <a href="/orders" data-soft-nav class="nav-item {{ request()->is('orders*') ? 'active' : '' }}">
                     <x-ui.icon name="receipt" class="nav-icon" />
                     <span>Orders</span>
+                    @if (($pendingOrderCount ?? 0) > 0)
+                        <span class="nav-pending-dot" title="{{ $pendingOrderCount }} payment waiting"
+                            data-pending-label="{{ $pendingOrderCount }} payment waiting"
+                            aria-label="{{ $pendingOrderCount }} payment waiting"></span>
+                    @endif
                 </a>
                 <a href="/licenses" data-soft-nav class="nav-item {{ request()->is('licenses*') ? 'active' : '' }}">
                     <x-ui.icon name="key-round" class="nav-icon" />
@@ -74,8 +79,10 @@
                             <x-ui.icon name="x" class="h-4 w-4" />
                         </button>
                         <div data-mini-cart-content class="mini-cart-loading" role="status">
-                            <span class="mini-cart-loading-dot" aria-hidden="true"></span>
-                            <span>Loading cart...</span>
+                            <span class="mini-cart-skeleton-line mini-cart-skeleton-title" aria-hidden="true"></span>
+                            <span class="mini-cart-skeleton-row" aria-hidden="true"></span>
+                            <span class="mini-cart-skeleton-row" aria-hidden="true"></span>
+                            <span class="sr-only">Loading cart...</span>
                         </div>
                     </div>
                 </div>
@@ -235,6 +242,11 @@
             <a href="/orders" data-mobile-menu-link data-soft-nav class="nav-item">
                 <x-ui.icon name="receipt" class="nav-icon" />
                 <span>Orders</span>
+                @if (($pendingOrderCount ?? 0) > 0)
+                    <span class="ml-auto rounded-full bg-aksa-accent px-2 py-0.5 text-[10px] font-bold text-white">
+                        {{ $pendingOrderCount }} pending
+                    </span>
+                @endif
             </a>
             <a href="/licenses" data-mobile-menu-link data-soft-nav class="nav-item">
                 <x-ui.icon name="key-round" class="nav-icon" />

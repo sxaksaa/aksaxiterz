@@ -267,6 +267,16 @@
                 Continue to Checkout opens payment options. Add to Cart lets you combine packages first.
             </p>
         </section>
+
+        <aside id="mobileCheckoutBar" class="mobile-checkout-bar" aria-hidden="true">
+            <div class="min-w-0">
+                <p id="mobileSelectedPackage" class="truncate text-xs text-gray-400">Select package</p>
+                <p id="mobileSelectedSubtotal" class="mt-0.5 text-base font-bold text-white">-</p>
+            </div>
+            <button id="mobileBuyNowBtn" type="button" class="btn-main min-h-11 shrink-0 px-5" disabled>
+                Checkout
+            </button>
+        </aside>
     </div>
 
     @include('partials.recent-purchase-toast', [
@@ -331,8 +341,12 @@
 
             function renderSelection() {
                 const summary = document.getElementById('summaryBox');
+                const mobileBar = document.getElementById('mobileCheckoutBar');
                 if (!selectedPackage) {
                     summary.classList.add('hidden');
+                    mobileBar?.classList.remove('is-visible');
+                    mobileBar?.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('mobile-checkout-open');
                     return;
                 }
 
@@ -343,6 +357,8 @@
                 selectedQuantity = Math.min(selectedQuantity, maxQuantity);
                 summary.classList.remove('hidden');
                 document.getElementById('selectedPackage').textContent =
+                    normalizedPackageName(selectedPackage.name);
+                document.getElementById('mobileSelectedPackage').textContent =
                     normalizedPackageName(selectedPackage.name);
                 document.getElementById('quantityValue').textContent = selectedQuantity;
                 document.getElementById('quantityLimit').textContent = `Max: ${maxQuantity}`;
@@ -364,12 +380,14 @@
                     setTimeout(() => subtotal.classList.remove('aksa-price-changing'), 300);
                 }
                 subtotal.textContent = nextSubtotal;
+                document.getElementById('mobileSelectedSubtotal').textContent = nextSubtotal;
 
                 const available = selectionAvailable();
                 const addButton = document.getElementById('addToCartBtn');
                 const buyButton = document.getElementById('buyNowBtn');
                 addButton.disabled = !available || addRequestPending;
                 buyButton.disabled = !available;
+                document.getElementById('mobileBuyNowBtn').disabled = !available;
                 addButton.classList.toggle('opacity-60', !available || addRequestPending);
                 buyButton.classList.toggle('opacity-60', !available);
 
@@ -377,6 +395,9 @@
                     buttonLabel(addButton, available ? 'Add to Cart' : 'Unavailable');
                 }
                 buttonLabel(buyButton, available ? 'Continue to Checkout' : 'Unavailable');
+                mobileBar?.classList.add('is-visible');
+                mobileBar?.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('mobile-checkout-open');
             }
 
             function choosePackage(card) {
@@ -595,6 +616,10 @@
                     : `/auth/google?redirect=${encodeURIComponent(url.pathname + url.search)}`;
             }, { signal: pageController.signal });
 
+            document.getElementById('mobileBuyNowBtn')?.addEventListener('click', () => {
+                document.getElementById('buyNowBtn')?.click();
+            }, { signal: pageController.signal });
+
             document.getElementById('addToCartBtn')?.addEventListener('click', async function() {
                 if (!selectionAvailable() || addRequestPending) return;
 
@@ -665,6 +690,7 @@
             });
 
             window.addEventListener('aksa:before-page-swap', () => {
+                document.body.classList.remove('mobile-checkout-open');
                 clearTimeout(stockTimer);
                 stockRequest?.abort();
                 pageController.abort();

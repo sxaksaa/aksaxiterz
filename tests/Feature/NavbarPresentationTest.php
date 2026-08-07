@@ -56,6 +56,7 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('data-mini-cart-panel', $html);
         $this->assertStringContainsString('data-mini-cart-content', $html);
         $this->assertStringContainsString('Close cart preview', $html);
+        $this->assertStringContainsString('mini-cart-skeleton-row', $html);
         $this->assertStringContainsString('href="/orders"', $html);
         $this->assertStringContainsString('href="/licenses"', $html);
         $this->assertStringContainsString('data-profile-toggle', $html);

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CartItem;
+use App\Support\OrderStats;
 use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -27,11 +28,18 @@ class AppServiceProvider extends ServiceProvider
         }
 
         View::composer('partials.navbar', function ($view): void {
-            $cartCount = Auth::check()
-                ? (int) CartItem::where('user_id', Auth::id())->sum('quantity')
-                : 0;
+            $cartCount = 0;
+            $pendingOrderCount = 0;
 
-            $view->with('cartCount', $cartCount);
+            if (Auth::check()) {
+                $cartCount = (int) CartItem::where('user_id', Auth::id())->sum('quantity');
+                $pendingOrderCount = OrderStats::forUser((int) Auth::id())['pending'];
+            }
+
+            $view->with([
+                'cartCount' => $cartCount,
+                'pendingOrderCount' => $pendingOrderCount,
+            ]);
         });
 
         Event::listen(DiagnosingHealth::class, function (): void {

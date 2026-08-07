@@ -12,6 +12,34 @@
         fn ($item) => (bool) ($item->is_checkout_available ?? false) &&
             (int) ($item->available_stock ?? 0) >= (int) $item->quantity
     );
+    $cartPackageIds = $miniCartItems->pluck('package_id')->map(fn ($id) => (int) $id);
+    $recommendation = $miniCartItems
+        ->pluck('product')
+        ->filter()
+        ->unique('id')
+        ->flatMap(function ($product) use ($cartPackageIds) {
+            $daily = $product->packages?->first(fn ($package) => $package->durationDays() === 1);
+            if (! $daily || (int) $daily->price <= 0) return collect();
+
+            return $product->packages
+                ->filter(fn ($package) =>
+                    ! $cartPackageIds->contains((int) $package->id) &&
+                    (int) ($package->available_license_stocks_count ?? 0) > 0 &&
+                    ($package->durationDays() ?? 0) > 1
+                )
+                ->map(function ($package) use ($product, $daily) {
+                    $days = $package->durationDays();
+                    $comparison = (int) $daily->price * $days;
+                    $savingPercent = $comparison > 0
+                        ? (int) round((($comparison - (int) $package->price) / $comparison) * 100)
+                        : 0;
+
+                    return compact('product', 'package', 'savingPercent');
+                });
+        })
+        ->filter(fn ($suggestion) => $suggestion['savingPercent'] > 0)
+        ->sortByDesc('savingPercent')
+        ->first();
 @endphp
 
 <div data-mini-cart-content>
@@ -53,6 +81,22 @@
 
         @if ($hiddenItemCount > 0)
             <p class="mini-cart-more">+{{ $hiddenItemCount }} other {{ \Illuminate\Support\Str::plural('package', $hiddenItemCount) }}</p>
+        @endif
+
+        @if ($recommendation)
+            <a href="{{ route('products.show', $recommendation['product']->slug) }}"
+                class="mini-cart-recommendation" data-soft-nav>
+                <span class="mini-cart-recommendation-icon"><x-ui.icon name="sparkles" class="h-4 w-4" /></span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-xs font-semibold text-white">
+                        Save {{ $recommendation['savingPercent'] }}% with {{ $recommendation['package']->name }}
+                    </span>
+                    <span class="mt-0.5 block truncate text-[11px] text-gray-500">
+                        {{ $recommendation['product']->name }} · lower price per day
+                    </span>
+                </span>
+                <x-ui.icon name="arrow-right" class="h-4 w-4 shrink-0 text-aksa-accent" />
+            </a>
         @endif
 
         <div class="mini-cart-summary">

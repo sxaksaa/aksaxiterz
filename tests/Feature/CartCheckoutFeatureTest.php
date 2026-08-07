@@ -74,6 +74,19 @@ class CartCheckoutFeatureTest extends TestCase
     public function test_customer_can_load_a_checkout_ready_mini_cart_preview(): void
     {
         [$user, $product, $package] = $this->catalogItem('Aurora Preview', 20000, 1.25, 3);
+        $package->update(['name' => '1 Day']);
+        $valuePackage = Package::create([
+            'product_id' => $product->id,
+            'name' => '30 Days',
+            'price' => 300000,
+            'price_usdt' => 15,
+        ]);
+        LicenseStock::create([
+            'product_id' => $product->id,
+            'package_id' => $valuePackage->id,
+            'license_key' => 'AURORA-PREVIEW-VALUE',
+            'is_sold' => false,
+        ]);
         CartItem::create([
             'user_id' => $user->id,
             'product_id' => $product->id,
@@ -93,6 +106,8 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertStringContainsString('href="'.route('checkout.cart').'"', $html);
         $this->assertStringContainsString('Edit Cart', $html);
         $this->assertStringContainsString('Checkout', $html);
+        $this->assertStringContainsString('Save 50% with 30 Days', $html);
+        $this->assertStringContainsString('lower price per day', $html);
         $this->assertSame(1, substr_count($html, route('cart.index')));
     }
 
