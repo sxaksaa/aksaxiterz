@@ -22,9 +22,6 @@
                 {{ $miniCartItems->count() }} {{ \Illuminate\Support\Str::plural('package', $miniCartItems->count()) }}
             </p>
         </div>
-        <a href="{{ route('cart.index') }}" class="text-xs font-semibold text-aksa-accent hover:text-white">
-            View cart
-        </a>
     </div>
 
     @if ($miniCartItems->isEmpty())
@@ -67,11 +64,11 @@
         </div>
 
         <div class="mini-cart-actions">
-            <a href="{{ route('cart.index') }}" class="btn-footer-secondary min-h-10">View Cart</a>
             @if ($checkoutAvailable)
+                <a href="{{ route('cart.index') }}" class="btn-footer-secondary min-h-10">Edit Cart</a>
                 <a href="{{ route('checkout.cart') }}" class="btn-main min-h-10">Checkout</a>
             @else
-                <a href="{{ route('cart.index') }}" class="btn-main min-h-10">Review Cart</a>
+                <a href="{{ route('cart.index') }}" class="btn-main min-h-10 mini-cart-review-action">Review Cart</a>
             @endif
         </div>
     @endif

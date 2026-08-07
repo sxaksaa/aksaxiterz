@@ -1746,6 +1746,10 @@
         font-size: 0.78rem;
     }
 
+    .mini-cart-review-action {
+        grid-column: 1 / -1;
+    }
+
     .mini-cart-empty {
         padding: 1.6rem 0.5rem 1rem;
         text-align: center;

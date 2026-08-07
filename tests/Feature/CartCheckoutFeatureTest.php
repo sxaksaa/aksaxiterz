@@ -91,7 +91,9 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertMatchesRegularExpression('/2\s+licenses/', $html);
         $this->assertStringContainsString('data-price-idr="40000"', $html);
         $this->assertStringContainsString('href="'.route('checkout.cart').'"', $html);
+        $this->assertStringContainsString('Edit Cart', $html);
         $this->assertStringContainsString('Checkout', $html);
+        $this->assertSame(1, substr_count($html, route('cart.index')));
     }
 
     public function test_mini_cart_sends_unavailable_items_to_cart_review(): void
@@ -112,6 +114,7 @@ class CartCheckoutFeatureTest extends TestCase
 
         $this->assertStringContainsString('Review Cart', $html);
         $this->assertStringNotContainsString('href="'.route('checkout.cart').'"', $html);
+        $this->assertSame(1, substr_count($html, route('cart.index')));
     }
 
     public function test_cart_page_disables_checkout_when_an_item_changes_to_updating(): void
