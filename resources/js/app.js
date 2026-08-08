@@ -8,6 +8,17 @@ let qrisExpiryCountdownTimer = null;
 let cryptoExpiryCountdownTimer = null;
 let binancePayExpiryCountdownTimer = null;
 let recentPurchaseToastCleanup = null;
+const MINI_CART_SHEET_BREAKPOINT = 768;
+
+function usesMiniCartSheet() {
+    return window.innerWidth < MINI_CART_SHEET_BREAKPOINT;
+}
+
+function shouldLockPageForMiniCart() {
+    const hasPreciseHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+    return usesMiniCartSheet() && !hasPreciseHover;
+}
 
 function loadQrLogo(source) {
     return new Promise((resolve, reject) => {
@@ -2054,6 +2065,25 @@ function miniCartRoot() {
     return document.querySelector('[data-mini-cart-root]');
 }
 
+function miniCartOverlayParts() {
+    return {
+        panel: document.querySelector('[data-mini-cart-panel]'),
+        backdrop: document.querySelector('.mini-cart-backdrop'),
+    };
+}
+
+function moveMiniCartOverlay(root, open) {
+    const { panel, backdrop } = miniCartOverlayParts();
+
+    if (!root || !panel || !backdrop) return;
+
+    if (open && usesMiniCartSheet()) {
+        document.body.append(backdrop, panel);
+    } else if (!open && panel.parentElement !== root) {
+        root.append(backdrop, panel);
+    }
+}
+
 function setMiniCartOpen(open, { auto = false } = {}) {
     const root = miniCartRoot();
     const trigger = root?.querySelector('[data-mini-cart-trigger]');
@@ -2062,11 +2092,16 @@ function setMiniCartOpen(open, { auto = false } = {}) {
 
     if (open) document.getElementById('navbar')?.classList.remove('nav-hidden');
 
+    moveMiniCartOverlay(root, open);
+
     clearTimeout(miniCartAutoCloseTimer);
     root.classList.toggle('is-open', open);
     root.classList.toggle('is-auto-open', open && auto);
+    const { panel, backdrop } = miniCartOverlayParts();
+    panel?.classList.toggle('is-visible', open);
+    backdrop?.classList.toggle('is-visible', open);
     trigger.setAttribute('aria-expanded', String(open));
-    document.body.classList.toggle('mini-cart-sheet-open', open && window.innerWidth < 1280);
+    document.body.classList.toggle('mini-cart-sheet-open', open && shouldLockPageForMiniCart());
 
     if (open && auto) {
         miniCartAutoCloseTimer = window.setTimeout(() => {
@@ -2100,7 +2135,7 @@ async function ensureMiniCartLoaded() {
         window.refreshAksaMiniCart?.(data.html, data.cart_count);
         root.dataset.miniCartLoaded = 'true';
     } catch (error) {
-        const loading = root.querySelector('[data-mini-cart-content]');
+        const loading = document.querySelector('[data-mini-cart-content]');
         if (loading) loading.innerHTML = '<p class="mini-cart-load-error">Open the cart to review your items.</p>';
     } finally {
         root.dataset.miniCartLoading = 'false';
@@ -2109,7 +2144,7 @@ async function ensureMiniCartLoaded() {
 
 window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
     const root = miniCartRoot();
-    const panel = root?.querySelector('[data-mini-cart-panel]');
+    const panel = document.querySelector('[data-mini-cart-panel]');
 
     if (!root || !panel || typeof html !== 'string') return;
 
@@ -2128,7 +2163,7 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
         'aria-label',
         `Open cart with ${Number(cartCount || 0)} items`
     );
-    initializeDisplayCurrency(root);
+    initializeDisplayCurrency(panel);
     root.classList.remove('mini-cart-bump');
     void root.offsetWidth;
     root.classList.add('mini-cart-bump');
@@ -2889,7 +2924,7 @@ document.addEventListener('click', (event) => {
 
     const miniCartTrigger = event.target.closest('[data-mini-cart-trigger]');
 
-    if (miniCartTrigger && window.innerWidth < 1280) {
+    if (miniCartTrigger && usesMiniCartSheet()) {
         event.preventDefault();
         event.stopPropagation();
         setMiniCartOpen(!miniCartRoot()?.classList.contains('is-open'));
@@ -2942,7 +2977,7 @@ window.addEventListener('resize', () => {
         closeMobileMenu();
     }
 
-    if (window.innerWidth >= 1280) closeMiniCart();
+    if (!usesMiniCartSheet()) closeMiniCart();
 
     updateNavGlider();
 }, { passive: true });
@@ -2978,7 +3013,7 @@ window.addEventListener('popstate', (event) => {
 });
 
 document.addEventListener('pointerover', (event) => {
-    if (event.target.closest('[data-mini-cart-root]') && window.innerWidth >= 1280) {
+    if (event.target.closest('[data-mini-cart-root]') && !usesMiniCartSheet()) {
         ensureMiniCartLoaded();
     }
 
