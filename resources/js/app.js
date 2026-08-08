@@ -3182,6 +3182,109 @@ document.addEventListener('submit', (event) => {
     window.setTimeout(() => form.submit(), 280);
 }, true);
 
+document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-cart-quantity-form]');
+    const submitter = event.submitter;
+    const row = form?.closest('[data-cart-item]');
+
+    if (!form || !row || !(submitter instanceof HTMLButtonElement) || event.defaultPrevented) return;
+
+    event.preventDefault();
+    if (form.dataset.cartUpdating === 'true') return;
+
+    const buttons = [...form.querySelectorAll('button[type="submit"]')];
+    const previousDisabled = buttons.map(button => button.disabled);
+    const body = new FormData(form);
+    body.set(submitter.name, submitter.value);
+    form.dataset.cartUpdating = 'true';
+    buttons.forEach(button => { button.disabled = true; });
+    row.classList.add('cart-item-updating');
+
+    try {
+        const response = await window.aksaFetchWithCsrf(form.action, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body,
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) throw new Error(data.message || 'Cart quantity could not be updated.');
+
+        const item = data.item || {};
+        const cart = data.cart || {};
+        const quantity = Number(item.quantity || 1);
+        const maxQuantity = Number(item.max_quantity || quantity);
+        const quantityOutput = form.querySelector('.quantity-stepper-value');
+        window.animateAksaValue?.(quantityOutput, String(quantity));
+
+        const lineTotal = row.querySelector('[data-cart-line-total]');
+        if (lineTotal) {
+            lineTotal.dataset.priceIdr = String(item.line_total_idr ?? 0);
+            lineTotal.dataset.priceUsd = String(item.line_total_usdt ?? '');
+            window.refreshAksaDisplayCurrency?.(row);
+            lineTotal.classList.remove('aksa-value-change');
+            void lineTotal.offsetWidth;
+            lineTotal.classList.add('aksa-value-change');
+        }
+
+        const decrement = form.querySelector('[data-cart-quantity-direction="down"]');
+        const increment = form.querySelector('[data-cart-quantity-direction="up"]');
+        if (decrement) {
+            decrement.value = String(Math.max(1, quantity - 1));
+            decrement.disabled = quantity <= 1;
+        }
+        if (increment) {
+            increment.value = String(quantity + 1);
+            increment.disabled = quantity >= maxQuantity;
+        }
+
+        (cart.item_limits || []).forEach(limit => {
+            const limitRow = document.querySelector(`[data-cart-item="${Number(limit.id)}"]`);
+            const limitForm = limitRow?.querySelector('[data-cart-quantity-form]');
+            const plus = limitForm?.querySelector('[data-cart-quantity-direction="up"]');
+            const current = Number(limitForm?.querySelector('.quantity-stepper-value')?.textContent || 1);
+            if (plus) plus.disabled = current >= Number(limit.max_quantity || 1);
+        });
+
+        const distinctItems = Number(cart.distinct_items || 0);
+        const totalQuantity = Number(cart.quantity || 0);
+        const bundleCount = document.getElementById('cartBundleCount');
+        window.animateAksaValue?.(
+            bundleCount,
+            `${distinctItems} ${distinctItems === 1 ? 'package' : 'packages'} · ${totalQuantity} ${totalQuantity === 1 ? 'license' : 'licenses'}`
+        );
+
+        const subtotal = document.querySelector('[data-cart-subtotal]');
+        if (subtotal) {
+            subtotal.dataset.priceIdr = String(cart.subtotal_idr ?? 0);
+            subtotal.dataset.priceUsd = String(cart.subtotal_usdt ?? '');
+            window.refreshAksaDisplayCurrency?.(subtotal.parentElement || document);
+            subtotal.classList.remove('aksa-value-change');
+            void subtotal.offsetWidth;
+            subtotal.classList.add('aksa-value-change');
+        }
+
+        document.querySelectorAll('[data-cart-count]').forEach(badge => {
+            badge.textContent = String(totalQuantity);
+            badge.classList.toggle('hidden', totalQuantity <= 0);
+        });
+
+        const miniCart = miniCartRoot();
+        if (miniCart) miniCart.dataset.miniCartLoaded = 'false';
+    } catch (error) {
+        previousDisabled.forEach((disabled, index) => { buttons[index].disabled = disabled; });
+        window.showAppToast?.('Cart not updated', error.message || 'Refresh the page and try again.', {
+            variant: 'error',
+        });
+    } finally {
+        form.dataset.cartUpdating = 'false';
+        row.classList.remove('cart-item-updating');
+    }
+}, true);
+
 document.addEventListener('change', (event) => {
     const control = event.target.closest('#checkoutForm input[type="radio"]');
 

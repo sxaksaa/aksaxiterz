@@ -103,23 +103,24 @@
                                         </div>
 
                                         <div class="cart-package-actions">
-                                            <div class="font-semibold text-white" data-display-price
+                                            <div class="font-semibold text-white" data-display-price data-cart-line-total
                                                 data-price-idr="{{ (int) $item->package->price * (int) $item->quantity }}"
                                                 data-price-usd="{{ $item->package->price_usdt !== null && (float) $item->package->price_usdt > 0 ? (float) $item->package->price_usdt * (int) $item->quantity : '' }}">
                                                 Rp {{ number_format($item->package->price * $item->quantity, 0, ',', '.') }}
                                             </div>
 
                                             <form method="POST" action="{{ route('cart.items.update', $item) }}"
-                                                class="quantity-stepper" aria-label="Quantity for {{ $item->product->name }} {{ $item->package->name }}">
+                                                class="quantity-stepper" data-cart-quantity-form
+                                                aria-label="Quantity for {{ $item->product->name }} {{ $item->package->name }}">
                                                 @csrf
                                                 @method('PATCH')
                                                 <button type="submit" name="quantity" value="{{ $decreaseQuantityTarget }}"
-                                                    class="quantity-stepper-button"
+                                                    class="quantity-stepper-button" data-cart-quantity-direction="down"
                                                     aria-label="Decrease {{ $item->product->name }} {{ $item->package->name }} quantity"
                                                     @disabled(! $canDecreaseQuantity)>−</button>
                                                 <output class="quantity-stepper-value" aria-live="polite">{{ $item->quantity }}</output>
                                                 <button type="submit" name="quantity" value="{{ $item->quantity + 1 }}"
-                                                    class="quantity-stepper-button"
+                                                    class="quantity-stepper-button" data-cart-quantity-direction="up"
                                                     aria-label="Increase {{ $item->product->name }} {{ $item->package->name }} quantity"
                                                     @disabled(! $itemCheckoutAvailable || $item->quantity >= $maxItemQuantity)>+</button>
                                             </form>
@@ -149,7 +150,7 @@
 
                     <div class="mt-5 summary-row">
                         <span>Subtotal</span>
-                        <span class="font-semibold text-white" data-display-price
+                        <span class="font-semibold text-white" data-display-price data-cart-subtotal
                             data-price-idr="{{ (int) $subtotalIdr }}"
                             data-price-usd="{{ $stablecoinPricingAvailable ? (float) $subtotalUsdt : '' }}">
                             Rp {{ number_format($subtotalIdr, 0, ',', '.') }}

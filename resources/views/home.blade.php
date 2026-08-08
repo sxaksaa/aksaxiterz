@@ -164,8 +164,16 @@
                     category,
                 });
 
-                container.classList.add('product-container-loading');
-                container.innerHTML = productSkeletonHtml();
+                const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                container.classList.remove('product-filter-entering');
+                container.classList.add('product-filter-leaving');
+                const exitDelay = reduceMotion ? 0 : 150;
+                const skeletonTimer = setTimeout(() => {
+                    if (requestSequence !== productRequestSequence) return;
+                    container.classList.add('product-container-loading');
+                    container.classList.remove('product-filter-leaving');
+                    container.innerHTML = productSkeletonHtml();
+                }, exitDelay);
 
                 fetch(`${productEndpoint}?${params.toString()}`, {
                         cache: 'no-store',
@@ -185,13 +193,20 @@
                     .then(html => {
                         if (requestSequence !== productRequestSequence) return;
 
+                        clearTimeout(skeletonTimer);
                         container.innerHTML = html.trim() || emptyProductsHtml();
+                        container.classList.remove('product-filter-leaving');
+                        container.classList.add('product-filter-entering');
                         window.refreshAksaDisplayCurrency?.(container);
+                        window.initializeAksaPageEnhancements?.(container);
+                        setTimeout(() => container.classList.remove('product-filter-entering'), 420);
                         refreshProductStocks();
                     })
                     .catch(error => {
                         if (error.name === 'AbortError' || requestSequence !== productRequestSequence) return;
 
+                        clearTimeout(skeletonTimer);
+                        container.classList.remove('product-filter-leaving');
                         container.innerHTML = emptyProductsHtml(
                             'Products could not be loaded. Please refresh the page and try again.'
                         );
@@ -203,6 +218,7 @@
                         }
                     })
                     .finally(() => {
+                        clearTimeout(skeletonTimer);
                         if (productRequestController === controller) {
                             productRequestController = null;
                             container.classList.remove('product-container-loading');
