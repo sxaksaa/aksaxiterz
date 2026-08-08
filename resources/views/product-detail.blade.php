@@ -440,6 +440,13 @@
                 card.classList.add('package-selection-pop');
                 setTimeout(() => card.classList.remove('package-selection-pop'), 420);
                 renderSelection();
+                const checkoutButton = document.getElementById('buyNowBtn');
+                checkoutButton?.classList.remove('checkout-ready-shimmer');
+                if (checkoutButton && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    void checkoutButton.offsetWidth;
+                    checkoutButton.classList.add('checkout-ready-shimmer');
+                    setTimeout(() => checkoutButton.classList.remove('checkout-ready-shimmer'), 760);
+                }
                 document.getElementById('summaryBox')?.scrollIntoView({
                     behavior: 'smooth',
                     block: 'nearest',

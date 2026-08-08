@@ -33,7 +33,7 @@
     @endphp
 
     <a href="{{ route('products.show', $product) }}"
-        class="product-card product-card-storefront fade-up flex min-h-60 flex-col gap-4 p-5"
+        class="product-card product-card-storefront flex min-h-60 flex-col gap-4 p-5"
         data-product-stock-card data-product-id="{{ $product->id }}" data-product-status="{{ $product->status }}"
         data-product-stock="{{ $stock }}">
 

@@ -2002,6 +2002,7 @@ window.refreshAksaCustomSelects = function() {
 
 window.initializeAksaPageEnhancements = function(root = document) {
     initializeCustomSelects(root);
+    initializeMotionEnhancements(root);
 };
 
 let mobileMenuOpen = false;
@@ -2720,6 +2721,7 @@ async function softNavigate(url, options = {}) {
         initializeCustomSelects(nextContent);
         initializeRecentPurchaseToast(nextContent);
         initializeDownloadAccordions(nextContent);
+        initializeMotionEnhancements(nextContent);
         closeMobileMenu();
         closeProfileDropdown();
         scrollAfterSoftNavigation(nextUrl);
@@ -2751,6 +2753,45 @@ const DOWNLOAD_ACCORDION_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 function shouldReduceMotion() {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
+
+let productRevealObserver = null;
+
+function initializeMotionEnhancements(root = document) {
+    const cards = [...root.querySelectorAll('.product-card-storefront:not([data-motion-reveal-ready])')];
+
+    cards.forEach((card, index) => {
+        card.dataset.motionRevealReady = 'true';
+        card.style.setProperty('--motion-reveal-delay', `${Math.min(index % 4, 3) * 55}ms`);
+    });
+
+    if (cards.length === 0 || shouldReduceMotion() || !('IntersectionObserver' in window)) {
+        cards.forEach(card => card.classList.add('is-scroll-revealed'));
+        return;
+    }
+
+    productRevealObserver ||= new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-scroll-revealed');
+            productRevealObserver.unobserve(entry.target);
+        });
+    }, { rootMargin: '0px 0px -7% 0px', threshold: 0.08 });
+
+    cards.forEach(card => productRevealObserver.observe(card));
+}
+
+window.animateAksaValue = function(element, nextText) {
+    if (!(element instanceof Element) || element.textContent === nextText) return;
+
+    element.textContent = nextText;
+
+    if (shouldReduceMotion()) return;
+
+    element.classList.remove('aksa-value-change');
+    void element.offsetWidth;
+    element.classList.add('aksa-value-change');
+    window.setTimeout(() => element.classList.remove('aksa-value-change'), 320);
+};
 
 function setDownloadAccordionExpanded(accordion, expanded) {
     accordion.querySelector('summary')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -2881,6 +2922,7 @@ function initializeGlobalPageEnhancements(root = document) {
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
+    initializeMotionEnhancements(root);
     updateNavGlider();
 
     const pageContent = root === document
@@ -3127,6 +3169,35 @@ document.addEventListener('submit', (event) => {
         event.stopImmediatePropagation();
     }
 }, true);
+
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('[data-cart-remove-form]');
+    const row = form?.closest('[data-cart-item]');
+
+    if (!form || !row || event.defaultPrevented || form.dataset.motionSubmitted === 'true' || shouldReduceMotion()) return;
+
+    event.preventDefault();
+    form.dataset.motionSubmitted = 'true';
+    row.classList.add('cart-item-removing');
+    window.setTimeout(() => form.submit(), 280);
+}, true);
+
+document.addEventListener('change', (event) => {
+    const control = event.target.closest('#checkoutForm input[type="radio"]');
+
+    if (!control || shouldReduceMotion()) return;
+
+    const section = control.closest('.product-section');
+    const summary = document.getElementById('checkoutFinalSummary');
+
+    [section, summary].forEach(element => {
+        if (!element) return;
+        element.classList.remove('checkout-step-transition');
+        void element.offsetWidth;
+        element.classList.add('checkout-step-transition');
+        window.setTimeout(() => element.classList.remove('checkout-step-transition'), 380);
+    });
+});
 
 document.addEventListener('submit', (event) => {
     const form = event.target.closest('[data-license-reset-form]');

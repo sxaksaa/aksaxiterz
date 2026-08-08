@@ -466,13 +466,13 @@
                     ? `-${formatStablecoin(voucherQuote?.discount_usdt || 0, paymentToken)}`
                     : `-${formatIdr(voucherQuote?.discount_idr || 0)}`;
 
-                document.getElementById('checkoutSubtotal').textContent = subtotal;
-                document.getElementById('checkoutTotal').textContent = total;
+                window.animateAksaValue?.(document.getElementById('checkoutSubtotal'), subtotal);
+                window.animateAksaValue?.(document.getElementById('checkoutTotal'), total);
                 document.getElementById('checkoutSubtotalLabel').textContent =
                     qris || stablecoin ? 'Catalog subtotal' : 'Subtotal';
                 document.getElementById('checkoutTotalLabel').textContent =
                     qris || stablecoin ? 'Invoice amount' : 'Total';
-                document.getElementById('checkoutDiscount').textContent = discount;
+                window.animateAksaValue?.(document.getElementById('checkoutDiscount'), discount);
                 document.getElementById('checkoutDiscountRow').classList.toggle('hidden', !voucherQuote);
 
                 const hint = document.getElementById('checkoutCurrencyHint');

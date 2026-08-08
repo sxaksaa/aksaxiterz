@@ -124,7 +124,8 @@
                                                     @disabled(! $itemCheckoutAvailable || $item->quantity >= $maxItemQuantity)>+</button>
                                             </form>
 
-                                            <form method="POST" action="{{ route('cart.items.destroy', $item) }}">
+                                            <form method="POST" action="{{ route('cart.items.destroy', $item) }}"
+                                                data-cart-remove-form>
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="cart-remove-button" aria-label="Remove {{ $item->package->name }}">
