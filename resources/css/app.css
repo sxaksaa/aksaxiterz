@@ -5085,3 +5085,23 @@
         transition: none;
     }
 }
+
+/* Wide desktop composition: use 2K/4K space without stretching readable content edge-to-edge. */
+@media (min-width: 1920px) {
+    .page-shell,
+    .site-navbar-pill {
+        max-width: 96rem;
+    }
+
+    #productContainer {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .home-hero-compact .hero-title {
+        max-width: 76rem;
+    }
+
+    .home-toolbar {
+        margin-inline: auto;
+    }
+}
