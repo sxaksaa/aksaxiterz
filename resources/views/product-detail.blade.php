@@ -67,7 +67,7 @@
     <div id="content" class="page-shell py-6 md:py-10"
         data-product-checkout-ready="{{ $checkoutAvailable ? 'true' : 'false' }}"
         data-product-stock-endpoint="{{ route('products.stock-detail', $product, false) }}">
-        <div class="product-hero mb-6 fade-up">
+        <div class="product-hero mb-6">
             <div>
                 <a href="/" class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
                 <div class="mt-4 flex flex-wrap gap-2">
