@@ -104,6 +104,9 @@
 
     body {
         min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
         overflow-x: hidden;
         user-select: none;
         -webkit-user-select: none;
@@ -317,6 +320,10 @@
 
     [data-aksa-page-content] {
         min-height: 52vh;
+    }
+
+    [data-aksa-footer-shell] {
+        margin-top: auto;
     }
 
     body.aksa-soft-nav-active [data-aksa-page-content] {

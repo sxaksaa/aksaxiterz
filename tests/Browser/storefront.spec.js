@@ -77,6 +77,44 @@ test('product focus prefetches detail once and navigation reuses it', async ({ p
     expect(detailRequests).toBe(1);
 });
 
+test('safe footer navigation prefetches once and reuses the response', async ({ page }) => {
+    let guideRequests = 0;
+
+    await page.route('**/guides', async (route) => {
+        if (route.request().headers()['x-requested-with'] === 'XMLHttpRequest') {
+            guideRequests++;
+        }
+
+        await route.continue();
+    });
+
+    await page.goto('/');
+
+    const guidesLink = page.locator('footer a[data-soft-nav][href$="/guides"]');
+    await guidesLink.focus();
+    await expect.poll(() => guideRequests).toBe(1);
+
+    await guidesLink.click();
+    await expect(page).toHaveURL(/\/guides$/);
+    await expect(page.locator('h1')).toBeVisible();
+    expect(guideRequests).toBe(1);
+});
+
+test('short product pages keep the footer at the viewport bottom naturally', async ({ page }) => {
+    await page.setViewportSize({ width: 2560, height: 1440 });
+    await page.goto('/');
+    await page.locator('[data-product-stock-card]').first().click();
+    await expect(page).toHaveURL(/\/product\//);
+
+    const footer = page.locator('.site-footer');
+    await expect(footer).toBeVisible();
+
+    await expect(footer).toHaveCSS('position', 'relative');
+    await expect.poll(() => footer.evaluate((element) => (
+        Math.abs(window.innerHeight - Math.round(element.getBoundingClientRect().bottom))
+    ))).toBeLessThanOrEqual(1);
+});
+
 test('back to products restores homepage filters and scroll position', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (message) => {

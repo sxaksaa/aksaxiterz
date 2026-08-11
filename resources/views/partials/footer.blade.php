@@ -6,7 +6,7 @@
     <div class="page-shell py-10 md:py-12">
         <div class="grid gap-8 md:grid-cols-[1.35fr_0.8fr_0.9fr_0.95fr]">
             <div class="footer-brand-block">
-                <a href="/" class="footer-brand" aria-label="Aksa Xiterz home">
+                <a href="/" data-soft-nav class="footer-brand" aria-label="Aksa Xiterz home">
                     <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz" loading="lazy" decoding="async"
                         class="block h-10 w-auto max-w-[180px] aksa-logo-glow"
                         width="612" height="195" draggable="false">
@@ -31,12 +31,12 @@
             <div class="footer-column">
                 <h2 class="footer-heading">Quick Links</h2>
                 <div class="mt-3 grid gap-2 text-sm">
-                    <a href="/" class="footer-link">Products</a>
-                    <a href="{{ route('guides.index') }}" class="footer-link">Guides</a>
-                    <a href="/downloads" class="footer-link">Downloads</a>
+                    <a href="/" data-soft-nav class="footer-link">Products</a>
+                    <a href="{{ route('guides.index') }}" data-soft-nav class="footer-link">Guides</a>
+                    <a href="/downloads" data-soft-nav class="footer-link">Downloads</a>
                     @auth
-                        <a href="/orders" class="footer-link">Orders</a>
-                        <a href="/licenses" class="footer-link">Licenses</a>
+                        <a href="/orders" data-soft-nav class="footer-link">Orders</a>
+                        <a href="/licenses" data-soft-nav class="footer-link">Licenses</a>
                     @endauth
                 </div>
             </div>
@@ -60,11 +60,11 @@
             <div class="footer-column">
                 <h2 class="footer-heading">Legal</h2>
                 <div class="mt-3 grid gap-2 text-sm">
-                    <a href="/terms" class="footer-link">Terms</a>
-                    <a href="/privacy" class="footer-link">Privacy Policy</a>
-                    <a href="/refund-policy" class="footer-link">Refund Policy</a>
-                    <a href="/faq" class="footer-link">FAQ</a>
-                    <a href="/contact" class="footer-link">Contact</a>
+                    <a href="/terms" data-soft-nav class="footer-link">Terms</a>
+                    <a href="/privacy" data-soft-nav class="footer-link">Privacy Policy</a>
+                    <a href="/refund-policy" data-soft-nav class="footer-link">Refund Policy</a>
+                    <a href="/faq" data-soft-nav class="footer-link">FAQ</a>
+                    <a href="/contact" data-soft-nav class="footer-link">Contact</a>
                 </div>
             </div>
         </div>

@@ -2864,13 +2864,13 @@ function takePrefetchedSoftNavigationPage(url, signal) {
     return abortableSoftNavigationPrefetch(entry.promise, signal);
 }
 
-function productLinkForPrefetch(event) {
+function softNavigationLinkForPrefetch(event) {
     return event.target instanceof Element
-        ? event.target.closest('a[data-product-stock-card][data-soft-nav]')
+        ? event.target.closest('a[data-soft-nav]')
         : null;
 }
 
-function prefetchProductLink(link) {
+function prefetchSoftNavigationLink(link) {
     if (!link || link.dataset.noSoftNav !== undefined) return;
 
     const rawHref = link.getAttribute('href');
@@ -3348,7 +3348,7 @@ window.addEventListener('popstate', (event) => {
 });
 
 document.addEventListener('pointerover', (event) => {
-    prefetchProductLink(productLinkForPrefetch(event));
+    prefetchSoftNavigationLink(softNavigationLinkForPrefetch(event));
 
     if (event.target.closest('[data-mini-cart-root]') && !usesMiniCartSheet()) {
         ensureMiniCartLoaded();
@@ -3395,7 +3395,7 @@ document.addEventListener('pointerout', (event) => {
 });
 
 document.addEventListener('focusin', (event) => {
-    prefetchProductLink(productLinkForPrefetch(event));
+    prefetchSoftNavigationLink(softNavigationLinkForPrefetch(event));
 
     if (event.target.closest('[data-mini-cart-root]')) ensureMiniCartLoaded();
 
@@ -3411,7 +3411,7 @@ document.addEventListener('focusin', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-    prefetchProductLink(productLinkForPrefetch(event));
+    prefetchSoftNavigationLink(softNavigationLinkForPrefetch(event));
 }, { passive: true });
 
 document.addEventListener('focusout', (event) => {
