@@ -1,4 +1,4 @@
-<nav id="navbar"
+<nav id="navbar" aria-label="Main navigation"
     class="site-navbar fixed inset-x-0 top-2 z-50 px-3 transition-transform duration-300 sm:top-3 sm:px-4 lg:top-4 lg:px-6">
 
     <div
@@ -8,7 +8,7 @@
         <a href="/" class="site-brand-link flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
             <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
                 class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
-                width="612" height="195" draggable="false">
+                width="612" height="195" decoding="async" fetchpriority="high" draggable="false">
         </a>
 
         <!-- MENU DESKTOP -->
@@ -65,7 +65,7 @@
                         class="nav-cart-link relative inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold text-gray-200 transition hover:text-white"
                         aria-label="Open cart with {{ $cartCount }} items" aria-haspopup="dialog" aria-expanded="false">
                         <x-ui.icon name="shopping-cart" class="h-4 w-4 text-aksa-accent" />
-                        <span>Cart</span>
+                        <span data-cart-label>Cart</span>
                         <span data-cart-count
                             class="{{ $cartCount > 0 ? '' : 'hidden' }} rounded-full bg-aksa-accent px-2 py-0.5 text-[10px] font-bold text-white">
                             {{ $cartCount }}
@@ -106,7 +106,8 @@
                 @php $user = auth()->user(); @endphp
                 <div class="relative hidden shrink-0 xl:block">
 
-                    <button type="button" data-profile-toggle
+                    <button type="button" data-profile-toggle aria-label="Open account menu" aria-haspopup="true"
+                        aria-expanded="false" aria-controls="dropdown"
                         class="flex shrink-0 items-center gap-2 text-gray-300 transition hover:text-white">
 
                         @if ($user->avatar)

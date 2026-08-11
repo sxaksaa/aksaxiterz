@@ -506,7 +506,7 @@
                 if (context.method === 'gopay_qris' && context.qrisPayload) {
                     await window.renderAksaStyledQrCode?.('#paymentInstructionQris', context.qrisPayload, {
                         width: 320,
-                        logoUrl: '/images/logo.png',
+                        logoUrl: '/images/brand/aksa-xiterz-mark.png',
                         darkColor: '#171120',
                         lightColor: '#eee7ff',
                     });

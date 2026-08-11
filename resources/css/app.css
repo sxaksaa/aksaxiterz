@@ -964,9 +964,10 @@
             0 16px 36px rgba(180, 155, 255, 0.12);
     }
 
-    :where(a, button, input, textarea, [role="button"]):focus-visible {
-        outline: 2px solid rgba(180, 155, 255, 0.78);
+    :where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+        outline: 3px solid var(--aksa-purple-bright);
         outline-offset: 3px;
+        box-shadow: 0 0 0 6px rgba(12, 10, 20, 0.82), 0 0 0 9px rgba(180, 155, 255, 0.34);
     }
 
     .btn-main {
@@ -4754,6 +4755,33 @@
 }
 
 @media (max-width: 360px) {
+    .site-navbar {
+        padding-inline: 0.5rem;
+    }
+
+    .site-navbar-pill {
+        padding-inline: 0.5rem;
+    }
+
+    .site-brand-link img {
+        max-width: 5.75rem;
+    }
+
+    [data-navbar-actions] {
+        gap: 0.25rem;
+    }
+
+    .nav-cart-link,
+    .nav-menu-button {
+        min-width: 2.5rem;
+        padding-inline: 0.55rem;
+    }
+
+    [data-cart-label],
+    .nav-menu-button [data-button-label] {
+        display: none;
+    }
+
     .orders-mobile-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }

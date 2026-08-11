@@ -4,6 +4,60 @@ import QRCodeStyling from 'qr-code-styling';
 let appToastTimer = null;
 let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
+const modalReturnFocus = new WeakMap();
+
+function modalFocusableElements(modal) {
+    return [...modal.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )].filter((element) => (
+        !element.hidden &&
+        element.getAttribute('aria-hidden') !== 'true' &&
+        element.getClientRects().length > 0
+    ));
+}
+
+function openAccessibleModal(modal) {
+    if (!(modal instanceof HTMLElement)) return;
+
+    if (document.activeElement instanceof HTMLElement && !modal.contains(document.activeElement)) {
+        modalReturnFocus.set(modal, document.activeElement);
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+
+    window.requestAnimationFrame(() => {
+        modalFocusableElements(modal)[0]?.focus();
+    });
+}
+
+function closeAccessibleModal(modal) {
+    if (!(modal instanceof HTMLElement) || modal.classList.contains('hidden')) return;
+
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+
+    const returnTarget = modalReturnFocus.get(modal);
+    modalReturnFocus.delete(modal);
+    if (returnTarget?.isConnected) returnTarget.focus();
+}
+
+function activePaymentModal() {
+    return document.querySelector('.qris-modal:not(.hidden)[aria-hidden="false"]');
+}
+
+function closePaymentModal(modal) {
+    const closeById = {
+        aksaQrisModal: window.closeAksaQrisModal,
+        aksaCryptoModal: window.closeAksaCryptoModal,
+        aksaBinancePayModal: window.closeAksaBinancePayModal,
+        aksaPaymentSuccessModal: window.closeAksaPaymentSuccessModal,
+    };
+
+    closeById[modal?.id]?.();
+}
 let qrisExpiryCountdownTimer = null;
 let cryptoExpiryCountdownTimer = null;
 let binancePayExpiryCountdownTimer = null;
@@ -964,13 +1018,11 @@ window.openAksaQrisModal = async function(checkout, options = {}) {
     if (checkButton) setButtonLabel(checkButton, 'Check Now');
     setQrisAutoStatus('waiting', 'Automatic verification active', 'We check this payment securely every 15 seconds.');
 
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('overflow-hidden');
+    openAccessibleModal(modal);
 
     await window.renderAksaStyledQrCode('#aksaQrisCanvas', qrPayload, {
         width: 320,
-        logoUrl: '/images/logo.png',
+        logoUrl: '/images/brand/aksa-xiterz-mark.png',
         darkColor: '#171120',
         lightColor: '#eee7ff',
     });
@@ -994,9 +1046,7 @@ window.closeAksaQrisModal = function() {
     qrisState.orderId = null;
     qrisState.statusUrl = null;
     setQrisAutoStatus('waiting', 'Automatic verification active', 'We check this payment securely every 15 seconds.');
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('overflow-hidden');
+    closeAccessibleModal(modal);
 };
 
 window.openAksaCryptoModal = async function(checkout, options = {}) {
@@ -1047,9 +1097,7 @@ window.openAksaCryptoModal = async function(checkout, options = {}) {
 
     startCryptoExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('overflow-hidden');
+    openAccessibleModal(modal);
 
     if (options.startPolling === true && cryptoState.orderId) {
         startCryptoPolling(cryptoState.orderId);
@@ -1065,9 +1113,7 @@ window.closeAksaCryptoModal = function() {
 
     stopCryptoPolling();
     stopCryptoExpiryCountdown();
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('overflow-hidden');
+    closeAccessibleModal(modal);
 };
 
 window.openAksaBinancePayModal = async function(checkout, options = {}) {
@@ -1117,9 +1163,7 @@ window.openAksaBinancePayModal = async function(checkout, options = {}) {
 
     startBinancePayExpiryCountdown(payment.expired_at, payment.remaining_seconds);
 
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('overflow-hidden');
+    openAccessibleModal(modal);
 
     if (options.startPolling !== false && binancePayState.orderId) {
         startBinancePayPolling(binancePayState.orderId);
@@ -1135,9 +1179,7 @@ window.closeAksaBinancePayModal = function() {
 
     stopBinancePayPolling();
     stopBinancePayExpiryCountdown();
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('overflow-hidden');
+    closeAccessibleModal(modal);
 };
 
 function licenseUrlForOrder(orderId) {
@@ -1204,9 +1246,7 @@ function showPaymentSuccess(options = {}) {
         countdown.innerText = `Redirecting to ${redirectLabel} in ${Math.ceil(redirectDelay / 1000)}s.`;
     }
 
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('overflow-hidden');
+    openAccessibleModal(modal);
     launchPaymentCelebration(modal);
 
     copyLicenseKeys(licenseKeys, copyStatus);
@@ -1245,9 +1285,9 @@ window.closeAksaPaymentSuccessModal = function() {
 
     if (!modal) return;
 
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('overflow-hidden');
+    clearTimeout(paymentSuccessRedirectTimer);
+    clearInterval(paymentSuccessCountdownTimer);
+    closeAccessibleModal(modal);
 };
 
 async function copyLicenseKeys(licenseKeys, statusElement) {
@@ -2055,11 +2095,19 @@ function closeMobileMenu() {
 }
 
 function toggleProfileDropdown() {
-    document.getElementById('dropdown')?.classList.toggle('hidden');
+    const dropdown = document.getElementById('dropdown');
+    const toggle = document.querySelector('[data-profile-toggle]');
+
+    if (!dropdown) return;
+
+    const willOpen = dropdown.classList.contains('hidden');
+    dropdown.classList.toggle('hidden');
+    toggle?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
 }
 
 function closeProfileDropdown() {
     document.getElementById('dropdown')?.classList.add('hidden');
+    document.querySelector('[data-profile-toggle]')?.setAttribute('aria-expanded', 'false');
 }
 
 function miniCartRoot() {
@@ -3007,6 +3055,36 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+    const modal = activePaymentModal();
+
+    if (modal && event.key === 'Escape') {
+        event.preventDefault();
+        closePaymentModal(modal);
+        return;
+    }
+
+    if (modal && event.key === 'Tab') {
+        const focusable = modalFocusableElements(modal);
+
+        if (focusable.length === 0) {
+            event.preventDefault();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+
+        return;
+    }
+
     if (event.key !== 'Escape') return;
 
     closeMobileMenu();

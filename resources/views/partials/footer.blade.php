@@ -7,7 +7,7 @@
         <div class="grid gap-8 md:grid-cols-[1.35fr_0.8fr_0.9fr_0.95fr]">
             <div class="footer-brand-block">
                 <a href="/" class="footer-brand" aria-label="Aksa Xiterz home">
-                    <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
+                    <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz" loading="lazy" decoding="async"
                         class="block h-10 w-auto max-w-[180px] aksa-logo-glow"
                         width="612" height="195" draggable="false">
                 </a>

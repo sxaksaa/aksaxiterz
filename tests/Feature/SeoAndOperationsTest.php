@@ -23,12 +23,41 @@ class SeoAndOperationsTest extends TestCase
             ->assertSee('application/ld+json', false);
     }
 
+    public function test_storefront_controls_have_accessible_names_and_states(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('aria-label="Main navigation"', false)
+            ->assertSee('<label for="searchInput" class="sr-only">Search products</label>', false)
+            ->assertSee('role="group" aria-label="Product categories"', false)
+            ->assertSee('data-category-filter data-category="" aria-pressed="true"', false)
+            ->assertSee('loading="lazy" decoding="async"', false)
+            ->assertDontSee('<a href="#" data-category-filter', false);
+    }
+
     public function test_private_pages_are_not_indexed(): void
     {
         $this->actingAs(User::factory()->create())
             ->get('/cart')
             ->assertOk()
             ->assertSee('<meta name="robots" content="noindex, nofollow">', false);
+    }
+
+    public function test_public_errors_are_branded_and_offer_a_safe_way_back(): void
+    {
+        $this->get('/page-that-does-not-exist')
+            ->assertNotFound()
+            ->assertSee('Page not found')
+            ->assertSee('Back to Products')
+            ->assertSee('<meta name="robots" content="noindex, nofollow">', false);
+
+        foreach ([500, 503] as $status) {
+            $html = view("errors.{$status}")->render();
+
+            $this->assertStringContainsString('Aksa Xiterz', $html);
+            $this->assertStringContainsString('Back to Products', $html);
+            $this->assertStringContainsString('noindex, nofollow', $html);
+        }
     }
 
     public function test_sitemap_contains_public_pages_and_visible_products_only(): void

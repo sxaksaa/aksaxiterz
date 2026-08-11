@@ -36,6 +36,7 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('data-navbar-actions', $html);
         $this->assertStringContainsString('data-desktop-discord', $html);
         $this->assertStringContainsString('aria-label="Open Discord support"', $html);
+        $this->assertStringContainsString('decoding="async" fetchpriority="high"', $html);
         $this->assertStringContainsString('discord-nav-icon', $html);
         $this->assertStringContainsString('mobile-discord-link', $html);
         $this->assertStringNotContainsString('Open cart with', $html);
@@ -60,6 +61,7 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('href="/orders"', $html);
         $this->assertStringContainsString('href="/licenses"', $html);
         $this->assertStringContainsString('data-profile-toggle', $html);
+        $this->assertStringContainsString('aria-label="Open account menu"', $html);
         $this->assertStringContainsString('class="relative hidden shrink-0 xl:block"', $html);
         $this->assertStringContainsString('Admin Dashboard', $html);
         $this->assertStringContainsString('action="/logout"', $html);

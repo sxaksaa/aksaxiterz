@@ -55,24 +55,27 @@
                 </div>
 
                 <div class="w-full">
+                    <label for="searchInput" class="sr-only">Search products</label>
                     <input type="text" id="searchInput" placeholder="Search Products..."
+                        autocomplete="off" inputmode="search"
                         class="search-bar w-full text-sm md:text-base" value="{{ request('search') }}">
                 </div>
             </div>
 
-            <div class="category-filter-row mt-4 flex gap-2 md:gap-3" aria-label="Product categories">
-                <a href="#" data-category-filter data-category=""
+            <div class="category-filter-row mt-4 flex gap-2 md:gap-3" role="group" aria-label="Product categories">
+                <button type="button" data-category-filter data-category="" aria-pressed="{{ !$active ? 'true' : 'false' }}"
                     class="category-chip {{ !$active ? 'active' : '' }}">
                     <x-ui.icon name="boxes" class="h-4 w-4" />
                     <span>All</span>
-                </a>
+                </button>
 
                 @foreach ($categories as $category)
-                    <a href="#" data-category-filter data-category="{{ $category->slug }}"
+                    <button type="button" data-category-filter data-category="{{ $category->slug }}"
+                        aria-pressed="{{ $active == $category->slug ? 'true' : 'false' }}"
                         class="category-chip {{ $active == $category->slug ? 'active' : '' }}">
                         <x-ui.icon :name="$categoryIcon($category->slug, $category->name)" class="h-4 w-4" />
                         <span>{{ $category->name }}</span>
-                    </a>
+                    </button>
                 @endforeach
             </div>
         </div>
@@ -132,11 +135,14 @@
                 currentCategory = cat;
                 const categoryName = el && el.textContent ? el.textContent.trim() : 'All';
 
-                document.querySelectorAll('.category-chip')
-                    .forEach(e => e.classList.remove('active'));
+                document.querySelectorAll('.category-chip').forEach((chip) => {
+                    chip.classList.remove('active');
+                    chip.setAttribute('aria-pressed', 'false');
+                });
 
                 if (el) {
                     el.classList.add('active');
+                    el.setAttribute('aria-pressed', 'true');
                 }
 
                 fetchProducts(searchInput.value, cat);

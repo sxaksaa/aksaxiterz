@@ -4,6 +4,8 @@
 
 The `/up` endpoint checks application boot, database access, cache read/write, and Laravel storage permissions. Add `https://aksaxiterz.com/up` to an external uptime monitor with a five-minute interval and enable email or Discord alerts.
 
+Use an external provider for full outage coverage. A monitor running on the same VPS cannot send an alert when the VPS itself is offline. Configure the provider to request `GET https://aksaxiterz.com/up`, expect HTTP 200, check every five minutes, and email `akbarsalahudinpurnomo@gmail.com` after two consecutive failures. The repository intentionally does not store provider credentials or SMTP passwords.
+
 For critical log alerts, set `LOG_STACK=daily,slack` and `LOG_SLACK_WEBHOOK_URL` in the production `.env`, then run `php artisan config:cache`. Never commit the webhook URL.
 
 ## Database backups
@@ -36,6 +38,12 @@ To inspect a backup without touching production:
 4. Point a staging `.env` to that database and run the smoke tests.
 
 Never test restoration against the live production database.
+
+Production includes a safe restore verifier. It validates the latest checksum, imports the dump into a uniquely named temporary database, checks its tables and migration history, and removes the temporary database automatically:
+
+```text
+/usr/local/sbin/aksaxiterz-verify-backup
+```
 
 ## Verification after deploy
 

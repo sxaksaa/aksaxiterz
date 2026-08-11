@@ -7,6 +7,9 @@ readonly DEPLOY_BRANCH="main"
 readonly PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
 readonly WEB_SERVICE="${WEB_SERVICE:-nginx}"
 readonly VPS_BACKUP_SCRIPT="/usr/local/sbin/aksaxiterz-backup"
+readonly VPS_RESTORE_VERIFY_SCRIPT="/usr/local/sbin/aksaxiterz-verify-backup"
+readonly NGINX_SITE_CONFIG="/etc/nginx/sites-available/aksaxiterz"
+readonly NGINX_PERFORMANCE_SNIPPET="/etc/nginx/snippets/aksaxiterz-performance.conf"
 
 fail() {
     printf 'Deploy failed: %s\n' "$1" >&2
@@ -189,6 +192,30 @@ php artisan optimize:clear
 php artisan optimize
 php artisan payments:verify-gopay-config
 php artisan schedule:list >/dev/null
+
+install -o root -g root -m 0644 \
+    "${APP_DIR}/ops/aksaxiterz-nginx-performance.conf" \
+    "${NGINX_PERFORMANCE_SNIPPET}"
+install -o root -g root -m 0755 \
+    "${APP_DIR}/ops/aksaxiterz-verify-backup.sh" \
+    "${VPS_RESTORE_VERIFY_SCRIPT}"
+
+[[ -f "${NGINX_SITE_CONFIG}" ]] || fail "missing Nginx site config: ${NGINX_SITE_CONFIG}"
+if ! grep -Fq "include ${NGINX_PERFORMANCE_SNIPPET};" "${NGINX_SITE_CONFIG}"; then
+    nginx_site_backup="$(mktemp /tmp/aksaxiterz-nginx-site.XXXXXX)"
+    cp --preserve=mode,ownership,timestamps "${NGINX_SITE_CONFIG}" "${nginx_site_backup}"
+    sed -i "/^[[:space:]]*client_max_body_size[[:space:]]/a\\    include ${NGINX_PERFORMANCE_SNIPPET};" "${NGINX_SITE_CONFIG}"
+
+    if ! nginx -t; then
+        cp --preserve=mode,ownership,timestamps "${nginx_site_backup}" "${NGINX_SITE_CONFIG}"
+        rm -f -- "${nginx_site_backup}"
+        fail "Nginx rejected the performance snippet; original site config restored"
+    fi
+
+    rm -f -- "${nginx_site_backup}"
+fi
+
+nginx -t
 
 readonly SCHEDULER_CRON_FILE="/etc/cron.d/aksaxiterz"
 [[ -f "${SCHEDULER_CRON_FILE}" ]] || fail "missing Laravel scheduler cron: ${SCHEDULER_CRON_FILE}"
