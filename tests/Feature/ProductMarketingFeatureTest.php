@@ -77,7 +77,7 @@ class ProductMarketingFeatureTest extends TestCase
             ->assertSee('Popular')
             ->assertSee('Aurora Updating')
             ->assertDontSee('Aurora Hidden')
-            ->assertSee('Update alerts in Discord');
+            ->assertSee('Checkout paused · Discord alerts');
 
         $this->get(route('products.show', $bestSeller))
             ->assertOk()

@@ -149,7 +149,10 @@ class ProductStockFeedTest extends TestCase
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('<strong data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>', false);
+            ->assertSee('<strong data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>', false)
+            ->assertSee('available licenses')
+            ->assertSee('available · Auto delivery')
+            ->assertSee('product-status-badge-static hidden', false);
 
         $stock->update(['is_sold' => true]);
 

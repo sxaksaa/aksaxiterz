@@ -15,17 +15,30 @@ class ActivityLogController extends Controller
         $period = in_array($request->input('period'), ['today', '7', '30', 'all'], true)
             ? $request->input('period')
             : 'all';
+        $search = trim($request->string('search')->toString());
+        $legacyProductIds = $search !== ''
+            ? Product::query()->where('name', 'like', '%'.$search.'%')->limit(100)->pluck('id')
+            : collect();
+        $legacyPackageIds = $search !== ''
+            ? Package::query()->where('name', 'like', '%'.$search.'%')->limit(100)->pluck('id')
+            : collect();
 
         $logs = AdminActivityLog::query()
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->string('search')->toString();
-
-                $query->where(function ($query) use ($search) {
+            ->when($search !== '', function ($query) use ($search, $legacyProductIds, $legacyPackageIds) {
+                $query->where(function ($query) use ($search, $legacyProductIds, $legacyPackageIds) {
                     $query->where('admin_name', 'like', '%'.$search.'%')
                         ->orWhere('admin_email', 'like', '%'.$search.'%')
                         ->orWhere('subject_label', 'like', '%'.$search.'%')
                         ->orWhere('details', 'like', '%'.$search.'%')
                         ->orWhere('action', 'like', '%'.$search.'%');
+
+                    foreach ($legacyProductIds as $productId) {
+                        $query->orWhere('details', 'like', '%Product #'.$productId.' ·%');
+                    }
+
+                    foreach ($legacyPackageIds as $packageId) {
+                        $query->orWhere('details', 'like', '%Package #'.$packageId);
+                    }
                 });
             })
             ->when(array_key_exists((string) $request->input('section'), AdminActivityLog::sectionOptions()), function ($query) use ($request) {

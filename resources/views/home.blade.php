@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('seo_title', 'Aksa Xiterz - Digital Game Licenses')
-@section('seo_description', 'Browse ready-stock digital game licenses with clear prices, automatic delivery, and secure payment verification.')
+@section('seo_description', 'Browse available digital game licenses with clear prices, automatic delivery, and secure payment verification.')
 
 @section('content')
     <section class="page-shell pb-7 pt-7 md:pb-10 md:pt-11">
@@ -21,7 +21,7 @@
             <div class="home-proof-strip">
                 <span><strong>5000+</strong> licenses delivered</span>
                 <span><strong>2000+</strong> community members</span>
-                <span><strong data-total-ready-stock>{{ $totalStock }}</strong> ready stock</span>
+                <span><strong data-total-ready-stock>{{ $totalStock }}</strong> available licenses</span>
             </div>
         </div>
     </section>
@@ -128,6 +128,16 @@
                     event.preventDefault();
                     filterCategory(chip.dataset.category || '', chip);
                 });
+            });
+
+            container.addEventListener('click', (event) => {
+                const clearButton = event.target.closest('[data-clear-product-filters]');
+                if (!clearButton) return;
+
+                searchInput.value = '';
+                const allCategory = document.querySelector('[data-category-filter][data-category=""]');
+                filterCategory('', allCategory);
+                searchInput.focus();
             });
 
             function filterCategory(cat, el) {
@@ -257,8 +267,8 @@
 
                     if (statusBadge) {
                         statusBadge.textContent = product.status_label || (isUpdating ? 'Updating' : 'Ready');
+                        statusBadge.classList.toggle('hidden', !isUpdating);
                         statusBadge.classList.toggle('product-status-badge-updating', isUpdating);
-                        statusBadge.classList.toggle('product-status-badge-ready', !isUpdating);
                     }
 
                     card.querySelector('[data-product-stock-icon-ready]')
@@ -270,8 +280,8 @@
 
                     if (stockLabel) {
                         stockLabel.textContent = isUpdating
-                            ? 'Update alerts in Discord'
-                            : (stock > 0 ? `${stock} ready` : 'Manual order');
+                            ? 'Checkout paused · Discord alerts'
+                            : (stock > 0 ? `${stock} available · Auto delivery` : 'Manual order via Discord');
                     }
                 });
 
@@ -400,6 +410,9 @@
                         </span>
                         <span class="empty-state-title">No products found</span>
                         <p class="empty-state-copy">${escapeHtml(message)}</p>
+                        <button type="button" class="order-action mt-4" data-clear-product-filters>
+                            Clear Filters
+                        </button>
                     </div>
                 `;
             }

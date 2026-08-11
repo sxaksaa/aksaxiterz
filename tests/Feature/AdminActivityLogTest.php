@@ -104,6 +104,16 @@ class AdminActivityLogTest extends TestCase
             ->assertSee('2 key(s) · Audit Product · 1 Day')
             ->assertDontSee('Product #'.$product->id)
             ->assertDontSee('Package #'.$package->id);
+
+        $this->actingAs($admin)
+            ->get(route('admin.activity.index', ['search' => 'Audit Product']))
+            ->assertOk()
+            ->assertSee('2 key(s) · Audit Product · 1 Day');
+
+        $this->actingAs($admin)
+            ->get(route('admin.activity.index', ['search' => '1 Day']))
+            ->assertOk()
+            ->assertSee('2 key(s) · Audit Product · 1 Day');
     }
 
     private function catalogFixture(): array

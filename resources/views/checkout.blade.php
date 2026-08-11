@@ -91,7 +91,7 @@
                                                         {{ \Illuminate\Support\Str::plural('license', $item['quantity']) }}
                                                     </p>
                                                     <p class="mt-1 text-xs {{ $item['is_available'] ? 'text-aksa-accent' : 'text-amber-200' }}">
-                                                        {{ $item['is_available'] ? $item['available_stock'].' licenses ready for automatic delivery' : 'Selection needs to be reviewed' }}
+                                                        {{ $item['is_available'] ? $item['available_stock'].' available · Auto delivery' : 'Selection needs to be reviewed' }}
                                                     </p>
                                                 </div>
                                                 <div class="font-semibold text-white" data-display-price

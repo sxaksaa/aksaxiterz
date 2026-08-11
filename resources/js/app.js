@@ -2057,6 +2057,7 @@ let miniCartAutoCloseTimer = null;
 let lastNavbarScroll = window.pageYOffset || 0;
 let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
+let softPageRuntimeSequence = 0;
 const ENABLE_AKSA_SAFE_SOFT_NAVIGATION = true;
 
 function navButton() {
@@ -2548,6 +2549,59 @@ function runnableScript(script) {
     return ['text/javascript', 'application/javascript', 'module'].includes(type);
 }
 
+function currentDocumentScriptNonce() {
+    const nonceScript = document.querySelector('script[nonce]');
+
+    return nonceScript?.nonce || nonceScript?.getAttribute('nonce') || '';
+}
+
+function executeTrackedInlineScript(code, runtime) {
+    const runtimeKey = `__aksaSoftPageRuntime${++softPageRuntimeSequence}`;
+    const executable = document.createElement('script');
+    const nonce = currentDocumentScriptNonce();
+
+    runtime.executed = false;
+    runtime.error = null;
+    window[runtimeKey] = runtime;
+
+    if (nonce) executable.nonce = nonce;
+
+    executable.textContent = `
+        {
+            const __aksaSoftPageRuntime = globalThis[${JSON.stringify(runtimeKey)}];
+            const window = __aksaSoftPageRuntime.window;
+            const document = __aksaSoftPageRuntime.document;
+            const setInterval = __aksaSoftPageRuntime.setInterval;
+            const clearInterval = __aksaSoftPageRuntime.clearInterval;
+            const setTimeout = __aksaSoftPageRuntime.setTimeout;
+            const clearTimeout = __aksaSoftPageRuntime.clearTimeout;
+
+            __aksaSoftPageRuntime.executed = true;
+
+            try {
+                ${code}
+            } catch (error) {
+                __aksaSoftPageRuntime.error = error;
+            }
+        }
+    `;
+
+    try {
+        document.head.appendChild(executable);
+
+        if (!runtime.executed) {
+            throw new Error('Soft page script was blocked by the active Content Security Policy');
+        }
+
+        if (runtime.error) throw runtime.error;
+    } finally {
+        executable.remove();
+        delete window[runtimeKey];
+        delete runtime.executed;
+        delete runtime.error;
+    }
+}
+
 function executeSoftPageScripts(nextDocument) {
     cleanupSoftPageScripts();
 
@@ -2563,24 +2617,7 @@ function executeSoftPageScripts(nextDocument) {
 
         if (!code) return;
 
-        const runner = new Function(
-            'window',
-            'document',
-            'setInterval',
-            'clearInterval',
-            'setTimeout',
-            'clearTimeout',
-            code,
-        );
-
-        runner(
-            runtime.window,
-            runtime.document,
-            runtime.setInterval,
-            runtime.clearInterval,
-            runtime.setTimeout,
-            runtime.clearTimeout,
-        );
+        executeTrackedInlineScript(code, runtime);
     });
 }
 

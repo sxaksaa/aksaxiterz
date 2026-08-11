@@ -22,12 +22,11 @@
             'android' => 'android',
             default => 'box',
         };
-        $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
-            ? 'product-status-badge-updating'
-            : 'product-status-badge-ready';
         $isUpdating = $product->status === \App\Models\Product::STATUS_UPDATING;
         $hasReadyStock = ! $isUpdating && $stock > 0;
-        $availabilityLabel = $isUpdating ? 'Update alerts in Discord' : ($stock > 0 ? $stock . ' ready' : 'Manual order');
+        $availabilityLabel = $isUpdating
+            ? 'Checkout paused · Discord alerts'
+            : ($stock > 0 ? $stock.' available · Auto delivery' : 'Manual order via Discord');
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
     @endphp
@@ -43,7 +42,7 @@
                 <span>{{ $categoryName }}</span>
             </span>
 
-            <span class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}"
+            <span class="product-status-badge product-status-badge-static {{ $isUpdating ? 'product-status-badge-updating' : 'hidden' }}"
                 data-product-status-badge>{{ $product->status_label }}</span>
         </div>
 
@@ -113,5 +112,8 @@
         </span>
         <span class="empty-state-title">No products found</span>
         <p class="empty-state-copy">Try another keyword or category.</p>
+        <button type="button" class="order-action mt-4" data-clear-product-filters>
+            Clear Filters
+        </button>
     </div>
 @endforelse

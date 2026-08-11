@@ -17,6 +17,10 @@ export default defineConfig({
     webServer: {
         command: 'php artisan serve --host=127.0.0.1 --port=8173',
         url: 'http://127.0.0.1:8173/up',
+        env: {
+            ...process.env,
+            AKSA_CSP: '1',
+        },
         reuseExistingServer: false,
         timeout: 30_000,
     },

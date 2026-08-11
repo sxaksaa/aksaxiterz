@@ -21,7 +21,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <div class="admin-stat-grid mt-6 grid gap-3 sm:grid-cols-2">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['total'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Download cards</div>

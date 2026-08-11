@@ -68,7 +68,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="admin-stat-grid mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($metricCards as $card)
                     <div class="order-stat">
                         <div class="flex items-start justify-between gap-3">
@@ -324,7 +324,7 @@
                     </a>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div class="admin-stat-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <a href="{{ route('admin.orders.index', ['status' => 'pending']) }}" class="order-stat transition hover:border-aksa-accent-50">
                         <div class="text-xl font-semibold text-white">{{ $orderStats['pending'] }}</div>
                         <div class="mt-1 text-xs text-gray-400">Pending orders</div>
@@ -366,7 +366,7 @@
                     </a>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-3">
+                <div class="grid grid-cols-3 gap-3">
                     <div class="rounded-xl border border-[#27272A] bg-black/20 p-3">
                         <div class="text-lg font-semibold text-white">{{ $stockStats['available'] }}</div>
                         <div class="mt-1 text-xs text-gray-500">Available</div>

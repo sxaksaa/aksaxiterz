@@ -28,7 +28,7 @@
                 </p>
             </div>
 
-            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+            <div class="admin-stat-grid mt-6 grid gap-3 sm:grid-cols-3">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['categories'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Categories</div>

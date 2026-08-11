@@ -2597,6 +2597,21 @@
         transform: translateY(-2px);
     }
 
+    @media (max-width: 639px) {
+        .admin-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .admin-stat-grid .order-stat {
+            min-width: 0;
+            padding: 0.85rem;
+        }
+
+        .admin-stat-grid .order-stat > :first-child {
+            overflow-wrap: anywhere;
+        }
+    }
+
     .order-help-strip {
         display: flex;
         flex-wrap: wrap;

@@ -98,7 +98,7 @@
                                         <div class="min-w-0">
                                             <p class="font-semibold text-white">{{ $item->package->name }}</p>
                                             <p class="mt-1 text-xs {{ $itemCheckoutAvailable ? 'text-aksa-accent' : 'text-amber-200' }}">
-                                                {{ $itemCheckoutAvailable ? $item->available_stock.' licenses currently available' : 'This selection needs to be reviewed' }}
+                                                {{ $itemCheckoutAvailable ? $item->available_stock.' available · Auto delivery' : 'This selection needs to be reviewed' }}
                                             </p>
                                         </div>
 

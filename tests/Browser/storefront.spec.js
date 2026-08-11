@@ -24,6 +24,27 @@ test('public storefront has working navigation and SEO metadata', async ({ page 
     expect(consoleErrors).toEqual([]);
 });
 
+test('product navigation stays in the same document with CSP enabled', async ({ page }) => {
+    const consoleErrors = [];
+    page.on('console', (message) => {
+        if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+
+    const response = await page.goto('/');
+    expect(response?.headers()['content-security-policy']).toContain("script-src 'self' 'nonce-");
+
+    await page.evaluate(() => {
+        window.__aksaSoftNavigationMarker = 'same-document';
+    });
+
+    await page.locator('[data-product-stock-card]').first().click();
+    await expect(page).toHaveURL(/\/product\//);
+    await expect(page.locator('h1')).toBeVisible();
+
+    expect(await page.evaluate(() => window.__aksaSoftNavigationMarker)).toBe('same-document');
+    expect(consoleErrors.filter(message => /content security policy|unsafe-eval|refused to evaluate/i.test(message))).toEqual([]);
+});
+
 test('operational and crawler endpoints respond correctly', async ({ request }) => {
     const health = await request.get('/up');
     expect(health.ok()).toBeTruthy();
@@ -93,6 +114,20 @@ test('product filtering fails safely when its request is unavailable', async ({ 
     await expect(page.getByText('Products could not be loaded. Please refresh the page and try again.')).toBeVisible();
     await expect(page.getByText('Products not loaded')).toBeVisible();
     await expect(page.locator('h1')).toBeVisible();
+});
+
+test('empty product search can clear all filters', async ({ page }) => {
+    await page.goto('/');
+
+    const search = page.getByRole('textbox', { name: 'Search products' });
+    await search.fill('product-that-does-not-exist-anywhere');
+    await expect(page.getByText('No products found')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Clear Filters' }).click();
+
+    await expect(search).toHaveValue('');
+    await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('storefront reflows without horizontal clipping at a 200 percent equivalent viewport', async ({ page }) => {
