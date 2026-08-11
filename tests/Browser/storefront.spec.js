@@ -13,6 +13,15 @@ test('public storefront has working navigation and SEO metadata', async ({ page 
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /127\.0\.0\.1:8173/);
     await expect(page.locator('h1')).toBeVisible();
 
+    const productCards = page.locator('[data-product-stock-card]');
+    const productCardCount = await productCards.count();
+    expect(productCardCount).toBeGreaterThan(0);
+    await expect(page.locator('[data-product-stock-card] .product-card-facts .product-card-fact'))
+        .toHaveCount(productCardCount);
+    expect((await productCards.allTextContents()).join(' ')).not.toMatch(/\bFrom \d+ days?\b/i);
+    await expect(page.locator('[data-product-availability] [data-product-stock-label]').first())
+        .toHaveCSS('white-space', 'normal');
+
     await page.goto('/downloads');
     await expect(page).toHaveTitle(/Downloads - Aksa Xiterz/);
     await expect(page.locator('h1')).toBeVisible();
@@ -43,6 +52,89 @@ test('product navigation stays in the same document with CSP enabled', async ({ 
 
     expect(await page.evaluate(() => window.__aksaSoftNavigationMarker)).toBe('same-document');
     expect(consoleErrors.filter(message => /content security policy|unsafe-eval|refused to evaluate/i.test(message))).toEqual([]);
+});
+
+test('product focus prefetches detail once and navigation reuses it', async ({ page }) => {
+    let detailRequests = 0;
+
+    await page.route('**/product/**', async (route) => {
+        if (route.request().headers()['x-requested-with'] === 'XMLHttpRequest') {
+            detailRequests++;
+        }
+
+        await route.continue();
+    });
+
+    await page.goto('/');
+
+    const product = page.locator('[data-product-stock-card]').first();
+    await product.focus();
+    await expect.poll(() => detailRequests).toBe(1);
+
+    await product.click();
+    await expect(page).toHaveURL(/\/product\//);
+    await expect(page.locator('h1')).toBeVisible();
+    expect(detailRequests).toBe(1);
+});
+
+test('back to products restores homepage filters and scroll position', async ({ page }) => {
+    const consoleErrors = [];
+    page.on('console', (message) => {
+        if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'PC', exact: true }).click();
+    const search = page.getByRole('textbox', { name: 'Search products' });
+    const filteredProducts = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+
+        return url.pathname === '/products-fragment'
+            && url.searchParams.get('search') === 'Aurora VN'
+            && response.ok();
+    });
+    await search.fill('Aurora VN');
+    await filteredProducts;
+    await expect(page.locator('#productContainer')).not.toHaveClass(/product-filter-(?:leaving|entering)|product-container-loading/);
+
+    const product = page.locator('[data-product-stock-card]').first();
+    await expect(product).toBeVisible();
+    await product.scrollIntoViewIfNeeded();
+    const savedScrollY = await page.evaluate(() => Math.round(window.scrollY));
+    expect(savedScrollY).toBeGreaterThan(0);
+    await expect.poll(() => page.evaluate(() => window.history.state)).toMatchObject({
+        aksaHomeView: {
+            search: 'Aurora VN',
+            category: 'pc',
+        },
+        aksaScrollPosition: {
+            y: savedScrollY,
+        },
+    });
+
+    await product.click();
+    await expect(page).toHaveURL(/\/product\//);
+    await expect.poll(() => page.evaluate(() => window.history.state?.aksaPreviousUrl)).toMatch(/\/$/);
+    await page.getByRole('link', { name: 'Back to products' }).click();
+
+    await expect(page).toHaveURL('/');
+    await expect(search).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.history.state)).toMatchObject({
+        aksaHomeView: {
+            search: 'Aurora VN',
+            category: 'pc',
+        },
+        aksaScrollPosition: {
+            y: savedScrollY,
+        },
+    });
+    expect(consoleErrors).toEqual([]);
+    await expect(search).toHaveValue('Aurora VN');
+    await expect(page.getByRole('button', { name: 'PC', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(savedScrollY);
 });
 
 test('operational and crawler endpoints respond correctly', async ({ request }) => {

@@ -69,7 +69,8 @@
         data-product-stock-endpoint="{{ route('products.stock-detail', $product, false) }}">
         <div class="product-hero mb-6">
             <div>
-                <a href="/" class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
+                <a href="/" data-soft-nav data-soft-nav-back
+                    class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <span class="support-pill product-hero-pill">
                         <x-ui.icon :name="$categoryIcon" class="h-4 w-4" />

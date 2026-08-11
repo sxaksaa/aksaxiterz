@@ -675,17 +675,26 @@
         color: #b49bff;
     }
 
-    .product-category-pill span,
-    .product-card-fact span {
+    .product-category-pill span {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
+    .product-card-fact span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+
+    .product-card-fact > svg {
+        flex: 0 0 auto;
+    }
+
     .product-card-facts {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         gap: 0.5rem;
     }
 
@@ -4495,10 +4504,6 @@
         .package-card:hover,
         .license-card:hover {
             transform: none;
-        }
-
-        .product-card-facts {
-            grid-template-columns: 1fr;
         }
 
         .qris-modal {

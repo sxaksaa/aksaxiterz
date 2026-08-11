@@ -94,9 +94,24 @@
     ])
 
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
-        document.addEventListener('DOMContentLoaded', () => {
+        (() => {
 
-            let currentCategory = @json(request('category', ''));
+            const pageContent = document.querySelector('[data-aksa-page-content]');
+            const initialSearch = @json((string) request('search', ''));
+            const initialCategory = @json((string) request('category', ''));
+            const handedOffSearch = pageContent?.dataset.aksaRestoredHomeSearch;
+            const handedOffCategory = pageContent?.dataset.aksaRestoredHomeCategory;
+            const restoredHomeView = handedOffSearch !== undefined || handedOffCategory !== undefined
+                ? {
+                    search: handedOffSearch || '',
+                    category: handedOffCategory || '',
+                }
+                : window.history.state?.aksaHomeView;
+            const restoredScrollY = Number(
+                pageContent?.dataset.aksaRestoredScrollY
+                    ?? window.history.state?.aksaScrollPosition?.y
+            );
+            let currentCategory = initialCategory;
             const productEndpoint = @json(route('products.fragment', [], false));
             const productStockEndpoint = @json(route('products.stocks', [], false));
             const stockPollingInterval = 30000;
@@ -113,11 +128,55 @@
 
             if (!searchInput || !container) return;
 
+            pageContent?.removeAttribute('data-aksa-restored-home-search');
+            pageContent?.removeAttribute('data-aksa-restored-home-category');
+            pageContent?.removeAttribute('data-aksa-restored-scroll-y');
+
+            function categoryChipFor(category) {
+                return [...document.querySelectorAll('[data-category-filter]')]
+                    .find((chip) => (chip.dataset.category || '') === category) || null;
+            }
+
+            function selectCategoryChip(category) {
+                const selectedChip = categoryChipFor(category) || categoryChipFor('');
+                currentCategory = selectedChip?.dataset.category || '';
+
+                document.querySelectorAll('.category-chip').forEach((chip) => {
+                    const active = chip === selectedChip;
+                    chip.classList.toggle('active', active);
+                    chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+
+                return selectedChip;
+            }
+
+            function persistHomeViewState() {
+                window.history.replaceState({
+                    ...(window.history.state || {}),
+                    aksaSoftNavigation: true,
+                    aksaHomeView: {
+                        search: searchInput.value,
+                        category: currentCategory,
+                    },
+                }, '', window.location.href);
+            }
+
+            const restoredSearch = typeof restoredHomeView?.search === 'string'
+                ? restoredHomeView.search.slice(0, 200)
+                : initialSearch;
+            const restoredCategory = typeof restoredHomeView?.category === 'string'
+                ? restoredHomeView.category
+                : initialCategory;
+
+            searchInput.value = restoredSearch;
+            selectCategoryChip(restoredCategory);
+
             searchInput.addEventListener('input', function() {
 
                 clearTimeout(searchTimeout);
 
                 searchTimeout = setTimeout(() => {
+                    persistHomeViewState();
                     fetchProducts(this.value, currentCategory);
                 }, 200);
 
@@ -142,20 +201,11 @@
 
             function filterCategory(cat, el) {
 
-                currentCategory = cat;
                 const categoryName = el && el.textContent ? el.textContent.trim() : 'All';
+                selectCategoryChip(cat);
+                persistHomeViewState();
 
-                document.querySelectorAll('.category-chip').forEach((chip) => {
-                    chip.classList.remove('active');
-                    chip.setAttribute('aria-pressed', 'false');
-                });
-
-                if (el) {
-                    el.classList.add('active');
-                    el.setAttribute('aria-pressed', 'true');
-                }
-
-                fetchProducts(searchInput.value, cat);
+                fetchProducts(searchInput.value, currentCategory);
 
                 if (window.showAppToast) {
                     window.showAppToast(
@@ -191,7 +241,7 @@
                     container.innerHTML = productSkeletonHtml();
                 }, exitDelay);
 
-                fetch(`${productEndpoint}?${params.toString()}`, {
+                return fetch(`${productEndpoint}?${params.toString()}`, {
                         cache: 'no-store',
                         headers: {
                             'Accept': 'text/html',
@@ -378,6 +428,25 @@
 
             scheduleStockPolling();
 
+            if (restoredHomeView) {
+                const needsFilteredRefresh = restoredSearch !== initialSearch
+                    || currentCategory !== initialCategory;
+                const restoredProducts = needsFilteredRefresh
+                    ? fetchProducts(restoredSearch, currentCategory)
+                    : Promise.resolve();
+
+                restoredProducts.finally(() => {
+                    if (!Number.isFinite(restoredScrollY)) return;
+
+                    setTimeout(() => {
+                        window.scrollTo({
+                            top: Math.max(0, restoredScrollY),
+                            behavior: 'auto',
+                        });
+                    }, 0);
+                });
+            }
+
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     pauseStockPolling();
@@ -394,7 +463,10 @@
                 }
             });
 
-            window.addEventListener('aksa:before-page-swap', disposeHomePage, {
+            window.addEventListener('aksa:before-page-swap', () => {
+                persistHomeViewState();
+                disposeHomePage();
+            }, {
                 once: true,
             });
 
@@ -438,6 +510,6 @@
                     .replace(/'/g, '&#039;');
             }
 
-        });
+        })();
     </script>
 @endsection

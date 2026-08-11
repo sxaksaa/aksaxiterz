@@ -89,7 +89,8 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
         ->withExists(['availableLicenseStocks as has_available_stock'])
         ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Product::STATUS_READY])
         ->orderByDesc('has_available_stock')
-        ->orderBy('name');
+        ->orderBy('name')
+        ->matchingSearch($request->string('search')->toString());
 
     if ($request->category === 'mobile') {
         $query->whereHas('category', fn ($query) => $query->whereIn('slug', ['android', 'ios']));
@@ -99,10 +100,6 @@ Route::get('/', function (Request $request) use ($activePromoVoucher) {
         if ($category) {
             $query->where('category_id', $category->id);
         }
-    }
-
-    if ($request->search) {
-        $query->where('name', 'like', '%'.$request->search.'%');
     }
 
     $products = app(ProductSalesSignals::class)->apply($query->get());
@@ -126,11 +123,8 @@ $productsFragment = function (Request $request) {
         ->withExists(['availableLicenseStocks as has_available_stock'])
         ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Product::STATUS_READY])
         ->orderByDesc('has_available_stock')
-        ->orderBy('name');
-
-    if ($request->search) {
-        $query->where('name', 'like', '%'.$request->search.'%');
-    }
+        ->orderBy('name')
+        ->matchingSearch($request->string('search')->toString());
 
     if ($request->category === 'mobile') {
         $query->whereHas('category', fn ($query) => $query->whereIn('slug', ['android', 'ios']));

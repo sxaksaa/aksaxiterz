@@ -54,8 +54,10 @@ class DisplayCurrencyPresentationTest extends TestCase
             ->assertSee('data-currency-option="usd"', false)
             ->assertSee('data-price-idr="10000"', false)
             ->assertSee('data-price-usd="1"', false)
-            ->assertSee('data-currency-text-idr="From 1 day"', false)
-            ->assertSee('data-currency-text-usd="From 7 days"', false);
+            ->assertDontSee('data-currency-text-idr=', false)
+            ->assertDontSee('data-currency-text-usd=', false)
+            ->assertDontSee('From 1 day')
+            ->assertDontSee('From 7 days');
 
         $this->assertSame(2, substr_count($home->getContent(), 'data-currency-switcher'));
         $this->assertMatchesRegularExpression(

@@ -395,6 +395,26 @@ class ProductStockFeedTest extends TestCase
         }
     }
 
+    public function test_product_search_ignores_spaces_and_punctuation_in_product_names(): void
+    {
+        $category = Category::create(['name' => 'Search', 'slug' => 'stock-feed-search']);
+        [$hyphenatedProduct] = $this->productWithPackage($category, 'Aurora-VN', 'aurora-vn-search');
+        [$spacedProduct] = $this->productWithPackage($category, 'XG Team', 'xg-team-search');
+        [$unrelatedProduct] = $this->productWithPackage($category, 'Unrelated Product', 'unrelated-search');
+
+        $this->get('/?search=Aurora%20VN')
+            ->assertOk()
+            ->assertSee($hyphenatedProduct->name)
+            ->assertDontSee($spacedProduct->name)
+            ->assertDontSee($unrelatedProduct->name);
+
+        $this->get(route('products.fragment', ['search' => 'XG-Team']))
+            ->assertOk()
+            ->assertSee($spacedProduct->name)
+            ->assertDontSee($hyphenatedProduct->name)
+            ->assertDontSee($unrelatedProduct->name);
+    }
+
     private function productWithPackage(
         Category $category,
         string $name,

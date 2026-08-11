@@ -6,14 +6,6 @@
             ->sortBy('price_usdt')
             ->first();
         $stock = $product->available_license_stocks_count ?? 0;
-        $durationDaysIdr = $minPackageIdr?->durationDays();
-        $durationDaysUsd = $minPackageUsd?->durationDays();
-        $durationLabelIdr = $durationDaysIdr
-            ? $durationDaysIdr . ' ' . \Illuminate\Support\Str::plural('day', $durationDaysIdr)
-            : 'Package';
-        $durationLabelUsd = $durationDaysUsd
-            ? $durationDaysUsd . ' ' . \Illuminate\Support\Str::plural('day', $durationDaysUsd)
-            : 'USD unavailable';
         $categoryName = $product->category->name ?? 'Product';
         $categoryKey = strtolower(trim($categoryName));
         $categoryIcon = match ($categoryKey) {
@@ -64,14 +56,6 @@
         </div>
 
         <div class="product-card-facts">
-            <span class="product-card-fact">
-                <x-ui.icon name="calendar" class="h-4 w-4" />
-                <span data-currency-text
-                    data-currency-text-idr="From {{ $durationLabelIdr }}"
-                    data-currency-text-usd="{{ $minPackageUsd ? 'From '.$durationLabelUsd : $durationLabelUsd }}">
-                    From {{ $durationLabelIdr }}
-                </span>
-            </span>
             <span class="product-card-fact" data-product-availability>
                 <x-ui.icon name="key-round" class="h-4 w-4 {{ $hasReadyStock ? '' : 'hidden' }}"
                     data-product-stock-icon-ready />

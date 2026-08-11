@@ -2058,6 +2058,10 @@ let lastNavbarScroll = window.pageYOffset || 0;
 let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
 let softPageRuntimeSequence = 0;
+let historyPositionTimer = null;
+const softNavigationPrefetches = new Map();
+const SOFT_NAVIGATION_PREFETCH_TTL = 30000;
+const SOFT_NAVIGATION_PREFETCH_LIMIT = 12;
 const ENABLE_AKSA_SAFE_SOFT_NAVIGATION = true;
 
 function navButton() {
@@ -2429,6 +2433,27 @@ function formNavigationUrl(form, submitter = null) {
     return url.href;
 }
 
+function persistCurrentHistoryPosition() {
+    const position = {
+        x: Math.max(0, Math.round(window.scrollX)),
+        y: Math.max(0, Math.round(window.scrollY)),
+    };
+
+    window.history.replaceState({
+        ...(window.history.state || {}),
+        aksaSoftNavigation: true,
+        aksaScrollPosition: position,
+    }, '', window.location.href);
+}
+
+function scheduleCurrentHistoryPosition() {
+    window.clearTimeout(historyPositionTimer);
+    historyPositionTimer = window.setTimeout(() => {
+        historyPositionTimer = null;
+        persistCurrentHistoryPosition();
+    }, 120);
+}
+
 function withCleanupSignal(options, signal) {
     if (options === undefined) return { signal };
     if (typeof options === 'boolean') return { capture: options, signal };
@@ -2602,10 +2627,8 @@ function executeTrackedInlineScript(code, runtime) {
     }
 }
 
-function executeSoftPageScripts(nextDocument) {
+function executeSoftPageScripts(scripts) {
     cleanupSoftPageScripts();
-
-    const scripts = [...nextDocument.body.querySelectorAll('script')].filter(runnableScript);
 
     if (scripts.length === 0) return;
 
@@ -2641,7 +2664,18 @@ function updateDocumentMeta(nextDocument) {
     }
 }
 
-function scrollAfterSoftNavigation(url) {
+function scrollAfterSoftNavigation(url, historyState = null) {
+    const savedPosition = historyState?.aksaScrollPosition;
+
+    if (savedPosition && Number.isFinite(savedPosition.x) && Number.isFinite(savedPosition.y)) {
+        window.scrollTo({
+            left: Math.max(0, savedPosition.x),
+            top: Math.max(0, savedPosition.y),
+            behavior: 'auto',
+        });
+        return;
+    }
+
     if (url.hash) {
         document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView({ block: 'start' });
         return;
@@ -2738,9 +2772,138 @@ function hideDashboardChartTooltip(point = null) {
     point?.removeAttribute('aria-describedby');
 }
 
+async function requestSoftNavigationPage(url, signal = null) {
+    const response = await fetch(url.href, {
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'text/html',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        ...(signal ? { signal } : {}),
+    });
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok || !contentType.includes('text/html')) {
+        throw new Error(`Soft navigation failed (${response.status})`);
+    }
+
+    if (response.redirected && new URL(response.url).origin !== window.location.origin) {
+        throw new Error('Soft navigation was redirected outside this site');
+    }
+
+    return {
+        html: await response.text(),
+        responseUrl: response.url,
+    };
+}
+
+function trimSoftNavigationPrefetches() {
+    while (softNavigationPrefetches.size > SOFT_NAVIGATION_PREFETCH_LIMIT) {
+        softNavigationPrefetches.delete(softNavigationPrefetches.keys().next().value);
+    }
+}
+
+function prefetchSoftNavigationPage(url) {
+    const existing = softNavigationPrefetches.get(url.href);
+
+    if (existing && existing.expiresAt > Date.now()) return existing.promise;
+
+    if (existing) softNavigationPrefetches.delete(url.href);
+
+    const entry = {
+        expiresAt: Date.now() + SOFT_NAVIGATION_PREFETCH_TTL,
+        promise: null,
+    };
+
+    entry.promise = requestSoftNavigationPage(url).catch((error) => {
+        if (softNavigationPrefetches.get(url.href) === entry) {
+            softNavigationPrefetches.delete(url.href);
+        }
+
+        throw error;
+    });
+    entry.promise.catch(() => {});
+    softNavigationPrefetches.set(url.href, entry);
+    trimSoftNavigationPrefetches();
+
+    return entry.promise;
+}
+
+function abortableSoftNavigationPrefetch(promise, signal) {
+    if (signal.aborted) {
+        return Promise.reject(new DOMException('Navigation aborted', 'AbortError'));
+    }
+
+    return new Promise((resolve, reject) => {
+        const abort = () => reject(new DOMException('Navigation aborted', 'AbortError'));
+        signal.addEventListener('abort', abort, { once: true });
+
+        promise.then(
+            (value) => {
+                signal.removeEventListener('abort', abort);
+                resolve(value);
+            },
+            (error) => {
+                signal.removeEventListener('abort', abort);
+                reject(error);
+            },
+        );
+    });
+}
+
+function takePrefetchedSoftNavigationPage(url, signal) {
+    const entry = softNavigationPrefetches.get(url.href);
+
+    if (!entry || entry.expiresAt <= Date.now()) {
+        if (entry) softNavigationPrefetches.delete(url.href);
+        return null;
+    }
+
+    softNavigationPrefetches.delete(url.href);
+
+    return abortableSoftNavigationPrefetch(entry.promise, signal);
+}
+
+function productLinkForPrefetch(event) {
+    return event.target instanceof Element
+        ? event.target.closest('a[data-product-stock-card][data-soft-nav]')
+        : null;
+}
+
+function prefetchProductLink(link) {
+    if (!link || link.dataset.noSoftNav !== undefined) return;
+
+    const rawHref = link.getAttribute('href');
+    if (!rawHref) return;
+
+    const url = new URL(rawHref, window.location.href);
+
+    if (url.origin !== window.location.origin || url.href === window.location.href) return;
+
+    prefetchSoftNavigationPage(url);
+}
+
+function attachRestoredPageState(content, historyState) {
+    const homeView = historyState?.aksaHomeView;
+    const scrollPosition = historyState?.aksaScrollPosition;
+
+    if (typeof homeView?.search === 'string') {
+        content.dataset.aksaRestoredHomeSearch = homeView.search;
+    }
+
+    if (typeof homeView?.category === 'string') {
+        content.dataset.aksaRestoredHomeCategory = homeView.category;
+    }
+
+    if (Number.isFinite(scrollPosition?.y)) {
+        content.dataset.aksaRestoredScrollY = String(scrollPosition.y);
+    }
+}
+
 async function softNavigate(url, options = {}) {
     const nextUrl = new URL(url, window.location.href);
     const currentContent = pageContentShell();
+    const previousUrl = window.location.href;
 
     if (!currentContent) {
         window.location.href = nextUrl.href;
@@ -2753,6 +2916,7 @@ async function softNavigate(url, options = {}) {
     activeSoftNavigation = controller;
     const pendingLink = options.pendingLink || null;
 
+    if (options.pushHistory !== false) persistCurrentHistoryPosition();
     window.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
     document.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
     currentContent.classList.remove('aksa-soft-nav-entered');
@@ -2761,33 +2925,19 @@ async function softNavigate(url, options = {}) {
     pendingLink?.classList.add('is-soft-nav-pending');
 
     try {
-        const response = await fetch(nextUrl.href, {
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'text/html',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            signal: controller.signal,
-        });
-
-        const contentType = response.headers.get('content-type') || '';
-
-        if (!response.ok || !contentType.includes('text/html')) {
-            throw new Error(`Soft navigation failed (${response.status})`);
-        }
-
-        if (response.redirected && new URL(response.url).origin !== window.location.origin) {
-            window.location.href = nextUrl.href;
-            return;
-        }
-
-        const html = await response.text();
+        const prefetchedPage = takePrefetchedSoftNavigationPage(nextUrl, controller.signal);
+        const { html } = await (prefetchedPage || requestSoftNavigationPage(nextUrl, controller.signal));
         const nextDocument = new DOMParser().parseFromString(html, 'text/html');
         const nextContent = nextDocument.querySelector('[data-aksa-page-content]');
+        const nextPageScripts = [...nextDocument.body.querySelectorAll('script')].filter(runnableScript);
 
         if (!nextContent) {
             window.location.href = nextUrl.href;
             return;
+        }
+
+        if (options.pushHistory === false) {
+            attachRestoredPageState(nextContent, window.history.state);
         }
 
         syncPersistentNavigation(nextDocument);
@@ -2805,10 +2955,13 @@ async function softNavigate(url, options = {}) {
                 }, '', window.location.href);
             }
 
-            window.history.pushState({ aksaSoftNavigation: true }, '', nextUrl.href);
+            window.history.pushState({
+                aksaSoftNavigation: true,
+                aksaPreviousUrl: previousUrl,
+            }, '', nextUrl.href);
         }
 
-        executeSoftPageScripts(nextDocument);
+        executeSoftPageScripts(nextPageScripts);
         initializeDisplayCurrency(document);
         initializeCustomSelects(nextContent);
         initializeRecentPurchaseToast(nextContent);
@@ -2816,7 +2969,10 @@ async function softNavigate(url, options = {}) {
         initializeMotionEnhancements(nextContent);
         closeMobileMenu();
         closeProfileDropdown();
-        scrollAfterSoftNavigation(nextUrl);
+        scrollAfterSoftNavigation(
+            nextUrl,
+            options.pushHistory === false ? window.history.state : null,
+        );
 
         requestAnimationFrame(() => {
             updateNavGlider();
@@ -3146,7 +3302,10 @@ window.addEventListener('resize', () => {
     updateNavGlider();
 }, { passive: true });
 
-window.addEventListener('scroll', updateNavbarOnScroll, { passive: true });
+window.addEventListener('scroll', () => {
+    updateNavbarOnScroll();
+    scheduleCurrentHistoryPosition();
+}, { passive: true });
 
 document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
@@ -3154,7 +3313,19 @@ document.addEventListener('click', (event) => {
     if (!shouldSoftNavigateLink(link, event)) return;
 
     event.preventDefault();
-    softNavigate(new URL(link.getAttribute('href'), window.location.href).href, {
+
+    const nextUrl = new URL(link.getAttribute('href'), window.location.href);
+
+    if (
+        link.dataset.softNavBack !== undefined
+        && window.history.state?.aksaPreviousUrl === nextUrl.href
+    ) {
+        persistCurrentHistoryPosition();
+        window.history.back();
+        return;
+    }
+
+    softNavigate(nextUrl.href, {
         pendingLink: link,
     });
 });
@@ -3177,6 +3348,8 @@ window.addEventListener('popstate', (event) => {
 });
 
 document.addEventListener('pointerover', (event) => {
+    prefetchProductLink(productLinkForPrefetch(event));
+
     if (event.target.closest('[data-mini-cart-root]') && !usesMiniCartSheet()) {
         ensureMiniCartLoaded();
     }
@@ -3222,6 +3395,8 @@ document.addEventListener('pointerout', (event) => {
 });
 
 document.addEventListener('focusin', (event) => {
+    prefetchProductLink(productLinkForPrefetch(event));
+
     if (event.target.closest('[data-mini-cart-root]')) ensureMiniCartLoaded();
 
     const navItem = navItemFromEvent(event);
@@ -3234,6 +3409,10 @@ document.addEventListener('focusin', (event) => {
         showDashboardChartTooltip(point);
     }
 });
+
+document.addEventListener('pointerdown', (event) => {
+    prefetchProductLink(productLinkForPrefetch(event));
+}, { passive: true });
 
 document.addEventListener('focusout', (event) => {
     const navItem = navItemFromEvent(event);

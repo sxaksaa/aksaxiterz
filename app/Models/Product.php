@@ -47,6 +47,28 @@ class Product extends Model
         return $query->where('status', self::STATUS_READY);
     }
 
+    public function scopeMatchingSearch(Builder $query, ?string $search): Builder
+    {
+        $search = trim(mb_substr((string) $search, 0, 200));
+
+        if ($search === '') {
+            return $query;
+        }
+
+        $terms = preg_split('/[^\pL\pN]+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $terms = array_slice(array_values(array_unique($terms)), 0, 8);
+
+        if ($terms === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $query) use ($terms): void {
+            foreach ($terms as $term) {
+                $query->where('name', 'like', '%'.$term.'%');
+            }
+        });
+    }
+
     public function isReadyForAutomaticCheckout(): bool
     {
         return $this->is_visible && $this->status === self::STATUS_READY;
