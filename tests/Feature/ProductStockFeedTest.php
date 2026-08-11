@@ -344,9 +344,12 @@ class ProductStockFeedTest extends TestCase
                 false
             )
             ->assertSee('data-product-status-badge', false)
+            ->assertSee('product-status-badge-static hidden', false)
             ->assertDontSee('Starts from')
             ->assertDontSee('data-product-availability-value', false)
             ->assertSee('data-package-card', false)
+            ->assertSee('packageMemoryKey', false)
+            ->assertSee('package-stock-changed', false)
             ->assertSee('data-package-id="'.$package->id.'"', false)
             ->assertSee('data-stock="2"', false)
             ->assertSee('data-package-checkout-enabled="true"', false)

@@ -21,9 +21,6 @@
             'android' => 'android',
             default => 'box',
         };
-        $statusBadgeClass = $product->status === \App\Models\Product::STATUS_UPDATING
-            ? 'product-status-badge-updating'
-            : 'product-status-badge-ready';
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
         $packageSavings = $product->packages->mapWithKeys(function ($package) use ($dailyPackage) {
@@ -79,7 +76,7 @@
                         <span>{{ $categoryName }}</span>
                     </span>
                     <span data-product-status-badge
-                        class="product-status-badge product-status-badge-static {{ $statusBadgeClass }}">
+                        class="product-status-badge product-status-badge-static {{ $isProductReady ? 'hidden' : 'product-status-badge-updating' }}">
                         {{ $product->status_label }}
                     </span>
                     @if ($salesBadgeLabel)
@@ -301,6 +298,7 @@
             const isAuthenticated = @json(auth()->check());
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const maxCheckoutQuantity = @json(\App\Services\CartService::MAX_TOTAL_QUANTITY);
+            const packageMemoryKey = `aksa:last-package:${currentProductId}`;
             let productReady = @json($isProductReady);
             let productUnavailable = false;
             let selectedPackage = null;
@@ -431,6 +429,11 @@
                     stock: Number(card.dataset.stock || 0),
                     enabled: true,
                 };
+                try {
+                    sessionStorage.setItem(packageMemoryKey, String(selectedPackage.id));
+                } catch (error) {
+                    // Package selection still works when storage is unavailable.
+                }
                 selectedQuantity = 1;
                 document.querySelectorAll('[data-package-card]').forEach(item => {
                     item.classList.toggle('active', item === card);
@@ -467,7 +470,7 @@
                 const statusBadge = document.querySelector('[data-product-status-badge]');
                 if (statusBadge) {
                     statusBadge.textContent = snapshot.status_label || (productReady ? 'Ready' : 'Updating');
-                    statusBadge.classList.toggle('product-status-badge-ready', productReady);
+                    statusBadge.classList.toggle('hidden', productReady);
                     statusBadge.classList.toggle('product-status-badge-updating', !productReady);
                 }
 
@@ -485,6 +488,7 @@
                 document.querySelectorAll('[data-package-card]').forEach(card => {
                     const id = Number(card.dataset.packageId);
                     const packageStock = stocks.get(id) || 0;
+                    const previousStock = Number(card.dataset.stock || 0);
                     const enabled = productReady && packageStock > 0;
                     card.dataset.stock = String(packageStock);
                     card.dataset.packageCheckoutEnabled = enabled ? 'true' : 'false';
@@ -496,11 +500,18 @@
                     const availability = card.querySelector('[data-package-availability]');
                     availability.classList.toggle('package-availability-ready', enabled);
                     availability.classList.toggle('package-availability-manual', !enabled);
-                    card.querySelector('[data-package-availability-label]').textContent = productUnavailable
+                    const availabilityLabel = card.querySelector('[data-package-availability-label]');
+                    availabilityLabel.textContent = productUnavailable
                         ? 'Product unavailable'
                         : (!productReady
                             ? 'Checkout paused during update'
                             : (packageStock > 0 ? `${packageStock} available · Auto delivery` : 'Manual order via Discord'));
+                    if (previousStock !== packageStock) {
+                        availabilityLabel.classList.remove('package-stock-changed');
+                        void availabilityLabel.offsetWidth;
+                        availabilityLabel.classList.add('package-stock-changed');
+                        setTimeout(() => availabilityLabel.classList.remove('package-stock-changed'), 620);
+                    }
 
                     const manual = card.querySelector('[data-manual-order]');
                     manual.classList.toggle('hidden', enabled);
@@ -599,6 +610,21 @@
                     choosePackage(card);
                 }, { signal: pageController.signal });
             });
+
+            try {
+                const rememberedPackageId = sessionStorage.getItem(packageMemoryKey);
+                const rememberedCard = rememberedPackageId
+                    ? document.querySelector(`[data-package-card][data-package-id="${CSS.escape(rememberedPackageId)}"]`)
+                    : null;
+
+                if (rememberedCard) {
+                    sessionStorage.removeItem(packageMemoryKey);
+                    rememberedCard.classList.add('package-return-highlight');
+                    setTimeout(() => rememberedCard.classList.remove('package-return-highlight'), 1200);
+                }
+            } catch (error) {
+                // Returning to the page remains functional when storage is unavailable.
+            }
 
             document.querySelectorAll('[data-manual-order]').forEach(button => {
                 button.addEventListener('click', event => {

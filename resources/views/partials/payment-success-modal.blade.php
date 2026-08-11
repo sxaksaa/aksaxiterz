@@ -8,7 +8,9 @@
 
         <div class="text-center">
             <div class="payment-success-mark mx-auto" aria-hidden="true">
-                <span class="payment-success-check"></span>
+                <svg class="payment-success-check" viewBox="0 0 32 32" focusable="false">
+                    <path d="M7 17l6 6L25 10" pathLength="1"></path>
+                </svg>
             </div>
 
             <p class="mt-5 text-xs font-semibold uppercase tracking-normal text-aksa-accent">Payment Complete</p>

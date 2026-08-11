@@ -2,7 +2,7 @@
     class="site-navbar fixed inset-x-0 top-2 z-50 px-3 transition-transform duration-300 sm:top-3 sm:px-4 lg:top-4 lg:px-6">
 
     <div
-        class="site-navbar-pill mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
+        class="site-navbar-pill site-navbar-entrance mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
 
         <!-- LOGO -->
         <a href="/" class="site-brand-link flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>

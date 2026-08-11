@@ -26,6 +26,7 @@ class NavbarPresentationTest extends TestCase
 
         $this->assertStringContainsString('id="navbar"', $html);
         $this->assertStringContainsString('site-navbar-pill', $html);
+        $this->assertStringContainsString('site-navbar-entrance', $html);
         $this->assertStringContainsString('id="menuBtn"', $html);
         $this->assertStringContainsString('aria-controls="mobileMenu"', $html);
         $this->assertStringContainsString('aria-expanded="false"', $html);

@@ -42,9 +42,10 @@
             </div>
         </section>
 
-        <div class="mb-6 rounded-xl border px-4 py-3 text-sm
+        <div data-payment-status-banner class="mb-6 rounded-xl border px-4 py-3 text-sm
+            {{ $stateKey === 'paid' ? 'payment-status-verified-in' : '' }}
             {{ $stateKey === 'paid'
-                ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'
+                ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
                 : ($stateKey === 'pending'
                     ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
                     : 'border-amber-400/30 bg-amber-400/10 text-amber-100') }}">
@@ -52,8 +53,8 @@
                 <x-ui.icon :name="$stateKey === 'paid' ? 'check-circle' : ($stateKey === 'pending' ? 'shield-check' : 'life-buoy')"
                     class="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                    <p class="font-semibold">{{ $paymentState['label'] }}</p>
-                    <p class="mt-1 leading-6 opacity-90">{{ $paymentState['message'] }}</p>
+                    <p class="font-semibold" data-payment-status-label>{{ $paymentState['label'] }}</p>
+                    <p class="mt-1 leading-6 opacity-90" data-payment-status-message>{{ $paymentState['message'] }}</p>
                 </div>
             </div>
         </div>
@@ -66,9 +67,12 @@
         <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <section class="product-section fade-up">
                 @if ($paymentState['is_paid'])
-                    <div class="flex flex-col items-center px-2 py-8 text-center">
-                        <span class="inline-flex h-16 w-16 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
-                            <x-ui.icon name="check-circle" class="h-8 w-8" />
+                    <div class="payment-confirmed-entrance flex flex-col items-center px-2 py-8 text-center">
+                        <span class="payment-confirmed-mark inline-flex h-16 w-16 items-center justify-center rounded-full border" aria-hidden="true">
+                            <svg class="h-9 w-9" viewBox="0 0 36 36" focusable="false">
+                                <circle class="payment-confirmed-ring" cx="18" cy="18" r="14"></circle>
+                                <path class="payment-confirmed-check" d="M11.5 18.5l4.2 4.2 8.8-9.2" pathLength="1"></path>
+                            </svg>
                         </span>
                         <h2 class="mt-5 text-2xl font-semibold text-white">Payment confirmed</h2>
 
@@ -88,7 +92,7 @@
                                 Your {{ \Illuminate\Support\Str::plural('license', $orderSummary['delivered_count']) }}
                                 {{ $orderSummary['delivered_count'] === 1 ? 'is' : 'are' }} ready.
                             </p>
-                            <a href="{{ $paymentRoutes['licenses'] }}" class="btn-main mt-6 inline-flex px-5 py-3">
+                            <a href="{{ $paymentRoutes['licenses'] }}" class="btn-main payment-confirmed-cta mt-6 inline-flex px-5 py-3">
                                 <x-ui.icon name="key-round" class="h-4 w-4" />
                                 <span>Open Licenses</span>
                             </a>
@@ -302,11 +306,11 @@
                         @endif
 
                         @if ($paymentState['can_cancel'])
-                            <form method="POST" action="{{ $paymentRoutes['cancel'] }}" data-no-soft-nav>
+                            <form method="POST" action="{{ $paymentRoutes['cancel'] }}" data-no-soft-nav data-cancel-payment-form>
                                 @csrf
-                                <button type="submit" class="order-action min-h-12 w-full justify-center border-red-400/30 text-red-200">
+                                <button type="submit" class="order-action min-h-12 w-full justify-center border-red-400/30 text-red-200" data-cancel-payment>
                                     <x-ui.icon name="x" class="h-4 w-4" />
-                                    <span>Cancel Checkout</span>
+                                    <span data-button-label>Cancel Checkout</span>
                                 </button>
                             </form>
                         @endif
@@ -369,7 +373,7 @@
                     </div>
                     <div class="summary-row qris-total-row">
                         <span>{{ $paymentState['instruction_active'] ? 'Exact payment' : 'Invoice total' }}</span>
-                        <span class="font-semibold text-aksa-accent">{{ $exactPayment }}</span>
+                        <span class="font-semibold text-aksa-accent" data-invoice-total>{{ $exactPayment }}</span>
                     </div>
                 </div>
 
@@ -378,11 +382,11 @@
                         <dt class="text-gray-500">Order ID</dt>
                         <dd class="flex min-w-0 items-center gap-2 text-right font-mono text-gray-300">
                             <span class="truncate">{{ $orderSummary['order_id'] }}</span>
-                            <button type="button" class="order-action shrink-0 px-2 py-1"
+                            <button type="button" class="order-action order-id-copy shrink-0 px-2 py-1"
                                 data-copy-payment="{{ $orderSummary['order_id'] }}"
-                                data-copy-label="Order ID">
+                                data-copy-label="Order ID" aria-label="Copy order ID">
                                 <x-ui.icon name="copy" class="h-3.5 w-3.5" />
-                                <span class="sr-only">Copy order ID</span>
+                                <span class="order-id-copy-label" aria-hidden="true">Copied</span>
                             </button>
                         </dd>
                     </div>
@@ -428,6 +432,12 @@
             let statusPollTimer = null;
             let paymentCheckInFlight = false;
             let expiryHandled = false;
+
+            document.title = context.instructionActive
+                ? 'Waiting for Payment... | Aksa Xiterz'
+                : (@json($paymentState['is_paid'])
+                    ? 'Payment Verified \u2713 | Aksa Xiterz'
+                    : document.title);
 
             function toast(title, message, variant = 'info') {
                 window.showAppToast?.(title, message, { variant });
@@ -554,8 +564,24 @@
 
             function handlePaymentResult(result, notifyPending = false) {
                 if (result?.status === 'paid') {
+                    document.title = 'Payment Verified \u2713 | Aksa Xiterz';
                     toast('Payment verified', result.message || 'Your payment has been confirmed.', 'success');
-                    window.location.reload();
+                    const banner = page.querySelector('[data-payment-status-banner]');
+                    const total = page.querySelector('[data-invoice-total]');
+                    const label = page.querySelector('[data-payment-status-label]');
+                    const message = page.querySelector('[data-payment-status-message]');
+
+                    banner?.classList.add('payment-status-updating');
+                    total?.classList.add('invoice-total-verified');
+
+                    window.setTimeout(() => {
+                        if (label) label.textContent = 'Payment verified';
+                        if (message) message.textContent = result.message || 'Your payment has been confirmed.';
+                        banner?.classList.remove('payment-status-updating');
+                        banner?.classList.add('payment-status-verified-in');
+                    }, 180);
+
+                    window.setTimeout(() => window.location.reload(), 950);
                     return;
                 }
 
@@ -597,6 +623,16 @@
 
                     try {
                         await copyText(value);
+                        if (button.dataset.copyLabel === 'Order ID') {
+                            button.classList.remove('is-copy-success');
+                            void button.offsetWidth;
+                            button.classList.add('is-copy-success');
+                            button.setAttribute('aria-label', 'Order ID copied');
+                            window.setTimeout(() => {
+                                button.classList.remove('is-copy-success');
+                                button.setAttribute('aria-label', 'Copy order ID');
+                            }, 1200);
+                        }
                         toast(`${button.dataset.copyLabel || 'Value'} copied`, 'Paste it exactly as shown.', 'success');
                     } catch (error) {
                         toast('Copy failed', 'Please select and copy the value manually.', 'error');
@@ -626,6 +662,19 @@
                     button.disabled = false;
                     setButtonLabel(button, originalLabel);
                 }
+            }, { signal: pageController.signal });
+
+            page.querySelector('[data-cancel-payment-form]')?.addEventListener('submit', event => {
+                const button = event.currentTarget.querySelector('[data-cancel-payment]');
+                if (!button || button.disabled) {
+                    event.preventDefault();
+                    return;
+                }
+
+                button.disabled = true;
+                button.setAttribute('aria-busy', 'true');
+                button.classList.add('is-cancelling');
+                setButtonLabel(button, 'Cancelling...');
             }, { signal: pageController.signal });
 
             const initialize = () => {

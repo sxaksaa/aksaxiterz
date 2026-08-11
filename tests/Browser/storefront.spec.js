@@ -53,6 +53,9 @@ test('payment dialog traps keyboard focus and restores the opener', async ({ pag
         modal.innerHTML = `
             <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaPaymentSuccessTitle">
                 <button type="button" data-payment-success-close aria-label="Close payment success">Close</button>
+                <div class="payment-success-mark" aria-hidden="true">
+                    <svg class="payment-success-check" viewBox="0 0 32 32"><path d="M7 17l6 6L25 10" pathLength="1"></path></svg>
+                </div>
                 <h2 id="aksaPaymentSuccessTitle">Payment Successful</h2>
                 <p id="aksaPaymentSuccessMessage"></p>
                 <p id="aksaPaymentSuccessCopyStatus"></p>
@@ -67,6 +70,7 @@ test('payment dialog traps keyboard focus and restores the opener', async ({ pag
 
     const close = page.getByRole('button', { name: 'Close payment success' });
     const primary = page.getByRole('link', { name: 'View License' });
+    await expect(page.locator('.payment-success-mark')).toHaveClass(/is-animating/);
     await expect(close).toBeFocused();
 
     await page.keyboard.press('Shift+Tab');

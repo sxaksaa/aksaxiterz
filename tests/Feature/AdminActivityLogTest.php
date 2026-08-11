@@ -90,9 +90,20 @@ class AdminActivityLogTest extends TestCase
         $serializedLog = json_encode($log->toArray(), JSON_THROW_ON_ERROR);
 
         $this->assertSame('admin.license-stocks.store', $log->action);
-        $this->assertSame('2 key(s) · Product #'.$product->id.' · Package #'.$package->id, $log->details);
+        $this->assertSame('2 keys · Audit Product · 1 Day', $log->details);
         $this->assertStringNotContainsString('SECRET-LICENSE-ONE', $serializedLog);
         $this->assertStringNotContainsString('SECRET-LICENSE-TWO', $serializedLog);
+
+        $log->update([
+            'details' => '2 key(s) · Product #'.$product->id.' · Package #'.$package->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.activity.index'))
+            ->assertOk()
+            ->assertSee('2 key(s) · Audit Product · 1 Day')
+            ->assertDontSee('Product #'.$product->id)
+            ->assertDontSee('Package #'.$package->id);
     }
 
     private function catalogFixture(): array

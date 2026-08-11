@@ -123,7 +123,7 @@
                                         </div>
                                     @endif
                                 </td>
-                                <td class="p-4 text-xs leading-5 text-gray-400">{{ $log->details ?: '-' }}</td>
+                                <td class="p-4 text-xs leading-5 text-gray-400">{{ $log->display_details ?: '-' }}</td>
                                 <td class="p-4 font-mono text-xs text-gray-400" title="{{ $log->user_agent }}">
                                     {{ $log->ip_address ?: '-' }}
                                 </td>
@@ -155,8 +155,8 @@
 
                     <div class="mt-4 grid gap-2 text-sm text-gray-400">
                         <div>Target: <span class="font-semibold text-white">{{ $log->subject_label ?: '-' }}</span></div>
-                        @if ($log->details)
-                            <div>Details: <span class="text-gray-300">{{ $log->details }}</span></div>
+                        @if ($log->display_details)
+                            <div>Details: <span class="text-gray-300">{{ $log->display_details }}</span></div>
                         @endif
                         <div>Time: {{ $log->created_at?->timezone(config('app.timezone'))->format('d M Y, H:i:s') ?? '-' }} WIB</div>
                         <div>IP: <span class="font-mono">{{ $log->ip_address ?: '-' }}</span></div>

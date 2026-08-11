@@ -332,6 +332,81 @@
         animation: aksa-page-enter 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
+    .product-detail-skeleton {
+        position: fixed;
+        z-index: 35;
+        inset: 0;
+        overflow: hidden;
+        padding-top: 7.25rem;
+        background: #0b0912;
+    }
+
+    .product-detail-skeleton-shell {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .product-detail-skeleton-hero,
+    .product-detail-skeleton-panel {
+        border: 1px solid rgba(180, 155, 255, 0.13);
+        border-radius: 1rem;
+        background: rgba(180, 155, 255, 0.055);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .product-detail-skeleton-hero {
+        min-height: 14.5rem;
+        padding: 2rem;
+    }
+
+    .product-detail-skeleton-hero span,
+    .product-detail-skeleton-heading,
+    .product-detail-skeleton-grid i {
+        display: block;
+        border-radius: 0.65rem;
+        background: rgba(180, 155, 255, 0.12);
+    }
+
+    .product-detail-skeleton-hero span:nth-child(1) { width: 7rem; height: 1.8rem; }
+    .product-detail-skeleton-hero span:nth-child(2) { width: min(26rem, 72%); height: 3.25rem; margin-top: 2rem; }
+    .product-detail-skeleton-hero span:nth-child(3) { width: min(18rem, 55%); height: 1.2rem; margin-top: 1rem; }
+
+    .product-detail-skeleton-panel {
+        padding: 1.5rem;
+    }
+
+    .product-detail-skeleton-heading { width: 10rem; height: 1.6rem; }
+
+    .product-detail-skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.25rem;
+    }
+
+    .product-detail-skeleton-grid i { min-height: 12rem; }
+
+    .product-detail-skeleton-hero::after,
+    .product-detail-skeleton-panel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, transparent 22%, rgba(255, 255, 255, 0.07) 46%, transparent 70%);
+        transform: translateX(-100%);
+        animation: product-detail-skeleton-sweep 1.15s ease-in-out infinite;
+    }
+
+    @keyframes product-detail-skeleton-sweep {
+        to { transform: translateX(100%); }
+    }
+
+    @media (max-width: 767px) {
+        .product-detail-skeleton { padding-top: 6.4rem; }
+        .product-detail-skeleton-grid { grid-template-columns: 1fr; }
+        .product-detail-skeleton-grid i:not(:first-child) { display: none; }
+    }
+
     .aksa-price-changing {
         animation: aksa-price-change 280ms cubic-bezier(0.22, 1, 0.36, 1);
     }
@@ -1694,6 +1769,22 @@
             0 0 52px rgba(180, 155, 255, 0.075);
         backdrop-filter: blur(22px) saturate(132%);
         -webkit-backdrop-filter: blur(22px) saturate(132%);
+    }
+
+    .site-navbar-entrance {
+        animation: site-navbar-entrance 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes site-navbar-entrance {
+        from {
+            opacity: 0;
+            transform: translateY(-0.75rem);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .nav-cart-link,
@@ -3140,10 +3231,228 @@
     }
 
     .payment-success-check {
-        @apply block h-7 w-4;
-        border-bottom: 4px solid #ffffff;
-        border-right: 4px solid #ffffff;
-        transform: translateY(-2px) rotate(45deg);
+        @apply block h-10 w-10;
+        overflow: visible;
+    }
+
+    .payment-success-check path {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 0;
+    }
+
+    .payment-success-mark.is-animating {
+        animation: payment-success-glow 820ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .payment-success-mark.is-animating .payment-success-check path {
+        stroke-dashoffset: 1;
+        animation: payment-success-check-draw 420ms cubic-bezier(0.65, 0, 0.35, 1) 100ms forwards;
+    }
+
+    @keyframes payment-success-check-draw {
+        to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes payment-success-glow {
+        0% { transform: scale(0.84); opacity: 0; }
+        54% {
+            transform: scale(1.06);
+            opacity: 1;
+            box-shadow: 0 18px 42px rgba(180, 155, 255, 0.28), 0 0 0 14px rgba(180, 155, 255, 0.16);
+        }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    .payment-confirmed-entrance {
+        animation: payment-confirmed-content-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .payment-confirmed-mark {
+        color: #ffffff;
+        border-color: rgba(180, 155, 255, 0.44);
+        background:
+            radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.22), transparent 24%),
+            linear-gradient(135deg, #6d28d9, #9f83ff 52%, #b49bff);
+        box-shadow:
+            0 14px 34px rgba(180, 155, 255, 0.2),
+            0 0 0 7px rgba(180, 155, 255, 0.08);
+        animation: payment-confirmed-mark-in 900ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+    }
+
+    .payment-confirmed-ring,
+    .payment-confirmed-check {
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .payment-confirmed-ring {
+        stroke-width: 1.8;
+        stroke-dasharray: 88;
+        stroke-dashoffset: 88;
+        animation: payment-confirmed-ring-draw 520ms ease-out 120ms forwards;
+    }
+
+    .payment-confirmed-check {
+        stroke-width: 2.8;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: payment-confirmed-check-draw 360ms cubic-bezier(0.65, 0, 0.35, 1) 480ms forwards;
+    }
+
+    @keyframes payment-confirmed-content-in {
+        from { opacity: 0; transform: translateY(0.6rem); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes payment-confirmed-mark-in {
+        0% { transform: scale(0.72); opacity: 0; box-shadow: 0 0 0 0 rgba(180, 155, 255, 0); }
+        62% {
+            transform: scale(1.08);
+            opacity: 1;
+            box-shadow: 0 18px 42px rgba(180, 155, 255, 0.28), 0 0 0 0.8rem rgba(180, 155, 255, 0.14);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+            box-shadow: 0 14px 34px rgba(180, 155, 255, 0.2), 0 0 0 0.35rem rgba(180, 155, 255, 0.08);
+        }
+    }
+
+    @keyframes payment-confirmed-ring-draw {
+        to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes payment-confirmed-check-draw {
+        to { stroke-dashoffset: 0; }
+    }
+
+    .payment-confirmed-cta {
+        overflow: hidden;
+        position: relative;
+    }
+
+    .payment-confirmed-cta::after {
+        content: "";
+        position: absolute;
+        inset: -45% auto -45% -35%;
+        width: 28%;
+        pointer-events: none;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+        transform: skewX(-18deg);
+        animation: payment-confirmed-cta-shimmer 760ms ease-out 850ms both;
+    }
+
+    .payment-status-updating {
+        opacity: 0;
+        transform: translateY(-0.4rem);
+        transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .payment-status-verified-in {
+        animation: payment-status-verified-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .invoice-total-verified {
+        animation: invoice-total-verified 720ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .package-stock-changed {
+        display: inline-block;
+        animation: package-stock-changed 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .package-card.package-return-highlight {
+        animation: package-return-highlight 1.15s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    [data-cancel-payment].is-cancelling > svg {
+        display: none;
+    }
+
+    [data-cancel-payment].is-cancelling::before {
+        content: "";
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.32);
+        border-top-color: currentColor;
+        border-radius: 999px;
+        animation: cancel-payment-spin 720ms linear infinite;
+    }
+
+    .order-id-copy {
+        min-width: 2rem;
+        overflow: hidden;
+        transition: min-width 180ms ease, border-color 180ms ease, color 180ms ease;
+    }
+
+    .order-id-copy-label {
+        display: none;
+        font-family: inherit;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+
+    .order-id-copy-label::before {
+        content: "\2713";
+        margin-right: 0.3rem;
+    }
+
+    .order-id-copy.is-copy-success {
+        min-width: 4.7rem;
+        border-color: rgba(180, 155, 255, 0.55);
+        color: #ddd3ff;
+    }
+
+    .order-id-copy.is-copy-success > svg {
+        display: none;
+    }
+
+    .order-id-copy.is-copy-success .order-id-copy-label {
+        display: inline;
+        animation: order-id-copied-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes payment-confirmed-cta-shimmer {
+        from { left: -35%; }
+        to { left: 125%; }
+    }
+
+    @keyframes payment-status-verified-in {
+        from { opacity: 0; transform: translateY(0.45rem); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes invoice-total-verified {
+        0% { transform: translateY(0); text-shadow: none; }
+        42% { transform: translateY(-0.28rem) scale(1.08); text-shadow: 0 0 18px rgba(180, 155, 255, 0.72); }
+        100% { transform: translateY(0) scale(1); text-shadow: 0 0 0 rgba(180, 155, 255, 0); }
+    }
+
+    @keyframes package-stock-changed {
+        0% { opacity: 0.3; transform: translateY(0.35rem); }
+        45% { color: #ddd3ff; text-shadow: 0 0 14px rgba(180, 155, 255, 0.7); }
+        100% { opacity: 1; transform: translateY(0); text-shadow: none; }
+    }
+
+    @keyframes package-return-highlight {
+        0%, 100% { border-color: rgba(180, 155, 255, 0.15); box-shadow: none; }
+        42% { border-color: rgba(180, 155, 255, 0.72); box-shadow: 0 0 0 3px rgba(180, 155, 255, 0.12), 0 16px 38px rgba(180, 155, 255, 0.16); }
+    }
+
+    @keyframes cancel-payment-spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes order-id-copied-in {
+        from { opacity: 0; transform: translateY(0.25rem); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     .payment-confetti {
@@ -4353,8 +4662,33 @@
     .quantity-stepper-value.quantity-change-up,
     .quantity-stepper-value.quantity-change-down,
     .license-key-box.license-copy-success,
+    .site-navbar-entrance,
+    .payment-success-mark.is-animating,
+    .payment-success-mark.is-animating .payment-success-check path,
+    .payment-confirmed-entrance,
+    .payment-confirmed-mark,
+    .payment-confirmed-ring,
+    .payment-confirmed-check,
+    .payment-confirmed-cta::after,
+    .payment-status-verified-in,
+    .invoice-total-verified,
+    .package-stock-changed,
+    .package-card.package-return-highlight,
+    [data-cancel-payment].is-cancelling::before,
+    .product-detail-skeleton-hero::after,
+    .product-detail-skeleton-panel::after,
+    .order-id-copy.is-copy-success .order-id-copy-label,
     .payment-confetti span {
         animation: none;
+    }
+
+    .payment-success-mark.is-animating .payment-success-check path {
+        stroke-dashoffset: 0;
+    }
+
+    .payment-confirmed-ring,
+    .payment-confirmed-check {
+        stroke-dashoffset: 0;
     }
 }
 

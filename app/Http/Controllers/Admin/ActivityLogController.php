@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\Package;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class ActivityLogController extends Controller
@@ -37,6 +39,8 @@ class ActivityLogController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $this->hydrateReadableLicenseStockDetails($logs->getCollection());
+
         $stats = [
             'total' => AdminActivityLog::count(),
             'today' => AdminActivityLog::where('created_at', '>=', now()->startOfDay())->count(),
@@ -47,5 +51,36 @@ class ActivityLogController extends Controller
         $sectionOptions = AdminActivityLog::sectionOptions();
 
         return view('admin.activity-logs.index', compact('logs', 'stats', 'sectionOptions', 'period'));
+    }
+
+    private function hydrateReadableLicenseStockDetails($logs): void
+    {
+        $productIds = [];
+        $packageIds = [];
+
+        foreach ($logs as $log) {
+            preg_match_all('/Product #(\d+)/', (string) $log->details, $productMatches);
+            preg_match_all('/Package #(\d+)/', (string) $log->details, $packageMatches);
+            $productIds = [...$productIds, ...($productMatches[1] ?? [])];
+            $packageIds = [...$packageIds, ...($packageMatches[1] ?? [])];
+        }
+
+        $products = Product::query()->whereKey(array_unique($productIds))->pluck('name', 'id');
+        $packages = Package::query()->whereKey(array_unique($packageIds))->pluck('name', 'id');
+
+        foreach ($logs as $log) {
+            $details = (string) $log->details;
+            $details = preg_replace_callback(
+                '/Product #(\d+)/',
+                fn ($match) => $products->get((int) $match[1], $match[0]),
+                $details
+            );
+            $details = preg_replace_callback(
+                '/Package #(\d+)/',
+                fn ($match) => $packages->get((int) $match[1], $match[0]),
+                $details
+            );
+            $log->setAttribute('display_details', $details);
+        }
     }
 }

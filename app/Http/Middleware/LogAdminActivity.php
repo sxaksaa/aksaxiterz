@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\AdminActivityLog;
 use App\Models\LicenseStock;
+use App\Models\Package;
+use App\Models\Product;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -158,15 +160,8 @@ class LogAdminActivity
             in_array($action, ['admin.vouchers.store', 'admin.vouchers.update'], true) => [
                 strtoupper(trim((string) $request->input('code'))),
             ],
-            $action === 'admin.license-stocks.store' => [
-                $this->licenseKeyCount((string) $request->input('license_keys')).' key(s)',
-                'Product #'.$request->integer('product_id'),
-                'Package #'.$request->integer('package_id'),
-            ],
-            $action === 'admin.license-stocks.update' => [
-                'Product #'.$request->integer('product_id'),
-                'Package #'.$request->integer('package_id'),
-            ],
+            $action === 'admin.license-stocks.store' => $this->licenseStockDetails($request, true),
+            $action === 'admin.license-stocks.update' => $this->licenseStockDetails($request),
             default => [],
         };
 
@@ -185,5 +180,27 @@ class LogAdminActivity
             ->filter()
             ->unique()
             ->count();
+    }
+
+    private function licenseStockDetails(Request $request, bool $includeKeyCount = false): array
+    {
+        $productId = $request->integer('product_id');
+        $packageId = $request->integer('package_id');
+        $productName = Product::query()->whereKey($productId)->value('name');
+        $packageName = Package::query()
+            ->whereKey($packageId)
+            ->where('product_id', $productId)
+            ->value('name');
+        $details = [];
+
+        if ($includeKeyCount) {
+            $keyCount = $this->licenseKeyCount((string) $request->input('license_keys'));
+            $details[] = $keyCount.' '.Str::plural('key', $keyCount);
+        }
+
+        $details[] = $productName ?: 'Product #'.$productId;
+        $details[] = $packageName ?: 'Package #'.$packageId;
+
+        return $details;
     }
 }
