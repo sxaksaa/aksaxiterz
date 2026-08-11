@@ -13,6 +13,17 @@ test('public storefront has working navigation and SEO metadata', async ({ page 
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /127\.0\.0\.1:8173/);
     await expect(page.locator('h1')).toBeVisible();
 
+    const heroGlow = await page.locator('.home-hero').evaluate((element) => {
+        const style = window.getComputedStyle(element, '::before');
+
+        return {
+            height: style.height,
+            maskImage: style.maskImage || style.webkitMaskImage,
+        };
+    });
+    expect(heroGlow.height).toBe('576px');
+    expect(heroGlow.maskImage).toContain('linear-gradient');
+
     const productCards = page.locator('[data-product-stock-card]');
     const productCardCount = await productCards.count();
     expect(productCardCount).toBeGreaterThan(0);
@@ -75,6 +86,23 @@ test('product focus prefetches detail once and navigation reuses it', async ({ p
     await expect(page).toHaveURL(/\/product\//);
     await expect(page.locator('h1')).toBeVisible();
     expect(detailRequests).toBe(1);
+});
+
+test('scroll reveals repeat from the side an item re-enters', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.goto('/');
+
+    const product = page.locator('[data-product-stock-card]').first();
+    await expect(product).toHaveAttribute('data-motion-reveal-from', 'bottom');
+    await product.scrollIntoViewIfNeeded();
+    await expect(product).toHaveClass(/is-scroll-revealed/);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(product).not.toHaveClass(/is-scroll-revealed/);
+    await expect(product).toHaveAttribute('data-motion-reveal-from', 'top');
+
+    await product.scrollIntoViewIfNeeded();
+    await expect(product).toHaveClass(/is-scroll-revealed/);
 });
 
 test('safe footer navigation prefetches once and reuses the response', async ({ page }) => {

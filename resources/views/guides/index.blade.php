@@ -26,7 +26,7 @@
 
         <div class="mx-auto grid max-w-5xl gap-4 md:grid-cols-2">
             @forelse ($guides as $guide)
-                <a href="{{ route('guides.show', $guide['slug']) }}" class="download-card motion-card block">
+                <a href="{{ route('guides.show', $guide['slug']) }}" data-scroll-reveal class="download-card motion-card block">
                     @include('guides._visual', [
                         'variant' => $guide['visual'] ?? 'default',
                         'title' => $guide['title'],

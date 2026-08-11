@@ -35,7 +35,7 @@
 
     <section class="page-shell pb-16 md:pb-20">
         <div class="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <aside class="product-section fade-up">
+            <aside class="product-section fade-up" data-scroll-reveal>
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Before You Start</p>
                 <div class="mt-4 grid gap-3">
                     @foreach ($guide['requirements'] ?? [] as $requirement)
@@ -52,7 +52,7 @@
 
             <div class="grid gap-4">
                 @foreach ($guide['steps'] ?? [] as $index => $step)
-                    <article class="product-section motion-card">
+                    <article class="product-section motion-card" data-scroll-reveal>
                         <div class="grid gap-5 md:grid-cols-[0.88fr_1.12fr] md:items-start">
                             @include('guides._visual', [
                                 'variant' => $step['visual'] ?? 'default',
@@ -78,7 +78,7 @@
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">More Guides</p>
                 <div class="mt-3 grid gap-3 md:grid-cols-3">
                     @foreach ($relatedGuides as $related)
-                        <a href="{{ route('guides.show', $related['slug']) }}" class="download-feature block">
+                        <a href="{{ route('guides.show', $related['slug']) }}" data-scroll-reveal class="download-feature block">
                             <div class="text-sm font-semibold text-white">{{ $related['title'] }}</div>
                             <div class="mt-1 text-xs leading-5 text-gray-400">{{ $related['summary'] }}</div>
                         </a>

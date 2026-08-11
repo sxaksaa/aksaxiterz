@@ -35,7 +35,7 @@
         </section>
 
         <div class="grid gap-5 lg:grid-cols-[260px_1fr]">
-            <aside class="product-section h-fit fade-up">
+            <aside class="product-section h-fit fade-up" data-scroll-reveal>
                 <h2 class="text-sm font-semibold text-white">Legal Pages</h2>
                 <div class="mt-4 grid gap-2 text-sm">
                     @foreach ($legalLinks as $key => $link)
@@ -63,7 +63,7 @@
 
             <main class="grid gap-4">
                 @foreach ($sections as $section)
-                    <section class="product-section motion-card">
+                    <section class="product-section motion-card" data-scroll-reveal>
                         <h2 class="text-xl font-semibold text-white">{{ $section['title'] }}</h2>
 
                         @if (!empty($section['body']))

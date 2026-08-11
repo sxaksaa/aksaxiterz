@@ -2059,6 +2059,7 @@ let activeSoftNavigation = null;
 let activePageScriptCleanup = null;
 let softPageRuntimeSequence = 0;
 let historyPositionTimer = null;
+let historyPositionTrackingSuspended = false;
 const softNavigationPrefetches = new Map();
 const SOFT_NAVIGATION_PREFETCH_TTL = 30000;
 const SOFT_NAVIGATION_PREFETCH_LIMIT = 12;
@@ -2446,7 +2447,14 @@ function persistCurrentHistoryPosition() {
     }, '', window.location.href);
 }
 
+function cancelScheduledHistoryPosition() {
+    window.clearTimeout(historyPositionTimer);
+    historyPositionTimer = null;
+}
+
 function scheduleCurrentHistoryPosition() {
+    if (historyPositionTrackingSuspended) return;
+
     window.clearTimeout(historyPositionTimer);
     historyPositionTimer = window.setTimeout(() => {
         historyPositionTimer = null;
@@ -2904,6 +2912,7 @@ async function softNavigate(url, options = {}) {
     const nextUrl = new URL(url, window.location.href);
     const currentContent = pageContentShell();
     const previousUrl = window.location.href;
+    const restoringHistory = options.pushHistory === false;
 
     if (!currentContent) {
         window.location.href = nextUrl.href;
@@ -2915,6 +2924,9 @@ async function softNavigate(url, options = {}) {
     const controller = new AbortController();
     activeSoftNavigation = controller;
     const pendingLink = options.pendingLink || null;
+
+    historyPositionTrackingSuspended = restoringHistory;
+    if (restoringHistory) cancelScheduledHistoryPosition();
 
     if (options.pushHistory !== false) persistCurrentHistoryPosition();
     window.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
@@ -2984,13 +2996,24 @@ async function softNavigate(url, options = {}) {
 
         window.location.href = nextUrl.href;
     } finally {
-        if (activeSoftNavigation === controller) {
+        const finishedCurrentNavigation = activeSoftNavigation === controller;
+
+        if (finishedCurrentNavigation) {
             activeSoftNavigation = null;
             document.body.classList.remove('aksa-soft-nav-active');
             pageContentShell()?.removeAttribute('aria-busy');
         }
 
         pendingLink?.classList.remove('is-soft-nav-pending');
+
+        if (restoringHistory && finishedCurrentNavigation) {
+            requestAnimationFrame(() => {
+                if (activeSoftNavigation) return;
+
+                historyPositionTrackingSuspended = false;
+                persistCurrentHistoryPosition();
+            });
+        }
     }
 }
 
@@ -3002,31 +3025,48 @@ function shouldReduceMotion() {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
-let productRevealObserver = null;
+let scrollRevealObserver = null;
 
 function initializeMotionEnhancements(root = document) {
-    const cards = [...root.querySelectorAll('.product-card-storefront:not([data-motion-reveal-ready])')];
+    const items = [...root.querySelectorAll('[data-scroll-reveal]:not([data-motion-reveal-ready])')];
 
-    cards.forEach((card, index) => {
-        card.dataset.motionRevealReady = 'true';
-        card.style.setProperty('--motion-reveal-delay', `${Math.min(index % 4, 3) * 55}ms`);
+    items.forEach((item, index) => {
+        item.dataset.motionRevealReady = 'true';
+        item.dataset.motionRevealFrom = 'bottom';
+        item.style.setProperty('--motion-reveal-delay', `${Math.min(index % 4, 3) * 45}ms`);
     });
 
-    if (cards.length === 0 || shouldReduceMotion() || !('IntersectionObserver' in window)) {
-        cards.forEach(card => card.classList.add('is-scroll-revealed'));
+    if (items.length === 0 || shouldReduceMotion() || !('IntersectionObserver' in window)) {
+        items.forEach(item => item.classList.add('is-scroll-revealed'));
         return;
     }
 
-    productRevealObserver ||= new IntersectionObserver(entries => {
+    scrollRevealObserver ||= new IntersectionObserver(entries => {
         entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
-            entry.target.classList.add('is-scroll-revealed');
-            productRevealObserver.unobserve(entry.target);
-        });
-    }, { rootMargin: '0px 0px -7% 0px', threshold: 0.08 });
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-scroll-revealed');
+                return;
+            }
 
-    cards.forEach(card => productRevealObserver.observe(card));
+            const bounds = entry.boundingClientRect;
+
+            if (bounds.bottom <= 0) {
+                entry.target.dataset.motionRevealFrom = 'top';
+                entry.target.classList.remove('is-scroll-revealed');
+            } else if (bounds.top >= window.innerHeight) {
+                entry.target.dataset.motionRevealFrom = 'bottom';
+                entry.target.classList.remove('is-scroll-revealed');
+            }
+        });
+    }, { threshold: [0, 0.08] });
+
+    items.forEach(item => scrollRevealObserver.observe(item));
 }
+
+document.addEventListener('aksa:before-page-swap', () => {
+    scrollRevealObserver?.disconnect();
+    scrollRevealObserver = null;
+});
 
 window.animateAksaValue = function(element, nextText) {
     if (!(element instanceof Element) || element.textContent === nextText) return;

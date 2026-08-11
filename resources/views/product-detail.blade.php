@@ -100,7 +100,7 @@
         ])
 
         @if (filled($product->important_note))
-            <div class="product-section mb-6 fade-up">
+            <div class="product-section mb-6 fade-up" data-scroll-reveal>
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Please Read</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Important Note</h2>
                 <p class="mt-4 max-w-4xl whitespace-pre-line text-sm leading-6 text-gray-300">
@@ -137,7 +137,7 @@
                         $badgeUsd = $bestValuePackageIdUsd === $package->id;
                     @endphp
 
-                    <article data-package-card data-price="{{ (float) $package->price }}"
+                    <article data-package-card data-scroll-reveal data-price="{{ (float) $package->price }}"
                         data-package-id="{{ $package->id }}" data-package-name="{{ $package->name }}"
                         data-price-usdt="{{ $package->price_usdt !== null ? (float) $package->price_usdt : '' }}"
                         data-stock="{{ $packageStock }}"

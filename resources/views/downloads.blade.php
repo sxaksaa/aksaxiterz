@@ -69,7 +69,7 @@
                     };
                 @endphp
 
-                <details class="download-card download-accordion motion-card text-left" data-download-accordion
+                <details class="download-card download-accordion motion-card text-left" data-download-accordion data-scroll-reveal
                     data-download-search="{{ Str::lower($download['name'].' '.$links->pluck('label')->implode(' ')) }}">
                     <summary class="download-accordion-summary">
                         <span class="min-w-0">
