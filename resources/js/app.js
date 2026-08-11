@@ -2701,31 +2701,6 @@ function hideDashboardChartTooltip(point = null) {
     point?.removeAttribute('aria-describedby');
 }
 
-function showProductDetailSkeleton(url) {
-    const destination = new URL(url, window.location.href);
-    if (!destination.pathname.startsWith('/product/')) return null;
-
-    document.querySelector('[data-product-detail-skeleton]')?.remove();
-    const skeleton = document.createElement('div');
-    skeleton.dataset.productDetailSkeleton = '';
-    skeleton.className = 'product-detail-skeleton';
-    skeleton.setAttribute('aria-hidden', 'true');
-    skeleton.innerHTML = `
-        <div class="page-shell product-detail-skeleton-shell">
-            <div class="product-detail-skeleton-hero">
-                <span></span><span></span><span></span>
-            </div>
-            <div class="product-detail-skeleton-panel">
-                <span class="product-detail-skeleton-heading"></span>
-                <div class="product-detail-skeleton-grid">
-                    <i></i><i></i><i></i><i></i>
-                </div>
-            </div>
-        </div>`;
-    document.body.appendChild(skeleton);
-    return skeleton;
-}
-
 async function softNavigate(url, options = {}) {
     const nextUrl = new URL(url, window.location.href);
     const currentContent = pageContentShell();
@@ -2740,7 +2715,6 @@ async function softNavigate(url, options = {}) {
     const controller = new AbortController();
     activeSoftNavigation = controller;
     const pendingLink = options.pendingLink || null;
-    const productDetailSkeleton = showProductDetailSkeleton(nextUrl);
 
     window.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
     document.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
@@ -2824,7 +2798,6 @@ async function softNavigate(url, options = {}) {
         }
 
         pendingLink?.classList.remove('is-soft-nav-pending');
-        productDetailSkeleton?.remove();
     }
 }
 
