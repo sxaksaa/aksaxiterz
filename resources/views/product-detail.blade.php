@@ -221,30 +221,32 @@
                 <h2 class="mt-1 text-xl font-semibold text-white">Ready to checkout</h2>
             </div>
 
-            <div class="summary-row summary-product-row mb-2">
-                <span>Product</span>
-                <span>{{ $product->name }}</span>
-            </div>
-            <div class="summary-row mb-2">
-                <span>Package</span>
-                <span id="selectedPackage">-</span>
-            </div>
-            <div class="summary-row mb-2">
-                <span>
-                    Quantity
-                    <small id="quantityLimit" class="ml-1 text-gray-500">Max: -</small>
-                </span>
-                <div class="quantity-stepper" aria-label="License quantity">
-                    <button id="quantityMinus" type="button" class="quantity-stepper-button"
-                        aria-label="Decrease quantity" disabled>−</button>
-                    <output id="quantityValue" class="quantity-stepper-value" aria-live="polite">1</output>
-                    <button id="quantityPlus" type="button" class="quantity-stepper-button"
-                        aria-label="Increase quantity" disabled>+</button>
+            <div class="product-summary-details grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                <div class="summary-row summary-product-row">
+                    <span>Product</span>
+                    <span>{{ $product->name }}</span>
                 </div>
-            </div>
-            <div class="summary-row">
-                <span>Subtotal</span>
-                <span id="selectedSubtotal">-</span>
+                <div class="summary-row">
+                    <span>Package</span>
+                    <span id="selectedPackage">-</span>
+                </div>
+                <div class="summary-row">
+                    <span>
+                        Quantity
+                        <small id="quantityLimit" class="ml-1 text-gray-500">Max: -</small>
+                    </span>
+                    <div class="quantity-stepper" aria-label="License quantity">
+                        <button id="quantityMinus" type="button" class="quantity-stepper-button"
+                            aria-label="Decrease quantity" disabled>−</button>
+                        <output id="quantityValue" class="quantity-stepper-value" aria-live="polite">1</output>
+                        <button id="quantityPlus" type="button" class="quantity-stepper-button"
+                            aria-label="Increase quantity" disabled>+</button>
+                    </div>
+                </div>
+                <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span id="selectedSubtotal">-</span>
+                </div>
             </div>
 
             <div class="product-summary-actions mt-5 grid grid-cols-2 gap-2 sm:gap-3">

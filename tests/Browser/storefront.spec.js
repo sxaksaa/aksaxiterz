@@ -65,6 +65,26 @@ test('product navigation stays in the same document with CSP enabled', async ({ 
     expect(consoleErrors.filter(message => /content security policy|unsafe-eval|refused to evaluate/i.test(message))).toEqual([]);
 });
 
+test('product checkout summary uses the restrained purple hierarchy', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('[data-product-stock-card]').first().click();
+
+    const availablePackage = page.locator('[data-package-checkout-enabled="true"]').first();
+    await expect(availablePackage).toBeVisible();
+    await availablePackage.click();
+
+    const summary = page.locator('#summaryBox');
+    await expect(summary).toBeVisible();
+    await expect(summary).toHaveCSS('border-color', 'rgba(180, 155, 255, 0.2)');
+    await expect(summary.locator('.summary-row').first()).toHaveCSS('border-color', 'rgba(180, 155, 255, 0.1)');
+    await expect(page.locator('#selectedSubtotal')).toHaveCSS('color', 'rgb(196, 181, 253)');
+
+    const columnCount = await page.locator('.product-summary-details').evaluate((element) => (
+        window.getComputedStyle(element).gridTemplateColumns.split(' ').length
+    ));
+    expect(columnCount).toBe(page.viewportSize().width >= 1024 ? 4 : 1);
+});
+
 test('product focus prefetches detail once and navigation reuses it', async ({ page }) => {
     let detailRequests = 0;
 
