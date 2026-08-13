@@ -21,10 +21,12 @@
         'checkout',
         'checkout/*'
     );
+    $siteIntroEnabled = request()->is('/');
 @endphp
 
 <!DOCTYPE html>
-<html lang="en" data-display-currency="idr" data-visitor-country="{{ $visitorCountry }}">
+<html lang="en" data-display-currency="idr" data-visitor-country="{{ $visitorCountry }}"
+    @if ($siteIntroEnabled) data-aksa-intro-page="true" @endif>
 
 <head>
     <meta charset="utf-8">
@@ -102,11 +104,56 @@
             root.dataset.currencyReady = 'false';
         })();
     </script>
+    @if ($siteIntroEnabled)
+        <script nonce="{{ request()->attributes->get('csp_nonce') }}" data-site-intro-prepaint>
+            (() => {
+                const root = document.documentElement;
+                const storageKey = 'aksa_site_intro_seen_v1';
+                let hasSeenIntro = true;
+
+                try {
+                    hasSeenIntro = sessionStorage.getItem(storageKey) === 'true';
+
+                    if (!hasSeenIntro) {
+                        sessionStorage.setItem(storageKey, 'true');
+                    }
+                } catch (error) {
+                    hasSeenIntro = true;
+                }
+
+                const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+                const shouldPlay = !hasSeenIntro && !reduceMotion && window.location.hash === '';
+
+                if (!shouldPlay) {
+                    root.dataset.aksaIntroState = 'skipped';
+                    return;
+                }
+
+                root.dataset.aksaIntroState = 'pending';
+                root.classList.add('aksa-intro-pending');
+                window.__aksaIntroFailsafe = window.setTimeout(() => {
+                    root.classList.remove('aksa-intro-pending', 'aksa-intro-running', 'aksa-intro-revealing');
+                    root.dataset.aksaIntroState = 'recovered';
+                }, 4000);
+            })();
+        </script>
+    @endif
     @stack('head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="text-white antialiased">
+
+    @if ($siteIntroEnabled)
+        <div id="aksaSiteIntro" class="site-intro" aria-hidden="true">
+            <div class="site-intro-lockup" data-site-intro-lockup>
+                <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt=""
+                    class="site-intro-logo-layer site-intro-mark-layer" width="612" height="195" decoding="sync">
+                <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt=""
+                    class="site-intro-logo-layer site-intro-wordmark-layer" width="612" height="195" decoding="sync">
+            </div>
+        </div>
+    @endif
 
     <div data-aksa-nav-shell>
         @include('partials.navbar')

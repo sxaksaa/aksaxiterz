@@ -1,4 +1,4 @@
-<div id="aksaCryptoModal" class="qris-modal hidden" aria-hidden="true">
+<div id="aksaCryptoModal" class="qris-modal hidden" aria-hidden="true" inert>
     <div class="qris-modal-backdrop" data-crypto-close></div>
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaCryptoTitle">

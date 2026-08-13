@@ -63,27 +63,59 @@
 
             <main class="grid gap-4">
                 @foreach ($sections as $section)
-                    <section class="product-section motion-card" data-scroll-reveal>
-                        <h2 class="text-xl font-semibold text-white">{{ $section['title'] }}</h2>
+                    @if (($slug ?? '') === 'faq')
+                        <details class="product-section download-accordion legal-faq-accordion motion-card"
+                            data-download-accordion data-scroll-reveal @if ($loop->first) open @endif>
+                            <summary class="download-accordion-summary" aria-expanded="{{ $loop->first ? 'true' : 'false' }}">
+                                <span class="text-xl font-semibold text-white">{{ $section['title'] }}</span>
+                                <span class="download-accordion-chevron" aria-hidden="true">
+                                    <x-ui.icon name="chevron-down" class="h-4 w-4" />
+                                </span>
+                            </summary>
 
-                        @if (!empty($section['body']))
-                            <div class="mt-3 grid gap-3 text-sm leading-6 text-gray-400">
-                                @foreach ($section['body'] as $paragraph)
-                                    <p>{{ $paragraph }}</p>
-                                @endforeach
+                            <div class="download-accordion-panel legal-faq-accordion-panel">
+                                @if (!empty($section['body']))
+                                    <div class="grid gap-3 text-sm leading-6 text-gray-400">
+                                        @foreach ($section['body'] as $paragraph)
+                                            <p>{{ $paragraph }}</p>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @if (!empty($section['items']))
+                                    <ul class="grid gap-2 text-sm leading-6 text-gray-400">
+                                        @foreach ($section['items'] as $item)
+                                            <li class="rounded-lg border border-[#27272A] bg-black/20 px-3 py-2">
+                                                {{ $item }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
                             </div>
-                        @endif
+                        </details>
+                    @else
+                        <section class="product-section motion-card" data-scroll-reveal>
+                            <h2 class="text-xl font-semibold text-white">{{ $section['title'] }}</h2>
 
-                        @if (!empty($section['items']))
-                            <ul class="mt-3 grid gap-2 text-sm leading-6 text-gray-400">
-                                @foreach ($section['items'] as $item)
-                                    <li class="rounded-lg border border-[#27272A] bg-black/20 px-3 py-2">
-                                        {{ $item }}
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </section>
+                            @if (!empty($section['body']))
+                                <div class="mt-3 grid gap-3 text-sm leading-6 text-gray-400">
+                                    @foreach ($section['body'] as $paragraph)
+                                        <p>{{ $paragraph }}</p>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if (!empty($section['items']))
+                                <ul class="mt-3 grid gap-2 text-sm leading-6 text-gray-400">
+                                    @foreach ($section['items'] as $item)
+                                        <li class="rounded-lg border border-[#27272A] bg-black/20 px-3 py-2">
+                                            {{ $item }}
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </section>
+                    @endif
                 @endforeach
             </main>
         </div>

@@ -31,6 +31,7 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('aria-expanded="false"', $html);
         $this->assertStringContainsString('id="mobileMenu"', $html);
         $this->assertStringContainsString('mobile-nav-panel', $html);
+        $this->assertStringContainsString('data-mobile-menu-content', $html);
         $this->assertStringContainsString('aria-hidden="true"', $html);
         $this->assertStringContainsString('href="/auth/google"', $html);
         $this->assertStringContainsString('data-navbar-actions', $html);
@@ -62,6 +63,9 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('href="/licenses"', $html);
         $this->assertStringContainsString('data-profile-toggle', $html);
         $this->assertStringContainsString('aria-label="Open account menu"', $html);
+        $this->assertStringContainsString('class="profile-menu-trigger', $html);
+        $this->assertStringContainsString('id="dropdown" aria-hidden="true" inert', $html);
+        $this->assertStringContainsString('class="profile-dropdown', $html);
         $this->assertStringContainsString('class="relative hidden shrink-0 xl:block"', $html);
         $this->assertStringContainsString('Admin Dashboard', $html);
         $this->assertStringContainsString('action="/logout"', $html);

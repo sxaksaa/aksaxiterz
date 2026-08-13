@@ -62,7 +62,10 @@
                 </div>
             </div>
 
-            <div class="category-filter-row mt-4 flex gap-2 md:gap-3" role="group" aria-label="Product categories">
+            <div class="category-filter-row mt-4 flex gap-2 md:gap-3" role="group" aria-label="Product categories"
+                data-category-filter-row>
+                <span class="category-filter-glider" data-category-filter-glider aria-hidden="true"></span>
+
                 <button type="button" data-category-filter data-category="" aria-pressed="{{ !$active ? 'true' : 'false' }}"
                     class="category-chip {{ !$active ? 'active' : '' }}">
                     <x-ui.icon name="boxes" class="h-4 w-4" />
@@ -146,6 +149,8 @@
                     chip.classList.toggle('active', active);
                     chip.setAttribute('aria-pressed', active ? 'true' : 'false');
                 });
+
+                window.updateAksaCategoryGlider?.(selectedChip);
 
                 return selectedChip;
             }

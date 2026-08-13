@@ -7,6 +7,7 @@
         <!-- LOGO -->
         <a href="/" class="site-brand-link flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
             <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
+                data-site-brand-logo
                 class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
                 width="612" height="195" decoding="async" fetchpriority="high" draggable="false">
         </a>
@@ -108,14 +109,14 @@
 
                     <button type="button" data-profile-toggle aria-label="Open account menu" aria-haspopup="true"
                         aria-expanded="false" aria-controls="dropdown"
-                        class="flex shrink-0 items-center gap-2 text-gray-300 transition hover:text-white">
+                        class="profile-menu-trigger flex shrink-0 items-center gap-2 text-gray-300 hover:text-white">
 
                         @if ($user->avatar)
                             <img src="{{ $user->avatar }}" alt="{{ $user->name }}"
-                                class="h-8 w-8 max-w-none shrink-0 rounded-full border border-aksa-accent-40 object-cover">
+                                class="profile-menu-avatar h-8 w-8 max-w-none shrink-0 rounded-full border border-aksa-accent-40 object-cover">
                         @else
                             <span
-                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full
+                                class="profile-menu-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full
                 bg-aksa-accent-20 text-xs font-bold text-aksa-accent">
                                 {{ strtoupper(substr($user->name, 0, 1)) }}
                             </span>
@@ -123,8 +124,8 @@
 
                     </button>
 
-                    <div id="dropdown"
-                        class="hidden absolute right-0 mt-3 w-44 z-50
+                    <div id="dropdown" aria-hidden="true" inert
+                        class="profile-dropdown absolute right-0 mt-3 w-44 z-50
         bg-[#15151B] border border-[#27272A] rounded-xl shadow-lg overflow-hidden">
 
                         <div class="px-4 py-3 text-xs text-gray-400 border-b border-[#27272A]">
@@ -216,7 +217,7 @@
     class="mobile-nav-panel fixed inset-x-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.25rem)] overflow-y-auto rounded-[1.35rem] border px-4 py-4 opacity-0 -translate-y-5 pointer-events-none transition-all duration-300 ease-out sm:left-auto sm:right-4 sm:w-[23rem] xl:hidden"
     aria-hidden="true">
 
-    <div class="flex flex-col gap-4 text-sm">
+    <div class="flex flex-col gap-4 text-sm" data-mobile-menu-content>
 
         @if ($showDisplayCurrencySwitcher ?? false)
             @include('partials.currency-switcher')

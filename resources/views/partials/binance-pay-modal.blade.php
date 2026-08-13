@@ -1,4 +1,4 @@
-<div id="aksaBinancePayModal" class="qris-modal hidden" aria-hidden="true">
+<div id="aksaBinancePayModal" class="qris-modal hidden" aria-hidden="true" inert>
     <div class="qris-modal-backdrop" data-binance-pay-close></div>
 
     <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaBinancePayTitle">

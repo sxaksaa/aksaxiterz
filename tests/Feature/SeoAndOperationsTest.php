@@ -27,12 +27,27 @@ class SeoAndOperationsTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
+            ->assertSee('data-aksa-intro-page="true"', false)
+            ->assertSee('data-site-intro-prepaint', false)
+            ->assertSee('id="aksaSiteIntro"', false)
+            ->assertSee('data-site-intro-lockup', false)
+            ->assertSee('data-site-brand-logo', false)
             ->assertSee('aria-label="Main navigation"', false)
             ->assertSee('<label for="searchInput" class="sr-only">Search products</label>', false)
             ->assertSee('role="group" aria-label="Product categories"', false)
+            ->assertSee('data-category-filter-row', false)
+            ->assertSee('data-category-filter-glider', false)
             ->assertSee('data-category-filter data-category="" aria-pressed="true"', false)
             ->assertSee('loading="lazy" decoding="async"', false)
             ->assertDontSee('<a href="#" data-category-filter', false);
+    }
+
+    public function test_branded_intro_is_scoped_to_the_homepage(): void
+    {
+        $this->get('/guides')
+            ->assertOk()
+            ->assertDontSee('data-aksa-intro-page="true"', false)
+            ->assertDontSee('id="aksaSiteIntro"', false);
     }
 
     public function test_private_pages_are_not_indexed(): void

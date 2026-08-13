@@ -1,5 +1,46 @@
 import { expect, test } from '@playwright/test';
 
+test('branded intro plays once per tab session and releases the storefront', async ({ page }) => {
+    await page.goto('/?intro-e2e=1');
+
+    await expect(page.locator('#aksaSiteIntro')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'running');
+
+    const introOpeningState = await page.evaluate(() => ({
+        backgroundImage: getComputedStyle(document.querySelector('#aksaSiteIntro')).backgroundImage,
+        backgroundColor: getComputedStyle(document.querySelector('#aksaSiteIntro')).backgroundColor,
+        pageContentOpacity: getComputedStyle(document.querySelector('[data-aksa-page-content]')).opacity,
+    }));
+
+    expect(introOpeningState).toEqual({
+        backgroundImage: 'none',
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        pageContentOpacity: '0',
+    });
+
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
+        timeout: 4000,
+    });
+    await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
+    await expect(page.locator('.site-navbar-pill')).toBeVisible();
+    await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
+
+    await page.reload();
+
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'skipped');
+    await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
+});
+
+test('branded intro skips motion when reduced motion is preferred', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/?intro-reduced-motion=1');
+
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'skipped');
+    await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
+    await expect(page.locator('.site-navbar-pill')).toBeVisible();
+    await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
+});
+
 test('public storefront has working navigation and SEO metadata', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (message) => {

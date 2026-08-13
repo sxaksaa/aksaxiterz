@@ -1,4 +1,4 @@
-<div id="aksaPaymentSuccessModal" class="qris-modal hidden" aria-hidden="true">
+<div id="aksaPaymentSuccessModal" class="qris-modal hidden" aria-hidden="true" inert>
     <div class="qris-modal-backdrop" data-payment-success-close></div>
 
     <section class="qris-dialog payment-success-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaPaymentSuccessTitle">

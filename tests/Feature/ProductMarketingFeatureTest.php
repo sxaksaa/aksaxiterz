@@ -91,6 +91,8 @@ class ProductMarketingFeatureTest extends TestCase
         $this->get(route('faq'))
             ->assertOk()
             ->assertSee('FAQ')
+            ->assertSee('data-download-accordion', false)
+            ->assertSee('legal-faq-accordion-panel', false)
             ->assertSee('Where will my license appear?')
             ->assertSee('What if the order is still pending?');
     }
