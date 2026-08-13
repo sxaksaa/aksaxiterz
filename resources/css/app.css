@@ -31,11 +31,18 @@
         --aksa-success-rgb: 180 155 255;
         --aksa-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
         --aksa-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.18);
+        --aksa-motion-fast: 260ms;
+        --aksa-motion-base: 360ms;
+        --aksa-motion-slow: 560ms;
+        --aksa-motion-reveal: 680ms;
+        --aksa-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     html {
+        overflow-y: scroll;
         scroll-behavior: smooth;
         scrollbar-color: rgba(180, 155, 255, 0.44) var(--aksa-bg);
+        scrollbar-gutter: stable;
         scrollbar-width: thin;
     }
 
@@ -327,7 +334,8 @@
 
     html.aksa-intro-pending,
     html.aksa-intro-running {
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: scroll;
     }
 
     html.aksa-intro-pending .site-intro,
@@ -379,6 +387,13 @@
         transform: scaleX(0.2);
     }
 
+    html.aksa-intro-pending [data-site-brand-logo],
+    html.aksa-intro-running [data-site-brand-logo],
+    html.aksa-intro-pending [data-aksa-nav-shell] .site-navbar-pill > :not(.site-brand-link),
+    html.aksa-intro-running [data-aksa-nav-shell] .site-navbar-pill > :not(.site-brand-link) {
+        opacity: 0;
+    }
+
     html.aksa-intro-pending [data-aksa-page-content],
     html.aksa-intro-running [data-aksa-page-content],
     html.aksa-intro-pending .pending-payment-reminder-shell,
@@ -394,33 +409,33 @@
         filter: blur(0) drop-shadow(0 0 38px rgba(124, 58, 237, 0.2));
         transform: translate(-50%, -50%) translateX(30%) scale(1);
         transition:
-            opacity 420ms ease,
-            filter 620ms ease,
-            transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
+            opacity 560ms ease,
+            filter 780ms ease,
+            transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     html.aksa-intro-brand-ready .site-intro-lockup {
         transform: translate(-50%, -50%) translateX(0) scale(1);
         transition:
-            opacity 320ms ease,
-            filter 420ms ease,
-            transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+            opacity 420ms ease,
+            filter 540ms ease,
+            transform 780ms var(--aksa-motion-ease);
     }
 
     html.aksa-intro-brand-ready .site-intro-wordmark-layer {
         opacity: 1;
         transform: translateX(0);
         transition:
-            opacity 360ms ease 80ms,
-            transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+            opacity 480ms ease 100ms,
+            transform 780ms var(--aksa-motion-ease);
     }
 
     html.aksa-intro-docking .site-intro-lockup {
         filter: blur(0) drop-shadow(0 0 24px rgba(124, 58, 237, 0.12));
         transform: translate(-50%, -50%) translate(var(--site-intro-dock-x), var(--site-intro-dock-y)) scale(var(--site-intro-dock-scale));
         transition:
-            filter 760ms ease,
-            transform 780ms cubic-bezier(0.16, 1, 0.3, 1);
+            filter 900ms ease,
+            transform 980ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     html.aksa-intro-nav-ready [data-aksa-nav-shell] .site-navbar-pill {
@@ -428,12 +443,19 @@
         transform: scaleX(1);
         transform-origin: center;
         transition:
-            opacity 260ms ease,
-            transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+            opacity 340ms ease,
+            transform 780ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    html.aksa-intro-nav-ready [data-site-brand-logo] {
-        animation: aksa-intro-brand-arrive 420ms ease both;
+    html.aksa-intro-logo-handoff .site-intro-lockup {
+        opacity: 0;
+        transition: opacity 320ms ease;
+    }
+
+    html.aksa-intro-logo-handoff [data-site-brand-logo],
+    html.aksa-intro-logo-handoff [data-aksa-nav-shell] .site-navbar-pill > :not(.site-brand-link) {
+        opacity: 1;
+        transition: opacity 320ms ease;
     }
 
     html.aksa-intro-content-ready [data-aksa-page-content],
@@ -441,30 +463,67 @@
     html.aksa-intro-content-ready [data-aksa-footer-shell] {
         opacity: 1;
         pointer-events: auto;
-        transition: opacity 520ms ease;
+        transition: opacity var(--aksa-motion-reveal) ease;
     }
 
-    html.aksa-intro-content-ready [data-aksa-page-content] > * {
-        animation: aksa-intro-content-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    html.aksa-intro-content-ready [data-aksa-page-content]:not([data-aksa-home-content]) > * {
+        animation: aksa-intro-content-in 860ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    html.aksa-intro-content-ready [data-aksa-page-content] > *:nth-child(2) {
+    html.aksa-intro-content-ready [data-aksa-page-content]:not([data-aksa-home-content]) > *:nth-child(2) {
         animation-delay: 70ms;
     }
 
-    html.aksa-intro-content-ready [data-aksa-page-content] > *:nth-child(n + 3) {
+    html.aksa-intro-content-ready [data-aksa-page-content]:not([data-aksa-home-content]) > *:nth-child(n + 3) {
         animation-delay: 120ms;
     }
+
+    html[data-aksa-intro-state="skipped"]:not(.aksa-home-reveal-consumed) [data-aksa-home-content] [data-home-reveal-item],
+    html.aksa-home-reveal-ready [data-aksa-home-content] [data-home-reveal-item] {
+        animation: aksa-home-stage-in var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
+    }
+
+    [data-home-reveal-stage="hero-title"] {
+        animation-delay: 0ms !important;
+    }
+
+    [data-home-reveal-stage="hero-action"] {
+        animation-delay: 180ms !important;
+    }
+
+    [data-home-reveal-stage="proof"] {
+        animation-delay: 360ms !important;
+    }
+
+    [data-home-reveal-stage="promo"] {
+        animation-delay: 500ms !important;
+    }
+
+    [data-home-reveal-stage="tools"] {
+        animation-delay: 600ms !important;
+    }
+
+    [data-home-reveal-stage="search"] {
+        animation-delay: 780ms !important;
+    }
+
+    [data-home-reveal-stage="product-card"] {
+        animation-delay: 1000ms !important;
+    }
+
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(2) { animation-delay: 1110ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(3) { animation-delay: 1220ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(4) { animation-delay: 1330ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(5) { animation-delay: 1440ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(6) { animation-delay: 1550ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(7) { animation-delay: 1660ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(8) { animation-delay: 1770ms !important; }
+    #productContainer > [data-home-reveal-stage="product-card"]:nth-child(n + 9) { animation-delay: 1880ms !important; }
 
     html.aksa-intro-revealing .site-intro {
         opacity: 0;
         pointer-events: none;
-        transition: opacity 520ms ease;
-    }
-
-    @keyframes aksa-intro-brand-arrive {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        transition: opacity var(--aksa-motion-reveal) ease;
     }
 
     @keyframes aksa-intro-content-in {
@@ -475,6 +534,20 @@
 
         to {
             opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes aksa-home-stage-in {
+        from {
+            opacity: 0;
+            filter: blur(3px);
+            transform: translateY(18px);
+        }
+
+        to {
+            opacity: 1;
+            filter: blur(0);
             transform: translateY(0);
         }
     }
@@ -497,15 +570,15 @@
     }
 
     [data-aksa-page-content].aksa-soft-nav-entered {
-        animation: aksa-soft-page-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: aksa-soft-page-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     [data-aksa-page-content].aksa-page-entered {
-        animation: aksa-page-enter 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: aksa-page-enter var(--aksa-motion-slow) cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .aksa-price-changing {
-        animation: aksa-price-change 280ms cubic-bezier(0.22, 1, 0.36, 1);
+        animation: aksa-price-change var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     a.is-soft-nav-pending {
@@ -582,6 +655,13 @@
         .profile-dropdown {
             animation: none;
             transition: none;
+        }
+
+        [data-home-reveal-item] {
+            animation: none !important;
+            filter: none !important;
+            opacity: 1 !important;
+            transform: none !important;
         }
     }
 
@@ -1006,7 +1086,7 @@
         height: 1rem;
         flex-shrink: 0;
         color: var(--aksa-text-muted);
-        transition: transform 0.15s ease;
+        transition: transform var(--aksa-motion-fast) ease;
     }
 
     .aksa-select.is-open .aksa-select-chevron {
@@ -1036,7 +1116,7 @@
     }
 
     .aksa-select-panel:not(.hidden) {
-        animation: aksa-dropdown-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: aksa-dropdown-in var(--aksa-motion-base) var(--aksa-motion-ease) both;
         transform-origin: top center;
     }
 
@@ -1064,7 +1144,7 @@
             0 4px 14px rgba(124, 58, 237, 0.3),
             inset 0 1px 0 rgba(255, 255, 255, 0.16);
         pointer-events: none;
-        transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+        transition: transform 460ms var(--aksa-motion-ease);
         will-change: transform;
     }
 
@@ -1099,10 +1179,10 @@
     .profile-menu-trigger {
         border-radius: 9999px;
         transition:
-            color 180ms ease,
-            background-color 180ms ease,
-            box-shadow 220ms ease,
-            transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+            color var(--aksa-motion-fast) ease,
+            background-color var(--aksa-motion-fast) ease,
+            box-shadow var(--aksa-motion-base) ease,
+            transform var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     .profile-menu-trigger:hover {
@@ -1116,7 +1196,7 @@
     }
 
     .profile-menu-avatar {
-        transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+        transition: transform var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     .profile-menu-trigger[aria-expanded="true"] .profile-menu-avatar {
@@ -1130,9 +1210,9 @@
         transform: translateY(-8px) scale(0.96);
         transform-origin: top right;
         transition:
-            opacity 160ms ease,
-            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-            visibility 0s linear 220ms;
+            opacity var(--aksa-motion-fast) ease,
+            transform var(--aksa-motion-base) var(--aksa-motion-ease),
+            visibility 0s linear 360ms;
         will-change: opacity, transform;
     }
 
@@ -1225,7 +1305,7 @@
         inset: 0;
         transform: translateX(-120%);
         background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
-        transition: transform 0.7s ease;
+        transition: transform 0.9s ease;
     }
 
     .btn-main:hover {
@@ -1234,7 +1314,7 @@
     }
 
     .btn-main > svg {
-        transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+        transition: transform var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     .btn-main:hover > svg:not(.animate-spin) {
@@ -1983,7 +2063,7 @@
         pointer-events: none;
         transform: translateY(-0.4rem) scale(0.985);
         transform-origin: top right;
-        transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+        transition: opacity var(--aksa-motion-fast) ease, transform var(--aksa-motion-base) var(--aksa-motion-ease), visibility var(--aksa-motion-base) ease;
     }
 
     .mini-cart-root::after {
@@ -2069,7 +2149,7 @@
     }
 
     .mini-cart-content-enter .mini-cart-item {
-        animation: mini-cart-item-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: mini-cart-item-enter 500ms var(--aksa-motion-ease) both;
     }
 
     .mini-cart-content-enter .mini-cart-item:nth-child(2) { animation-delay: 45ms; }
@@ -2232,7 +2312,7 @@
             border-radius: 1.25rem 1.25rem 0 0;
             transform: translateY(calc(100% + 1.5rem));
             transform-origin: bottom center;
-            transition: opacity 200ms ease, transform 220ms ease, visibility 220ms ease;
+            transition: opacity 280ms ease, transform 380ms var(--aksa-motion-ease), visibility 380ms ease;
         }
 
         .mini-cart-root:hover .mini-cart-panel,
@@ -2263,7 +2343,7 @@
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-            transition: opacity 180ms ease, visibility 180ms ease;
+            transition: opacity var(--aksa-motion-fast) ease, visibility var(--aksa-motion-fast) ease;
         }
 
         .mini-cart-root.is-open .mini-cart-backdrop,
@@ -2422,6 +2502,7 @@
             0 0 48px rgba(180, 155, 255, 0.08);
         backdrop-filter: blur(22px) saturate(128%);
         -webkit-backdrop-filter: blur(22px) saturate(128%);
+        transition-duration: 420ms;
     }
 
     .mobile-nav-panel .nav-item {
@@ -2442,8 +2523,8 @@
         opacity: 0;
         transform: translateY(-7px);
         transition:
-            opacity 180ms ease,
-            transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+            opacity var(--aksa-motion-fast) ease,
+            transform var(--aksa-motion-base) var(--aksa-motion-ease);
         transition-delay: 0ms;
     }
 
@@ -2483,9 +2564,9 @@
         opacity: 0;
         pointer-events: none;
         transition:
-            width 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 160ms ease;
+            width var(--aksa-motion-slow) var(--aksa-motion-ease),
+            transform var(--aksa-motion-slow) var(--aksa-motion-ease),
+            opacity var(--aksa-motion-fast) ease;
         will-change: width, transform;
     }
 
@@ -2683,6 +2764,8 @@
         @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-gray-400 transition;
         background: rgba(20, 17, 34, 0.55);
         border-color: rgba(180, 155, 255, 0.08);
+        transition-duration: var(--aksa-motion-base);
+        transition-timing-function: var(--aksa-motion-ease);
     }
 
     .download-accordion[open]:not([data-download-expanded]) .download-accordion-chevron,
@@ -2698,8 +2781,8 @@
         opacity: 0;
         transform: translateY(-6px);
         transition:
-            opacity 180ms ease,
-            transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+            opacity var(--aksa-motion-fast) ease,
+            transform var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     .download-accordion[open]:not([data-download-expanded]) .download-accordion-panel,
@@ -3242,7 +3325,7 @@
         background: rgba(3, 3, 8, 0.78);
         backdrop-filter: blur(16px);
         opacity: 0;
-        transition: opacity 200ms ease;
+        transition: opacity 280ms ease;
     }
 
     .qris-modal.is-open .qris-modal-backdrop {
@@ -3265,8 +3348,8 @@
         transform: translateY(10px) scale(0.97);
         transform-origin: center;
         transition:
-            opacity 180ms ease,
-            transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+            opacity var(--aksa-motion-fast) ease,
+            transform var(--aksa-motion-base) var(--aksa-motion-ease);
     }
 
     .qris-modal.is-open .qris-dialog {
@@ -3929,9 +4012,9 @@
             0 18px 42px rgba(0, 0, 0, 0.36),
             0 0 0 1px rgba(180, 155, 255, 0.06);
         transition:
-            opacity 320ms ease,
-            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            filter 320ms ease;
+            opacity 440ms ease,
+            transform var(--aksa-motion-slow) var(--aksa-motion-ease),
+            filter 440ms ease;
         will-change: opacity, transform;
     }
 
@@ -3968,7 +4051,7 @@
     }
 
     .app-toast.is-visible {
-        animation: appToastIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: appToastIn var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
         transform: translate3d(0, 0, 0) scale(1);
         opacity: 1;
         pointer-events: auto;
@@ -3980,7 +4063,7 @@
     }
 
     .app-toast.is-visible::before {
-        animation: recentPurchaseSheen 980ms ease-out both;
+        animation: recentPurchaseSheen 1200ms ease-out both;
     }
 
     .app-toast.is-visible::after {
@@ -4034,9 +4117,9 @@
             0 18px 42px rgba(0, 0, 0, 0.36),
             0 0 0 1px rgba(180, 155, 255, 0.1);
         transition:
-            opacity 320ms ease,
-            transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            filter 320ms ease;
+            opacity 440ms ease,
+            transform var(--aksa-motion-slow) var(--aksa-motion-ease),
+            filter 440ms ease;
         will-change: opacity, transform;
     }
 
@@ -4073,7 +4156,7 @@
     }
 
     .recent-purchase-toast.is-visible {
-        animation: recentPurchaseIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: recentPurchaseIn var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
         opacity: 1;
         pointer-events: auto;
         filter: saturate(1.04);
@@ -4085,7 +4168,7 @@
     }
 
     .recent-purchase-toast.is-visible::before {
-        animation: recentPurchaseSheen 980ms ease-out both;
+        animation: recentPurchaseSheen 1200ms ease-out both;
     }
 
     .recent-purchase-toast.is-visible::after {
@@ -4207,10 +4290,10 @@
         background: rgba(180, 155, 255, 0.12);
         color: #b49bff;
         transition:
-            border-color 0.2s ease,
-            background-color 0.2s ease,
-            color 0.2s ease,
-            transform 0.2s ease;
+            border-color 0.3s ease,
+            background-color 0.3s ease,
+            color 0.3s ease,
+            transform 0.3s ease;
     }
 
     .payment-card:hover .payment-card-icon,
@@ -4267,7 +4350,7 @@
     }
 
     .card-hover {
-        transition: all 0.25s ease;
+        transition: all 0.36s var(--aksa-motion-ease);
     }
 
     .card-hover:hover {
@@ -4279,25 +4362,25 @@
     }
 
     .btn-press {
-        transition-duration: 140ms;
+        transition-duration: 200ms;
     }
 
     .fade-up {
-        animation: fadeUp 0.36s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        animation: fadeUp 0.52s cubic-bezier(0.16, 1, 0.3, 1) backwards;
         will-change: transform;
     }
 
     .motion-card {
-        animation: fadeUp 0.36s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        animation: fadeUp 0.52s cubic-bezier(0.16, 1, 0.3, 1) backwards;
         will-change: transform;
     }
 
     .motion-card:nth-child(2) {
-        animation-delay: 0.04s;
+        animation-delay: 0.06s;
     }
 
     .motion-card:nth-child(3) {
-        animation-delay: 0.08s;
+        animation-delay: 0.12s;
     }
 
     .motion-card:nth-child(4) {
@@ -4643,9 +4726,9 @@
         opacity: 0;
         pointer-events: none;
         transition:
-            width 340ms cubic-bezier(0.22, 1, 0.36, 1),
-            transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 140ms ease;
+            width 480ms var(--aksa-motion-ease),
+            transform 480ms var(--aksa-motion-ease),
+            opacity 200ms ease;
         will-change: width, transform;
     }
 
@@ -4786,7 +4869,7 @@
             opacity: 0;
             visibility: hidden;
             transform: translateY(calc(100% + 1.5rem));
-            transition: opacity 200ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1), visibility 200ms ease;
+            transition: opacity 280ms ease, transform 380ms var(--aksa-motion-ease), visibility 280ms ease;
             pointer-events: none;
         }
 
@@ -4968,7 +5051,7 @@
 }
 
 #productContainer {
-    transition: opacity 150ms ease, transform 180ms cubic-bezier(0.4, 0, 1, 1);
+    transition: opacity 240ms ease, transform 300ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 #productContainer.product-filter-leaving {
@@ -4977,7 +5060,7 @@
 }
 
 #productContainer.product-filter-entering {
-    animation: product-filter-enter 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: product-filter-enter var(--aksa-motion-slow) var(--aksa-motion-ease);
 }
 
 .cart-package-row.cart-item-updating {
@@ -5653,16 +5736,16 @@
     opacity: 1;
     translate: 0 0;
     scale: 1;
-    transition: opacity 480ms cubic-bezier(0.22, 1, 0.36, 1) var(--motion-reveal-delay, 0ms),
-        translate 420ms cubic-bezier(0.22, 1, 0.36, 1) var(--motion-reveal-delay, 0ms),
-        scale 420ms cubic-bezier(0.22, 1, 0.36, 1) var(--motion-reveal-delay, 0ms);
+    transition: opacity var(--aksa-motion-reveal) var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
+        translate 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
+        scale 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms);
 }
 
 .cart-package-row {
     max-height: 12rem;
     transform-origin: top center;
-    transition: opacity 220ms ease, transform 240ms cubic-bezier(0.4, 0, 1, 1),
-        max-height 260ms ease, padding 260ms ease;
+    transition: opacity 300ms ease, transform 340ms cubic-bezier(0.4, 0, 1, 1),
+        max-height 380ms ease, padding 380ms ease;
 }
 
 .cart-package-row.cart-item-removing {
@@ -5675,11 +5758,11 @@
 }
 
 .checkout-step-transition {
-    animation: checkout-step-transition 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: checkout-step-transition 500ms var(--aksa-motion-ease);
 }
 
 .aksa-value-change {
-    animation: aksa-value-change-vertical 300ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: aksa-value-change-vertical 420ms var(--aksa-motion-ease);
 }
 
 .checkout-ready-shimmer {
@@ -5694,7 +5777,7 @@
     width: 30%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
     transform: skewX(-18deg);
-    animation: checkout-ready-shimmer 720ms ease-out both;
+    animation: checkout-ready-shimmer 960ms ease-out both;
     pointer-events: none;
 }
 
@@ -5711,6 +5794,27 @@
 @keyframes checkout-ready-shimmer {
     from { left: -45%; }
     to { left: 125%; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .btn-main,
+    .discord-cta,
+    .category-chip,
+    .product-card,
+    .panel-card,
+    .home-panel,
+    .home-stat,
+    .download-card,
+    .download-feature,
+    .download-resource-link,
+    .payment-card,
+    .package-card,
+    .nav-cart-link,
+    .nav-menu-button,
+    .nav-login-link {
+        transition-duration: var(--aksa-motion-base);
+        transition-timing-function: var(--aksa-motion-ease);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

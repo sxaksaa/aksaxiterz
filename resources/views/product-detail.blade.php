@@ -387,7 +387,7 @@
                     subtotal.classList.remove('aksa-price-changing');
                     void subtotal.offsetWidth;
                     subtotal.classList.add('aksa-price-changing');
-                    setTimeout(() => subtotal.classList.remove('aksa-price-changing'), 300);
+                    setTimeout(() => subtotal.classList.remove('aksa-price-changing'), 420);
                 }
                 subtotal.textContent = nextSubtotal;
                 document.getElementById('mobileSelectedSubtotal').textContent = nextSubtotal;
@@ -451,7 +451,7 @@
                 if (checkoutButton && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                     void checkoutButton.offsetWidth;
                     checkoutButton.classList.add('checkout-ready-shimmer');
-                    setTimeout(() => checkoutButton.classList.remove('checkout-ready-shimmer'), 760);
+                    setTimeout(() => checkoutButton.classList.remove('checkout-ready-shimmer'), 1000);
                 }
                 document.getElementById('summaryBox')?.scrollIntoView({
                     behavior: 'smooth',

@@ -10,13 +10,83 @@ test('branded intro plays once per tab session and releases the storefront', asy
         backgroundImage: getComputedStyle(document.querySelector('#aksaSiteIntro')).backgroundImage,
         backgroundColor: getComputedStyle(document.querySelector('#aksaSiteIntro')).backgroundColor,
         pageContentOpacity: getComputedStyle(document.querySelector('[data-aksa-page-content]')).opacity,
+        layoutWidth: document.documentElement.clientWidth,
     }));
 
-    expect(introOpeningState).toEqual({
+    expect(introOpeningState).toMatchObject({
         backgroundImage: 'none',
         backgroundColor: 'rgba(0, 0, 0, 0)',
         pageContentOpacity: '0',
     });
+
+    await expect(page.locator('html')).toHaveClass(/aksa-intro-nav-ready/);
+
+    const navbarExpansionState = await page.evaluate(() => ({
+        introLogoOpacity: getComputedStyle(document.querySelector('[data-site-intro-lockup]')).opacity,
+        navbarLogoOpacity: getComputedStyle(document.querySelector('[data-site-brand-logo]')).opacity,
+        navbarActionsOpacity: getComputedStyle(document.querySelector('[data-navbar-actions]')).opacity,
+    }));
+
+    expect(navbarExpansionState).toEqual({
+        introLogoOpacity: '1',
+        navbarLogoOpacity: '0',
+        navbarActionsOpacity: '0',
+    });
+
+    await expect(page.locator('html')).toHaveClass(/aksa-intro-logo-handoff/);
+    await page.waitForTimeout(360);
+
+    const logoHandoffState = await page.evaluate(() => {
+        const introLogo = document.querySelector('[data-site-intro-lockup]');
+        const navbarLogo = document.querySelector('[data-site-brand-logo]');
+        const introRect = introLogo.getBoundingClientRect();
+        const navbarRect = navbarLogo.getBoundingClientRect();
+
+        return {
+            introLogoOpacity: Number(getComputedStyle(introLogo).opacity),
+            navbarLogoOpacity: Number(getComputedStyle(navbarLogo).opacity),
+            navbarActionsOpacity: Number(getComputedStyle(document.querySelector('[data-navbar-actions]')).opacity),
+            introLeft: introRect.left,
+            navbarLeft: navbarRect.left,
+            viewportWidth: window.innerWidth,
+            layoutWidth: document.documentElement.clientWidth,
+            horizontalDifference: Math.abs(introRect.left - navbarRect.left),
+            verticalDifference: Math.abs(introRect.top - navbarRect.top),
+        };
+    });
+
+    expect(logoHandoffState.introLogoOpacity).toBeLessThan(0.05);
+    expect(logoHandoffState.navbarLogoOpacity).toBeGreaterThan(0.95);
+    expect(logoHandoffState.navbarActionsOpacity).toBeGreaterThan(0.95);
+    expect(logoHandoffState.horizontalDifference, JSON.stringify(logoHandoffState)).toBeLessThan(2);
+    expect(logoHandoffState.verticalDifference).toBeLessThan(2);
+
+    await expect(page.locator('html')).toHaveClass(/aksa-home-reveal-ready/);
+
+    const revealSequence = await page.evaluate(() => {
+        const delayFor = (selector) => Number.parseFloat(
+            getComputedStyle(document.querySelector(selector)).animationDelay,
+        );
+        const cardDelays = [...document.querySelectorAll('[data-home-reveal-stage="product-card"]')]
+            .slice(0, 4)
+            .map((card) => Number.parseFloat(getComputedStyle(card).animationDelay));
+
+        return {
+            stages: [
+                delayFor('[data-home-reveal-stage="hero-title"]'),
+                delayFor('[data-home-reveal-stage="hero-action"]'),
+                delayFor('[data-home-reveal-stage="proof"]'),
+                delayFor('[data-home-reveal-stage="tools"]'),
+                delayFor('[data-home-reveal-stage="search"]'),
+            ],
+            cardDelays,
+            recentPurchaseHidden: document.querySelector('[data-recent-purchase-toast]')?.hidden,
+        };
+    });
+
+    expect(revealSequence.stages).toEqual([0, 0.18, 0.36, 0.6, 0.78]);
+    expect(revealSequence.cardDelays).toEqual([1, 1.11, 1.22, 1.33]);
+    expect(revealSequence.recentPurchaseHidden).toBe(true);
 
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
         timeout: 4000,
@@ -24,6 +94,9 @@ test('branded intro plays once per tab session and releases the storefront', asy
     await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
+
+    const releasedLayoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(releasedLayoutWidth).toBe(introOpeningState.layoutWidth);
 
     await page.reload();
 

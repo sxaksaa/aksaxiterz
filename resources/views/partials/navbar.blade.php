@@ -1,5 +1,5 @@
 <nav id="navbar" aria-label="Main navigation"
-    class="site-navbar fixed inset-x-0 top-2 z-50 px-3 transition-transform duration-300 sm:top-3 sm:px-4 lg:top-4 lg:px-6">
+    class="site-navbar fixed inset-x-0 top-2 z-50 px-3 transition-transform duration-[420ms] sm:top-3 sm:px-4 lg:top-4 lg:px-6">
 
     <div
         class="site-navbar-pill mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-3 py-3 sm:px-5 lg:px-6 xl:grid-cols-[minmax(170px,1fr)_auto_minmax(170px,1fr)]">
@@ -214,7 +214,7 @@
 </nav>
 
 <div id="mobileMenu"
-    class="mobile-nav-panel fixed inset-x-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.25rem)] overflow-y-auto rounded-[1.35rem] border px-4 py-4 opacity-0 -translate-y-5 pointer-events-none transition-all duration-300 ease-out sm:left-auto sm:right-4 sm:w-[23rem] xl:hidden"
+    class="mobile-nav-panel fixed inset-x-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.25rem)] overflow-y-auto rounded-[1.35rem] border px-4 py-4 opacity-0 -translate-y-5 pointer-events-none transition-all duration-[420ms] ease-out sm:left-auto sm:right-4 sm:w-[23rem] xl:hidden"
     aria-hidden="true">
 
     <div class="flex flex-col gap-4 text-sm" data-mobile-menu-content>

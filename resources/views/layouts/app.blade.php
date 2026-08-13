@@ -134,7 +134,7 @@
                 window.__aksaIntroFailsafe = window.setTimeout(() => {
                     root.classList.remove('aksa-intro-pending', 'aksa-intro-running', 'aksa-intro-revealing');
                     root.dataset.aksaIntroState = 'recovered';
-                }, 4000);
+                }, 5000);
             })();
         </script>
     @endif
@@ -163,7 +163,7 @@
         @include('partials.pending-payment-reminder')
     @endauth
 
-    <main id="aksaPageContent" data-aksa-page-content>
+    <main id="aksaPageContent" data-aksa-page-content @if ($siteIntroEnabled) data-aksa-home-content @endif>
         @yield('content')
     </main>
 

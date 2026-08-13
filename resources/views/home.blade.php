@@ -5,20 +5,20 @@
 
 @section('content')
     <section class="page-shell pb-7 pt-7 md:pb-10 md:pt-11">
-        <div class="home-hero home-hero-compact fade-up">
-            <h1 class="hero-title">
+        <div class="home-hero home-hero-compact">
+            <h1 class="hero-title" data-home-reveal-item data-home-reveal-stage="hero-title">
                 <span class="block">Sharpen your aim.</span>
                 <span class="hero-accent block">Elevate your gameplay.</span>
             </h1>
 
-            <div class="hero-actions">
+            <div class="hero-actions" data-home-reveal-item data-home-reveal-stage="hero-action">
                 <a href="#products" class="btn-main px-5 py-3">
                     <x-ui.icon name="boxes" class="h-4 w-4" />
                     <span>Explore Products</span>
                 </a>
             </div>
 
-            <div class="home-proof-strip">
+            <div class="home-proof-strip" data-home-reveal-item data-home-reveal-stage="proof">
                 <span><strong>5000+</strong> licenses delivered</span>
                 <span><strong>2000+</strong> community members</span>
                 <span><strong data-total-ready-stock>{{ $totalStock }}</strong> available licenses</span>
@@ -27,7 +27,7 @@
     </section>
 
     @if ($promoVoucher ?? null)
-        <section class="page-shell pb-6">
+        <section class="page-shell pb-6" data-home-reveal-item data-home-reveal-stage="promo">
             @include('partials.promo-banner', ['promoVoucher' => $promoVoucher])
         </section>
     @endif
@@ -47,14 +47,14 @@
             };
         @endphp
 
-        <div class="home-toolbar fade-up">
+        <div class="home-toolbar">
             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
-                <div>
+                <div data-home-reveal-item data-home-reveal-stage="tools">
                     <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
                     <p class="mt-1 text-sm text-gray-400">Search by product name or filter by category.</p>
                 </div>
 
-                <div class="w-full">
+                <div class="w-full" data-home-reveal-item data-home-reveal-stage="search">
                     <label for="searchInput" class="sr-only">Search products</label>
                     <input type="text" id="searchInput" placeholder="Search Products..."
                         autocomplete="off" inputmode="search"
@@ -63,7 +63,7 @@
             </div>
 
             <div class="category-filter-row mt-4 flex gap-2 md:gap-3" role="group" aria-label="Product categories"
-                data-category-filter-row>
+                data-category-filter-row data-home-reveal-item data-home-reveal-stage="tools">
                 <span class="category-filter-glider" data-category-filter-glider aria-hidden="true"></span>
 
                 <button type="button" data-category-filter data-category="" aria-pressed="{{ !$active ? 'true' : 'false' }}"
@@ -238,7 +238,7 @@
                 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 container.classList.remove('product-filter-entering');
                 container.classList.add('product-filter-leaving');
-                const exitDelay = reduceMotion ? 0 : 150;
+                const exitDelay = reduceMotion ? 0 : 260;
                 const skeletonTimer = setTimeout(() => {
                     if (requestSequence !== productRequestSequence) return;
                     container.classList.add('product-container-loading');
@@ -270,7 +270,7 @@
                         container.classList.add('product-filter-entering');
                         window.refreshAksaDisplayCurrency?.(container);
                         window.initializeAksaPageEnhancements?.(container);
-                        setTimeout(() => container.classList.remove('product-filter-entering'), 420);
+                        setTimeout(() => container.classList.remove('product-filter-entering'), 600);
                         refreshProductStocks();
                     })
                     .catch(error => {

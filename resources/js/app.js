@@ -6,7 +6,7 @@ let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
 const modalReturnFocus = new WeakMap();
 const modalCloseTimers = new WeakMap();
-const MODAL_TRANSITION_DURATION = 240;
+const MODAL_TRANSITION_DURATION = 380;
 
 function modalFocusableElements(modal) {
     return [...modal.querySelectorAll(
@@ -423,7 +423,7 @@ function refreshDisplayCurrency(root = document) {
             element.classList.remove('aksa-price-changing');
             void element.offsetWidth;
             element.classList.add('aksa-price-changing');
-            window.setTimeout(() => element.classList.remove('aksa-price-changing'), 300);
+            window.setTimeout(() => element.classList.remove('aksa-price-changing'), 420);
         }
 
         element.textContent = nextText;
@@ -1419,6 +1419,7 @@ const RECENT_PURCHASE_SNOOZE_KEY = 'aksa_recent_purchase_snoozed_until';
 const RECENT_PURCHASE_VISIBLE_MS = window.matchMedia('(max-width: 639px)').matches ? 5200 : 8200;
 const RECENT_PURCHASE_GAP_MS = 14500;
 const RECENT_PURCHASE_INITIAL_DELAY_MS = 1800;
+const RECENT_PURCHASE_HOME_INITIAL_DELAY_MS = 5200;
 const RECENT_PURCHASE_NEW_DELAY_MS = 350;
 const RECENT_PURCHASE_POLL_MS = 20000;
 const RECENT_PURCHASE_MAX_KNOWN_KEYS = 100;
@@ -1571,6 +1572,9 @@ function initializeRecentPurchaseToast(root = document) {
     if (recentPurchaseSnoozed()) return;
 
     const endpoint = recentPurchaseFeedUrl(toast);
+    const initialDelay = toast.closest('[data-aksa-home-content]')
+        ? RECENT_PURCHASE_HOME_INITIAL_DELAY_MS
+        : RECENT_PURCHASE_INITIAL_DELAY_MS;
     const closeButton = toast.querySelector('[data-recent-purchase-close]');
     let purchases = parseRecentPurchaseData(toast);
     let purchasesByKey = new Map(purchases.map((purchase) => [purchase.key, purchase]));
@@ -1743,7 +1747,7 @@ function initializeRecentPurchaseToast(root = document) {
         if (newKeys.length > 0 && visibleTimer === null) {
             scheduleCycle(RECENT_PURCHASE_NEW_DELAY_MS);
         } else if (cycleTimer === null && visibleTimer === null) {
-            scheduleCycle(RECENT_PURCHASE_INITIAL_DELAY_MS);
+            scheduleCycle(initialDelay);
         }
     };
 
@@ -1871,7 +1875,7 @@ function initializeRecentPurchaseToast(root = document) {
     window.addEventListener('pageshow', pageShown);
 
     if (!paused && purchases.length > 0) {
-        scheduleCycle(RECENT_PURCHASE_INITIAL_DELAY_MS);
+        scheduleCycle(initialDelay);
     }
 
     schedulePoll();
@@ -2111,7 +2115,7 @@ function openMobileMenu() {
     mobileMenuOpen = true;
     navbar?.classList.remove('nav-hidden');
     [...(menu.querySelector('[data-mobile-menu-content]')?.children || [])].forEach((item, index) => {
-        item.style.setProperty('--mobile-menu-item-delay', `${Math.min(index, 9) * 24}ms`);
+        item.style.setProperty('--mobile-menu-item-delay', `${Math.min(index, 9) * 38}ms`);
     });
     menu.classList.add('is-open');
     menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
@@ -2253,7 +2257,7 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
     if (currentContent && nextContent) {
         nextContent.classList.add('mini-cart-content-enter');
         currentContent.replaceWith(nextContent);
-        window.setTimeout(() => nextContent.classList.remove('mini-cart-content-enter'), 420);
+        window.setTimeout(() => nextContent.classList.remove('mini-cart-content-enter'), 560);
     }
 
     root.querySelector('[data-mini-cart-trigger]')?.setAttribute(
@@ -3018,6 +3022,7 @@ async function softNavigate(url, options = {}) {
         initializeRecentPurchaseToast(nextContent);
         initializeDownloadAccordions(nextContent);
         initializeMotionEnhancements(nextContent);
+        beginHomeStagedReveal(nextContent);
         closeMobileMenu();
         closeProfileDropdown();
         scrollAfterSoftNavigation(
@@ -3028,7 +3033,7 @@ async function softNavigate(url, options = {}) {
         requestAnimationFrame(() => {
             updateNavGlider();
             nextContent.classList.add('aksa-soft-nav-entered');
-            window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 380);
+            window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 540);
         });
     } catch (error) {
         if (error.name === 'AbortError') return;
@@ -3057,7 +3062,7 @@ async function softNavigate(url, options = {}) {
 }
 
 const DOWNLOAD_ACCORDION_SELECTOR = '[data-download-accordion]';
-const DOWNLOAD_ACCORDION_DURATION = 280;
+const DOWNLOAD_ACCORDION_DURATION = 400;
 const DOWNLOAD_ACCORDION_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 function shouldReduceMotion() {
@@ -3065,6 +3070,31 @@ function shouldReduceMotion() {
 }
 
 let scrollRevealObserver = null;
+let homeStagedRevealTimer = null;
+
+function homeContentWithin(root = document) {
+    if (root instanceof Element && root.matches('[data-aksa-home-content]')) return root;
+
+    return root.querySelector?.('[data-aksa-home-content]') || null;
+}
+
+function beginHomeStagedReveal(root = document) {
+    if (!homeContentWithin(root)) return;
+
+    const documentRoot = document.documentElement;
+    window.clearTimeout(homeStagedRevealTimer);
+    documentRoot.classList.remove('aksa-home-reveal-ready');
+    documentRoot.classList.remove('aksa-home-reveal-consumed');
+
+    window.requestAnimationFrame(() => {
+        documentRoot.classList.add('aksa-home-reveal-ready');
+        homeStagedRevealTimer = window.setTimeout(() => {
+            documentRoot.classList.remove('aksa-home-reveal-ready');
+            documentRoot.classList.add('aksa-home-reveal-consumed');
+            homeStagedRevealTimer = null;
+        }, 2800);
+    });
+}
 
 function initializeMotionEnhancements(root = document) {
     const items = [...root.querySelectorAll('[data-scroll-reveal]:not([data-motion-reveal-ready])')];
@@ -3105,6 +3135,9 @@ function initializeMotionEnhancements(root = document) {
 document.addEventListener('aksa:before-page-swap', () => {
     scrollRevealObserver?.disconnect();
     scrollRevealObserver = null;
+    window.clearTimeout(homeStagedRevealTimer);
+    homeStagedRevealTimer = null;
+    document.documentElement.classList.remove('aksa-home-reveal-ready', 'aksa-home-reveal-consumed');
 });
 
 window.animateAksaValue = function(element, nextText) {
@@ -3117,7 +3150,7 @@ window.animateAksaValue = function(element, nextText) {
     element.classList.remove('aksa-value-change');
     void element.offsetWidth;
     element.classList.add('aksa-value-change');
-    window.setTimeout(() => element.classList.remove('aksa-value-change'), 320);
+    window.setTimeout(() => element.classList.remove('aksa-value-change'), 460);
 };
 
 function setDownloadAccordionExpanded(accordion, expanded) {
@@ -3271,6 +3304,7 @@ const SITE_INTRO_CLASS_NAMES = [
     'aksa-intro-brand-ready',
     'aksa-intro-docking',
     'aksa-intro-nav-ready',
+    'aksa-intro-logo-handoff',
     'aksa-intro-content-ready',
     'aksa-intro-revealing',
 ];
@@ -3322,7 +3356,7 @@ function initializeSiteIntro() {
         root.classList.add('aksa-intro-mark-ready');
     });
 
-    schedule(() => root.classList.add('aksa-intro-brand-ready'), 430);
+    schedule(() => root.classList.add('aksa-intro-brand-ready'), 520);
 
     schedule(() => {
         const navbarPill = brandLogo.closest('.site-navbar-pill');
@@ -3346,19 +3380,26 @@ function initializeSiteIntro() {
         const targetCenterY = pillLayoutTop + relativeTop + brandLogo.offsetHeight / 2;
         const scale = Math.max(0.08, brandLogo.offsetWidth / lockupWidth);
 
-        lockup.style.setProperty('--site-intro-dock-x', `${targetCenterX - window.innerWidth / 2}px`);
-        lockup.style.setProperty('--site-intro-dock-y', `${targetCenterY - window.innerHeight / 2}px`);
+        const lockupLayoutCenterX = lockup.offsetLeft;
+        const lockupLayoutCenterY = lockup.offsetTop;
+
+        lockup.style.setProperty('--site-intro-dock-x', `${targetCenterX - lockupLayoutCenterX}px`);
+        lockup.style.setProperty('--site-intro-dock-y', `${targetCenterY - lockupLayoutCenterY}px`);
         lockup.style.setProperty('--site-intro-dock-scale', String(scale));
         root.classList.add('aksa-intro-docking');
-    }, 960);
+    }, 1100);
 
-    schedule(() => root.classList.add('aksa-intro-nav-ready'), 1420);
-    schedule(() => root.classList.add('aksa-intro-content-ready'), 1600);
+    schedule(() => root.classList.add('aksa-intro-nav-ready'), 1320);
+    schedule(() => root.classList.add('aksa-intro-logo-handoff'), 2140);
+    schedule(() => {
+        root.classList.add('aksa-intro-content-ready');
+        beginHomeStagedReveal(document);
+    }, 2520);
     schedule(() => {
         root.classList.remove('aksa-intro-running');
         root.classList.add('aksa-intro-revealing');
-    }, 1660);
-    schedule(() => finishSiteIntro(root, intro, timers), 2240);
+    }, 2600);
+    schedule(() => finishSiteIntro(root, intro, timers), 3320);
 
     return true;
 }
@@ -3370,6 +3411,7 @@ function initializeGlobalPageEnhancements(root = document) {
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
     initializeMotionEnhancements(root);
+    if (!siteIntroPlaying) beginHomeStagedReveal(root);
     updateNavGlider();
     updateCategoryFilterGlider();
 
@@ -3381,7 +3423,7 @@ function initializeGlobalPageEnhancements(root = document) {
 
         if (!siteIntroPlaying) {
             pageContent.classList.add('aksa-page-entered');
-            window.setTimeout(() => pageContent.classList.remove('aksa-page-entered'), 420);
+            window.setTimeout(() => pageContent.classList.remove('aksa-page-entered'), 600);
         }
     }
 }
@@ -3803,7 +3845,7 @@ document.addEventListener('change', (event) => {
         element.classList.remove('checkout-step-transition');
         void element.offsetWidth;
         element.classList.add('checkout-step-transition');
-        window.setTimeout(() => element.classList.remove('checkout-step-transition'), 380);
+        window.setTimeout(() => element.classList.remove('checkout-step-transition'), 540);
     });
 });
 
