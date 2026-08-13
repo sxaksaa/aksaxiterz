@@ -149,7 +149,10 @@ class ProductStockFeedTest extends TestCase
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('<strong data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>', false)
+            ->assertSee(
+                '<strong data-home-count-up="'.($existingVisibleStock + 1).'" data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>',
+                false,
+            )
             ->assertSee('available licenses')
             ->assertSee('available · Auto delivery')
             ->assertSee('product-status-badge-static hidden', false);
@@ -166,7 +169,10 @@ class ProductStockFeedTest extends TestCase
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('<strong data-total-ready-stock>'.$existingVisibleStock.'</strong>', false)
+            ->assertSee(
+                '<strong data-home-count-up="'.$existingVisibleStock.'" data-total-ready-stock>'.$existingVisibleStock.'</strong>',
+                false,
+            )
             ->assertSee('data-total-ready-stock', false)
             ->assertSee('data-product-stock-card', false)
             ->assertSee('data-product-stock-label', false)

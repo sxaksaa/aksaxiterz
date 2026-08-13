@@ -19,9 +19,9 @@
             </div>
 
             <div class="home-proof-strip" data-home-reveal-item data-home-reveal-stage="proof">
-                <span><strong>5000+</strong> licenses delivered</span>
-                <span><strong>2000+</strong> community members</span>
-                <span><strong data-total-ready-stock>{{ $totalStock }}</strong> available licenses</span>
+                <span><strong data-home-count-up="5000" data-home-count-up-suffix="+">5000+</strong> licenses delivered</span>
+                <span><strong data-home-count-up="2000" data-home-count-up-suffix="+">2000+</strong> community members</span>
+                <span><strong data-home-count-up="{{ $totalStock }}" data-total-ready-stock>{{ $totalStock }}</strong> available licenses</span>
             </div>
         </div>
     </section>
@@ -343,6 +343,7 @@
                 const totalAvailableStock = Number(snapshot.total_available_stock);
 
                 if (totalStock && Number.isSafeInteger(totalAvailableStock) && totalAvailableStock >= 0) {
+                    totalStock.dataset.homeCountUp = String(totalAvailableStock);
                     totalStock.textContent = String(totalAvailableStock);
                 }
             }
@@ -443,12 +444,16 @@
                 restoredProducts.finally(() => {
                     if (!Number.isFinite(restoredScrollY)) return;
 
-                    setTimeout(() => {
+                    requestAnimationFrame(() => {
                         window.scrollTo({
                             top: Math.max(0, restoredScrollY),
                             behavior: 'auto',
                         });
-                    }, 0);
+
+                        requestAnimationFrame(() => {
+                            pageContent?.dispatchEvent(new CustomEvent('aksa:history-scroll-restored'));
+                        });
+                    });
                 });
             }
 

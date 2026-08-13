@@ -483,6 +483,10 @@
         animation: aksa-home-stage-in var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
     }
 
+    html.aksa-home-reveal-ready [data-aksa-home-content] {
+        overflow: clip;
+    }
+
     [data-home-reveal-stage="hero-title"] {
         animation-delay: 0ms !important;
     }
@@ -577,6 +581,22 @@
         animation: aksa-page-enter var(--aksa-motion-slow) cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
+    [data-display-price].aksa-currency-price-waiting {
+        display: inline-block;
+        min-width: var(--aksa-currency-price-width);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        will-change: opacity, transform, filter;
+    }
+
+    [data-display-price].aksa-currency-price-leaving {
+        animation: aksa-currency-price-out 170ms cubic-bezier(0.4, 0, 1, 1) both;
+    }
+
+    [data-display-price].aksa-currency-price-entering {
+        animation: aksa-currency-price-in 340ms var(--aksa-motion-ease) both;
+    }
+
     .aksa-price-changing {
         animation: aksa-price-change var(--aksa-motion-base) var(--aksa-motion-ease);
     }
@@ -628,6 +648,16 @@
         }
     }
 
+    @keyframes aksa-currency-price-out {
+        from { opacity: 1; filter: blur(0); transform: translateY(0); }
+        to { opacity: 0; filter: blur(2px); transform: translateY(-5px); }
+    }
+
+    @keyframes aksa-currency-price-in {
+        from { opacity: 0; filter: blur(2px); transform: translateY(7px); }
+        to { opacity: 1; filter: blur(0); transform: translateY(0); }
+    }
+
     @keyframes aksa-price-change {
         0% { opacity: 0.3; transform: translateY(4px); }
         100% { opacity: 1; transform: translateY(0); }
@@ -648,6 +678,9 @@
         [data-aksa-page-content],
         [data-aksa-page-content].aksa-soft-nav-entered,
         [data-aksa-page-content].aksa-page-entered,
+        [data-display-price].aksa-currency-price-waiting,
+        [data-display-price].aksa-currency-price-leaving,
+        [data-display-price].aksa-currency-price-entering,
         .aksa-price-changing,
         a.is-soft-nav-pending::after,
         .profile-menu-trigger,
@@ -1148,6 +1181,21 @@
         will-change: transform;
     }
 
+    .currency-active-glider::after {
+        position: absolute;
+        inset: 1px;
+        border-radius: inherit;
+        background: linear-gradient(105deg, transparent 18%, rgba(255, 255, 255, 0.38) 48%, transparent 78%);
+        content: "";
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-90%);
+    }
+
+    [data-currency-switcher].is-currency-switching .currency-active-glider::after {
+        animation: aksa-currency-glider-sheen 620ms var(--aksa-motion-ease) 80ms both;
+    }
+
     .currency-toggle-option {
         position: relative;
         z-index: 1;
@@ -1174,6 +1222,12 @@
             opacity: 1;
             transform: translateY(0) scale(1);
         }
+    }
+
+    @keyframes aksa-currency-glider-sheen {
+        0% { opacity: 0; transform: translateX(-90%); }
+        28% { opacity: 0.72; }
+        100% { opacity: 0; transform: translateX(90%); }
     }
 
     .profile-menu-trigger {
@@ -2605,6 +2659,14 @@
         color: #ffffff;
     }
 
+    .nav-item.is-navigation-pending {
+        color: #ffffff;
+    }
+
+    .nav-item.is-navigation-pending .nav-icon {
+        color: var(--aksa-purple);
+    }
+
     .nav-item:hover .nav-icon {
         color: #b49bff;
         transform: none;
@@ -3574,6 +3636,17 @@
         animation: payment-success-check-draw 420ms cubic-bezier(0.65, 0, 0.35, 1) 100ms forwards;
     }
 
+    .payment-success-dialog.is-celebrating [data-payment-success-stage]:not([data-payment-success-stage="mark"]):not([data-payment-success-stage="close"]) {
+        animation: payment-success-stage-in var(--aksa-motion-slow) var(--aksa-motion-ease) var(--payment-success-stage-delay, 0ms) both;
+    }
+
+    [data-payment-success-stage="eyebrow"] { --payment-success-stage-delay: 180ms; }
+    [data-payment-success-stage="title"] { --payment-success-stage-delay: 260ms; }
+    [data-payment-success-stage="message"] { --payment-success-stage-delay: 360ms; }
+    [data-payment-success-stage="status"] { --payment-success-stage-delay: 460ms; }
+    [data-payment-success-stage="countdown"] { --payment-success-stage-delay: 540ms; }
+    [data-payment-success-stage="action"] { --payment-success-stage-delay: 620ms; }
+
     @keyframes payment-success-check-draw {
         to { stroke-dashoffset: 0; }
     }
@@ -3586,6 +3659,18 @@
             box-shadow: 0 18px 42px rgba(180, 155, 255, 0.28), 0 0 0 14px rgba(180, 155, 255, 0.16);
         }
         100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes payment-success-stage-in {
+        from {
+            opacity: 0;
+            transform: translateY(0.65rem);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .payment-confirmed-entrance {
@@ -5722,6 +5807,12 @@
 }
 
 /* Purposeful storefront motion: reveal, cart collapse, checkout feedback, and value changes. */
+[data-home-count-up] {
+    display: inline-block;
+    min-width: var(--home-count-up-width, 3ch);
+    font-variant-numeric: tabular-nums;
+}
+
 [data-scroll-reveal][data-motion-reveal-ready="true"] {
     opacity: 0;
     translate: 0 14px;
@@ -5830,6 +5921,10 @@
     .checkout-ready-shimmer::after {
         animation: none;
         transition: none;
+    }
+
+    .payment-success-dialog.is-celebrating [data-payment-success-stage] {
+        animation: none !important;
     }
 }
 

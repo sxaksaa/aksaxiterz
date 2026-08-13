@@ -88,12 +88,17 @@ test('branded intro plays once per tab session and releases the storefront', asy
     expect(revealSequence.cardDelays).toEqual([1, 1.11, 1.22, 1.33]);
     expect(revealSequence.recentPurchaseHidden).toBe(true);
 
+    const deliveredCounter = page.locator('[data-home-count-up="5000"]');
+    await expect(deliveredCounter).toHaveAttribute('data-home-count-up-state', 'running');
+
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
         timeout: 4000,
     });
     await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
+    await expect(deliveredCounter).toHaveAttribute('data-home-count-up-state', 'complete');
+    await expect(deliveredCounter).toHaveText('5000+');
 
     const releasedLayoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(releasedLayoutWidth).toBe(introOpeningState.layoutWidth);
@@ -105,6 +110,7 @@ test('branded intro plays once per tab session and releases the storefront', asy
 });
 
 test('branded intro skips motion when reduced motion is preferred', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('aksa_display_currency', 'idr'));
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/?intro-reduced-motion=1');
 
@@ -112,6 +118,19 @@ test('branded intro skips motion when reduced motion is preferred', async ({ pag
     await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
+    await expect(page.locator('[data-home-count-up="5000"]')).toHaveText('5000+');
+
+    const reducedCurrencySwap = await page.evaluate(() => {
+        window.setAksaDisplayCurrency('usd', { source: 'manual' });
+        const price = document.querySelector('[data-product-stock-card] [data-display-price]');
+
+        return {
+            text: price.textContent,
+            state: price.dataset.currencySwapState || null,
+        };
+    });
+    expect(reducedCurrencySwap.text).toContain('$');
+    expect(reducedCurrencySwap.state).toBeNull();
 });
 
 test('public storefront has working navigation and SEO metadata', async ({ page }) => {
@@ -158,6 +177,72 @@ test('public storefront has working navigation and SEO metadata', async ({ page 
     expect(consoleErrors).toEqual([]);
 });
 
+test('currency switch moves the glider before staggered prices without shifting cards', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('aksa_display_currency', 'idr'));
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', { timeout: 5000 });
+
+    let usdButton = page.locator('[data-currency-option="usd"]:visible');
+    if (await usdButton.count() === 0) {
+        const menuButton = page.locator('[data-mobile-menu-toggle]');
+        expect(await menuButton.count()).toBe(1);
+        await menuButton.click();
+        usdButton = page.locator('[data-currency-option="usd"]:visible');
+    }
+    expect(await usdButton.count()).toBe(1);
+
+    const firstCard = page.locator('[data-product-stock-card]').first();
+    const prices = page.locator('[data-product-stock-card] [data-display-price]');
+    await expect(prices.first()).toContainText('Rp');
+    const cardWidthBefore = await firstCard.evaluate(element => element.getBoundingClientRect().width);
+
+    const immediateState = await page.evaluate(() => {
+        window.__aksaCurrencySwapEvents = [];
+        const watchedPrices = [...document.querySelectorAll('[data-product-stock-card] [data-display-price]')].slice(0, 2);
+        const observer = new MutationObserver((records) => {
+            records.forEach((record) => {
+                if (record.attributeName !== 'data-currency-swap-state') return;
+
+                const state = record.target.dataset.currencySwapState;
+                if (state === 'entering') {
+                    window.__aksaCurrencySwapEvents.push({
+                        index: watchedPrices.indexOf(record.target),
+                        time: performance.now(),
+                    });
+                }
+            });
+        });
+        watchedPrices.forEach(price => observer.observe(price, { attributes: true }));
+
+        const button = [...document.querySelectorAll('[data-currency-option="usd"]')]
+            .find(option => option.getClientRects().length > 0);
+        button.click();
+
+        return {
+            currency: document.documentElement.dataset.displayCurrency,
+            price: watchedPrices[0].textContent,
+            priceState: watchedPrices[0].dataset.currencySwapState,
+            switcherAnimating: button.closest('[data-currency-switcher]').classList.contains('is-currency-switching'),
+        };
+    });
+
+    expect(immediateState).toMatchObject({
+        currency: 'usd',
+        priceState: 'waiting',
+        switcherAnimating: true,
+    });
+    expect(immediateState.price).toContain('Rp');
+    await expect(prices.first()).toHaveAttribute('data-currency-swap-state', 'complete');
+    await expect(prices.first()).toContainText('$');
+
+    const enteringEvents = await page.evaluate(() => window.__aksaCurrencySwapEvents);
+    expect(enteringEvents).toHaveLength(2);
+    expect(enteringEvents[1].time - enteringEvents[0].time).toBeGreaterThanOrEqual(30);
+
+    const cardWidthAfter = await firstCard.evaluate(element => element.getBoundingClientRect().width);
+    expect(Math.abs(cardWidthAfter - cardWidthBefore)).toBeLessThanOrEqual(1);
+});
+
 test('product navigation stays in the same document with CSP enabled', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (message) => {
@@ -177,6 +262,32 @@ test('product navigation stays in the same document with CSP enabled', async ({ 
 
     expect(await page.evaluate(() => window.__aksaSoftNavigationMarker)).toBe('same-document');
     expect(consoleErrors.filter(message => /content security policy|unsafe-eval|refused to evaluate/i.test(message))).toEqual([]);
+});
+
+test('navbar glider commits to the destination before soft navigation finishes', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.route('**/guides', async (route) => {
+        if (route.request().headers()['x-requested-with'] === 'XMLHttpRequest') {
+            await new Promise(resolve => setTimeout(resolve, 450));
+        }
+
+        await route.continue();
+    });
+    await page.goto('/');
+
+    const guides = page.locator('#navMenu .nav-item[href$="/guides"]');
+    await guides.click();
+    await expect(guides).toHaveClass(/is-navigation-pending/);
+
+    const gliderAligned = await page.locator('[data-nav-glider]').evaluate((glider) => {
+        const link = document.querySelector('#navMenu .nav-item.is-navigation-pending');
+
+        return glider.style.transform.includes(`${link.offsetLeft}px`);
+    });
+    expect(gliderAligned).toBe(true);
+
+    await expect(page).toHaveURL(/\/guides$/);
+    await expect(page.locator('#navMenu .nav-item[href$="/guides"]')).toHaveClass(/active/);
 });
 
 test('product checkout summary uses the restrained purple hierarchy', async ({ page }) => {
@@ -302,20 +413,27 @@ test('back to products restores homepage filters and scroll position', async ({ 
     const product = page.locator('[data-product-stock-card]').first();
     await expect(product).toBeVisible();
     await product.scrollIntoViewIfNeeded();
-    const savedScrollY = await page.evaluate(() => Math.round(window.scrollY));
-    expect(savedScrollY).toBeGreaterThan(0);
+    const initialScrollY = await page.evaluate(() => Math.round(window.scrollY));
+    expect(initialScrollY).toBeGreaterThan(0);
     await expect.poll(() => page.evaluate(() => window.history.state)).toMatchObject({
         aksaHomeView: {
             search: 'Aurora VN',
             category: 'pc',
         },
         aksaScrollPosition: {
-            y: savedScrollY,
+            y: initialScrollY,
         },
     });
 
+    await product.evaluate((element) => {
+        element.addEventListener('click', () => {
+            window.__aksaNavigationClickScrollY = Math.round(window.scrollY);
+        }, { capture: true, once: true });
+    });
     await product.click();
     await expect(page).toHaveURL(/\/product\//);
+    const navigationScrollY = await page.evaluate(() => window.__aksaNavigationClickScrollY);
+    expect(navigationScrollY).toBeGreaterThan(0);
     await expect.poll(() => page.evaluate(() => window.history.state?.aksaPreviousUrl)).toMatch(/\/$/);
     await page.getByRole('link', { name: 'Back to products' }).click();
 
@@ -327,14 +445,14 @@ test('back to products restores homepage filters and scroll position', async ({ 
             category: 'pc',
         },
         aksaScrollPosition: {
-            y: savedScrollY,
+            y: navigationScrollY,
         },
     });
     expect(consoleErrors).toEqual([]);
     await expect(search).toHaveValue('Aurora VN');
     await expect(page.getByRole('button', { name: 'PC', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(savedScrollY);
+    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(navigationScrollY);
 });
 
 test('operational and crawler endpoints respond correctly', async ({ request }) => {
@@ -364,16 +482,16 @@ test('payment dialog traps keyboard focus and restores the opener', async ({ pag
         modal.className = 'qris-modal hidden';
         modal.setAttribute('aria-hidden', 'true');
         modal.innerHTML = `
-            <section class="qris-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaPaymentSuccessTitle">
-                <button type="button" data-payment-success-close aria-label="Close payment success">Close</button>
-                <div class="payment-success-mark" aria-hidden="true">
+            <section class="qris-dialog payment-success-dialog" role="dialog" aria-modal="true" aria-labelledby="aksaPaymentSuccessTitle">
+                <button type="button" data-payment-success-close data-payment-success-stage="close" aria-label="Close payment success">Close</button>
+                <div class="payment-success-mark" data-payment-success-stage="mark" aria-hidden="true">
                     <svg class="payment-success-check" viewBox="0 0 32 32"><path d="M7 17l6 6L25 10" pathLength="1"></path></svg>
                 </div>
-                <h2 id="aksaPaymentSuccessTitle">Payment Successful</h2>
-                <p id="aksaPaymentSuccessMessage"></p>
-                <p id="aksaPaymentSuccessCopyStatus"></p>
-                <p id="aksaPaymentSuccessCountdown"></p>
-                <a href="/licenses" id="aksaPaymentSuccessPrimary">View License</a>
+                <h2 id="aksaPaymentSuccessTitle" data-payment-success-stage="title">Payment Successful</h2>
+                <p id="aksaPaymentSuccessMessage" data-payment-success-stage="message"></p>
+                <p id="aksaPaymentSuccessCopyStatus" data-payment-success-stage="status"></p>
+                <p id="aksaPaymentSuccessCountdown" data-payment-success-stage="countdown"></p>
+                <a href="/licenses" id="aksaPaymentSuccessPrimary" data-payment-success-stage="action">View License</a>
             </section>`;
         document.body.appendChild(modal);
 
@@ -384,6 +502,13 @@ test('payment dialog traps keyboard focus and restores the opener', async ({ pag
     const close = page.getByRole('button', { name: 'Close payment success' });
     const primary = page.getByRole('link', { name: 'View License' });
     await expect(page.locator('.payment-success-mark')).toHaveClass(/is-animating/);
+    await expect(page.locator('.payment-success-dialog')).toHaveClass(/is-celebrating/);
+    const paymentSequence = await page.evaluate(() => ({
+        title: getComputedStyle(document.querySelector('[data-payment-success-stage="title"]')).animationDelay,
+        message: getComputedStyle(document.querySelector('[data-payment-success-stage="message"]')).animationDelay,
+        action: getComputedStyle(document.querySelector('[data-payment-success-stage="action"]')).animationDelay,
+    }));
+    expect(paymentSequence).toEqual({ title: '0.26s', message: '0.36s', action: '0.62s' });
     await expect(close).toBeFocused();
 
     await page.keyboard.press('Shift+Tab');

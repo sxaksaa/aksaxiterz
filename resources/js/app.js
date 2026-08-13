@@ -349,6 +349,8 @@ const INDONESIAN_TIMEZONES = new Set([
     'Asia/Jayapura',
 ]);
 let activeDisplayCurrency = null;
+let displayCurrencyAnimationSequence = 0;
+let displayCurrencyAnimationTimers = [];
 
 function normalizedDisplayCurrency(currency) {
     const normalized = String(currency || '').trim().toLowerCase();
@@ -402,33 +404,21 @@ function formatDisplayPrice(idrAmount, usdAmount, currency = activeDisplayCurren
         : formatIdr(idrAmount);
 }
 
-function refreshDisplayCurrency(root = document) {
-    const currency = activeDisplayCurrency || detectedDisplayCurrency();
-    const scope = root?.querySelectorAll ? root : document;
-
-    scope.querySelectorAll('[data-display-price]').forEach(element => {
+function displayPriceText(element, currency) {
         const idrAmount = element.dataset.priceIdr;
         const usdAmount = element.dataset.priceUsd;
 
-        if (idrAmount === undefined) return;
+    if (idrAmount === undefined) return null;
 
         const prefix = element.dataset.pricePrefix || '';
         const suffix = element.dataset.priceSuffix || '';
 
-        const nextText = currency === 'usd' && (usdAmount === undefined || usdAmount === '')
-            ? (element.dataset.priceUsdFallback || 'USD unavailable')
-            : `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+    return currency === 'usd' && (usdAmount === undefined || usdAmount === '')
+        ? (element.dataset.priceUsdFallback || 'USD unavailable')
+        : `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+}
 
-        if (element.textContent !== nextText && document.documentElement.dataset.currencyReady === 'true') {
-            element.classList.remove('aksa-price-changing');
-            void element.offsetWidth;
-            element.classList.add('aksa-price-changing');
-            window.setTimeout(() => element.classList.remove('aksa-price-changing'), 420);
-        }
-
-        element.textContent = nextText;
-    });
-
+function syncDisplayCurrencyContent(scope, currency) {
     scope.querySelectorAll('[data-currency-text]').forEach(element => {
         const value = currency === 'usd'
             ? element.dataset.currencyTextUsd
@@ -444,7 +434,9 @@ function refreshDisplayCurrency(root = document) {
 
         element.classList.toggle('hidden', !visible);
     });
+}
 
+function syncDisplayCurrencyControls(currency) {
     document.querySelectorAll('[data-currency-option]').forEach(button => {
         const selected = button.dataset.currencyOption === currency;
 
@@ -459,6 +451,124 @@ function refreshDisplayCurrency(root = document) {
 
     document.documentElement.dataset.displayCurrency = currency;
     document.documentElement.dataset.currencyReady = 'true';
+}
+
+function refreshDisplayCurrency(root = document) {
+    const currency = activeDisplayCurrency || detectedDisplayCurrency();
+    const scope = root?.querySelectorAll ? root : document;
+
+    scope.querySelectorAll('[data-display-price]').forEach(element => {
+        const nextText = displayPriceText(element, currency);
+
+        if (nextText === null) return;
+
+        element.textContent = nextText;
+    });
+
+    syncDisplayCurrencyContent(scope, currency);
+    syncDisplayCurrencyControls(currency);
+}
+
+function clearDisplayCurrencyAnimation() {
+    displayCurrencyAnimationSequence += 1;
+    displayCurrencyAnimationTimers.forEach(timer => window.clearTimeout(timer));
+    displayCurrencyAnimationTimers = [];
+
+    document.querySelectorAll('[data-display-price]').forEach(element => {
+        element.classList.remove('aksa-currency-price-waiting', 'aksa-currency-price-leaving', 'aksa-currency-price-entering');
+        element.style.removeProperty('--aksa-currency-price-width');
+        delete element.dataset.currencySwapState;
+    });
+
+    document.querySelectorAll('[data-currency-switcher]')
+        .forEach(switcher => switcher.classList.remove('is-currency-switching'));
+}
+
+function measureDisplayPriceWidth(element, text) {
+    const currentWidth = element.getBoundingClientRect().width;
+    const computed = window.getComputedStyle(element);
+    const measurement = document.createElement('span');
+
+    measurement.textContent = text;
+    Object.assign(measurement.style, {
+        position: 'fixed',
+        left: '-10000px',
+        top: '0',
+        visibility: 'hidden',
+        whiteSpace: 'nowrap',
+        font: computed.font,
+        fontFeatureSettings: computed.fontFeatureSettings,
+        fontKerning: computed.fontKerning,
+        letterSpacing: computed.letterSpacing,
+    });
+    document.body.appendChild(measurement);
+    const nextWidth = measurement.getBoundingClientRect().width;
+    measurement.remove();
+
+    return Math.ceil(Math.max(currentWidth, nextWidth));
+}
+
+function animateDisplayCurrencyChange(currency, onComplete) {
+    clearDisplayCurrencyAnimation();
+    const sequence = displayCurrencyAnimationSequence;
+    const prices = [...document.querySelectorAll('[data-display-price]')]
+        .filter(element => element.getClientRects().length > 0)
+        .map(element => ({ element, nextText: displayPriceText(element, currency) }))
+        .filter(item => item.nextText !== null && item.element.textContent !== item.nextText);
+
+    document.querySelectorAll('[data-currency-switcher]').forEach(switcher => {
+        switcher.classList.add('is-currency-switching');
+    });
+
+    if (prices.length === 0) {
+        refreshDisplayCurrency(document);
+        onComplete();
+        return;
+    }
+
+    const schedule = (callback, delay) => {
+        const timer = window.setTimeout(() => {
+            if (sequence === displayCurrencyAnimationSequence) callback();
+        }, delay);
+        displayCurrencyAnimationTimers.push(timer);
+    };
+    let completionDelay = 0;
+
+    prices.forEach(({ element, nextText }, index) => {
+        const stagger = Math.min(index, 6) * 45;
+        const leaveAt = 110 + stagger;
+        const enterAt = leaveAt + 170;
+        const finishAt = enterAt + 340;
+
+        element.style.setProperty('--aksa-currency-price-width', `${measureDisplayPriceWidth(element, nextText)}px`);
+        element.classList.add('aksa-currency-price-waiting');
+        element.dataset.currencySwapState = 'waiting';
+
+        schedule(() => {
+            element.classList.add('aksa-currency-price-leaving');
+            element.dataset.currencySwapState = 'leaving';
+        }, leaveAt);
+        schedule(() => {
+            element.textContent = nextText;
+            element.classList.remove('aksa-currency-price-leaving');
+            element.classList.add('aksa-currency-price-entering');
+            element.dataset.currencySwapState = 'entering';
+        }, enterAt);
+        schedule(() => {
+            element.classList.remove('aksa-currency-price-waiting', 'aksa-currency-price-entering');
+            element.style.removeProperty('--aksa-currency-price-width');
+            element.dataset.currencySwapState = 'complete';
+        }, finishAt);
+
+        completionDelay = Math.max(completionDelay, finishAt);
+    });
+
+    schedule(() => syncDisplayCurrencyContent(document, currency), 280);
+    schedule(() => {
+        document.querySelectorAll('[data-currency-switcher]')
+            .forEach(switcher => switcher.classList.remove('is-currency-switching'));
+        onComplete();
+    }, completionDelay);
 }
 
 function notifyDisplayCurrencyChanged(source = 'automatic') {
@@ -488,6 +598,13 @@ window.setAksaDisplayCurrency = (currency, options = {}) => {
 
     if (!normalized) return false;
 
+    const previousCurrency = activeDisplayCurrency || detectedDisplayCurrency();
+
+    if (normalized === previousCurrency) {
+        refreshDisplayCurrency(document);
+        return true;
+    }
+
     activeDisplayCurrency = normalized;
 
     if (options.persist !== false) {
@@ -498,8 +615,20 @@ window.setAksaDisplayCurrency = (currency, options = {}) => {
         }
     }
 
-    refreshDisplayCurrency(document);
-    notifyDisplayCurrencyChanged(options.source || 'manual');
+    syncDisplayCurrencyControls(normalized);
+
+    const completeChange = () => notifyDisplayCurrencyChanged(options.source || 'manual');
+    const shouldAnimate = options.animate !== false
+        && options.source === 'manual'
+        && !shouldReduceMotion();
+
+    if (shouldAnimate) {
+        animateDisplayCurrencyChange(normalized, completeChange);
+    } else {
+        clearDisplayCurrencyAnimation();
+        refreshDisplayCurrency(document);
+        completeChange();
+    }
 
     return true;
 };
@@ -1271,10 +1400,17 @@ function showPaymentSuccess(options = {}) {
     }
 
     const successMark = modal.querySelector('.payment-success-mark');
+    const successDialog = modal.querySelector('.payment-success-dialog');
     if (successMark) {
         successMark.classList.remove('is-animating');
         void successMark.offsetWidth;
         successMark.classList.add('is-animating');
+    }
+
+    if (successDialog) {
+        successDialog.classList.remove('is-celebrating');
+        void successDialog.offsetWidth;
+        successDialog.classList.add('is-celebrating');
     }
 
     openAccessibleModal(modal);
@@ -2088,6 +2224,7 @@ let activePageScriptCleanup = null;
 let softPageRuntimeSequence = 0;
 let historyPositionTimer = null;
 let historyPositionTrackingSuspended = false;
+let pendingNavGliderLink = null;
 const softNavigationPrefetches = new Map();
 const SOFT_NAVIGATION_PREFETCH_TTL = 30000;
 const SOFT_NAVIGATION_PREFETCH_LIMIT = 12;
@@ -2349,8 +2486,9 @@ function pageContentShell() {
 function updateNavGlider(previewLink = null) {
     const menu = document.getElementById('navMenu');
     const glider = menu?.querySelector('[data-nav-glider]');
-    const activeLink = previewLink?.closest('#navMenu') === menu
-        ? previewLink
+    const preferredLink = previewLink || pendingNavGliderLink;
+    const activeLink = preferredLink?.closest('#navMenu') === menu
+        ? preferredLink
         : menu?.querySelector('.nav-item.active');
 
     if (!menu || !glider || !activeLink) {
@@ -2370,6 +2508,23 @@ function updateNavGlider(previewLink = null) {
         glider.getBoundingClientRect();
         requestAnimationFrame(() => glider.style.removeProperty('transition'));
     }
+}
+
+function setPendingNavGlider(link) {
+    if (!link?.closest('#navMenu')) return;
+
+    pendingNavGliderLink?.classList.remove('is-navigation-pending');
+    pendingNavGliderLink = link;
+    pendingNavGliderLink.classList.add('is-navigation-pending');
+    updateNavGlider(pendingNavGliderLink);
+}
+
+function clearPendingNavGlider(link = null) {
+    if (link && pendingNavGliderLink !== link) return;
+
+    pendingNavGliderLink?.classList.remove('is-navigation-pending');
+    pendingNavGliderLink = null;
+    updateNavGlider();
 }
 
 function navItemFromEvent(event) {
@@ -2948,6 +3103,10 @@ function attachRestoredPageState(content, historyState) {
 
     if (Number.isFinite(scrollPosition?.y)) {
         content.dataset.aksaRestoredScrollY = String(scrollPosition.y);
+
+        if (homeView && content.matches('[data-aksa-home-content]')) {
+            content.dataset.aksaScrollRestorePending = 'true';
+        }
     }
 }
 
@@ -2956,6 +3115,7 @@ async function softNavigate(url, options = {}) {
     const currentContent = pageContentShell();
     const previousUrl = window.location.href;
     const restoringHistory = options.pushHistory === false;
+    let deferredHistoryPositionRestore = false;
 
     if (!currentContent) {
         window.location.href = nextUrl.href;
@@ -2967,11 +3127,11 @@ async function softNavigate(url, options = {}) {
     const controller = new AbortController();
     activeSoftNavigation = controller;
     const pendingLink = options.pendingLink || null;
+    const navigationPreviewLink = options.navigationPreviewLink || null;
 
-    historyPositionTrackingSuspended = restoringHistory;
-    if (restoringHistory) cancelScheduledHistoryPosition();
-
-    if (options.pushHistory !== false) persistCurrentHistoryPosition();
+    cancelScheduledHistoryPosition();
+    if (!restoringHistory) persistCurrentHistoryPosition();
+    historyPositionTrackingSuspended = true;
     window.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
     document.dispatchEvent(new CustomEvent('aksa:before-page-swap'));
     currentContent.classList.remove('aksa-soft-nav-entered');
@@ -3016,6 +3176,27 @@ async function softNavigate(url, options = {}) {
             }, '', nextUrl.href);
         }
 
+        if (restoringHistory && nextContent.dataset.aksaScrollRestorePending === 'true') {
+            deferredHistoryPositionRestore = true;
+            let restoreFallbackTimer = null;
+
+            const finishHistoryPositionRestore = () => {
+                window.clearTimeout(restoreFallbackTimer);
+                nextContent.removeEventListener('aksa:history-scroll-restored', finishHistoryPositionRestore);
+                nextContent.removeAttribute('data-aksa-scroll-restore-pending');
+
+                window.requestAnimationFrame(() => {
+                    if (pageContentShell() !== nextContent || (activeSoftNavigation && activeSoftNavigation !== controller)) return;
+
+                    historyPositionTrackingSuspended = false;
+                    persistCurrentHistoryPosition();
+                });
+            };
+
+            nextContent.addEventListener('aksa:history-scroll-restored', finishHistoryPositionRestore, { once: true });
+            restoreFallbackTimer = window.setTimeout(finishHistoryPositionRestore, 5000);
+        }
+
         executeSoftPageScripts(nextPageScripts);
         initializeDisplayCurrency(document);
         initializeCustomSelects(nextContent);
@@ -3031,6 +3212,7 @@ async function softNavigate(url, options = {}) {
         );
 
         requestAnimationFrame(() => {
+            clearPendingNavGlider(navigationPreviewLink);
             updateNavGlider();
             nextContent.classList.add('aksa-soft-nav-entered');
             window.setTimeout(() => nextContent.classList.remove('aksa-soft-nav-entered'), 540);
@@ -3046,11 +3228,12 @@ async function softNavigate(url, options = {}) {
             activeSoftNavigation = null;
             document.body.classList.remove('aksa-soft-nav-active');
             pageContentShell()?.removeAttribute('aria-busy');
+            clearPendingNavGlider(navigationPreviewLink);
         }
 
         pendingLink?.classList.remove('is-soft-nav-pending');
 
-        if (restoringHistory && finishedCurrentNavigation) {
+        if (finishedCurrentNavigation && !deferredHistoryPositionRestore) {
             requestAnimationFrame(() => {
                 if (activeSoftNavigation) return;
 
@@ -3071,6 +3254,8 @@ function shouldReduceMotion() {
 
 let scrollRevealObserver = null;
 let homeStagedRevealTimer = null;
+let homeCountUpTimer = null;
+let homeCountUpFrame = null;
 
 function homeContentWithin(root = document) {
     if (root instanceof Element && root.matches('[data-aksa-home-content]')) return root;
@@ -3078,13 +3263,80 @@ function homeContentWithin(root = document) {
     return root.querySelector?.('[data-aksa-home-content]') || null;
 }
 
+function stopHomeCountUps() {
+    window.clearTimeout(homeCountUpTimer);
+    window.cancelAnimationFrame(homeCountUpFrame);
+    homeCountUpTimer = null;
+    homeCountUpFrame = null;
+}
+
+function startHomeCountUps(content) {
+    const counters = [...content.querySelectorAll('[data-home-count-up]:not([data-home-counted])')];
+
+    if (counters.length === 0) return;
+
+    const finish = () => {
+        counters.forEach((counter) => {
+            const target = Math.max(0, Number.parseInt(counter.dataset.homeCountUp || '0', 10) || 0);
+            counter.textContent = `${target}${counter.dataset.homeCountUpSuffix || ''}`;
+            counter.dataset.homeCounted = 'true';
+            counter.dataset.homeCountUpState = 'complete';
+        });
+    };
+
+    stopHomeCountUps();
+
+    if (shouldReduceMotion()) {
+        finish();
+        return;
+    }
+
+    counters.forEach((counter) => {
+        counter.style.setProperty('--home-count-up-width', `${Math.ceil(counter.getBoundingClientRect().width)}px`);
+        counter.textContent = `0${counter.dataset.homeCountUpSuffix || ''}`;
+        counter.dataset.homeCountUpState = 'waiting';
+    });
+
+    homeCountUpTimer = window.setTimeout(() => {
+        const startedAt = window.performance.now();
+        const duration = 1180;
+
+        counters.forEach(counter => counter.dataset.homeCountUpState = 'running');
+
+        const tick = (now) => {
+            const progress = Math.min(1, (now - startedAt) / duration);
+            const eased = 1 - ((1 - progress) ** 3);
+
+            counters.forEach((counter) => {
+                const target = Math.max(0, Number.parseInt(counter.dataset.homeCountUp || '0', 10) || 0);
+                const suffix = counter.dataset.homeCountUpSuffix || '';
+                counter.textContent = `${Math.round(target * eased)}${suffix}`;
+            });
+
+            if (progress < 1) {
+                homeCountUpFrame = window.requestAnimationFrame(tick);
+                return;
+            }
+
+            homeCountUpFrame = null;
+            finish();
+        };
+
+        homeCountUpTimer = null;
+        homeCountUpFrame = window.requestAnimationFrame(tick);
+    }, 360);
+}
+
 function beginHomeStagedReveal(root = document) {
-    if (!homeContentWithin(root)) return;
+    const homeContent = homeContentWithin(root);
+
+    if (!homeContent) return;
 
     const documentRoot = document.documentElement;
     window.clearTimeout(homeStagedRevealTimer);
     documentRoot.classList.remove('aksa-home-reveal-ready');
     documentRoot.classList.remove('aksa-home-reveal-consumed');
+    startHomeCountUps(homeContent);
 
     window.requestAnimationFrame(() => {
         documentRoot.classList.add('aksa-home-reveal-ready');
@@ -3136,6 +3388,7 @@ document.addEventListener('aksa:before-page-swap', () => {
     scrollRevealObserver?.disconnect();
     scrollRevealObserver = null;
     window.clearTimeout(homeStagedRevealTimer);
+    stopHomeCountUps();
     homeStagedRevealTimer = null;
     document.documentElement.classList.remove('aksa-home-reveal-ready', 'aksa-home-reveal-consumed');
 });
@@ -3561,6 +3814,9 @@ document.addEventListener('click', (event) => {
     event.preventDefault();
 
     const nextUrl = new URL(link.getAttribute('href'), window.location.href);
+    const navigationPreviewLink = link.closest('#navMenu .nav-item');
+
+    if (navigationPreviewLink) setPendingNavGlider(navigationPreviewLink);
 
     if (
         link.dataset.softNavBack !== undefined
@@ -3573,6 +3829,7 @@ document.addEventListener('click', (event) => {
 
     softNavigate(nextUrl.href, {
         pendingLink: link,
+        navigationPreviewLink,
     });
 });
 
