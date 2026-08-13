@@ -68,6 +68,8 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertSee('Rp 40.000')
             ->assertSee('data-price-usd="2.5"', false)
             ->assertSee('platform fee + unique amount')
+            ->assertSee('id="checkoutVoucherPanel"', false)
+            ->assertSee('data-voucher-action', false)
             ->assertSee('action="'.route('checkout.product.process', $product).'"', false)
             ->assertSee('name="package_id" value="'.$package->id.'"', false)
             ->assertSee('name="quantity" value="2"', false)

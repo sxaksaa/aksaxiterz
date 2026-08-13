@@ -269,7 +269,7 @@
                         <h2 class="mt-1 text-xl font-semibold text-white">Final summary</h2>
                     </div>
 
-                    <div class="rounded-xl border border-[#27272A] bg-black/15 p-4">
+                    <div id="checkoutVoucherPanel" class="checkout-voucher-panel rounded-xl border border-[#27272A] bg-black/15 p-4">
                         <label for="checkoutVoucherCode"
                             class="mb-2 block text-xs font-semibold uppercase tracking-normal text-gray-400">
                             Voucher code
@@ -277,7 +277,7 @@
                         <div class="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
                             <input id="checkoutVoucherCode" class="search-bar min-w-0 uppercase" maxlength="50"
                                 placeholder="Enter voucher code" autocomplete="off" @disabled($hasUnavailableItems)>
-                            <button id="checkoutApplyVoucher" type="button" class="btn-footer h-12"
+                            <button id="checkoutApplyVoucher" type="button" class="btn-footer h-12" data-voucher-action
                                 @disabled($hasUnavailableItems)>
                                 <x-ui.icon name="ticket-percent" class="h-4 w-4" />
                                 <span data-button-label>Apply</span>
@@ -338,6 +338,7 @@
             let voucherRequestController = null;
             let voucherRequestSequence = 0;
             let voucherRequestPending = false;
+            let voucherMotionTimer = null;
 
             const formatIdr = value => `Rp ${Number(value).toLocaleString('id-ID')}`;
             const formatUsd = value => `$${Number(value).toLocaleString(undefined, {
@@ -386,11 +387,49 @@
             function voucherFeedback(message, variant = 'success') {
                 const element = document.getElementById('checkoutVoucherFeedback');
                 element.textContent = message;
-                element.classList.remove('hidden', 'text-aksa-accent', 'text-red-300', 'text-gray-400');
+                element.classList.remove('hidden', 'text-aksa-accent', 'text-red-300', 'text-gray-400', 'voucher-feedback-in');
                 element.classList.add(
                     variant === 'success' ? 'text-aksa-accent' :
                     (variant === 'loading' ? 'text-gray-400' : 'text-red-300')
                 );
+
+                if (variant !== 'loading') {
+                    void element.offsetWidth;
+                    element.classList.add('voucher-feedback-in');
+                }
+            }
+
+            function resetVoucherMotion() {
+                clearTimeout(voucherMotionTimer);
+                const panel = document.getElementById('checkoutVoucherPanel');
+                const input = document.getElementById('checkoutVoucherCode');
+                const button = document.getElementById('checkoutApplyVoucher');
+
+                panel?.classList.remove('is-voucher-applied');
+                input?.classList.remove('is-voucher-applied');
+                button?.classList.remove('is-voucher-applied');
+            }
+
+            function showVoucherAppliedMotion() {
+                resetVoucherMotion();
+                const panel = document.getElementById('checkoutVoucherPanel');
+                const input = document.getElementById('checkoutVoucherCode');
+                const button = document.getElementById('checkoutApplyVoucher');
+                const discountRow = document.getElementById('checkoutDiscountRow');
+
+                void panel?.offsetWidth;
+                panel?.classList.add('is-voucher-applied');
+                input?.classList.add('is-voucher-applied');
+                button?.classList.add('is-voucher-applied');
+                setButtonLabel(button, 'Applied');
+                discountRow?.classList.remove('voucher-discount-in');
+                if (discountRow) void discountRow.offsetWidth;
+                discountRow?.classList.add('voucher-discount-in');
+
+                voucherMotionTimer = setTimeout(() => {
+                    panel?.classList.remove('is-voucher-applied');
+                    discountRow?.classList.remove('voucher-discount-in');
+                }, 1050);
             }
 
             function clearVoucherFeedback() {
@@ -399,6 +438,8 @@
                 appliedVoucherCode = null;
                 document.getElementById('checkoutVoucherValue').value = '';
                 document.getElementById('checkoutVoucherFeedback').classList.add('hidden');
+                resetVoucherMotion();
+                setButtonLabel(document.getElementById('checkoutApplyVoucher'), 'Apply');
             }
 
             function abortVoucherRequest() {
@@ -411,6 +452,8 @@
             function handleVoucherRefreshError(error) {
                 if (error?.name === 'AbortError') return;
 
+                resetVoucherMotion();
+                setButtonLabel(document.getElementById('checkoutApplyVoucher'), 'Apply');
                 voucherFeedback(error.message || 'Voucher could not be applied.', 'error');
                 updateTotals();
             }
@@ -514,6 +557,8 @@
                 voucherRequestController = new AbortController();
                 const requestController = voucherRequestController;
                 voucherRequestPending = true;
+                resetVoucherMotion();
+                setButtonLabel(document.getElementById('checkoutApplyVoucher'), 'Checking...');
                 voucherFeedback('Checking voucher...', 'loading');
                 updateTotals();
                 const body = new FormData();
@@ -557,12 +602,17 @@
                     document.getElementById('checkoutVoucherValue').value = appliedVoucherCode;
                     voucherFeedback(`${data.discount_percent}% voucher applied to this checkout.`, 'success');
                     updateTotals();
+                    showVoucherAppliedMotion();
 
                     return true;
                 } finally {
                     if (requestSequence === voucherRequestSequence) {
                         voucherRequestController = null;
                         voucherRequestPending = false;
+                        setButtonLabel(
+                            document.getElementById('checkoutApplyVoucher'),
+                            voucherQuote ? 'Applied' : 'Apply'
+                        );
                         updateTotals();
                     }
                 }
@@ -682,12 +732,14 @@
                     if (error?.name !== 'AbortError') {
                         voucherQuote = null;
                         document.getElementById('checkoutVoucherValue').value = '';
+                        resetVoucherMotion();
                         voucherFeedback(error.message, 'error');
                         updateTotals();
                     }
                 } finally {
                     this.disabled = false;
-                    setButtonLabel(this, 'Apply');
+                    setButtonLabel(this, voucherQuote ? 'Applied' : 'Apply');
+                    this.classList.toggle('is-voucher-applied', Boolean(voucherQuote));
                 }
             });
 
@@ -700,8 +752,13 @@
                 }
             });
 
-            form.addEventListener('submit', event => {
+            form.addEventListener('submit', async event => {
                 const method = paymentMethod();
+
+                if (form.dataset.checkoutSubmitting === 'true') {
+                    event.preventDefault();
+                    return;
+                }
 
                 if (voucherRequestPending) {
                     event.preventDefault();
@@ -743,9 +800,46 @@
                     return;
                 }
 
+                event.preventDefault();
+                form.dataset.checkoutSubmitting = 'true';
                 const submit = document.getElementById('checkoutSubmitButton');
                 submit.disabled = true;
                 setButtonLabel(submit, 'Creating Invoice...');
+
+                try {
+                    const response = await window.aksaFetchWithCsrf(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new FormData(form),
+                    });
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        if (data.redirect_url) {
+                            window.showAppToast?.('Existing payment found', data.message || 'Continue your active payment.', {
+                                variant: 'warning',
+                            });
+                            window.setTimeout(() => window.location.assign(data.redirect_url), 650);
+                            return;
+                        }
+
+                        throw new Error(data.message || 'The invoice could not be created.');
+                    }
+
+                    const summary = document.getElementById('checkoutFinalSummary');
+                    await window.animateAksaCheckoutSuccess?.(submit, summary);
+                    window.location.assign(data.instruction_url || data.redirect_url || '/orders');
+                } catch (error) {
+                    form.dataset.checkoutSubmitting = 'false';
+                    submit.classList.remove('checkout-submit-success');
+                    window.showAppToast?.('Checkout not created', error.message || 'Review the checkout and try again.', {
+                        variant: 'error',
+                    });
+                    updateTotals();
+                }
             });
 
             window.addEventListener('aksa:currency-change', updateTotals);

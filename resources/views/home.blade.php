@@ -56,9 +56,15 @@
 
                 <div class="w-full" data-home-reveal-item data-home-reveal-stage="search">
                     <label for="searchInput" class="sr-only">Search products</label>
-                    <input type="text" id="searchInput" placeholder="Search Products..."
-                        autocomplete="off" inputmode="search"
-                        class="search-bar w-full text-sm md:text-base" value="{{ request('search') }}">
+                    <div class="product-search-shell">
+                        <input type="text" id="searchInput" placeholder="Search Products..."
+                            autocomplete="off" inputmode="search"
+                            class="search-bar w-full pr-11 text-sm md:text-base" value="{{ request('search') }}">
+                        <button type="button" class="product-search-clear hidden" data-clear-product-search
+                            aria-label="Clear product search">
+                            <x-ui.icon name="x" class="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -120,6 +126,7 @@
             const stockPollingInterval = 30000;
 
             const searchInput = document.getElementById('searchInput');
+            const clearSearchButton = document.querySelector('[data-clear-product-search]');
             const container = document.getElementById('productContainer');
             const totalStock = document.querySelector('[data-total-ready-stock]');
             let searchTimeout = null;
@@ -130,6 +137,10 @@
             let stockPollingDisposed = false;
 
             if (!searchInput || !container) return;
+
+            function updateSearchClearButton() {
+                clearSearchButton?.classList.toggle('hidden', searchInput.value.length === 0);
+            }
 
             pageContent?.removeAttribute('data-aksa-restored-home-search');
             pageContent?.removeAttribute('data-aksa-restored-home-category');
@@ -174,17 +185,31 @@
                 : initialCategory;
 
             searchInput.value = restoredSearch;
+            updateSearchClearButton();
             selectCategoryChip(restoredCategory);
 
             searchInput.addEventListener('input', function() {
 
                 clearTimeout(searchTimeout);
+                updateSearchClearButton();
 
                 searchTimeout = setTimeout(() => {
                     persistHomeViewState();
                     fetchProducts(this.value, currentCategory);
                 }, 200);
 
+            });
+
+            clearSearchButton?.addEventListener('click', () => {
+                if (!searchInput.value) return;
+
+                clearTimeout(searchTimeout);
+                searchInput.value = '';
+                updateSearchClearButton();
+                container.dataset.productRestore = 'true';
+                persistHomeViewState();
+                fetchProducts('', currentCategory);
+                searchInput.focus();
             });
 
             document.querySelectorAll('[data-category-filter]').forEach((chip) => {
@@ -199,6 +224,8 @@
                 if (!clearButton) return;
 
                 searchInput.value = '';
+                updateSearchClearButton();
+                container.dataset.productRestore = 'true';
                 const allCategory = document.querySelector('[data-category-filter][data-category=""]');
                 filterCategory('', allCategory);
                 searchInput.focus();
@@ -268,6 +295,15 @@
                         container.innerHTML = html.trim() || emptyProductsHtml();
                         container.classList.remove('product-filter-leaving');
                         container.classList.add('product-filter-entering');
+                        if (container.dataset.productRestore === 'true') {
+                            delete container.dataset.productRestore;
+                            container.dataset.productRestoreCompleted = 'true';
+                            [...container.children].forEach((card, index) => {
+                                card.style.setProperty('--product-result-delay', `${Math.min(index * 55, 330)}ms`);
+                            });
+                            container.classList.add('product-filter-restoring');
+                            setTimeout(() => container.classList.remove('product-filter-restoring'), 980);
+                        }
                         window.refreshAksaDisplayCurrency?.(container);
                         window.initializeAksaPageEnhancements?.(container);
                         setTimeout(() => container.classList.remove('product-filter-entering'), 600);
@@ -277,6 +313,7 @@
                         if (error.name === 'AbortError' || requestSequence !== productRequestSequence) return;
 
                         clearTimeout(skeletonTimer);
+                        delete container.dataset.productRestore;
                         container.classList.remove('product-filter-leaving');
                         container.innerHTML = emptyProductsHtml(
                             'Products could not be loaded. Please refresh the page and try again.'
@@ -312,6 +349,8 @@
 
                     if (!card) return;
 
+                    const previousStatus = card.dataset.productStatus || '';
+                    const previousStock = Number(card.dataset.productStock || 0);
                     const status = product.status === 'updating' ? 'updating' : 'ready';
                     const isUpdating = status === 'updating';
                     const hasReadyStock = !isUpdating && stock > 0;
@@ -337,14 +376,29 @@
                         stockLabel.textContent = isUpdating
                             ? 'Checkout paused · Discord alerts'
                             : (stock > 0 ? `${stock} available · Auto delivery` : 'Manual order via Discord');
+
+                        if (previousStatus !== status || previousStock !== stock) {
+                            stockLabel.classList.remove('product-stock-changed');
+                            void stockLabel.offsetWidth;
+                            stockLabel.classList.add('product-stock-changed');
+                            setTimeout(() => stockLabel.classList.remove('product-stock-changed'), 680);
+                        }
                     }
                 });
 
                 const totalAvailableStock = Number(snapshot.total_available_stock);
 
                 if (totalStock && Number.isSafeInteger(totalAvailableStock) && totalAvailableStock >= 0) {
+                    const previousTotal = Number(totalStock.textContent || 0);
                     totalStock.dataset.homeCountUp = String(totalAvailableStock);
                     totalStock.textContent = String(totalAvailableStock);
+
+                    if (Number.isFinite(previousTotal) && previousTotal !== totalAvailableStock) {
+                        totalStock.classList.remove('aksa-value-change');
+                        void totalStock.offsetWidth;
+                        totalStock.classList.add('aksa-value-change');
+                        setTimeout(() => totalStock.classList.remove('aksa-value-change'), 480);
+                    }
                 }
             }
 
@@ -482,7 +536,7 @@
 
             function emptyProductsHtml(message = 'No products match this filter yet.') {
                 return `
-                    <div class="empty-state sm:col-span-2 lg:col-span-3">
+                    <div class="empty-state col-span-full">
                         <span class="empty-state-icon">
                             <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="m21 8-9-5-9 5 9 5 9-5Z"></path>

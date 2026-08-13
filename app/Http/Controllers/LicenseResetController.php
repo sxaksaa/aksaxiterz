@@ -28,9 +28,9 @@ class LicenseResetController extends Controller
         $providerLabel = $licenseResetManager->labelForProvider($attempt->provider);
         $cooldownHours = $licenseResetManager->cooldownHoursForProvider($attempt->provider);
 
-        return back()->with(
-            'license_reset_success',
-            $providerLabel.' HWID for '.$attempt->username.' was reset successfully. You can reset it again in '.$cooldownHours.' hours.',
-        );
+        return back()->with('license_reset_success', [
+            'license_id' => $license->id,
+            'message' => $providerLabel.' HWID for '.$attempt->username.' was reset successfully. You can reset it again in '.$cooldownHours.' hours.',
+        ]);
     }
 }

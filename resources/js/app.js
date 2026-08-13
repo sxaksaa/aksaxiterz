@@ -1521,6 +1521,7 @@ window.showAppToast = function(title, message = '', options = {}) {
     const toast = document.getElementById('appToast');
     const toastTitle = document.getElementById('appToastTitle');
     const toastMessage = document.getElementById('appToastMessage');
+    const toastAction = document.getElementById('appToastAction');
 
     if (!toast || !toastTitle || !toastMessage) return;
 
@@ -1532,6 +1533,17 @@ window.showAppToast = function(title, message = '', options = {}) {
     toast.dataset.variant = variant;
     toastTitle.innerText = title;
     toastMessage.innerText = message;
+    if (toastAction) {
+        toastAction.classList.toggle('hidden', !options.actionLabel);
+        toastAction.textContent = options.actionLabel || '';
+        toastAction.onclick = typeof options.onAction === 'function'
+            ? () => {
+                clearTimeout(appToastTimer);
+                options.onAction();
+                toast.classList.remove('is-visible');
+            }
+            : null;
+    }
     toast.style.setProperty('--app-toast-duration', `${visibleDuration}ms`);
     toast.classList.remove('is-visible');
     void toast.offsetWidth;
@@ -1559,6 +1571,7 @@ const RECENT_PURCHASE_HOME_INITIAL_DELAY_MS = 5200;
 const RECENT_PURCHASE_NEW_DELAY_MS = 350;
 const RECENT_PURCHASE_POLL_MS = 20000;
 const RECENT_PURCHASE_MAX_KNOWN_KEYS = 100;
+const RECENT_PURCHASE_EXIT_MS = 560;
 
 function clearRecentPurchaseToast() {
     recentPurchaseToastCleanup?.();
@@ -1768,20 +1781,25 @@ function initializeRecentPurchaseToast(root = document) {
 
         clearTimer(hideTimer);
         hideTimer = null;
+        const wasVisible = toast.classList.contains('is-visible');
         toast.classList.remove('is-visible');
 
         if (immediately) {
+            toast.classList.remove('is-leaving');
             toast.hidden = true;
             return;
         }
+
+        toast.classList.toggle('is-leaving', wasVisible && !shouldReduceMotion());
 
         hideTimer = window.setTimeout(() => {
             hideTimer = null;
 
             if (!toast.classList.contains('is-visible')) {
+                toast.classList.remove('is-leaving');
                 toast.hidden = true;
             }
-        }, 300);
+        }, shouldReduceMotion() ? 0 : RECENT_PURCHASE_EXIT_MS);
     };
 
     const revealToast = () => {
@@ -1794,7 +1812,7 @@ function initializeRecentPurchaseToast(root = document) {
 
         toast.style.setProperty('--recent-purchase-duration', `${RECENT_PURCHASE_VISIBLE_MS}ms`);
         toast.hidden = false;
-        toast.classList.remove('is-visible');
+        toast.classList.remove('is-visible', 'is-leaving');
         void toast.offsetWidth;
 
         renderFrame = window.requestAnimationFrame(() => {
@@ -1983,7 +2001,7 @@ function initializeRecentPurchaseToast(root = document) {
         if (event.persisted) resume();
     };
 
-    const cleanup = () => {
+    const cleanup = (immediately = true) => {
         if (closed) return;
 
         closed = true;
@@ -1997,12 +2015,12 @@ function initializeRecentPurchaseToast(root = document) {
         document.removeEventListener('visibilitychange', visibilityChanged);
         window.removeEventListener('pagehide', pause);
         window.removeEventListener('pageshow', pageShown);
-        concealToast(true);
+        concealToast(immediately);
     };
 
     const close = () => {
         snoozeRecentPurchaseToast();
-        cleanup();
+        cleanup(false);
     };
 
     closeButton?.addEventListener('click', close);
@@ -2017,6 +2035,63 @@ function initializeRecentPurchaseToast(root = document) {
     schedulePoll();
     recentPurchaseToastCleanup = cleanup;
 }
+
+const invalidFormControls = new WeakSet();
+const validationAnimationTimers = new WeakMap();
+
+function formValidationTarget(control) {
+    if (!(control instanceof HTMLElement)) return null;
+
+    if (control.matches('select[data-aksa-select-enhanced]')) {
+        const customSelect = control.nextElementSibling;
+
+        if (customSelect?.classList.contains('aksa-select')) return customSelect;
+    }
+
+    return control;
+}
+
+function animateFormValidation(control, className, duration = 680) {
+    const target = formValidationTarget(control);
+
+    if (!target) return;
+
+    window.clearTimeout(validationAnimationTimers.get(target));
+    target.classList.remove('aksa-validation-invalid', 'aksa-validation-corrected');
+    void target.offsetWidth;
+    target.classList.add(className);
+    validationAnimationTimers.set(target, window.setTimeout(() => {
+        target.classList.remove(className);
+        validationAnimationTimers.delete(target);
+    }, shouldReduceMotion() ? 0 : duration));
+}
+
+document.addEventListener('invalid', (event) => {
+    const control = event.target;
+
+    if (!(control instanceof HTMLInputElement)
+        && !(control instanceof HTMLSelectElement)
+        && !(control instanceof HTMLTextAreaElement)) return;
+
+    invalidFormControls.add(control);
+    animateFormValidation(control, 'aksa-validation-invalid');
+}, true);
+
+function handleCorrectedFormControl(event) {
+    const control = event.target;
+
+    if (!(control instanceof HTMLInputElement)
+        && !(control instanceof HTMLSelectElement)
+        && !(control instanceof HTMLTextAreaElement)
+        || !invalidFormControls.has(control)
+        || !control.validity.valid) return;
+
+    invalidFormControls.delete(control);
+    animateFormValidation(control, 'aksa-validation-corrected', 520);
+}
+
+document.addEventListener('input', handleCorrectedFormControl);
+document.addEventListener('change', handleCorrectedFormControl);
 
 const customSelects = new WeakMap();
 
@@ -2213,6 +2288,7 @@ window.refreshAksaCustomSelects = function() {
 
 window.initializeAksaPageEnhancements = function(root = document) {
     initializeCustomSelects(root);
+    initializeLicenseResetSuccess(root);
     initializeMotionEnhancements(root);
 };
 
@@ -2395,6 +2471,18 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
         nextContent.classList.add('mini-cart-content-enter');
         currentContent.replaceWith(nextContent);
         window.setTimeout(() => nextContent.classList.remove('mini-cart-content-enter'), 560);
+
+        const highlightItemId = Number(options.highlightItemId || 0);
+        const highlightedItem = highlightItemId > 0
+            ? nextContent.querySelector(`[data-mini-cart-item-id="${highlightItemId}"]`)
+            : null;
+
+        if (highlightedItem) {
+            window.requestAnimationFrame(() => {
+                highlightedItem.classList.add('is-cart-highlighted');
+                window.setTimeout(() => highlightedItem.classList.remove('is-cart-highlighted'), 1350);
+            });
+        }
     }
 
     root.querySelector('[data-mini-cart-trigger]')?.setAttribute(
@@ -2402,9 +2490,13 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
         `Open cart with ${Number(cartCount || 0)} items`
     );
     initializeDisplayCurrency(panel);
-    root.classList.remove('mini-cart-bump');
-    void root.offsetWidth;
-    root.classList.add('mini-cart-bump');
+
+    if (options.bumpBadge) {
+        root.classList.remove('mini-cart-bump');
+        void root.offsetWidth;
+        root.classList.add('mini-cart-bump');
+        window.setTimeout(() => root.classList.remove('mini-cart-bump'), 620);
+    }
 
     if (options.firstItem) {
         root.classList.remove('mini-cart-first-item');
@@ -2422,6 +2514,21 @@ window.pulseAksaSuccess = function(button) {
     void button.offsetWidth;
     button.classList.add('aksa-action-success');
     window.setTimeout(() => button.classList.remove('aksa-action-success'), 900);
+};
+
+window.animateAksaCheckoutSuccess = async function(submit, summary) {
+    if (!(submit instanceof Element)) return;
+
+    submit.classList.add('checkout-submit-success');
+    setButtonLabel(submit, 'Invoice Ready');
+    summary?.classList.remove('checkout-summary-success');
+    if (summary) void summary.offsetWidth;
+    summary?.classList.add('checkout-summary-success');
+
+    await new Promise(resolve => window.setTimeout(
+        resolve,
+        shouldReduceMotion() ? 0 : 680
+    ));
 };
 
 window.animateAksaCartTransfer = async function(source) {
@@ -3657,12 +3764,25 @@ function initializeSiteIntro() {
     return true;
 }
 
+function initializeLicenseResetSuccess(root = document) {
+    root.querySelectorAll?.('[data-license-reset-success]').forEach(button => {
+        if (button.dataset.licenseResetSuccessReady === 'true') return;
+
+        button.dataset.licenseResetSuccessReady = 'true';
+        window.setTimeout(() => {
+            setButtonLabel(button, button.dataset.resetFinalLabel || 'Reset cooldown active');
+            button.classList.remove('is-reset-success');
+        }, shouldReduceMotion() ? 0 : 1450);
+    });
+}
+
 function initializeGlobalPageEnhancements(root = document) {
     const siteIntroPlaying = root === document && initializeSiteIntro();
     initializeDisplayCurrency(root);
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);
+    initializeLicenseResetSuccess(root);
     initializeMotionEnhancements(root);
     if (!siteIntroPlaying) beginHomeStagedReveal(root);
     updateNavGlider();
@@ -3833,7 +3953,7 @@ document.addEventListener('click', (event) => {
     });
 });
 
-document.addEventListener('submit', (event) => {
+document.addEventListener('submit', async (event) => {
     const form = event.target.closest('form');
 
     if (!shouldSoftNavigateForm(form, event)) return;
@@ -3974,16 +4094,184 @@ document.addEventListener('submit', (event) => {
     }
 }, true);
 
-document.addEventListener('submit', (event) => {
+function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDelta) {
+    const bundleCount = document.getElementById('cartBundleCount');
+    const subtotal = document.querySelector('[data-cart-subtotal]');
+
+    if (bundleCount) {
+        const distinctItems = Math.max(0, Number(bundleCount.dataset.cartDistinctItems || 0) + distinctDelta);
+        const totalQuantity = Math.max(0, Number(bundleCount.dataset.cartTotalQuantity || 0) + quantityDelta);
+
+        bundleCount.dataset.cartDistinctItems = String(distinctItems);
+        bundleCount.dataset.cartTotalQuantity = String(totalQuantity);
+        window.animateAksaValue?.(
+            bundleCount,
+            `${distinctItems} ${distinctItems === 1 ? 'package' : 'packages'} · ${totalQuantity} ${totalQuantity === 1 ? 'license' : 'licenses'}`
+        );
+
+        document.querySelectorAll('[data-cart-count]').forEach(badge => {
+            badge.textContent = String(totalQuantity);
+            badge.classList.toggle('hidden', totalQuantity <= 0);
+        });
+
+        const miniCart = miniCartRoot();
+        if (miniCart) {
+            miniCart.dataset.miniCartLoaded = 'false';
+            miniCart.querySelector('[data-mini-cart-trigger]')?.setAttribute(
+                'aria-label',
+                `Open cart with ${totalQuantity} items`
+            );
+        }
+    }
+
+    if (subtotal) {
+        const nextIdr = Math.max(0, Number(subtotal.dataset.priceIdr || 0) + idrDelta);
+        const currentUsd = Number(subtotal.dataset.priceUsd || 0);
+        const nextUsd = Math.max(0, currentUsd + usdDelta);
+
+        subtotal.dataset.priceIdr = String(nextIdr);
+        if (subtotal.dataset.priceUsd !== '') subtotal.dataset.priceUsd = String(nextUsd);
+        window.refreshAksaDisplayCurrency?.(subtotal.parentElement || document);
+        subtotal.classList.remove('aksa-value-change');
+        void subtotal.offsetWidth;
+        subtotal.classList.add('aksa-value-change');
+    }
+}
+
+document.addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-cart-remove-form]');
     const row = form?.closest('[data-cart-item]');
 
-    if (!form || !row || event.defaultPrevented || form.dataset.motionSubmitted === 'true' || shouldReduceMotion()) return;
+    if (!form || !row || event.defaultPrevented || form.dataset.cartRemovalPending === 'true') return;
 
     event.preventDefault();
-    form.dataset.motionSubmitted = 'true';
+    form.dataset.cartRemovalPending = 'true';
+
+    const quantity = Math.max(1, Number(row.dataset.cartItemQuantity || 1));
+    const lineTotal = row.querySelector('[data-cart-line-total]');
+    const lineTotalIdr = Math.max(0, Number(lineTotal?.dataset.priceIdr || 0));
+    const lineTotalUsd = Math.max(0, Number(lineTotal?.dataset.priceUsd || 0));
+    const packageName = row.querySelector('.font-semibold.text-white')?.textContent?.trim() || 'Package';
+    const action = form.action;
+    const restoreUrl = row.dataset.cartRestoreUrl || '';
+    const packageId = Number(row.dataset.cartPackageId || 0);
+    const requestBody = new FormData(form);
+    const group = row.closest('[data-cart-product-group]');
+    const originalGroupCount = group?.querySelectorAll('[data-cart-item]').length || 1;
+    const updateGroupCount = count => {
+        const label = group?.querySelector('[data-cart-group-count]');
+        if (label) label.textContent = `${count} ${count === 1 ? 'package' : 'packages'} selected`;
+    };
+
     row.classList.add('cart-item-removing');
-    window.setTimeout(() => form.submit(), 280);
+    row.setAttribute('aria-hidden', 'true');
+    row.setAttribute('inert', '');
+    updateCartRemovalSummary(-1, -quantity, -lineTotalIdr, -lineTotalUsd);
+    updateGroupCount(Math.max(0, originalGroupCount - 1));
+
+    const revealRestoredRow = () => {
+        window.clearTimeout(form._cartRemovalCleanupTimer);
+        form.dataset.cartRemovalPending = 'false';
+        delete row.dataset.cartRemovalCommitted;
+        row.classList.remove('cart-item-removing');
+        row.removeAttribute('aria-hidden');
+        row.removeAttribute('inert');
+        updateCartRemovalSummary(1, quantity, lineTotalIdr, lineTotalUsd);
+        updateGroupCount(originalGroupCount);
+        row.classList.add('cart-item-restored');
+        window.setTimeout(() => row.classList.remove('cart-item-restored'), 1400);
+    };
+
+    const removeCommittedRow = () => {
+        row.remove();
+
+        const remainingInGroup = group?.querySelectorAll('[data-cart-item]').length || 0;
+        if (group && remainingInGroup === 0) {
+            group.remove();
+        } else if (group) {
+            const count = group.querySelector('[data-cart-group-count]');
+            if (count) count.textContent = `${remainingInGroup} ${remainingInGroup === 1 ? 'package' : 'packages'} selected`;
+        }
+
+        const bundleCount = document.getElementById('cartBundleCount');
+        if (
+            Number(bundleCount?.dataset.cartDistinctItems || 0) === 0 &&
+            window.location.pathname === '/cart'
+        ) {
+            window.location.reload();
+        }
+    };
+
+    try {
+        const response = await window.aksaFetchWithCsrf(action, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: requestBody,
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) throw new Error(data.message || 'The package could not be removed.');
+
+        row.dataset.cartRemovalCommitted = 'true';
+        const restoreRow = async () => {
+            if (!restoreUrl || packageId <= 0 || row.dataset.cartRestoring === 'true') return;
+
+            row.dataset.cartRestoring = 'true';
+            try {
+                const restoreBody = new FormData();
+                restoreBody.set('package_id', String(packageId));
+                restoreBody.set('quantity', String(quantity));
+                const restoreResponse = await window.aksaFetchWithCsrf(restoreUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: restoreBody,
+                });
+                const restoreData = await restoreResponse.json().catch(() => ({}));
+
+                if (!restoreResponse.ok) throw new Error(restoreData.message || 'The package could not be restored.');
+
+                const restoredItemId = Number(restoreData.item_id || 0);
+                if (restoredItemId > 0) {
+                    row.dataset.cartItem = String(restoredItemId);
+                    row.querySelectorAll('[data-cart-quantity-form], [data-cart-remove-form]').forEach(itemForm => {
+                        const itemUrl = new URL(itemForm.action, window.location.origin);
+                        itemUrl.pathname = itemUrl.pathname.replace(/\/[^/]+$/, `/${restoredItemId}`);
+                        itemForm.action = itemUrl.toString();
+                    });
+                }
+
+                revealRestoredRow();
+                window.showAppToast?.('Package restored', `${packageName} is back in your cart.`, {
+                    variant: 'success',
+                });
+            } catch (error) {
+                window.showAppToast?.('Undo failed', error.message || 'Add the package again from its product page.', {
+                    variant: 'error',
+                });
+            } finally {
+                row.dataset.cartRestoring = 'false';
+            }
+        };
+
+        window.showAppToast?.('Package removed', `${packageName} was removed from your cart.`, {
+            variant: 'success',
+            duration: 5000,
+            actionLabel: 'Undo',
+            onAction: () => { void restoreRow(); },
+        });
+        form._cartRemovalCleanupTimer = window.setTimeout(removeCommittedRow, 5100);
+    } catch (error) {
+        revealRestoredRow();
+        window.showAppToast?.('Cart not updated', error.message || 'Refresh the page and try again.', {
+            variant: 'error',
+        });
+    }
 }, true);
 
 document.addEventListener('submit', async (event) => {
@@ -4077,7 +4365,13 @@ document.addEventListener('submit', async (event) => {
         });
 
         const miniCart = miniCartRoot();
-        if (miniCart) miniCart.dataset.miniCartLoaded = 'false';
+        if (miniCart) {
+            miniCart.dataset.miniCartLoaded = 'false';
+            miniCart.querySelector('[data-mini-cart-trigger]')?.setAttribute(
+                'aria-label',
+                `Open cart with ${totalQuantity} items`
+            );
+        }
     } catch (error) {
         previousDisabled.forEach((disabled, index) => { buttons[index].disabled = disabled; });
         window.showAppToast?.('Cart not updated', error.message || 'Refresh the page and try again.', {
@@ -4143,6 +4437,36 @@ document.addEventListener('click', (event) => {
 
     window.closeAksaPaymentSuccessModal?.();
 });
+
+function maskedLicenseValue(value) {
+    return value.length > 8
+        ? `${value.slice(0, 4)}${'•'.repeat(value.length - 8)}${value.slice(-4)}`
+        : '•'.repeat(Math.max(4, value.length));
+}
+
+function renderAnimatedLicenseKey(key, value, revealed) {
+    const displayValue = revealed ? value : maskedLicenseValue(value);
+
+    key.classList.toggle('is-license-revealed', revealed);
+    key.classList.toggle('is-license-masked', !revealed);
+
+    if (shouldReduceMotion()) {
+        key.textContent = displayValue;
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    [...displayValue].forEach((character, index) => {
+        const span = document.createElement('span');
+        span.className = 'license-key-character';
+        span.style.setProperty('--license-character-delay', `${Math.min(index * 14, 280)}ms`);
+        span.textContent = character;
+        fragment.appendChild(span);
+    });
+
+    key.replaceChildren(fragment);
+}
 
 document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-qris-check]');
@@ -4219,12 +4543,36 @@ document.addEventListener('click', async (event) => {
 function filterLicenseGroups() {
     const search = String(document.getElementById('licenseSearch')?.value || '').trim().toLowerCase();
     const product = String(document.getElementById('licenseProductFilter')?.value || '');
+    const root = document.getElementById('licenseGroups');
 
-    document.querySelectorAll('[data-license-group]').forEach(group => {
-        const matchesSearch = !search || String(group.dataset.licenseSearch || '').includes(search);
-        const matchesProduct = !product || group.dataset.licenseProduct === product;
-        group.classList.toggle('hidden', !matchesSearch || !matchesProduct);
-    });
+    if (!root) return;
+
+    window.clearTimeout(root._licenseFilterTimer);
+    root.classList.add('filter-results-leaving');
+    root._licenseFilterTimer = window.setTimeout(() => {
+        const visibleGroups = [];
+
+        root.querySelectorAll('[data-license-group]').forEach(group => {
+            const matchesSearch = !search || String(group.dataset.licenseSearch || '').includes(search);
+            const matchesProduct = !product || group.dataset.licenseProduct === product;
+            const visible = matchesSearch && matchesProduct;
+
+            group.classList.toggle('hidden', !visible);
+            group.classList.remove('filter-result-enter');
+            if (visible) visibleGroups.push(group);
+        });
+
+        root.classList.remove('filter-results-leaving');
+        visibleGroups.forEach((group, index) => {
+            group.style.setProperty('--filter-result-delay', `${Math.min(index * 70, 350)}ms`);
+            group.classList.add('filter-result-enter');
+        });
+
+        window.setTimeout(() => visibleGroups.forEach(group => {
+            group.classList.remove('filter-result-enter');
+            group.style.removeProperty('--filter-result-delay');
+        }), 900);
+    }, shouldReduceMotion() ? 0 : 140);
 }
 
 document.addEventListener('input', (event) => {
@@ -4238,33 +4586,82 @@ document.addEventListener('input', (event) => {
     }
 });
 
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-download-resource]');
+
+    if (!link) return;
+
+    const label = link.querySelector('[data-download-resource-label]');
+    const originalLabel = label?.dataset.originalLabel || label?.textContent?.trim() || 'Download';
+
+    if (label) label.dataset.originalLabel = originalLabel;
+    clearTimeout(link._downloadLaunchTimer);
+    clearTimeout(link._downloadRestoreTimer);
+    link.classList.remove('is-download-complete');
+    link.classList.add('is-download-launching');
+    if (label) label.textContent = 'Opening...';
+
+    link._downloadLaunchTimer = setTimeout(() => {
+        link.classList.remove('is-download-launching');
+        link.classList.add('is-download-complete');
+        if (label) label.textContent = link.dataset.downloadCompleteLabel || 'Opened';
+
+        link._downloadRestoreTimer = setTimeout(() => {
+            link.classList.remove('is-download-complete');
+            if (label) label.textContent = originalLabel;
+        }, 1250);
+    }, shouldReduceMotion() ? 0 : 520);
+});
+
 document.addEventListener('change', (event) => {
     if (event.target.matches('#licenseProductFilter')) filterLicenseGroups();
 });
 
-document.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-order-filter]');
-    const root = button?.closest('#ordersContent');
-    if (!button || !root) return;
+window.filterAksaOrderEntries = function(root, filter = 'active', { animate = false } = {}) {
+    if (!(root instanceof Element)) return;
 
-    const filter = button.dataset.orderFilter || 'active';
-    let visibleCount = 0;
-    root.querySelectorAll('[data-order-entry]').forEach(entry => {
-        const status = entry.dataset.orderStatus;
-        const visible = filter === 'all' ||
-            (filter === 'active' && status === 'pending') ||
-            (filter === 'previous' && status !== 'pending') ||
-            status === filter;
-        entry.classList.toggle('hidden', !visible);
-        if (visible) visibleCount += 1;
-    });
-    root.querySelector('[data-order-filter-empty]')?.classList.toggle('hidden', visibleCount > 0);
-    root.querySelectorAll('[data-order-filter]').forEach(option => {
-        const selected = option === button;
-        option.classList.toggle('active', selected);
-        option.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    });
-});
+    const applyEntries = () => {
+        let visibleCount = 0;
+        const visibleEntries = [];
+
+        root.querySelectorAll('[data-order-entry]').forEach(entry => {
+            const status = entry.dataset.orderStatus;
+            const visible = filter === 'all' ||
+                (filter === 'active' && status === 'pending') ||
+                (filter === 'previous' && status !== 'pending') ||
+                status === filter;
+
+            entry.classList.toggle('hidden', !visible);
+            entry.classList.remove('filter-result-enter');
+            if (visible) {
+                visibleCount += 1;
+                visibleEntries.push(entry);
+            }
+        });
+
+        root.querySelector('[data-order-filter-empty]')?.classList.toggle('hidden', visibleCount > 0);
+        root.classList.remove('filter-results-leaving');
+
+        if (animate) {
+            visibleEntries.forEach((entry, index) => {
+                entry.style.setProperty('--filter-result-delay', `${Math.min(index * 55, 330)}ms`);
+                entry.classList.add('filter-result-enter');
+            });
+            window.setTimeout(() => visibleEntries.forEach(entry => {
+                entry.classList.remove('filter-result-enter');
+                entry.style.removeProperty('--filter-result-delay');
+            }), 900);
+        }
+    };
+
+    window.clearTimeout(root._orderFilterTimer);
+    if (animate && !shouldReduceMotion()) {
+        root.classList.add('filter-results-leaving');
+        root._orderFilterTimer = window.setTimeout(applyEntries, 140);
+    } else {
+        applyEntries();
+    }
+};
 
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
@@ -4375,11 +4772,7 @@ document.addEventListener('click', async (event) => {
 
         if (key && fullValue) {
             clearTimeout(revealButton._licenseHideTimeout);
-            key.textContent = masked
-                ? fullValue
-                : (fullValue.length > 8
-                    ? `${fullValue.slice(0, 4)}${'•'.repeat(fullValue.length - 8)}${fullValue.slice(-4)}`
-                    : '•'.repeat(Math.max(4, fullValue.length)));
+            renderAnimatedLicenseKey(key, fullValue, masked);
             key.dataset.licenseMasked = masked ? 'false' : 'true';
             revealButton.setAttribute('aria-pressed', masked ? 'true' : 'false');
             setButtonLabel(revealButton, masked ? 'Hide' : 'Reveal');
@@ -4387,9 +4780,7 @@ document.addEventListener('click', async (event) => {
             if (masked) {
                 revealButton._licenseHideTimeout = setTimeout(() => {
                     const latestValue = key.dataset.licenseKeyValue || '';
-                    key.textContent = latestValue.length > 8
-                        ? `${latestValue.slice(0, 4)}${'•'.repeat(latestValue.length - 8)}${latestValue.slice(-4)}`
-                        : '•'.repeat(Math.max(4, latestValue.length));
+                    renderAnimatedLicenseKey(key, latestValue, false);
                     key.dataset.licenseMasked = 'true';
                     revealButton.setAttribute('aria-pressed', 'false');
                     setButtonLabel(revealButton, 'Reveal');
@@ -4412,8 +4803,8 @@ document.addEventListener('click', async (event) => {
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, 'Copied ✓');
-        button.classList.add('text-green-400');
+        setButtonLabel(button, 'Copied');
+        button.classList.add('text-aksa-accent-soft');
         button.classList.add('is-copy-success');
         const licenseBox = button.closest('.license-key-box');
         licenseBox?.classList.remove('license-copy-success');
@@ -4429,7 +4820,7 @@ document.addEventListener('click', async (event) => {
     } finally {
         setTimeout(() => {
             setButtonLabel(button, originalText || 'Copy');
-            button.classList.remove('text-green-400');
+            button.classList.remove('text-aksa-accent-soft');
             button.classList.remove('is-copy-success');
             button.closest('.license-key-box')?.classList.remove('license-copy-success');
         }, 1800);
@@ -4446,11 +4837,18 @@ document.addEventListener('click', async (event) => {
     if (!text) return;
 
     const originalText = getButtonLabel(button);
+    const copyAllGroup = button.matches('[data-copy-all-licenses]')
+        ? button.closest('[data-license-group]')
+        : null;
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, 'Copied ✓');
-        button.classList.add('text-green-400');
+        setButtonLabel(button, button.dataset.copySuccessLabel || 'Copied ✓');
+        button.classList.add('text-aksa-accent-soft');
+        button.classList.toggle('is-copy-all-success', Boolean(copyAllGroup));
+        copyAllGroup?.classList.remove('license-group-copy-success');
+        if (copyAllGroup) void copyAllGroup.offsetWidth;
+        copyAllGroup?.classList.add('license-group-copy-success');
         window.showAppToast?.(
             button.dataset.copyTitle || 'Copied',
             button.dataset.copyMessage || 'The text is ready to paste.', {
@@ -4462,9 +4860,12 @@ document.addEventListener('click', async (event) => {
             variant: 'error',
         });
     } finally {
-        setTimeout(() => {
+        window.clearTimeout(button._copyValueRestoreTimer);
+        button._copyValueRestoreTimer = setTimeout(() => {
             setButtonLabel(button, originalText || 'Copy');
-            button.classList.remove('text-green-400');
+            button.classList.remove('text-aksa-accent-soft');
+            button.classList.remove('is-copy-all-success');
+            copyAllGroup?.classList.remove('license-group-copy-success');
         }, 1800);
     }
 });

@@ -84,6 +84,8 @@ class AdminDownloadManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-download-accordion', false);
         $response->assertSee('download-accordion-panel', false);
+        $response->assertSee('data-download-resource', false);
+        $response->assertSee('data-download-complete-label=', false);
         $response->assertSeeInOrder(['Alpha Tool', 'Visible Tool', 'Zeta Tool']);
         $response->assertSee('Visible Tool');
     }

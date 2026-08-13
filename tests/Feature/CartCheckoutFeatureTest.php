@@ -87,7 +87,7 @@ class CartCheckoutFeatureTest extends TestCase
             'license_key' => 'AURORA-PREVIEW-VALUE',
             'is_sold' => false,
         ]);
-        CartItem::create([
+        $cartItem = CartItem::create([
             'user_id' => $user->id,
             'product_id' => $product->id,
             'package_id' => $package->id,
@@ -101,6 +101,8 @@ class CartCheckoutFeatureTest extends TestCase
 
         $html = $response->json('html');
         $this->assertStringContainsString('Aurora Preview', $html);
+        $this->assertStringContainsString('data-mini-cart-item-id="'.$cartItem->id.'"', $html);
+        $this->assertStringContainsString('data-mini-cart-item-quantity="2"', $html);
         $this->assertMatchesRegularExpression('/2\s+licenses/', $html);
         $this->assertStringContainsString('data-price-idr="40000"', $html);
         $this->assertStringContainsString('href="'.route('checkout.cart').'"', $html);
@@ -109,6 +111,43 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertStringContainsString('Save 50% with 30 Days', $html);
         $this->assertStringContainsString('lower price per day', $html);
         $this->assertSame(1, substr_count($html, route('cart.index')));
+    }
+
+    public function test_added_existing_package_is_promoted_into_the_highlightable_mini_cart_preview(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Original Package', 20000, 1.25, 5);
+        $originalItem = CartItem::create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'quantity' => 1,
+        ]);
+
+        foreach (['Second Package', 'Third Package', 'Fourth Package'] as $name) {
+            [, $otherProduct, $otherPackage] = $this->catalogItem($name, 25000, 1.5, 2, $user);
+            CartItem::create([
+                'user_id' => $user->id,
+                'product_id' => $otherProduct->id,
+                'package_id' => $otherPackage->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->postJson(route('cart.items.store', $product), [
+                'package_id' => $package->id,
+                'quantity' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('item_id', $originalItem->id)
+            ->assertJsonPath('cart_count', 5);
+
+        $html = $response->json('cart_preview_html');
+        preg_match('/data-mini-cart-item-id="(\d+)"/', $html, $firstPreviewItem);
+
+        $this->assertSame((string) $originalItem->id, $firstPreviewItem[1] ?? null);
+        $this->assertStringContainsString('data-mini-cart-item-quantity="2"', $html);
+        $this->assertSame(3, substr_count($html, 'data-mini-cart-item-id='));
     }
 
     public function test_mini_cart_sends_unavailable_items_to_cart_review(): void
@@ -241,6 +280,7 @@ class CartCheckoutFeatureTest extends TestCase
         $licenseHtml = $licenseResponse->getContent();
         $this->assertSame(1, substr_count($licenseHtml, 'id="license-'.$order->order_id.'"'));
         $this->assertSame(3, substr_count($licenseHtml, 'data-copy-license='));
+        $this->assertSame(3, substr_count($licenseHtml, 'data-reveal-license='));
 
         config(['admin.emails' => [$user->email]]);
         $this->actingAs($user)

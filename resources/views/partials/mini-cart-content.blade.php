@@ -1,6 +1,18 @@
 @php
     $miniCartItems = collect($miniCartItems ?? []);
-    $previewItems = $miniCartItems->sortByDesc('id')->take(3);
+    $miniCartHighlightItemId = (int) ($miniCartHighlightItemId ?? 0);
+    $previewItems = $miniCartItems
+        ->sort(function ($left, $right) use ($miniCartHighlightItemId): int {
+            $leftIsHighlighted = (int) $left->id === $miniCartHighlightItemId;
+            $rightIsHighlighted = (int) $right->id === $miniCartHighlightItemId;
+
+            if ($leftIsHighlighted !== $rightIsHighlighted) {
+                return $leftIsHighlighted ? -1 : 1;
+            }
+
+            return (int) $right->id <=> (int) $left->id;
+        })
+        ->take(3);
     $hiddenItemCount = max(0, $miniCartItems->count() - $previewItems->count());
     $subtotalIdr = (int) $miniCartItems->sum(
         fn ($item) => ((int) ($item->package?->price ?? 0)) * (int) $item->quantity
@@ -61,7 +73,8 @@
     @else
         <div class="mini-cart-items">
             @foreach ($previewItems as $item)
-                <div class="mini-cart-item">
+                <div class="mini-cart-item" data-mini-cart-item-id="{{ $item->id }}"
+                    data-mini-cart-item-quantity="{{ $item->quantity }}">
                     <span class="mini-cart-item-icon"><x-ui.icon name="key-round" class="h-4 w-4" /></span>
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-semibold text-white">{{ $item->product?->name ?? 'Product' }}</p>

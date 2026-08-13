@@ -40,29 +40,21 @@
         const ordersPageTimers = [];
         let activeOrderFilter = 'active';
 
-        function applyOrderFilter(filter = activeOrderFilter) {
+        function applyOrderFilter(filter = activeOrderFilter, { animate = false } = {}) {
             activeOrderFilter = filter;
-            let visibleCount = 0;
-            document.querySelectorAll('[data-order-entry]').forEach(entry => {
-                const status = entry.dataset.orderStatus;
-                const visible = filter === 'all' ||
-                    (filter === 'active' && status === 'pending') ||
-                    (filter === 'previous' && status !== 'pending') ||
-                    status === filter;
-                entry.classList.toggle('hidden', !visible);
-                if (visible) visibleCount += 1;
-            });
-            document.querySelector('[data-order-filter-empty]')?.classList.toggle('hidden', visibleCount > 0);
+            const root = document.getElementById('ordersContent');
+
             document.querySelectorAll('[data-order-filter]').forEach(button => {
                 button.classList.toggle('active', button.dataset.orderFilter === filter);
                 button.setAttribute('aria-pressed', button.dataset.orderFilter === filter ? 'true' : 'false');
             });
+            window.filterAksaOrderEntries?.(root, filter, { animate });
         }
 
         document.addEventListener('click', (event) => {
             const button = event.target.closest('[data-order-filter]');
             if (!button || !document.getElementById('ordersContent')?.contains(button)) return;
-            applyOrderFilter(button.dataset.orderFilter || 'active');
+            applyOrderFilter(button.dataset.orderFilter || 'active', { animate: true });
         }, { signal: ordersPageController.signal });
 
         function trackOrdersInterval(callback, delay) {
@@ -70,6 +62,51 @@
             ordersPageTimers.push(timer);
 
             return timer;
+        }
+
+        function captureOrderTimelineStates(root) {
+            const states = new Map();
+
+            root?.querySelectorAll('[data-order-entry][data-order-id]').forEach(entry => {
+                const timeline = entry.querySelector('[data-order-timeline]');
+
+                if (!timeline) return;
+
+                states.set(entry.dataset.orderId, {
+                    progress: timeline.style.getPropertyValue('--order-timeline-progress').trim() || '0%',
+                    signature: timeline.dataset.orderTimelineState || '',
+                    steps: [...timeline.querySelectorAll('.order-timeline-step')]
+                        .map(step => step.classList.contains('is-complete')),
+                });
+            });
+
+            return states;
+        }
+
+        function animateOrderTimelineChanges(root, previousStates) {
+            root?.querySelectorAll('[data-order-entry][data-order-id]').forEach(entry => {
+                const previous = previousStates.get(entry.dataset.orderId);
+                const timeline = entry.querySelector('[data-order-timeline]');
+
+                if (!previous || !timeline || previous.signature === timeline.dataset.orderTimelineState) return;
+
+                timeline.style.setProperty('--order-timeline-from', previous.progress);
+                timeline.classList.add('is-advancing');
+                timeline.querySelectorAll('.order-timeline-step').forEach((step, index) => {
+                    if (!previous.steps[index] && step.classList.contains('is-complete')) {
+                        step.style.setProperty('--order-timeline-step-delay', `${index * 90}ms`);
+                        step.classList.add('is-newly-complete');
+                    }
+                });
+
+                setTimeout(() => {
+                    timeline.classList.remove('is-advancing');
+                    timeline.querySelectorAll('.is-newly-complete').forEach(step => {
+                        step.classList.remove('is-newly-complete');
+                        step.style.removeProperty('--order-timeline-step-delay');
+                    });
+                }, 1100);
+            });
         }
 
         window.addEventListener('aksa:before-page-swap', () => {
@@ -128,6 +165,7 @@
 
             ordersRefreshing = true;
             const ordersContent = document.getElementById('ordersContent');
+            const previousTimelineStates = captureOrderTimelineStates(ordersContent);
             ordersContent?.classList.add('content-is-refreshing');
 
             try {
@@ -144,6 +182,7 @@
 
                 if (ordersContent) {
                     ordersContent.innerHTML = await response.text();
+                    animateOrderTimelineChanges(ordersContent, previousTimelineStates);
                 }
                 applyOrderFilter();
                 updateCountdowns();

@@ -181,7 +181,7 @@
                 : '/licenses';
         @endphp
 
-        <article class="order-mobile-card motion-card" data-order-entry
+        <article class="order-mobile-card motion-card" data-order-entry data-order-id="{{ $order->order_id }}"
             data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -511,7 +511,7 @@
                             : '/licenses';
                     @endphp
 
-                    <tr class="orders-table-row" data-order-entry
+                    <tr class="orders-table-row" data-order-entry data-order-id="{{ $order->order_id }}"
                         data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
                         <td class="p-4">
                             <div class="flex max-w-[210px] items-center gap-2">

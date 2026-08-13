@@ -1,6 +1,6 @@
 @if (($pendingOrderCount ?? 0) > 0 && $pendingOrder && ! request()->is('orders', 'orders/*'))
     <div class="page-shell pending-payment-reminder-shell">
-        <a href="{{ route('orders.payment', $pendingOrder->order_id) }}" class="pending-payment-reminder">
+        <a href="{{ route('orders.payment', $pendingOrder->order_id) }}" class="pending-payment-reminder payment-pending-panel">
             <span class="pending-payment-reminder-dot" aria-hidden="true"></span>
             <span class="min-w-0 flex-1 truncate text-sm text-gray-300">
                 <strong class="font-semibold text-white">

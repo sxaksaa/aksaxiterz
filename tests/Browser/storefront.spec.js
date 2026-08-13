@@ -133,6 +133,215 @@ test('branded intro skips motion when reduced motion is preferred', async ({ pag
     expect(reducedCurrencySwap.state).toBeNull();
 });
 
+test('license actions and download launch feedback use the themed motion states', async ({ page }) => {
+    await page.goto('/');
+
+    const licenseKey = page.locator('[data-license-motion-test]');
+    await page.evaluate(() => {
+        const key = document.createElement('span');
+        const button = document.createElement('button');
+
+        key.dataset.licenseMotionTest = 'true';
+        key.dataset.licenseKeyValue = 'AKSA-TEST-12345678';
+        key.dataset.licenseMasked = 'true';
+        key.id = 'key-motion-test';
+        key.textContent = 'AKSA-••••••••-5678';
+        button.type = 'button';
+        button.dataset.revealLicense = 'motion-test';
+        button.innerHTML = '<span data-button-label>Reveal</span>';
+        document.querySelector('main')?.append(key, button);
+    });
+
+    await page.locator('[data-reveal-license="motion-test"]').click();
+    await expect(licenseKey).toHaveAttribute('data-license-masked', 'false');
+    await expect(licenseKey.locator('.license-key-character')).toHaveCount(18);
+    expect(await licenseKey.locator('.license-key-character').first().evaluate(
+        character => getComputedStyle(character).animationName,
+    )).toContain('license-character-reveal');
+
+    const copyButton = page.locator('[data-copy-license="motion-test"]');
+    await page.evaluate(() => {
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: async () => {} },
+        });
+
+        const box = document.createElement('div');
+        const button = document.createElement('button');
+
+        box.className = 'license-key-box';
+        button.type = 'button';
+        button.dataset.copyLicense = 'motion-test';
+        button.className = 'order-action btn-press';
+        button.innerHTML = '<svg aria-hidden="true"></svg><span data-button-label>Copy</span>';
+        box.append(button);
+        document.querySelector('main')?.append(box);
+    });
+
+    await copyButton.click();
+    await expect(copyButton.locator('[data-button-label]')).toHaveText('Copied');
+    await expect(copyButton).toHaveClass(/text-aksa-accent-soft/);
+    await expect(copyButton).not.toHaveClass(/text-green-400/);
+    await expect(copyButton.locator('svg')).toHaveCSS('display', 'none');
+    expect(await copyButton.evaluate(button => getComputedStyle(button, '::before').content)).toBe('"✓"');
+    await expect(copyButton).toHaveCSS('color', 'rgb(180, 155, 255)');
+
+    await page.goto('/downloads');
+    const downloadLink = page.locator('[data-download-motion-test]');
+    await page.evaluate(() => {
+        const link = document.createElement('a');
+        link.href = '#download-motion-test';
+        link.dataset.downloadMotionTest = 'true';
+        link.dataset.downloadResource = '';
+        link.dataset.downloadCompleteLabel = 'Download started';
+        link.className = 'download-resource-link';
+        link.innerHTML = '<span class="download-resource-icon"><svg></svg></span><span data-download-resource-label>Download Loader</span>';
+        link.addEventListener('click', event => event.preventDefault(), { capture: true });
+        document.querySelector('main')?.appendChild(link);
+    });
+
+    await downloadLink.click();
+    await expect(downloadLink).toHaveClass(/is-download-launching/);
+    await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Opening...');
+    await expect(downloadLink).toHaveClass(/is-download-complete/);
+    await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Download started');
+});
+
+test('cart removal commits and Undo restores the original package quantity', async ({ page }) => {
+    let removeRequests = 0;
+    let restoreRequests = 0;
+    await page.route('**/cart/items/123', async route => {
+        removeRequests++;
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'Removed' }) });
+    });
+    await page.route('**/cart/items/product-slug', async route => {
+        restoreRequests++;
+        await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ cart_count: 2, item_id: 456 }),
+        });
+    });
+    await page.goto('/');
+
+    await page.evaluate(() => {
+        const fixture = document.createElement('section');
+        fixture.innerHTML = `
+            <h2 id="cartBundleCount" data-cart-distinct-items="1" data-cart-total-quantity="2">1 package · 2 licenses</h2>
+            <span data-cart-subtotal data-display-price data-price-idr="40000" data-price-usd="2">Rp 40.000</span>
+            <article data-cart-product-group>
+                <p data-cart-group-count>1 package selected</p>
+                <div class="cart-package-row" data-cart-item="123" data-cart-item-quantity="2"
+                    data-cart-package-id="44" data-cart-restore-url="/cart/items/product-slug">
+                    <p class="font-semibold text-white">30 Days</p>
+                    <span data-cart-line-total data-price-idr="40000" data-price-usd="2"></span>
+                    <form method="POST" action="/cart/items/123" data-cart-remove-form>
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit">Remove package</button>
+                    </form>
+                </div>
+            </article>
+        `;
+        document.querySelector('main')?.append(fixture);
+    });
+
+    const row = page.locator('[data-cart-product-group] .cart-package-row');
+    await page.getByRole('button', { name: 'Remove package' }).click();
+    await expect(row).toHaveClass(/cart-item-removing/);
+    await expect(page.locator('#cartBundleCount')).toHaveText('0 packages · 0 licenses');
+    await expect(page.locator('[data-cart-group-count]')).toHaveText('0 packages selected');
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
+    expect(removeRequests).toBe(1);
+
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(row).not.toHaveClass(/cart-item-removing/);
+    await expect(row).toHaveClass(/cart-item-restored/);
+    await expect(row).toHaveAttribute('data-cart-item', '456');
+    await expect(row.locator('[data-cart-remove-form]')).toHaveAttribute('action', /\/cart\/items\/456$/);
+    await expect(page.locator('#cartBundleCount')).toHaveText('1 package · 2 licenses');
+    await expect(page.locator('[data-cart-group-count]')).toHaveText('1 package selected');
+    expect(restoreRequests).toBe(1);
+});
+
+test('a server-confirmed checkout morphs into invoice ready before navigation', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+        const summary = document.createElement('aside');
+        const submit = document.createElement('button');
+
+        summary.id = 'checkoutFinalSummary';
+        submit.id = 'checkoutSubmitButton';
+        submit.innerHTML = '<svg></svg><span data-button-label>Creating Invoice...</span>';
+        document.querySelector('main')?.append(summary, submit);
+    });
+
+    const animation = page.evaluate(() => window.animateAksaCheckoutSuccess(
+        document.getElementById('checkoutSubmitButton'),
+        document.getElementById('checkoutFinalSummary'),
+    ));
+    const submit = page.locator('#checkoutSubmitButton');
+    const summary = page.locator('#checkoutFinalSummary');
+
+    await expect(submit).toHaveClass(/checkout-submit-success/);
+    await expect(submit.locator('[data-button-label]')).toHaveText('Invoice Ready');
+    await expect(submit.locator('svg')).toHaveCSS('display', 'none');
+    await expect(summary).toHaveClass(/checkout-summary-success/);
+    await animation;
+});
+
+test('license and order actions reveal their changed state one result at a time', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: async () => {} },
+        });
+
+        const fixture = document.createElement('section');
+        fixture.innerHTML = `
+            <input id="licenseSearch">
+            <select id="licenseProductFilter"><option value="">All</option></select>
+            <div id="licenseGroups">
+                <article class="license-card" data-license-group data-license-product="1" data-license-search="alpha order-a">
+                    <button type="button" data-copy-value="A" data-copy-all-licenses data-copy-success-label="3 Keys Copied">
+                        <svg></svg><span data-button-label>Copy 3 Keys</span>
+                    </button>
+                </article>
+                <article class="license-card" data-license-group data-license-product="2" data-license-search="beta order-b"></article>
+            </div>
+            <button type="button" class="license-reset-action is-reset-success" data-license-reset-success
+                data-reset-final-label="Reset in 24h"><svg></svg><span data-button-label>Reset successful</span></button>
+            <div id="ordersMotionFixture">
+                <div data-order-filter-empty class="hidden"></div>
+                <article data-order-entry data-order-status="pending">Pending order</article>
+                <article data-order-entry data-order-status="paid">Paid order</article>
+            </div>
+        `;
+        document.querySelector('main')?.append(fixture);
+        window.initializeAksaPageEnhancements(fixture);
+    });
+
+    const reset = page.locator('[data-license-reset-success]');
+    await expect(reset).toHaveClass(/is-reset-success/);
+    await expect(reset.locator('[data-button-label]')).toHaveText('Reset in 24h', { timeout: 2500 });
+    await expect(reset).not.toHaveClass(/is-reset-success/);
+
+    const copyAll = page.locator('[data-copy-all-licenses]');
+    await copyAll.click();
+    await expect(copyAll.locator('[data-button-label]')).toHaveText('3 Keys Copied');
+    await expect(copyAll).toHaveClass(/is-copy-all-success/);
+    await expect(page.locator('[data-license-group]').first()).toHaveClass(/license-group-copy-success/);
+
+    await page.locator('#licenseSearch').fill('beta');
+    await expect(page.locator('[data-license-search="alpha order-a"]')).toHaveClass(/hidden/);
+    await expect(page.locator('[data-license-search="beta order-b"]')).toHaveClass(/filter-result-enter/);
+
+    await page.evaluate(() => {
+        window.filterAksaOrderEntries(document.getElementById('ordersMotionFixture'), 'paid', { animate: true });
+    });
+    await expect(page.getByText('Pending order')).toHaveClass(/hidden/);
+    await expect(page.getByText('Paid order')).toHaveClass(/filter-result-enter/);
+});
+
 test('public storefront has working navigation and SEO metadata', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (message) => {
@@ -297,6 +506,9 @@ test('product checkout summary uses the restrained purple hierarchy', async ({ p
     const availablePackage = page.locator('[data-package-checkout-enabled="true"]').first();
     await expect(availablePackage).toBeVisible();
     await availablePackage.click();
+    await expect(availablePackage).toHaveClass(/active/);
+    expect(await availablePackage.evaluate(element => getComputedStyle(element).animationName))
+        .toContain('package-selection-pop');
 
     const summary = page.locator('#summaryBox');
     await expect(summary).toBeVisible();
@@ -308,6 +520,52 @@ test('product checkout summary uses the restrained purple hierarchy', async ({ p
         window.getComputedStyle(element).gridTemplateColumns.split(' ').length
     ));
     expect(columnCount).toBe(page.viewportSize().width >= 1024 ? 4 : 1);
+});
+
+test('mini cart highlights only the item most recently added', async ({ page }) => {
+    await page.goto('/');
+
+    await page.evaluate(() => {
+        const root = document.createElement('div');
+        root.dataset.miniCartRoot = '';
+        root.innerHTML = `
+            <a href="#" data-mini-cart-trigger aria-expanded="false">
+                <span data-cart-count>1</span>
+            </a>
+            <div data-mini-cart-panel>
+                <div data-mini-cart-content></div>
+            </div>
+        `;
+        document.body.append(root);
+
+        window.refreshAksaMiniCart(`
+            <div data-mini-cart-content>
+                <div class="mini-cart-items">
+                    <div class="mini-cart-item" data-mini-cart-item-id="42">
+                        <span class="mini-cart-item-icon">A</span>
+                        <span>New package</span>
+                    </div>
+                    <div class="mini-cart-item" data-mini-cart-item-id="17">
+                        <span class="mini-cart-item-icon">B</span>
+                        <span>Existing package</span>
+                    </div>
+                </div>
+            </div>
+        `, 2, {
+            bumpBadge: true,
+            highlightItemId: 42,
+        });
+    });
+
+    const root = page.locator('[data-mini-cart-root]');
+    const highlightedItem = root.locator('[data-mini-cart-item-id="42"]');
+    const existingItem = root.locator('[data-mini-cart-item-id="17"]');
+
+    await expect(root).toHaveClass(/mini-cart-bump/);
+    await expect(highlightedItem).toHaveClass(/is-cart-highlighted/);
+    await expect(existingItem).not.toHaveClass(/is-cart-highlighted/);
+    await expect(root).not.toHaveClass(/mini-cart-bump/, { timeout: 1500 });
+    await expect(highlightedItem).not.toHaveClass(/is-cart-highlighted/, { timeout: 2500 });
 });
 
 test('product focus prefetches detail once and navigation reuses it', async ({ page }) => {
@@ -533,18 +791,116 @@ test('product filtering fails safely when its request is unavailable', async ({ 
     await expect(page.locator('h1')).toBeVisible();
 });
 
+test('live stock changes animate the updated availability without replacing the card', async ({ page }) => {
+    await page.goto('/');
+
+    const firstCard = page.locator('[data-product-stock-card]').first();
+    const product = await firstCard.evaluate(card => ({
+        id: Number(card.dataset.productId),
+        stock: Number(card.dataset.productStock),
+        name: card.querySelector('h2')?.textContent?.trim() || '',
+    }));
+    const nextStock = product.stock + 1;
+
+    await page.route('**/api/product-stocks', route => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+            products: [{
+                id: product.id,
+                status: 'ready',
+                status_label: 'Ready',
+                available_stock: nextStock,
+            }],
+            total_available_stock: nextStock,
+        }),
+    }));
+
+    const stockResponse = page.waitForResponse(response => response.url().endsWith('/api/product-stocks'));
+    await page.getByRole('textbox', { name: 'Search products' }).fill(product.name);
+    await stockResponse;
+
+    const refreshedCard = page.locator(`[data-product-stock-card][data-product-id="${product.id}"]`);
+    await expect(refreshedCard).toHaveCount(1);
+    await expect(refreshedCard.locator('[data-product-stock-label]')).toContainText(`${nextStock} available`);
+    await expect(refreshedCard.locator('[data-product-stock-label]')).toHaveClass(/product-stock-changed/);
+});
+
 test('empty product search can clear all filters', async ({ page }) => {
+    await page.setViewportSize({ width: 2048, height: 1100 });
     await page.goto('/');
 
     const search = page.getByRole('textbox', { name: 'Search products' });
     await search.fill('product-that-does-not-exist-anywhere');
-    await expect(page.getByText('No products found')).toBeVisible();
+    const emptyState = page.locator('#productContainer > .empty-state');
+    await expect(emptyState.getByText('No products found')).toBeVisible();
+
+    const emptyStateAlignment = await page.evaluate(() => {
+        const container = document.querySelector('#productContainer');
+        const empty = container?.querySelector(':scope > .empty-state');
+        const containerRect = container?.getBoundingClientRect();
+        const emptyRect = empty?.getBoundingClientRect();
+
+        return {
+            left: Math.abs((containerRect?.left || 0) - (emptyRect?.left || 0)),
+            right: Math.abs((containerRect?.right || 0) - (emptyRect?.right || 0)),
+        };
+    });
+
+    expect(emptyStateAlignment.left).toBeLessThanOrEqual(1);
+    expect(emptyStateAlignment.right).toBeLessThanOrEqual(1);
 
     await page.getByRole('button', { name: 'Clear Filters' }).click();
 
     await expect(search).toHaveValue('');
     await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('the product search clear control restores results with a staggered entrance', async ({ page }) => {
+    await page.route('**/products-fragment?*', async route => {
+        const search = new URL(route.request().url()).searchParams.get('search') || '';
+        const products = search
+            ? '<article data-product-stock-card data-product-id="1">Aurora</article>'
+            : '<article data-product-stock-card data-product-id="1">Aurora</article><article data-product-stock-card data-product-id="2">Fluorite</article>';
+        await route.fulfill({ contentType: 'text/html', body: products });
+    });
+    await page.goto('/');
+
+    const search = page.getByRole('textbox', { name: 'Search products' });
+    const clear = page.getByRole('button', { name: 'Clear product search' });
+
+    await expect(clear).toBeHidden();
+    await search.fill('Aurora');
+    await expect(clear).toBeVisible();
+    await expect(page.locator('[data-product-stock-card]')).toHaveCount(1);
+
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toBeHidden();
+    await expect(page.locator('#productContainer')).toHaveAttribute('data-product-restore-completed', 'true');
+    await expect(page.locator('#productContainer > *')).toHaveCount(2);
+    expect(await page.locator('#productContainer > *').nth(1).evaluate(
+        element => element.style.getPropertyValue('--product-result-delay'),
+    )).toBe('55ms');
+});
+
+test('form validation animates only after an invalid attempt and settles after correction', async ({ page }) => {
+    await page.goto('/');
+
+    const validationInput = page.locator('[data-validation-motion-test]');
+    await page.evaluate(() => {
+        const input = document.createElement('input');
+        input.required = true;
+        input.dataset.validationMotionTest = 'true';
+        document.querySelector('main')?.appendChild(input);
+    });
+
+    await expect(validationInput).not.toHaveClass(/aksa-validation-invalid/);
+    await validationInput.evaluate(input => input.dispatchEvent(new Event('invalid')));
+    await expect(validationInput).toHaveClass(/aksa-validation-invalid/);
+
+    await validationInput.fill('valid');
+    await expect(validationInput).toHaveClass(/aksa-validation-corrected/);
 });
 
 test('storefront reflows without horizontal clipping at a 200 percent equivalent viewport', async ({ page }) => {

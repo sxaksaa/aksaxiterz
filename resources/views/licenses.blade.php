@@ -24,6 +24,13 @@
             ['value' => $licenseCount, 'label' => 'Licenses'],
             ['value' => $latestLicense?->created_at?->format('d M') ?? '-', 'label' => 'Latest'],
         ];
+        $licenseResetSuccess = session('license_reset_success');
+        $licenseResetSuccessMessage = is_array($licenseResetSuccess)
+            ? (string) ($licenseResetSuccess['message'] ?? '')
+            : (string) $licenseResetSuccess;
+        $recentlyResetLicenseId = is_array($licenseResetSuccess)
+            ? (int) ($licenseResetSuccess['license_id'] ?? 0)
+            : 0;
     @endphp
 
     <div class="page-shell public-account-page py-7 md:py-12">
@@ -47,10 +54,10 @@
             </div>
         </section>
 
-        @if (session('license_reset_success'))
+        @if ($licenseResetSuccessMessage !== '')
             <div class="mb-5 rounded-xl border border-aksa-accent-30 bg-aksa-accent-10 px-4 py-3 text-sm text-aksa-accent-soft fade-up"
                 role="status">
-                {{ session('license_reset_success') }}
+                {{ $licenseResetSuccessMessage }}
             </div>
         @endif
 
@@ -126,6 +133,8 @@
                         <div class="flex flex-wrap items-center gap-2">
                             @if ($orderLicenses->count() > 1)
                                 <button type="button" data-copy-value="{{ $copyAllValue }}"
+                                    data-copy-all-licenses
+                                    data-copy-success-label="{{ $orderLicenses->count() }} Keys Copied"
                                     data-copy-title="Product licenses copied"
                                     data-copy-message="All licenses and durations for this product are ready to paste."
                                     class="order-action btn-press">
@@ -217,10 +226,18 @@
                                                 </button>
                                             </form>
                                         @elseif (($resetState['remaining_seconds'] ?? 0) > 0)
-                                            <button type="button" class="order-action license-reset-action" disabled
+                                            <button type="button"
+                                                class="order-action license-reset-action {{ $recentlyResetLicenseId === (int) $license->id ? 'is-reset-success' : '' }}"
+                                                @if ($recentlyResetLicenseId === (int) $license->id)
+                                                    data-license-reset-success
+                                                    data-reset-final-label="Reset in {{ $resetWaitLabel }}"
+                                                @endif
+                                                disabled
                                                 title="Reset available at {{ $resetState['available_at']?->timezone(config('app.timezone'))->format('d M Y, H:i') }} WIB">
                                                 <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
-                                                <span>Reset in {{ $resetWaitLabel }}</span>
+                                                <span data-button-label>
+                                                    {{ $recentlyResetLicenseId === (int) $license->id ? 'Reset successful' : 'Reset in '.$resetWaitLabel }}
+                                                </span>
                                             </button>
                                         @elseif (! $resetState['configured'])
                                             <button type="button" class="order-action license-reset-action" disabled

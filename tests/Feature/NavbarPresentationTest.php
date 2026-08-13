@@ -82,5 +82,7 @@ class NavbarPresentationTest extends TestCase
         $this->assertStringContainsString('is waiting', $html);
         $this->assertStringContainsString('Continue Payment', $html);
         $this->assertStringContainsString('/orders/ORDER-PENDING-REMINDER/payment', $html);
+        $this->assertStringContainsString('payment-pending-panel', $html);
+        $this->assertStringContainsString('pending-payment-reminder-dot', $html);
     }
 }

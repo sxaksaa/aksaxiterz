@@ -714,7 +714,9 @@
                     );
                     window.refreshAksaMiniCart?.(data.cart_preview_html, data.cart_count, {
                         autoOpen: true,
+                        bumpBadge: true,
                         firstItem: previousCartCount === 0 && Number(data.cart_count) > 0,
+                        highlightItemId: data.item_id,
                     });
                     toast('Added to cart', data.message, 'success');
                     buttonLabel(this, 'Added');

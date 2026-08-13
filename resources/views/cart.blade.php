@@ -66,7 +66,8 @@
                                 ! $groupItem->is_checkout_available || $groupItem->available_stock < $groupItem->quantity
                             );
                         @endphp
-                        <article class="panel-card motion-card overflow-hidden {{ $groupNeedsReview ? 'border-amber-400/30' : '' }}">
+                        <article class="panel-card motion-card overflow-hidden {{ $groupNeedsReview ? 'border-amber-400/30' : '' }}"
+                            data-cart-product-group>
                             <div class="border-b border-white/5 px-5 py-4">
                                 <p class="text-xs uppercase tracking-normal text-aksa-accent">
                                     {{ $groupProduct->category?->name ?? 'Product' }}
@@ -75,7 +76,7 @@
                                     class="mt-1 block truncate text-lg font-semibold text-white transition hover:text-aksa-accent">
                                     {{ $groupProduct->name }}
                                 </a>
-                                <p class="mt-1 text-xs text-gray-400">
+                                <p class="mt-1 text-xs text-gray-400" data-cart-group-count>
                                     {{ $productItems->count() }} {{ \Illuminate\Support\Str::plural('package', $productItems->count()) }} selected
                                 </p>
                             </div>
@@ -94,6 +95,9 @@
                                     @endphp
                                     <div class="cart-package-row px-5 py-4"
                                         data-cart-item="{{ $item->id }}"
+                                        data-cart-item-quantity="{{ $item->quantity }}"
+                                        data-cart-package-id="{{ $item->package_id }}"
+                                        data-cart-restore-url="{{ route('cart.items.store', $item->product) }}"
                                         data-cart-item-checkout-ready="{{ $itemCheckoutAvailable ? 'true' : 'false' }}">
                                         <div class="min-w-0">
                                             <p class="font-semibold text-white">{{ $item->package->name }}</p>
@@ -144,7 +148,9 @@
 
                 <aside class="cart-summary-sticky product-section fade-up lg:sticky lg:top-24">
                     <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Cart Summary</p>
-                    <h2 id="cartBundleCount" class="mt-1 text-xl font-semibold text-white">
+                    <h2 id="cartBundleCount" class="mt-1 text-xl font-semibold text-white"
+                        data-cart-distinct-items="{{ $cartItems->count() }}"
+                        data-cart-total-quantity="{{ $cartItems->sum('quantity') }}">
                         {{ $cartItems->count() }} packages · {{ $cartItems->sum('quantity') }} licenses
                     </h2>
 

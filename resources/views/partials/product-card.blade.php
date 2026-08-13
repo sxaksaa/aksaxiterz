@@ -91,7 +91,7 @@
 
     </a>
 @empty
-    <div class="empty-state sm:col-span-2 lg:col-span-3">
+    <div class="empty-state col-span-full">
         <span class="empty-state-icon">
             <x-ui.icon name="box" class="h-6 w-6" />
         </span>

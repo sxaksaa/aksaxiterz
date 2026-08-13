@@ -85,6 +85,7 @@ class CartController extends Controller
                         $this->attachAvailability($items);
                         $this->loadRecommendationData($items);
                     }),
+                    'miniCartHighlightItemId' => $item->id,
                 ])->render(),
             ]);
         });

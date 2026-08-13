@@ -189,6 +189,9 @@ class PaymentPresentationTest extends TestCase
 
         $this->assertStringContainsString('ORDER-STATE-PENDING', $html);
         $this->assertStringContainsString('aria-label="Order progress"', $html);
+        $this->assertStringContainsString('data-order-timeline', $html);
+        $this->assertStringContainsString('order-timeline-track', $html);
+        $this->assertStringContainsString('data-order-id="ORDER-STATE-PENDING"', $html);
         $this->assertStringContainsString('<span>Created</span>', $html);
         $this->assertStringContainsString('<span>Closed</span>', $html);
         $this->assertStringContainsString('<span>Paid</span>', $html);

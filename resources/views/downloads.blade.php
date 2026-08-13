@@ -83,13 +83,19 @@
 
                     <div class="download-accordion-panel">
                         @forelse ($links as $link)
+                            @php
+                                $linkIcon = $resourceIcon($link);
+                                $linkCompleteLabel = $linkIcon === 'download' ? 'Download started' : 'Opened';
+                            @endphp
                             <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer"
-                                class="download-resource-link">
+                                class="download-resource-link" data-download-resource
+                                data-download-complete-label="{{ $linkCompleteLabel }}">
                                 <span class="download-resource-icon">
-                                    <x-ui.icon name="{{ $resourceIcon($link) }}" class="h-4 w-4" />
+                                    <x-ui.icon name="{{ $linkIcon }}" class="h-4 w-4" />
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-sm font-semibold text-white">
+                                    <span class="download-resource-label block truncate text-sm font-semibold text-white"
+                                        data-download-resource-label>
                                         {{ $link['label'] ?? 'Download' }}
                                     </span>
                                     <span class="mt-0.5 block text-xs text-gray-500">

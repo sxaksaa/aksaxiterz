@@ -42,7 +42,7 @@
             </div>
         </section>
 
-        <div data-payment-status-banner class="mb-6 rounded-xl border px-4 py-3 text-sm
+        <div data-payment-status-banner class="mb-6 rounded-xl border px-4 py-3 text-sm {{ $stateKey === 'pending' ? 'payment-pending-panel' : '' }}
             {{ $stateKey === 'paid' ? 'payment-status-verified-in' : '' }}
             {{ $stateKey === 'paid'
                 ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
@@ -53,7 +53,12 @@
                 <x-ui.icon :name="$stateKey === 'paid' ? 'check-circle' : ($stateKey === 'pending' ? 'shield-check' : 'life-buoy')"
                     class="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                    <p class="font-semibold" data-payment-status-label>{{ $paymentState['label'] }}</p>
+                    <p class="inline-flex items-center gap-2 font-semibold" data-payment-status-label>
+                        @if ($stateKey === 'pending')
+                            <span class="payment-pending-dot" aria-hidden="true"></span>
+                        @endif
+                        <span>{{ $paymentState['label'] }}</span>
+                    </p>
                     <p class="mt-1 leading-6 opacity-90" data-payment-status-message>{{ $paymentState['message'] }}</p>
                 </div>
             </div>
@@ -577,6 +582,7 @@
                     window.setTimeout(() => {
                         if (label) label.textContent = 'Payment verified';
                         if (message) message.textContent = result.message || 'Your payment has been confirmed.';
+                        banner?.classList.remove('payment-pending-panel');
                         banner?.classList.remove('payment-status-updating');
                         banner?.classList.add('payment-status-verified-in');
                     }, 180);

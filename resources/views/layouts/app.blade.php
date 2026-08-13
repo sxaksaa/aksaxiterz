@@ -174,6 +174,7 @@
     <div id="appToast" class="app-toast" data-variant="info" role="status" aria-live="polite">
         <div id="appToastTitle" class="app-toast-title">Notice</div>
         <div id="appToastMessage" class="app-toast-message"></div>
+        <button id="appToastAction" type="button" class="app-toast-action hidden"></button>
     </div>
 
     @stack('scripts')
