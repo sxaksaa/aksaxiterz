@@ -5,7 +5,6 @@
         <section class="orders-hero account-hero fade-up mb-8">
             <div class="account-hero-layout">
                 <div class="account-hero-copy">
-                    <p class="account-eyebrow">Order Center</p>
                     <h1 class="account-title">Order History</h1>
                     <p class="account-copy">
                         Track payments, continue pending invoices, and jump back into your licenses after checkout.
@@ -133,6 +132,40 @@
             return button?.querySelector('[data-button-label]')?.textContent || button?.innerText || '';
         }
 
+        function showOrdersRefreshSkeleton(root) {
+            if (!root || root.querySelector('[data-orders-refresh-skeleton]')) return;
+
+            const skeleton = document.createElement('div');
+            skeleton.className = 'orders-refresh-skeleton';
+            skeleton.dataset.ordersRefreshSkeleton = '';
+            skeleton.setAttribute('aria-hidden', 'true');
+            skeleton.innerHTML = Array.from({ length: 3 }, (_, index) => `
+                <span class="orders-refresh-skeleton-row" style="--orders-skeleton-delay: ${index * 70}ms">
+                    <i></i><b></b><em></em>
+                </span>
+            `).join('');
+            root.appendChild(skeleton);
+            root.classList.add('content-is-skeleton-loading');
+            root.setAttribute('aria-busy', 'true');
+        }
+
+        function animateRefreshedOrders(root) {
+            if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+            const entries = [...root.querySelectorAll('[data-order-entry]')]
+                .filter(entry => !entry.classList.contains('hidden') && entry.offsetParent !== null);
+
+            entries.forEach((entry, index) => {
+                entry.style.setProperty('--orders-result-delay', `${Math.min(index * 55, 330)}ms`);
+                entry.classList.add('orders-content-enter');
+            });
+
+            setTimeout(() => entries.forEach((entry) => {
+                entry.classList.remove('orders-content-enter');
+                entry.style.removeProperty('--orders-result-delay');
+            }), 980);
+        }
+
         async function fetchPaymentJson(url, formData) {
             const response = await fetch(url, {
                 method: 'POST',
@@ -167,6 +200,7 @@
             const ordersContent = document.getElementById('ordersContent');
             const previousTimelineStates = captureOrderTimelineStates(ordersContent);
             ordersContent?.classList.add('content-is-refreshing');
+            const skeletonTimer = setTimeout(() => showOrdersRefreshSkeleton(ordersContent), 220);
 
             try {
                 const fragmentUrl = new URL('/orders-fragment', window.location.origin);
@@ -185,10 +219,14 @@
                     animateOrderTimelineChanges(ordersContent, previousTimelineStates);
                 }
                 applyOrderFilter();
+                animateRefreshedOrders(ordersContent);
                 updateCountdowns();
             } finally {
+                clearTimeout(skeletonTimer);
                 ordersRefreshing = false;
-                ordersContent?.classList.remove('content-is-refreshing');
+                ordersContent?.classList.remove('content-is-refreshing', 'content-is-skeleton-loading');
+                ordersContent?.removeAttribute('aria-busy');
+                ordersContent?.querySelector('[data-orders-refresh-skeleton]')?.remove();
             }
         }
 

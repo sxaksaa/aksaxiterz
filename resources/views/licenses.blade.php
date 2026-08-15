@@ -38,7 +38,6 @@
         <section class="license-hero account-hero mb-5 fade-up">
             <div class="account-hero-layout">
                 <div class="account-hero-copy">
-                    <p class="account-eyebrow">License Vault</p>
                     <h1 class="account-title">My Licenses</h1>
                     <p class="account-copy">Manage and copy your purchased license keys.</p>
                 </div>

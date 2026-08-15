@@ -107,7 +107,7 @@
                         </div>
                     </section>
 
-                    <section class="product-section fade-up">
+                    <section class="checkout-payment-section product-section">
                         <div class="mb-4">
                             <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 2</p>
                             <h2 class="mt-1 text-xl font-semibold text-white">Payment method</h2>
@@ -164,37 +164,40 @@
                         </div>
 
                         @if ($binancePayAvailable)
-                            <div id="checkoutBinanceOptions" class="mt-5 hidden">
-                                <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Binance Pay coin</p>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <label class="crypto-coin-option cursor-pointer">
-                                        <input class="sr-only" type="radio" name="token" value="usdt">
-                                        <span class="crypto-coin-header">
-                                            <x-ui.icon name="tether" class="crypto-token-icon" />
-                                            <span class="crypto-token-copy">
-                                                <span class="crypto-token-title">USDT</span>
-                                                <span class="crypto-token-subtitle">Tether</span>
+                            <div id="checkoutBinanceOptions" class="checkout-options-reveal" aria-hidden="true" inert>
+                                <div class="checkout-options-reveal-inner">
+                                    <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Binance Pay coin</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <label class="crypto-coin-option cursor-pointer">
+                                            <input class="sr-only" type="radio" name="token" value="usdt">
+                                            <span class="crypto-coin-header">
+                                                <x-ui.icon name="tether" class="crypto-token-icon" />
+                                                <span class="crypto-token-copy">
+                                                    <span class="crypto-token-title">USDT</span>
+                                                    <span class="crypto-token-subtitle">Tether</span>
+                                                </span>
                                             </span>
-                                        </span>
-                                    </label>
-                                    <label class="crypto-coin-option cursor-pointer">
-                                        <input class="sr-only" type="radio" name="token" value="usdc">
-                                        <span class="crypto-coin-header">
-                                            <x-ui.icon name="usdc" class="crypto-token-icon" />
-                                            <span class="crypto-token-copy">
-                                                <span class="crypto-token-title">USDC</span>
-                                                <span class="crypto-token-subtitle">USD Coin</span>
+                                        </label>
+                                        <label class="crypto-coin-option cursor-pointer">
+                                            <input class="sr-only" type="radio" name="token" value="usdc">
+                                            <span class="crypto-coin-header">
+                                                <x-ui.icon name="usdc" class="crypto-token-icon" />
+                                                <span class="crypto-token-copy">
+                                                    <span class="crypto-token-title">USDC</span>
+                                                    <span class="crypto-token-subtitle">USD Coin</span>
+                                                </span>
                                             </span>
-                                        </span>
-                                    </label>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         @endif
 
-                        <div id="checkoutCryptoOptions" class="mt-5 hidden">
-                            <div>
-                                <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
-                                <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Select crypto coin">
+                        <div id="checkoutCryptoOptions" class="checkout-options-reveal" aria-hidden="true" inert>
+                            <div class="checkout-options-reveal-inner">
+                                <div>
+                                    <p class="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-400">Coin</p>
+                                    <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Select crypto coin">
                                     <label class="crypto-coin-option cursor-pointer" data-checkout-crypto-token-option>
                                         <input class="sr-only" type="radio" name="crypto_token" value="usdt">
                                         <span class="crypto-coin-header">
@@ -215,15 +218,16 @@
                                             </span>
                                         </span>
                                     </label>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div id="checkoutCryptoNetworkOptions" class="mt-4 hidden">
-                                <div class="mb-2 flex items-center justify-between gap-3">
-                                    <p class="text-xs font-semibold uppercase tracking-normal text-gray-400">Network</p>
-                                    <span id="checkoutCryptoNetworkPrompt" class="text-xs text-gray-500">Select a coin first</span>
-                                </div>
-                                <div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Select crypto network">
+                                <div id="checkoutCryptoNetworkOptions" class="checkout-network-reveal" aria-hidden="true" inert>
+                                    <div class="checkout-network-reveal-inner">
+                                        <div class="mb-2 flex items-center justify-between gap-3">
+                                            <p class="text-xs font-semibold uppercase tracking-normal text-gray-400">Network</p>
+                                            <span id="checkoutCryptoNetworkPrompt" class="text-xs text-gray-500">Select a coin first</span>
+                                        </div>
+                                        <div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Select crypto network">
                                     <label class="crypto-coin-option cursor-pointer text-left"
                                         data-checkout-crypto-network-option data-token="usdt">
                                         <input class="sr-only" type="radio" name="coin" value="usdtbsc" disabled>
@@ -257,13 +261,15 @@
                                             </span>
                                         </span>
                                     </label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </section>
                 </div>
 
-                <aside id="checkoutFinalSummary" class="product-section fade-up lg:sticky lg:top-24">
+                <aside id="checkoutFinalSummary" class="checkout-final-summary product-section lg:sticky lg:top-24">
                     <div class="mb-5">
                         <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 3</p>
                         <h2 class="mt-1 text-xl font-semibold text-white">Final summary</h2>
@@ -360,6 +366,14 @@
             const selectedPaymentToken = () => paymentMethod() === 'binance_pay'
                 ? selectedToken()
                 : (paymentMethod() === 'crypto' ? selectedCryptoToken() : null);
+
+            function setCheckoutOptionsVisibility(element, visible) {
+                if (!element) return;
+
+                element.classList.toggle('is-open', visible);
+                element.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                element.inert = !visible;
+            }
 
             function setButtonLabel(button, label) {
                 const target = button?.querySelector('[data-button-label]');
@@ -463,7 +477,7 @@
                 const networkOptions = document.getElementById('checkoutCryptoNetworkOptions');
                 const prompt = document.getElementById('checkoutCryptoNetworkPrompt');
 
-                networkOptions?.classList.toggle('hidden', !token);
+                setCheckoutOptionsVisibility(networkOptions, Boolean(token));
 
                 if (prompt) {
                     prompt.textContent = token ? `Choose a network for ${token.toUpperCase()}` : 'Select a coin first';
@@ -509,13 +523,13 @@
                     ? `-${formatStablecoin(voucherQuote?.discount_usdt || 0, paymentToken)}`
                     : `-${formatIdr(voucherQuote?.discount_idr || 0)}`;
 
-                window.animateAksaValue?.(document.getElementById('checkoutSubtotal'), subtotal);
-                window.animateAksaValue?.(document.getElementById('checkoutTotal'), total);
+                document.getElementById('checkoutSubtotal').textContent = subtotal;
+                document.getElementById('checkoutTotal').textContent = total;
                 document.getElementById('checkoutSubtotalLabel').textContent =
                     qris || stablecoin ? 'Catalog subtotal' : 'Subtotal';
                 document.getElementById('checkoutTotalLabel').textContent =
                     qris || stablecoin ? 'Invoice amount' : 'Total';
-                window.animateAksaValue?.(document.getElementById('checkoutDiscount'), discount);
+                document.getElementById('checkoutDiscount').textContent = discount;
                 document.getElementById('checkoutDiscountRow').classList.toggle('hidden', !voucherQuote);
 
                 const hint = document.getElementById('checkoutCurrencyHint');
@@ -624,14 +638,22 @@
                     form.querySelectorAll('[data-checkout-payment-card]').forEach(card => {
                         card.classList.toggle('active', card.contains(input));
                     });
-                    document.getElementById('checkoutBinanceOptions')?.classList.toggle(
-                        'hidden',
-                        paymentMethod() !== 'binance_pay'
+                    setCheckoutOptionsVisibility(
+                        document.getElementById('checkoutBinanceOptions'),
+                        paymentMethod() === 'binance_pay'
                     );
-                    document.getElementById('checkoutCryptoOptions').classList.toggle(
-                        'hidden',
-                        paymentMethod() !== 'crypto'
+                    setCheckoutOptionsVisibility(
+                        document.getElementById('checkoutCryptoOptions'),
+                        paymentMethod() === 'crypto'
                     );
+                    if (paymentMethod() !== 'crypto') {
+                        setCheckoutOptionsVisibility(
+                            document.getElementById('checkoutCryptoNetworkOptions'),
+                            false
+                        );
+                    } else {
+                        refreshCryptoNetworkOptions();
+                    }
                     voucherQuote = null;
                     document.getElementById('checkoutVoucherValue').value = '';
                     updateTotals();
@@ -850,6 +872,14 @@
                 once: true,
             });
 
+            setCheckoutOptionsVisibility(
+                document.getElementById('checkoutBinanceOptions'),
+                paymentMethod() === 'binance_pay'
+            );
+            setCheckoutOptionsVisibility(
+                document.getElementById('checkoutCryptoOptions'),
+                paymentMethod() === 'crypto'
+            );
             refreshCryptoNetworkOptions();
             updateTotals();
         })();

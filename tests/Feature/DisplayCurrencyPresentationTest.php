@@ -90,6 +90,12 @@ class DisplayCurrencyPresentationTest extends TestCase
             stock: 2
         );
         $this->enableGopayQris();
+        config([
+            'services.binance.pay.enabled' => true,
+            'services.binance.pay.pay_id' => '123456789',
+            'services.binance.pay.api_key' => 'test-key',
+            'services.binance.pay.api_secret' => 'test-secret',
+        ]);
 
         $checkout = $this->actingAs($user)
             ->get(route('checkout.product', [
@@ -100,6 +106,13 @@ class DisplayCurrencyPresentationTest extends TestCase
             ->assertOk()
             ->assertSee('data-price-idr="40000"', false)
             ->assertSee('data-price-usd="2.5"', false)
+            ->assertSee('class="checkout-payment-section product-section"', false)
+            ->assertSee('class="checkout-final-summary product-section', false)
+            ->assertSee('id="checkoutBinanceOptions" class="checkout-options-reveal" aria-hidden="true" inert', false)
+            ->assertSee('class="checkout-options-reveal-inner"', false)
+            ->assertSee('id="checkoutCryptoNetworkOptions" class="checkout-network-reveal" aria-hidden="true" inert', false)
+            ->assertSee('class="checkout-network-reveal-inner"', false)
+            ->assertSee("element.classList.toggle('is-open', visible)", false)
             ->assertSee('Final payment is charged in IDR through QRIS.')
             ->assertSee('Final payment uses ${String(paymentToken).toUpperCase()}')
             ->assertDontSee('name="display_currency"', false);
@@ -108,6 +121,15 @@ class DisplayCurrencyPresentationTest extends TestCase
             '/id="checkoutTotal"[^>]*data-display-price/',
             $checkout->getContent()
         );
+        $this->assertStringNotContainsString(
+            "window.animateAksaValue?.(document.getElementById('checkoutSubtotal')",
+            $checkout->getContent()
+        );
+        $this->assertStringNotContainsString(
+            "window.animateAksaValue?.(document.getElementById('checkoutTotal')",
+            $checkout->getContent()
+        );
+        $this->assertStringNotContainsString('checkout-step-transition', $checkout->getContent());
 
         $response = $this->actingAs($user)
             ->postJson(route('checkout.product.process', $product), [

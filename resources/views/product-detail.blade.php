@@ -706,7 +706,7 @@
 
                     const previousCartCount = Number(document.querySelector('[data-cart-count]')?.textContent || 0);
                     document.querySelectorAll('[data-cart-count]').forEach(badge => {
-                        badge.textContent = data.cart_count;
+                        window.animateAksaValue?.(badge, String(data.cart_count));
                         badge.classList.toggle('hidden', Number(data.cart_count) < 1);
                     });
                     await window.animateAksaCartTransfer?.(

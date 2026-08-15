@@ -2489,6 +2489,11 @@ window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
         'aria-label',
         `Open cart with ${Number(cartCount || 0)} items`
     );
+    document.querySelectorAll('[data-cart-count]').forEach((badge) => {
+        const nextCount = String(Number(cartCount || 0));
+        window.animateAksaValue?.(badge, nextCount);
+        badge.classList.toggle('hidden', Number(cartCount || 0) < 1);
+    });
     initializeDisplayCurrency(panel);
 
     if (options.bumpBadge) {
@@ -3500,17 +3505,30 @@ document.addEventListener('aksa:before-page-swap', () => {
     document.documentElement.classList.remove('aksa-home-reveal-ready', 'aksa-home-reveal-consumed');
 });
 
-window.animateAksaValue = function(element, nextText) {
-    if (!(element instanceof Element) || element.textContent === nextText) return;
+window.animateAksaValue = function(element, nextText, options = {}) {
+    if (!(element instanceof Element)) return;
 
-    element.textContent = nextText;
+    const renderedText = element.textContent?.trim() || '';
+    const previousText = String(options.previousText ?? renderedText).trim();
+    const normalizedNextText = String(nextText);
 
-    if (shouldReduceMotion()) return;
+    if (renderedText === normalizedNextText && previousText === normalizedNextText) return;
+
+    element.dataset.aksaPreviousValue = previousText;
+    element.textContent = normalizedNextText;
+
+    if (shouldReduceMotion()) {
+        delete element.dataset.aksaPreviousValue;
+        return;
+    }
 
     element.classList.remove('aksa-value-change');
     void element.offsetWidth;
     element.classList.add('aksa-value-change');
-    window.setTimeout(() => element.classList.remove('aksa-value-change'), 460);
+    window.setTimeout(() => {
+        element.classList.remove('aksa-value-change');
+        delete element.dataset.aksaPreviousValue;
+    }, 520);
 };
 
 function setDownloadAccordionExpanded(accordion, expanded) {
@@ -4110,7 +4128,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
         );
 
         document.querySelectorAll('[data-cart-count]').forEach(badge => {
-            badge.textContent = String(totalQuantity);
+            window.animateAksaValue?.(badge, String(totalQuantity));
             badge.classList.toggle('hidden', totalQuantity <= 0);
         });
 
@@ -4125,6 +4143,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
     }
 
     if (subtotal) {
+        const previousSubtotal = subtotal.textContent?.trim() || '';
         const nextIdr = Math.max(0, Number(subtotal.dataset.priceIdr || 0) + idrDelta);
         const currentUsd = Number(subtotal.dataset.priceUsd || 0);
         const nextUsd = Math.max(0, currentUsd + usdDelta);
@@ -4132,9 +4151,9 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
         subtotal.dataset.priceIdr = String(nextIdr);
         if (subtotal.dataset.priceUsd !== '') subtotal.dataset.priceUsd = String(nextUsd);
         window.refreshAksaDisplayCurrency?.(subtotal.parentElement || document);
-        subtotal.classList.remove('aksa-value-change');
-        void subtotal.offsetWidth;
-        subtotal.classList.add('aksa-value-change');
+        window.animateAksaValue?.(subtotal, subtotal.textContent?.trim() || '', {
+            previousText: previousSubtotal,
+        });
     }
 }
 
@@ -4314,12 +4333,13 @@ document.addEventListener('submit', async (event) => {
 
         const lineTotal = row.querySelector('[data-cart-line-total]');
         if (lineTotal) {
+            const previousLineTotal = lineTotal.textContent?.trim() || '';
             lineTotal.dataset.priceIdr = String(item.line_total_idr ?? 0);
             lineTotal.dataset.priceUsd = String(item.line_total_usdt ?? '');
             window.refreshAksaDisplayCurrency?.(row);
-            lineTotal.classList.remove('aksa-value-change');
-            void lineTotal.offsetWidth;
-            lineTotal.classList.add('aksa-value-change');
+            window.animateAksaValue?.(lineTotal, lineTotal.textContent?.trim() || '', {
+                previousText: previousLineTotal,
+            });
         }
 
         const decrement = form.querySelector('[data-cart-quantity-direction="down"]');
@@ -4351,16 +4371,17 @@ document.addEventListener('submit', async (event) => {
 
         const subtotal = document.querySelector('[data-cart-subtotal]');
         if (subtotal) {
+            const previousSubtotal = subtotal.textContent?.trim() || '';
             subtotal.dataset.priceIdr = String(cart.subtotal_idr ?? 0);
             subtotal.dataset.priceUsd = String(cart.subtotal_usdt ?? '');
             window.refreshAksaDisplayCurrency?.(subtotal.parentElement || document);
-            subtotal.classList.remove('aksa-value-change');
-            void subtotal.offsetWidth;
-            subtotal.classList.add('aksa-value-change');
+            window.animateAksaValue?.(subtotal, subtotal.textContent?.trim() || '', {
+                previousText: previousSubtotal,
+            });
         }
 
         document.querySelectorAll('[data-cart-count]').forEach(badge => {
-            badge.textContent = String(totalQuantity);
+            window.animateAksaValue?.(badge, String(totalQuantity));
             badge.classList.toggle('hidden', totalQuantity <= 0);
         });
 
@@ -4382,23 +4403,6 @@ document.addEventListener('submit', async (event) => {
         row.classList.remove('cart-item-updating');
     }
 }, true);
-
-document.addEventListener('change', (event) => {
-    const control = event.target.closest('#checkoutForm input[type="radio"]');
-
-    if (!control || shouldReduceMotion()) return;
-
-    const section = control.closest('.product-section');
-    const summary = document.getElementById('checkoutFinalSummary');
-
-    [section, summary].forEach(element => {
-        if (!element) return;
-        element.classList.remove('checkout-step-transition');
-        void element.offsetWidth;
-        element.classList.add('checkout-step-transition');
-        window.setTimeout(() => element.classList.remove('checkout-step-transition'), 540);
-    });
-});
 
 document.addEventListener('submit', (event) => {
     const form = event.target.closest('[data-license-reset-form]');
@@ -4804,6 +4808,7 @@ document.addEventListener('click', async (event) => {
     try {
         await navigator.clipboard.writeText(text);
         setButtonLabel(button, 'Copied');
+        button.classList.remove('text-green-400');
         button.classList.add('text-aksa-accent-soft');
         button.classList.add('is-copy-success');
         const licenseBox = button.closest('.license-key-box');
@@ -4843,7 +4848,8 @@ document.addEventListener('click', async (event) => {
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, button.dataset.copySuccessLabel || 'Copied ✓');
+        setButtonLabel(button, button.dataset.copySuccessLabel || 'Copied');
+        button.classList.remove('text-green-400');
         button.classList.add('text-aksa-accent-soft');
         button.classList.toggle('is-copy-all-success', Boolean(copyAllGroup));
         copyAllGroup?.classList.remove('license-group-copy-success');

@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test';
 
 test('branded intro plays once per tab session and releases the storefront', async ({ page }) => {
+    await page.addInitScript(() => {
+        window.__homeCounterStates = [];
+        const recordCounterState = () => {
+            document.querySelectorAll('[data-home-count-up-state]').forEach((counter) => {
+                const state = counter.getAttribute('data-home-count-up-state');
+                if (state && !window.__homeCounterStates.includes(state)) {
+                    window.__homeCounterStates.push(state);
+                }
+            });
+        };
+        new MutationObserver(recordCounterState).observe(document, {
+            attributes: true,
+            attributeFilter: ['data-home-count-up-state'],
+            childList: true,
+            subtree: true,
+        });
+    });
     await page.goto('/?intro-e2e=1');
 
     await expect(page.locator('#aksaSiteIntro')).toBeVisible();
@@ -89,7 +106,7 @@ test('branded intro plays once per tab session and releases the storefront', asy
     expect(revealSequence.recentPurchaseHidden).toBe(true);
 
     const deliveredCounter = page.locator('[data-home-count-up="5000"]');
-    await expect(deliveredCounter).toHaveAttribute('data-home-count-up-state', 'running');
+    await expect.poll(() => page.evaluate(() => window.__homeCounterStates.includes('running'))).toBe(true);
 
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
         timeout: 4000,
@@ -184,6 +201,9 @@ test('license actions and download launch feedback use the themed motion states'
     await expect(copyButton).not.toHaveClass(/text-green-400/);
     await expect(copyButton.locator('svg')).toHaveCSS('display', 'none');
     expect(await copyButton.evaluate(button => getComputedStyle(button, '::before').content)).toBe('"✓"');
+    expect(await copyButton.evaluate(button => getComputedStyle(button, '::after').content)).toBe('none');
+    await expect(copyButton).toHaveCSS('color', 'rgb(180, 155, 255)');
+    await copyButton.hover();
     await expect(copyButton).toHaveCSS('color', 'rgb(180, 155, 255)');
 
     await page.goto('/downloads');
@@ -377,11 +397,22 @@ test('public storefront has working navigation and SEO metadata', async ({ page 
 
     await page.goto('/downloads');
     await expect(page).toHaveTitle(/Downloads - Aksa Xiterz/);
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1')).toHaveText('Downloads');
+    await expect(page.locator('.download-hero')).toHaveCount(0);
+    await expect(page.getByRole('searchbox', { name: 'Search downloads...' })).toBeVisible();
+    const downloadsTopGap = await page.locator('h1').evaluate((title) => (
+        title.getBoundingClientRect().top - document.querySelector('.site-navbar-pill').getBoundingClientRect().bottom
+    ));
+    expect(downloadsTopGap).toBeGreaterThanOrEqual(24);
 
     await page.goto('/guides');
     await expect(page).toHaveTitle(/Setup Guides - Aksa Xiterz/);
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1')).toHaveText('Guides');
+    await expect(page.locator('.download-hero')).toHaveCount(0);
+    const guidesTopGap = await page.locator('h1').evaluate((title) => (
+        title.getBoundingClientRect().top - document.querySelector('.site-navbar-pill').getBoundingClientRect().bottom
+    ));
+    expect(guidesTopGap).toBeGreaterThanOrEqual(24);
 
     expect(consoleErrors).toEqual([]);
 });
@@ -505,10 +536,12 @@ test('product checkout summary uses the restrained purple hierarchy', async ({ p
 
     const availablePackage = page.locator('[data-package-checkout-enabled="true"]').first();
     await expect(availablePackage).toBeVisible();
-    await availablePackage.click();
+    const packageAnimationName = await availablePackage.evaluate(element => {
+        element.click();
+        return getComputedStyle(element).animationName;
+    });
     await expect(availablePackage).toHaveClass(/active/);
-    expect(await availablePackage.evaluate(element => getComputedStyle(element).animationName))
-        .toContain('package-selection-pop');
+    expect(packageAnimationName).toContain('package-selection-pop');
 
     const summary = page.locator('#summaryBox');
     await expect(summary).toBeVisible();
@@ -802,6 +835,21 @@ test('live stock changes animate the updated availability without replacing the 
     }));
     const nextStock = product.stock + 1;
 
+    await page.evaluate((productId) => {
+        window.__stockAnimationObserved = false;
+        const selector = `[data-product-stock-card][data-product-id="${productId}"] [data-product-stock-label]`;
+        new MutationObserver(() => {
+            if (document.querySelector(selector)?.classList.contains('product-stock-changed')) {
+                window.__stockAnimationObserved = true;
+            }
+        }).observe(document.body, {
+            attributes: true,
+            attributeFilter: ['class'],
+            childList: true,
+            subtree: true,
+        });
+    }, product.id);
+
     await page.route('**/api/product-stocks', route => route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -822,7 +870,123 @@ test('live stock changes animate the updated availability without replacing the 
     const refreshedCard = page.locator(`[data-product-stock-card][data-product-id="${product.id}"]`);
     await expect(refreshedCard).toHaveCount(1);
     await expect(refreshedCard.locator('[data-product-stock-label]')).toContainText(`${nextStock} available`);
-    await expect(refreshedCard.locator('[data-product-stock-label]')).toHaveClass(/product-stock-changed/);
+    await expect.poll(() => page.evaluate(() => window.__stockAnimationObserved)).toBe(true);
+});
+
+test('slow product search uses a stable skeleton without replaying result animations', async ({ page }) => {
+    await page.route('**/products-fragment?*', async route => {
+        const requestUrl = new URL(route.request().url());
+        const responseDelay = requestUrl.searchParams.get('search') ? 1500 : 720;
+        await new Promise(resolve => setTimeout(resolve, responseDelay));
+        await route.fulfill({
+            contentType: 'text/html',
+            body: '<article data-product-stock-card data-product-id="1">Aurora</article><article data-product-stock-card data-product-id="2">Fluorite</article>',
+        });
+    });
+    await page.goto('/');
+
+    const categoryResponse = page.waitForResponse(response => (
+        response.url().includes('/products-fragment?') && response.ok()
+    ));
+    await page.getByRole('button', { name: 'PC', exact: true }).click();
+    await page.waitForTimeout(360);
+    await expect(page.locator('#productContainer > .skeleton-card')).toHaveCount(0);
+    await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
+    await categoryResponse;
+
+    await page.getByRole('textbox', { name: 'Search products' }).fill('Aurora');
+    await expect(page.locator('#productContainer')).toHaveClass(/product-container-loading/);
+    await expect(page.locator('#productContainer > .skeleton-card')).toHaveCount(6);
+    await expect(page.locator('[data-product-stock-card]')).toHaveCount(2);
+    await expect(page.locator('#productContainer')).not.toHaveClass(
+        /product-container-loading|product-filter-leaving|product-filter-entering|product-skeleton-resolved/,
+    );
+    await expect(page.locator('#productContainer > *').nth(1)).not.toHaveAttribute('style', /product-result-delay/);
+});
+
+test('live values roll while the navbar logo keeps a subtle themed hover', async ({ page }) => {
+    await page.goto('/');
+    const valueRollState = await page.evaluate(() => {
+        const value = document.createElement('span');
+        const checkoutForm = document.createElement('form');
+        const motionPanel = document.createElement('div');
+        const summaryPanel = document.createElement('aside');
+        const optionsPanel = document.createElement('div');
+        value.dataset.valueRollTest = '';
+        value.textContent = '3';
+        checkoutForm.id = 'checkoutForm';
+        motionPanel.dataset.fadeLayerTest = '';
+        motionPanel.className = 'product-section checkout-payment-section';
+        motionPanel.innerHTML = '<label><input type="radio" name="payment_method" value="test">Test payment</label>';
+        summaryPanel.id = 'checkoutFinalSummary';
+        summaryPanel.className = 'product-section checkout-final-summary';
+        optionsPanel.dataset.checkoutOptionsTest = '';
+        optionsPanel.className = 'checkout-options-reveal';
+        optionsPanel.setAttribute('aria-hidden', 'true');
+        optionsPanel.inert = true;
+        optionsPanel.innerHTML = `
+            <div class="checkout-options-reveal-inner">
+                <div><label class="crypto-coin-option">USDT</label><label class="crypto-coin-option">USDC</label></div>
+                <div class="checkout-network-reveal" data-checkout-network-test aria-hidden="true" inert>
+                    <div class="checkout-network-reveal-inner">
+                        <div><label class="crypto-coin-option" data-checkout-crypto-network-option>BNB Smart Chain</label></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        checkoutForm.append(motionPanel, summaryPanel, optionsPanel);
+        document.querySelector('main')?.append(value, checkoutForm);
+        window.animateAksaValue(value, '8');
+
+        return {
+            started: value.classList.contains('aksa-value-change'),
+            previousContent: getComputedStyle(value, '::before').content,
+        };
+    });
+
+    const value = page.locator('[data-value-roll-test]');
+    await expect(value).toHaveText('8');
+    await expect(value).toHaveAttribute('data-aksa-previous-value', '3');
+    expect(valueRollState).toEqual({ started: true, previousContent: '"3"' });
+
+    const brand = page.locator('.site-brand-link');
+    const logo = page.locator('[data-site-brand-logo]');
+    const brandWidth = await brand.evaluate(element => element.getBoundingClientRect().width);
+    const logoWidth = await logo.evaluate(element => element.getBoundingClientRect().width);
+    expect(Math.abs(brandWidth - logoWidth)).toBeLessThanOrEqual(1);
+    expect(await brand.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+    await brand.hover();
+    await expect(logo).not.toHaveCSS('transform', 'none');
+    expect(await logo.evaluate(element => getComputedStyle(element).filter)).toContain('drop-shadow');
+    await expect(page.locator('[data-fade-layer-test]')).toHaveCSS('will-change', 'auto');
+    await expect(page.locator('[data-fade-layer-test]')).toHaveCSS('backdrop-filter', 'none');
+    await page.getByRole('radio', { name: 'Test payment' }).click();
+    await expect(page.locator('[data-fade-layer-test]')).not.toHaveClass(/checkout-step-transition/);
+    await expect(page.locator('[data-fade-layer-test]')).toHaveCSS('opacity', '1');
+    await expect(page.locator('#checkoutFinalSummary')).not.toHaveClass(/checkout-step-transition/);
+    await expect(page.locator('#checkoutFinalSummary')).toHaveCSS('opacity', '1');
+
+    const optionsPanel = page.locator('[data-checkout-options-test]');
+    await expect(optionsPanel).toHaveCSS('opacity', '0');
+    await optionsPanel.evaluate(element => {
+        element.classList.add('is-open');
+        element.setAttribute('aria-hidden', 'false');
+        element.inert = false;
+    });
+    await expect(optionsPanel).toHaveCSS('opacity', '1');
+    await expect(optionsPanel).toHaveAttribute('aria-hidden', 'false');
+    await expect(optionsPanel.locator('.crypto-coin-option').first()).toHaveCSS('opacity', '1');
+
+    const networkPanel = page.locator('[data-checkout-network-test]');
+    await expect(networkPanel).toHaveCSS('opacity', '0');
+    await networkPanel.evaluate(element => {
+        element.classList.add('is-open');
+        element.setAttribute('aria-hidden', 'false');
+        element.inert = false;
+    });
+    await expect(networkPanel).toHaveCSS('opacity', '1');
+    await expect(networkPanel).toHaveAttribute('aria-hidden', 'false');
+    await expect(networkPanel.locator('[data-checkout-crypto-network-option]')).toHaveCSS('opacity', '1');
 });
 
 test('empty product search can clear all filters', async ({ page }) => {
@@ -833,6 +997,7 @@ test('empty product search can clear all filters', async ({ page }) => {
     await search.fill('product-that-does-not-exist-anywhere');
     const emptyState = page.locator('#productContainer > .empty-state');
     await expect(emptyState.getByText('No products found')).toBeVisible();
+    await expect(page.locator('#productContainer')).not.toHaveClass(/product-filter-entering/);
 
     const emptyStateAlignment = await page.evaluate(() => {
         const container = document.querySelector('#productContainer');
@@ -851,8 +1016,13 @@ test('empty product search can clear all filters', async ({ page }) => {
 
     await page.getByRole('button', { name: 'Clear Filters' }).click();
 
+    await expect(emptyState).toHaveClass(/empty-state-clearing/);
+
     await expect(search).toHaveValue('');
-    await expect(page.locator('[data-product-stock-card]').first()).toBeVisible();
+    await expect(page.locator('#productContainer')).toHaveAttribute('data-product-restore-completed', 'true', {
+        timeout: 10000,
+    });
+    await expect(page.locator('[data-product-stock-card]').first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 

@@ -266,11 +266,17 @@ class CartCheckoutFeatureTest extends TestCase
         $this->actingAs($user)
             ->get('/orders')
             ->assertOk()
+            ->assertSee('Order History')
+            ->assertDontSee('Order Center')
             ->assertSee('Aurora')
-            ->assertSee('Drip');
+            ->assertSee('Drip')
+            ->assertSee('orders-refresh-skeleton', false)
+            ->assertSee('animateRefreshedOrders', false);
         $licenseResponse = $this->actingAs($user)
             ->get('/licenses?order='.$order->order_id)
             ->assertOk()
+            ->assertSee('My Licenses')
+            ->assertDontSee('License Vault')
             ->assertSee('Aurora')
             ->assertSee('Drip')
             ->assertSee('2 licenses · latest purchase')

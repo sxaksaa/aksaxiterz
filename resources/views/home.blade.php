@@ -223,12 +223,18 @@
                 const clearButton = event.target.closest('[data-clear-product-filters]');
                 if (!clearButton) return;
 
-                searchInput.value = '';
-                updateSearchClearButton();
-                container.dataset.productRestore = 'true';
-                const allCategory = document.querySelector('[data-category-filter][data-category=""]');
-                filterCategory('', allCategory);
-                searchInput.focus();
+                const emptyState = clearButton.closest('.empty-state');
+                emptyState?.classList.add('empty-state-clearing');
+                clearButton.disabled = true;
+
+                setTimeout(() => {
+                    searchInput.value = '';
+                    updateSearchClearButton();
+                    container.dataset.productRestore = 'true';
+                    const allCategory = document.querySelector('[data-category-filter][data-category=""]');
+                    filterCategory('', allCategory);
+                    searchInput.focus();
+                }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180);
             });
 
             function filterCategory(cat, el) {
@@ -263,15 +269,13 @@
                 });
 
                 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                container.classList.remove('product-filter-entering');
-                container.classList.add('product-filter-leaving');
-                const exitDelay = reduceMotion ? 0 : 260;
-                const skeletonTimer = setTimeout(() => {
+                const shouldShowSkeleton = search.trim().length > 0;
+                const skeletonDelay = reduceMotion ? 0 : 260;
+                const skeletonTimer = shouldShowSkeleton ? setTimeout(() => {
                     if (requestSequence !== productRequestSequence) return;
                     container.classList.add('product-container-loading');
-                    container.classList.remove('product-filter-leaving');
                     container.innerHTML = productSkeletonHtml();
-                }, exitDelay);
+                }, skeletonDelay) : null;
 
                 return fetch(`${productEndpoint}?${params.toString()}`, {
                         cache: 'no-store',
@@ -293,8 +297,7 @@
 
                         clearTimeout(skeletonTimer);
                         container.innerHTML = html.trim() || emptyProductsHtml();
-                        container.classList.remove('product-filter-leaving');
-                        container.classList.add('product-filter-entering');
+                        container.classList.remove('product-container-loading');
                         if (container.dataset.productRestore === 'true') {
                             delete container.dataset.productRestore;
                             container.dataset.productRestoreCompleted = 'true';
@@ -306,7 +309,6 @@
                         }
                         window.refreshAksaDisplayCurrency?.(container);
                         window.initializeAksaPageEnhancements?.(container);
-                        setTimeout(() => container.classList.remove('product-filter-entering'), 600);
                         refreshProductStocks();
                     })
                     .catch(error => {
@@ -314,7 +316,7 @@
 
                         clearTimeout(skeletonTimer);
                         delete container.dataset.productRestore;
-                        container.classList.remove('product-filter-leaving');
+                        container.classList.remove('product-container-loading');
                         container.innerHTML = emptyProductsHtml(
                             'Products could not be loaded. Please refresh the page and try again.'
                         );
@@ -373,15 +375,18 @@
                     const stockLabel = card.querySelector('[data-product-stock-label]');
 
                     if (stockLabel) {
-                        stockLabel.textContent = isUpdating
+                        const nextStockLabel = isUpdating
                             ? 'Checkout paused · Discord alerts'
                             : (stock > 0 ? `${stock} available · Auto delivery` : 'Manual order via Discord');
 
                         if (previousStatus !== status || previousStock !== stock) {
+                            window.animateAksaValue?.(stockLabel, nextStockLabel);
                             stockLabel.classList.remove('product-stock-changed');
                             void stockLabel.offsetWidth;
                             stockLabel.classList.add('product-stock-changed');
                             setTimeout(() => stockLabel.classList.remove('product-stock-changed'), 680);
+                        } else {
+                            stockLabel.textContent = nextStockLabel;
                         }
                     }
                 });
@@ -391,13 +396,11 @@
                 if (totalStock && Number.isSafeInteger(totalAvailableStock) && totalAvailableStock >= 0) {
                     const previousTotal = Number(totalStock.textContent || 0);
                     totalStock.dataset.homeCountUp = String(totalAvailableStock);
-                    totalStock.textContent = String(totalAvailableStock);
 
                     if (Number.isFinite(previousTotal) && previousTotal !== totalAvailableStock) {
-                        totalStock.classList.remove('aksa-value-change');
-                        void totalStock.offsetWidth;
-                        totalStock.classList.add('aksa-value-change');
-                        setTimeout(() => totalStock.classList.remove('aksa-value-change'), 480);
+                        window.animateAksaValue?.(totalStock, String(totalAvailableStock));
+                    } else {
+                        totalStock.textContent = String(totalAvailableStock);
                     }
                 }
             }

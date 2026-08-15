@@ -86,6 +86,13 @@ class AdminDownloadManagementTest extends TestCase
         $response->assertSee('download-accordion-panel', false);
         $response->assertSee('data-download-resource', false);
         $response->assertSee('data-download-complete-label=', false);
+        $response->assertSee('<h1 class="text-3xl font-semibold text-white md:text-4xl">Downloads</h1>', false);
+        $response->assertSee('id="downloadSearch"', false);
+        $response->assertSee('page-shell pb-16 pt-14 md:pb-20 md:pt-16', false);
+        $response->assertDontSee('download-hero', false);
+        $response->assertDontSee('All setup files in');
+        $response->assertDontSee('Choose what you need');
+        $response->assertDontSee('>Files</p>', false);
         $response->assertSeeInOrder(['Alpha Tool', 'Visible Tool', 'Zeta Tool']);
         $response->assertSee('Visible Tool');
     }

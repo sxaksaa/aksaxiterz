@@ -4,26 +4,10 @@
 @section('seo_description', 'Find official setup files and product downloads provided by Aksa Xiterz.')
 
 @section('content')
-    <section class="page-shell pb-10 pt-10 md:pb-14 md:pt-16">
-        <div class="download-hero mx-auto max-w-5xl fade-up">
-            <h1 class="hero-title">
-                All setup files in <span class="hero-accent">one clean place.</span>
-            </h1>
-            <p class="hero-copy">
-                Public setup packages, companion files, emulator resources, and required runtimes. Pick the matching
-                product below and open the exact file you need.
-            </p>
-        </div>
-    </section>
-
-    <section class="page-shell pb-16 md:pb-20">
-        <div class="mx-auto mb-5 flex max-w-5xl flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Files</p>
-            <h2 class="text-2xl font-semibold text-white">Choose what you need</h2>
-            <p class="max-w-2xl text-sm leading-6 text-gray-400">
-                Open a product, then pick the exact file, video, or setup resource you need.
-            </p>
-            <input id="downloadSearch" type="search" class="search-bar mt-3" placeholder="Search downloads..."
+    <section class="page-shell pb-16 pt-14 md:pb-20 md:pt-16">
+        <div class="mx-auto mb-6 flex max-w-5xl flex-col gap-0 fade-up">
+            <h1 class="text-3xl font-semibold text-white md:text-4xl">Downloads</h1>
+            <input id="downloadSearch" type="search" class="search-bar mt-4" placeholder="Search downloads..."
                 autocomplete="off">
         </div>
 

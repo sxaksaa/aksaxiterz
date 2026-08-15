@@ -4,24 +4,9 @@
 @section('seo_description', 'Read practical setup, troubleshooting, and product usage guides from Aksa Xiterz.')
 
 @section('content')
-    <section class="page-shell pb-10 pt-10 md:pb-14 md:pt-16">
-        <div class="download-hero mx-auto max-w-5xl fade-up">
-            <h1 class="hero-title">
-                Practical guides for <span class="hero-accent">clean setup</span> fixes.
-            </h1>
-            <p class="hero-copy">
-                Short tutorials for common Windows, emulator, and setup problems.
-            </p>
-        </div>
-    </section>
-
-    <section class="page-shell pb-16 md:pb-20">
-        <div class="mx-auto mb-5 flex max-w-5xl flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Knowledge Base</p>
-            <h2 class="text-2xl font-semibold text-white">Choose a guide</h2>
-            <p class="max-w-2xl text-sm leading-6 text-gray-400">
-                Open a guide and follow each step in order.
-            </p>
+    <section class="page-shell pb-16 pt-14 md:pb-20 md:pt-16">
+        <div class="mx-auto mb-6 max-w-5xl fade-up">
+            <h1 class="text-3xl font-semibold text-white md:text-4xl">Guides</h1>
         </div>
 
         <div class="mx-auto grid max-w-5xl gap-4 md:grid-cols-2">

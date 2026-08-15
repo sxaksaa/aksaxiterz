@@ -46,6 +46,12 @@ class SeoAndOperationsTest extends TestCase
     {
         $this->get('/guides')
             ->assertOk()
+            ->assertSee('<h1 class="text-3xl font-semibold text-white md:text-4xl">Guides</h1>', false)
+            ->assertSee('page-shell pb-16 pt-14 md:pb-20 md:pt-16', false)
+            ->assertDontSee('download-hero', false)
+            ->assertDontSee('Practical guides for')
+            ->assertDontSee('Knowledge Base')
+            ->assertDontSee('Choose a guide')
             ->assertDontSee('data-aksa-intro-page="true"', false)
             ->assertDontSee('id="aksaSiteIntro"', false);
     }

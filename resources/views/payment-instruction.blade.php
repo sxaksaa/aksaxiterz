@@ -16,12 +16,6 @@
 
             return ($formatted !== '' ? $formatted : '0').' '.$token;
         };
-        $catalogSubtotal = $usesStablecoin
-            ? '$'.number_format($orderSubtotalUsdt, 2)
-            : 'Rp '.number_format($orderSubtotalIdr);
-        $exactPayment = $usesStablecoin
-            ? $stablecoinAmount($payment['amount'] ?? 0)
-            : 'Rp '.number_format((int) ($payment['amount'] ?? 0));
     @endphp
 
     <div class="page-shell py-7 md:py-12" data-payment-instruction-page>
@@ -110,15 +104,13 @@
                                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                                     {{ $payment['method_label'] }}
                                 </p>
-                                <h2 class="mt-1 text-xl font-semibold text-white">
-                                    @if ($payment['method'] === 'gopay_qris')
-                                        Scan and enter the exact amount
-                                    @elseif ($payment['method'] === 'binance_pay')
-                                        Send with Binance Pay
-                                    @else
-                                        Send to the selected network
-                                    @endif
-                                </h2>
+                                @if ($payment['method'] !== 'gopay_qris')
+                                    <h2 class="mt-1 text-xl font-semibold text-white">
+                                        {{ $payment['method'] === 'binance_pay'
+                                            ? 'Send with Binance Pay'
+                                            : 'Send to the selected network' }}
+                                    </h2>
+                                @endif
                             </div>
 
                             @if ($paymentState['expires_at'])
@@ -164,7 +156,7 @@
                                     <div class="qris-detail-row qris-total-row">
                                         <span class="min-w-0">Exact amount to enter</span>
                                         <span class="flex shrink-0 items-center gap-2">
-                                            <strong class="qris-amount-value whitespace-nowrap">Rp {{ number_format($payment['amount']) }}</strong>
+                                            <strong class="qris-amount-value whitespace-nowrap" data-invoice-total>Rp {{ number_format($payment['amount']) }}</strong>
                                             <button type="button" class="order-action shrink-0 px-2 py-1 text-[11px]"
                                                 data-copy-payment="{{ $payment['amount'] }}"
                                                 data-copy-label="Amount">
@@ -191,7 +183,7 @@
                                     <div class="qris-detail-row qris-total-row">
                                         <span>Exact amount</span>
                                         <span class="flex items-center gap-2">
-                                            <strong class="qris-amount-value font-mono">{{ $stablecoinAmount($payment['amount']) }}</strong>
+                                            <strong class="qris-amount-value font-mono" data-invoice-total>{{ $stablecoinAmount($payment['amount']) }}</strong>
                                             <button type="button" class="order-action shrink-0 px-2 py-1 text-[11px]"
                                                 data-copy-payment="{{ $payment['amount'] }}"
                                                 data-copy-label="Amount">
@@ -231,7 +223,7 @@
                                 <div class="qris-detail-row qris-total-row">
                                     <span>Exact amount</span>
                                     <span class="flex items-center gap-2">
-                                        <strong class="qris-amount-value font-mono">{{ $stablecoinAmount($payment['amount']) }}</strong>
+                                        <strong class="qris-amount-value font-mono" data-invoice-total>{{ $stablecoinAmount($payment['amount']) }}</strong>
                                         <button type="button" class="order-action shrink-0 px-2 py-1 text-[11px]"
                                             data-copy-payment="{{ $payment['amount'] }}"
                                             data-copy-label="Amount">
@@ -361,27 +353,6 @@
                     @endforeach
                 </div>
 
-                <div class="mt-5 grid gap-2 border-t border-white/10 pt-5 text-sm">
-                    <div class="summary-row">
-                        <span>Catalog subtotal</span>
-                        <span>{{ $catalogSubtotal }}</span>
-                    </div>
-                    @if ($orderSummary['voucher_code'])
-                        <div class="summary-row">
-                            <span>Voucher</span>
-                            <span class="font-mono text-aksa-accent">{{ $orderSummary['voucher_code'] }}</span>
-                        </div>
-                    @endif
-                    <div class="summary-row">
-                        <span>Payment method</span>
-                        <span>{{ $orderSummary['payment_method_label'] }}</span>
-                    </div>
-                    <div class="summary-row qris-total-row">
-                        <span>{{ $paymentState['instruction_active'] ? 'Exact payment' : 'Invoice total' }}</span>
-                        <span class="font-semibold text-aksa-accent" data-invoice-total>{{ $exactPayment }}</span>
-                    </div>
-                </div>
-
                 <dl class="mt-5 grid gap-3 border-t border-white/10 pt-5 text-xs">
                     <div class="flex items-start justify-between gap-4">
                         <dt class="text-gray-500">Order ID</dt>
@@ -395,6 +366,16 @@
                             </button>
                         </dd>
                     </div>
+                    <div class="flex items-start justify-between gap-4">
+                        <dt class="text-gray-500">Payment method</dt>
+                        <dd class="text-right font-medium text-gray-300">{{ $orderSummary['payment_method_label'] }}</dd>
+                    </div>
+                    @if ($orderSummary['voucher_code'])
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="text-gray-500">Voucher</dt>
+                            <dd class="text-right font-mono text-aksa-accent">{{ $orderSummary['voucher_code'] }}</dd>
+                        </div>
+                    @endif
                     <div class="flex items-start justify-between gap-4">
                         <dt class="text-gray-500">Created</dt>
                         <dd class="text-right text-gray-300">{{ $orderSummary['created_at'] ?? '-' }}</dd>
