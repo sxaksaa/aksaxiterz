@@ -61,7 +61,7 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
                     <input name="search" value="{{ request('search') }}" class="search-bar w-full"
-                        placeholder="Order ID, customer, or product">
+                        placeholder="Order ID, customer, product, or amount">
                 </label>
 
                 <label class="block">
@@ -125,6 +125,7 @@
                             <th class="p-4 text-left">Customer</th>
                             <th class="p-4 text-left">Product</th>
                             <th class="p-4 text-left">Method</th>
+                            <th class="p-4 text-left">Amount</th>
                             <th class="w-[300px] p-4 text-left">Status</th>
                             <th class="p-4 text-left">Paid At</th>
                             <th class="p-4 text-right">Action</th>
@@ -143,6 +144,14 @@
                                 };
                                 $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
                                 $paidAt = ($order->paid_at ?: ($isPaid ? $order->updated_at : null))?->timezone(config('app.timezone'));
+                                $paymentPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+                                $isCryptoPayment = in_array($order->payment_method, ['crypto', 'binance_pay'], true);
+                                $cryptoToken = strtoupper((string) ($paymentPayload['token'] ?? 'USDT'));
+                                $amountLabel = $order->price === null
+                                    ? '-'
+                                    : ($isCryptoPayment
+                                        ? rtrim(rtrim(number_format((float) $order->price, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
+                                        : 'Rp ' . number_format((float) $order->price, 0, ',', '.'));
                             @endphp
 
                             <tr class="orders-table-row">
@@ -158,6 +167,7 @@
                                     @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
                                 </td>
                                 <td class="p-4 text-gray-300">{{ $methodLabel }}</td>
+                                <td class="whitespace-nowrap p-4 font-semibold text-white">{{ $amountLabel }}</td>
                                 <td class="w-[300px] p-4">
                                     <span class="status-pill {{ $statusClass }}">{{ ucfirst($order->status) }}</span>
                                     <div class="mt-1 text-xs {{ $isPaid && $order->licenses_count < max(1, (int) $order->quantity) ? 'text-red-300' : 'text-gray-500' }}">
@@ -177,7 +187,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-8">
+                                <td colspan="8" class="p-8">
                                     <div class="empty-state">
                                         <span class="empty-state-icon">
                                             <x-ui.icon name="receipt" class="h-6 w-6" />
@@ -198,6 +208,14 @@
                 @php
                     $isPaid = $order->status === 'paid';
                     $statusClass = $isPaid ? 'status-pill-paid' : ($order->status === 'pending' ? 'status-pill-pending' : 'status-pill-cancelled');
+                    $paymentPayload = is_array($order->payment_payload) ? $order->payment_payload : [];
+                    $isCryptoPayment = in_array($order->payment_method, ['crypto', 'binance_pay'], true);
+                    $cryptoToken = strtoupper((string) ($paymentPayload['token'] ?? 'USDT'));
+                    $amountLabel = $order->price === null
+                        ? '-'
+                        : ($isCryptoPayment
+                            ? rtrim(rtrim(number_format((float) $order->price, 6, '.', ''), '0'), '.') . ' ' . $cryptoToken
+                            : 'Rp ' . number_format((float) $order->price, 0, ',', '.'));
                 @endphp
                 <article class="order-mobile-card motion-card">
                     <div class="flex items-start justify-between gap-3">
@@ -225,6 +243,7 @@
                                 } }}
                             </span>
                         </div>
+                        <div>Amount: <span class="font-semibold text-white">{{ $amountLabel }}</span></div>
                         <div>Items: <span class="font-semibold text-white">{{ $order->item_count }} package(s)</span></div>
                         <div>Quantity: <span class="font-semibold text-white">{{ $order->total_quantity }} {{ $order->total_quantity === 1 ? 'key' : 'keys' }}</span></div>
                         <div>Delivery:

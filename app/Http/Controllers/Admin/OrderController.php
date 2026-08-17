@@ -24,9 +24,10 @@ class OrderController extends Controller
         $orders = Order::with(['user', 'product', 'package', 'items'])
             ->withCount('licenses')
             ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->search;
+                $search = trim((string) $request->search);
+                $amount = $this->searchAmount($search);
 
-                $query->where(function ($query) use ($search) {
+                $query->where(function ($query) use ($search, $amount) {
                     $query->where('order_id', 'like', '%'.$search.'%')
                         ->orWhereHas('user', function ($userQuery) use ($search) {
                             $userQuery->where('name', 'like', '%'.$search.'%')
@@ -34,6 +35,10 @@ class OrderController extends Controller
                         })
                         ->orWhereHas('product', fn ($productQuery) => $productQuery->where('name', 'like', '%'.$search.'%'))
                         ->orWhereHas('items', fn ($itemQuery) => $itemQuery->where('product_name', 'like', '%'.$search.'%'));
+
+                    if ($amount !== null) {
+                        $query->orWhere('price', $amount);
+                    }
                 });
             })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
@@ -109,5 +114,38 @@ class OrderController extends Controller
             ->whereRaw(
                 '(SELECT COUNT(*) FROM licenses WHERE licenses.order_id = orders.order_id) < COALESCE(orders.quantity, 1)'
             );
+    }
+
+    private function searchAmount(string $search): ?string
+    {
+        $amount = preg_replace('/\s+/u', '', strtolower($search));
+        $amount = preg_replace('/^(rp|idr)/', '', $amount);
+        $amount = preg_replace('/(usdt|usdc)$/', '', $amount);
+
+        if ($amount === null || $amount === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d+$/', $amount) === 1) {
+            return $amount;
+        }
+
+        if (preg_match('/^\d{1,3}(?:[.,]\d{3})+$/', $amount) === 1) {
+            return str_replace([',', '.'], '', $amount);
+        }
+
+        if (preg_match('/^\d{1,3}(?:\.\d{3})+,\d{1,6}$/', $amount) === 1) {
+            return str_replace(',', '.', str_replace('.', '', $amount));
+        }
+
+        if (preg_match('/^\d{1,3}(?:,\d{3})+\.\d{1,6}$/', $amount) === 1) {
+            return str_replace(',', '', $amount);
+        }
+
+        if (preg_match('/^\d+[.,]\d{1,6}$/', $amount) === 1) {
+            return str_replace(',', '.', $amount);
+        }
+
+        return null;
     }
 }

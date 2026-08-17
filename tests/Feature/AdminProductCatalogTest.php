@@ -175,6 +175,39 @@ class AdminProductCatalogTest extends TestCase
         ]);
     }
 
+    public function test_license_stock_page_defaults_to_available_and_can_still_show_all_statuses(): void
+    {
+        [$admin, $product, $package] = $this->makeCatalogProduct();
+
+        LicenseStock::create([
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'license_key' => 'AVAILABLE-STOCK-KEY',
+            'is_sold' => false,
+        ]);
+        LicenseStock::create([
+            'product_id' => $product->id,
+            'package_id' => $package->id,
+            'license_key' => 'SOLD-STOCK-KEY',
+            'is_sold' => true,
+            'sold_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.license-stocks.index'))
+            ->assertOk()
+            ->assertSee('AVAILABLE-STOCK-KEY')
+            ->assertDontSee('SOLD-STOCK-KEY')
+            ->assertSee('<option value="available" selected>Available</option>', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.license-stocks.index', ['status' => '']))
+            ->assertOk()
+            ->assertSee('AVAILABLE-STOCK-KEY')
+            ->assertSee('SOLD-STOCK-KEY')
+            ->assertSee('<option value="" selected>All status</option>', false);
+    }
+
     public function test_admin_cannot_delete_product_with_order_or_stock_history(): void
     {
         [$admin, $product, $package] = $this->makeCatalogProduct();

@@ -135,6 +135,33 @@ class AdminOrderOperationsTest extends TestCase
             ->assertDontSee('min-w-[1240px]', false);
     }
 
+    public function test_admin_can_search_orders_by_formatted_amount_and_see_the_amount(): void
+    {
+        [$admin, $matchingOrder] = $this->makePendingOrder([
+            'order_id' => 'ORDER-AMOUNT-MATCH',
+            'price' => 15000,
+        ]);
+
+        Order::create([
+            'order_id' => 'ORDER-AMOUNT-OTHER',
+            'user_id' => $matchingOrder->user_id,
+            'product_id' => $matchingOrder->product_id,
+            'package_id' => $matchingOrder->package_id,
+            'status' => 'pending',
+            'payment_method' => 'pakasir',
+            'price' => 150000,
+            'expired_at' => now()->addMinutes(10),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.orders.index', ['search' => 'Rp 15.000']))
+            ->assertOk()
+            ->assertSee('ORDER-AMOUNT-MATCH')
+            ->assertSee('Rp 15.000')
+            ->assertDontSee('ORDER-AMOUNT-OTHER')
+            ->assertSee('Order ID, customer, product, or amount');
+    }
+
     public function test_paid_order_with_license_hides_manual_delivery_actions(): void
     {
         [$admin, $order] = $this->makePendingOrder([

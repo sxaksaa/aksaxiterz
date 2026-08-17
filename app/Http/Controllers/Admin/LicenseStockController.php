@@ -15,6 +15,10 @@ class LicenseStockController extends Controller
 {
     public function index(Request $request)
     {
+        $status = array_key_exists('status', $request->query())
+            ? (string) $request->query('status')
+            : 'available';
+
         $stocks = LicenseStock::with(['product', 'package', 'soldLicense.user', 'reservedOrder.user'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $query->where('license_key', 'like', '%'.$request->search.'%');
@@ -25,9 +29,9 @@ class LicenseStockController extends Controller
             ->when($request->filled('package_id'), function ($query) use ($request) {
                 $query->where('package_id', $request->integer('package_id'));
             })
-            ->when($request->status === 'available', fn ($query) => $query->available())
-            ->when($request->status === 'reserved', fn ($query) => $query->reserved())
-            ->when($request->status === 'sold', fn ($query) => $query->where('is_sold', true))
+            ->when($status === 'available', fn ($query) => $query->available())
+            ->when($status === 'reserved', fn ($query) => $query->reserved())
+            ->when($status === 'sold', fn ($query) => $query->where('is_sold', true))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -59,7 +63,8 @@ class LicenseStockController extends Controller
             'packages',
             'addablePackages',
             'editStock',
-            'stats'
+            'stats',
+            'status'
         ));
     }
 

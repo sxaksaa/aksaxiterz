@@ -223,10 +223,10 @@
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Status</span>
                     <select name="status" class="search-bar w-full">
-                        <option value="">All status</option>
-                        <option value="available" @selected(request('status') === 'available')>Available</option>
-                        <option value="reserved" @selected(request('status') === 'reserved')>Reserved</option>
-                        <option value="sold" @selected(request('status') === 'sold')>Sold</option>
+                        <option value="" @selected($status === '')>All status</option>
+                        <option value="available" @selected($status === 'available')>Available</option>
+                        <option value="reserved" @selected($status === 'reserved')>Reserved</option>
+                        <option value="sold" @selected($status === 'sold')>Sold</option>
                     </select>
                 </label>
 
