@@ -141,7 +141,7 @@ class LogAdminActivity
     private function safeDetails(Request $request, string $action): ?string
     {
         $details = match (true) {
-            in_array($action, ['admin.products.store', 'admin.products.update'], true) => [
+            in_array($action, ['admin.products.store', 'admin.products.update', 'admin.products.quick-update'], true) => [
                 $request->filled('status') ? 'Status: '.$request->string('status')->toString() : null,
                 $request->has('is_visible')
                     ? 'Visibility: '.($request->boolean('is_visible') ? 'public' : 'hidden')

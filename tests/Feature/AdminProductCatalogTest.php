@@ -237,6 +237,106 @@ class AdminProductCatalogTest extends TestCase
         $this->assertDatabaseHas('products', ['id' => $product->id]);
     }
 
+    public function test_catalog_quick_edit_updates_details_prices_and_visibility_together(): void
+    {
+        [$admin, $product, $package, $category] = $this->makeCatalogProduct();
+        $buyer = User::factory()->create();
+        CartItem::create(['user_id' => $buyer->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        $catalog = route('admin.products.index', ['search' => 'Test', 'visibility' => 'visible']);
+        $this->actingAs($admin)->get($catalog)->assertOk()->assertSee('data-catalog-edit-button', false)->assertSee('packages['.$package->id.'][price]', false);
+
+        $this->patch(route('admin.products.quick-update', ['product' => $product, 'search' => 'Test', 'visibility' => 'visible']), [
+            'name' => $product->name,
+            'category_id' => $category->id,
+            'description' => 'Changed in catalog.',
+            'status' => Product::STATUS_UPDATING,
+            'is_visible' => '0',
+            'packages' => [$package->id => ['id' => $package->id, 'price' => 25000, 'price_usdt' => '']],
+        ])->assertRedirect($catalog)->assertSessionHasNoErrors();
+
+        $this->assertFalse($product->fresh()->is_visible);
+        $this->assertSame(Product::STATUS_UPDATING, $product->fresh()->status);
+        $this->assertSame('Changed in catalog.', $product->fresh()->description);
+        $this->assertSame(25000, $package->fresh()->price);
+        $this->assertNull($package->fresh()->price_usdt);
+        $this->assertDatabaseMissing('cart_items', ['product_id' => $product->id]);
+    }
+
+    public function test_quick_edit_rejects_invalid_prices_and_foreign_packages_without_partial_updates(): void
+    {
+        [$admin, $product, $package, $category] = $this->makeCatalogProduct();
+        $other = Product::create(['name' => 'Other', 'slug' => 'other', 'category_id' => $category->id, 'description' => 'Other product']);
+        $foreign = $other->packages()->create(['name' => '1 Day', 'price' => 500]);
+        $payload = [
+            'quick_product_id' => $product->id,
+            'name' => $product->name,
+            'category_id' => $category->id,
+            'description' => 'Must not be saved.',
+            'status' => Product::STATUS_UPDATING,
+            'is_visible' => '0',
+            'packages' => [$package->id => ['id' => $package->id, 'price' => -1]],
+        ];
+        $catalog = route('admin.products.index');
+        $this->actingAs($admin)->from($catalog)->patch(route('admin.products.quick-update', $product), $payload)
+            ->assertSessionHasErrors('packages.'.$package->id.'.price');
+        $this->get($catalog)->assertOk()->assertSee('Must not be saved.');
+        $payload['packages'] = [['id' => $foreign->id, 'price' => 100]];
+        $this->patch(route('admin.products.quick-update', $product), $payload)->assertSessionHasErrors('packages.0.id');
+        $this->assertSame('Test product description.', $product->fresh()->description);
+        $this->assertTrue($product->fresh()->is_visible);
+        $this->assertSame(10000, $package->fresh()->price);
+        $this->assertSame(500, $foreign->fresh()->price);
+    }
+
+    public function test_non_admin_cannot_quick_edit_catalog(): void
+    {
+        [, $product] = $this->makeCatalogProduct();
+        $this->actingAs(User::factory()->create())
+            ->patch(route('admin.products.quick-update', $product), ['is_visible' => '0'])
+            ->assertNotFound();
+        $this->assertTrue($product->fresh()->is_visible);
+    }
+
+    public function test_catalog_can_manage_notes_and_package_durations(): void
+    {
+        [$admin, $product, $package, $category] = $this->makeCatalogProduct();
+        $this->actingAs($admin)->get(route('admin.products.index'))
+            ->assertOk()->assertSee('Important note')->assertSee('Add package')->assertSee('Delete product')->assertDontSee('Full edit');
+        $payload = [
+            'name' => $product->name, 'category_id' => $category->id,
+            'description' => $product->description, 'status' => 'ready', 'is_visible' => '1',
+            'important_note' => 'Read before purchasing.',
+            'packages' => [['id' => $package->id, 'name' => '7 Days', 'price' => 50000]],
+        ];
+        $this->patch(route('admin.products.quick-update', $product), $payload)->assertSessionHasNoErrors();
+        $this->assertSame('7 Days', $package->fresh()->name);
+        $this->assertSame('Read before purchasing.', $product->fresh()->important_note);
+        $payload['important_note'] = '';
+        $this->patch(route('admin.products.quick-update', $product), $payload)->assertSessionHasNoErrors();
+        $this->assertNull($product->fresh()->important_note);
+        $payload['packages'][0]['name'] = 'Invalid duration';
+        $this->patch(route('admin.products.quick-update', $product), $payload)->assertSessionHasErrors('packages.0.name');
+        $this->assertSame('7 Days', $package->fresh()->name);
+    }
+
+    public function test_catalog_package_actions_keep_filters_and_protect_stock(): void
+    {
+        [$admin, $product, $package] = $this->makeCatalogProduct();
+        $query = ['search' => 'Test', 'visibility' => 'visible'];
+        $catalog = route('admin.products.index', $query);
+        $this->actingAs($admin)->from($catalog)->post(route('admin.products.packages.store', ['product' => $product, ...$query]), [
+            'from_catalog' => '1', 'package_name' => '3 Days', 'package_price' => 30000,
+        ])->assertRedirect($catalog)->assertSessionHasNoErrors();
+        $added = $product->packages()->where('name', '3 Days')->firstOrFail();
+        $this->delete(route('admin.packages.destroy', ['package' => $added, ...$query]), ['from_catalog' => '1'])
+            ->assertRedirect($catalog)->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('packages', ['id' => $added->id]);
+        LicenseStock::create(['product_id' => $product->id, 'package_id' => $package->id, 'license_key' => 'CATALOG-LOCKED-KEY', 'is_sold' => false]);
+        $this->delete(route('admin.packages.destroy', ['package' => $package, ...$query]), ['from_catalog' => '1'])
+            ->assertRedirect($catalog)->assertSessionHasErrors('package');
+        $this->assertDatabaseHas('packages', ['id' => $package->id]);
+    }
+
     private function makeCatalogProduct(): array
     {
         config(['admin.emails' => ['admin@example.com']]);

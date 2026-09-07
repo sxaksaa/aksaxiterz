@@ -469,6 +469,7 @@ Route::middleware(['auth', 'admin', 'admin.activity'])
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::patch('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::patch('/products/{product}/quick-edit', [ProductController::class, 'quickUpdate'])->name('products.quick-update');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::patch('/products/{product}/important-note', [ProductController::class, 'updateImportantNote'])
             ->name('products.important-note.update');

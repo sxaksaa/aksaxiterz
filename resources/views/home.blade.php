@@ -4,7 +4,7 @@
 @section('seo_description', 'Browse available digital game licenses with clear prices, automatic delivery, and secure payment verification.')
 
 @section('content')
-    <section class="page-shell pb-7 pt-7 md:pb-10 md:pt-11">
+    <section class="page-shell home-hero-section">
         <div class="home-hero home-hero-compact">
             <h1 class="hero-title" data-home-reveal-item data-home-reveal-stage="hero-title">
                 <span class="block">Sharpen your aim.</span>
@@ -19,9 +19,8 @@
             </div>
 
             <div class="home-proof-strip" data-home-reveal-item data-home-reveal-stage="proof">
-                <span><strong data-home-count-up="5000" data-home-count-up-suffix="+">5000+</strong> licenses delivered</span>
-                <span><strong data-home-count-up="2000" data-home-count-up-suffix="+">2000+</strong> community members</span>
-                <span><strong data-home-count-up="{{ $totalStock }}" data-total-ready-stock>{{ $totalStock }}</strong> available licenses</span>
+                <span>Over <strong data-home-count-up="2500">2500</strong> members</span>
+                <span><strong data-home-count-up="{{ $totalStock }}" data-total-ready-stock>{{ $totalStock }}</strong> Licenses in stock</span>
             </div>
         </div>
     </section>

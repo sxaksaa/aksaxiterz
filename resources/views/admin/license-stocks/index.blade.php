@@ -10,8 +10,10 @@
         $packageLabel = function ($package) use ($packageName) {
             return ($package->product->name ?? 'Product') . ' - ' . $packageName($package);
         };
-        $selectedCreateProductId = old('product_id');
-        $selectedCreatePackage = old('package_id') ? $addablePackages->firstWhere('id', (int) old('package_id')) : null;
+        $addingStock = old('stock_action') === 'create';
+        $stockFilterCount = collect(request()->only(['search', 'product_id', 'package_id']))->filter(fn ($value) => filled($value))->count();
+        $selectedCreateProductId = $addingStock ? old('product_id') : null;
+        $selectedCreatePackage = $addingStock && old('package_id') ? $addablePackages->firstWhere('id', (int) old('package_id')) : null;
 
         if (! $selectedCreateProductId && $selectedCreatePackage) {
             $selectedCreateProductId = $selectedCreatePackage->product_id;
@@ -64,7 +66,23 @@
             </div>
         @endif
 
-        <section class="product-section mb-6 fade-up">
+        <div class="mb-4 flex flex-wrap gap-3">
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="stockAddPanel" aria-expanded="{{ $addingStock ? 'true' : 'false' }}">
+                <x-ui.icon name="package-plus" class="h-4 w-4" />
+                <span>Add license</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="stockSearchPanel" aria-expanded="false">
+                <x-ui.icon name="search" class="h-4 w-4" />
+                <span>Search &amp; filter</span>
+                <span class="text-xs text-aksa-accent">{{ $status === '' ? 'All status' : ucfirst($status) }}{{ $stockFilterCount ? ' / '.$stockFilterCount.' filters' : '' }}</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+        </div>
+
+        <div id="stockAddPanel" class="catalog-disclosure-panel" @if (! $addingStock) hidden @endif>
+            <div class="catalog-disclosure-spacing">
+        <section class="product-section">
             <div class="mb-4">
                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Bulk Add</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Add License Keys</h2>
@@ -74,6 +92,7 @@
             <form action="{{ route('admin.license-stocks.store') }}" method="POST"
                 class="grid gap-4 lg:grid-cols-[260px_260px_1fr_auto] lg:items-end">
                 @csrf
+                <input type="hidden" name="stock_action" value="create">
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Product</span>
@@ -100,7 +119,7 @@
                                 data-add-stock-package="{{ $package->id }}"
                                 data-duration-label="{{ $packageName($package) }}"
                                 data-full-label="{{ $packageLabel($package) }}"
-                                @selected((string) old('package_id') === (string) $package->id)>
+                                @selected($addingStock && (string) old('package_id') === (string) $package->id)>
                                 {{ $packageName($package) }}
                             </option>
                         @endforeach
@@ -120,6 +139,8 @@
                 </button>
             </form>
         </section>
+            </div>
+        </div>
 
         @if ($editStock)
             <section class="product-section mb-6 fade-up">
@@ -182,7 +203,9 @@
             </section>
         @endif
 
-        <section class="product-section mb-6 fade-up">
+        <div id="stockSearchPanel" class="catalog-disclosure-panel" hidden>
+            <div class="catalog-disclosure-spacing">
+        <section class="product-section">
             <form id="stockFilterForm" method="GET" action="{{ route('admin.license-stocks.index') }}" class="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[1fr_1fr_1.45fr_0.85fr_auto]">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
@@ -242,6 +265,8 @@
                 </div>
             </form>
         </section>
+            </div>
+        </div>
 
         <div class="orders-table-wrap hidden lg:block">
             <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
@@ -486,6 +511,7 @@
 
             document.querySelectorAll('[data-stock-key-input]').forEach((textarea) => {
                 const resizeTextarea = () => {
+                    if (!textarea.getClientRects().length) return;
                     const maxHeight = Number.parseInt(getComputedStyle(textarea).maxHeight, 10) || 240;
 
                     textarea.style.height = 'auto';

@@ -3,6 +3,7 @@
 @section('content')
     @php
         $isEditing = (bool) $editVoucher;
+        $voucherFormOpen = $isEditing || old('voucher_form') === '1';
         $formAction = $isEditing
             ? route('admin.vouchers.update', $editVoucher)
             : route('admin.vouchers.store');
@@ -76,7 +77,22 @@
             </div>
         @endif
 
-        <section class="product-section relative z-40 mb-6 overflow-visible fade-up">
+        <div class="mb-4 flex flex-wrap gap-3">
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="voucherCreatePanel" aria-expanded="{{ $voucherFormOpen ? 'true' : 'false' }}">
+                <x-ui.icon name="ticket-percent" class="h-4 w-4" />
+                <span>{{ $isEditing ? 'Edit voucher' : 'Create voucher' }}</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="voucherSearchPanel" aria-expanded="false">
+                <x-ui.icon name="search" class="h-4 w-4" />
+                <span>Search &amp; filter{{ request()->filled('search') ? ' (active)' : '' }}</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+        </div>
+
+        <div id="voucherCreatePanel" class="catalog-disclosure-panel relative z-40" @if (! $voucherFormOpen) hidden @endif>
+            <div class="catalog-disclosure-spacing">
+        <section class="product-section relative overflow-visible">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
@@ -96,6 +112,7 @@
 
             <form action="{{ $formAction }}" method="POST" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 @csrf
+                <input type="hidden" name="voucher_form" value="1">
                 @if ($isEditing)
                     @method('PATCH')
                 @endif
@@ -379,8 +396,12 @@
                 </div>
             </form>
         </section>
+            </div>
+        </div>
 
-        <section class="product-section relative z-10 mb-6 fade-up">
+        <div id="voucherSearchPanel" class="catalog-disclosure-panel relative z-10" hidden>
+            <div class="catalog-disclosure-spacing">
+        <section class="product-section">
             <form method="GET" action="{{ route('admin.vouchers.index') }}" class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">Search code</span>
@@ -399,6 +420,8 @@
                 </div>
             </form>
         </section>
+            </div>
+        </div>
 
         <div class="orders-table-wrap hidden lg:block">
             <div class="overflow-x-auto">

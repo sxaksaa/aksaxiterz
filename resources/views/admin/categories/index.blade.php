@@ -2,10 +2,8 @@
 
 @section('content')
     @php
-        $isEditing = (bool) $editCategory;
-        $formAction = $isEditing
-            ? route('admin.categories.update', $editCategory)
-            : route('admin.categories.store');
+        $addingCategory = old('category_action') === 'create';
+        $categoryQuery = request()->only(['search', 'page']);
         $iconFor = function (?string $slug, ?string $name = null) {
             $key = strtolower(trim($slug ?: ($name ?? '')));
 
@@ -56,178 +54,105 @@
             </div>
         @endif
 
-        <section class="product-section mb-6 fade-up">
-            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
-                        {{ $isEditing ? 'Edit Category' : 'New Category' }}
-                    </p>
-                    <h2 class="mt-1 text-xl font-semibold text-white">
-                        {{ $isEditing ? $editCategory->name : 'Add Category' }}
-                    </h2>
-                </div>
+        <div class="mb-4 flex flex-wrap gap-3">
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="categoryAddPanel" aria-expanded="{{ $addingCategory ? 'true' : 'false' }}">
+                <x-ui.icon name="box" class="h-4 w-4" />
+                <span>Add category</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="categorySearchPanel" aria-expanded="false">
+                <x-ui.icon name="search" class="h-4 w-4" />
+                <span>Search{{ request()->filled('search') ? ' (active)' : '' }}</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+        </div>
 
-                @if ($isEditing)
-                    <a href="{{ route('admin.categories.index') }}" class="btn-footer-secondary w-fit">
-                        <x-ui.icon name="x" class="h-4 w-4" />
-                        <span>Cancel Edit</span>
-                    </a>
-                @endif
-            </div>
-
-            <form action="{{ $formAction }}" method="POST" class="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-                @csrf
-                @if ($isEditing)
-                    @method('PATCH')
-                @endif
-
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Name</span>
-                    <input name="name" value="{{ old('name', $editCategory->name ?? '') }}" class="search-bar w-full"
-                        placeholder="PC, Android, iOS" required maxlength="80">
-                </label>
-
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Slug</span>
-                    <input name="slug" value="{{ old('slug', $editCategory->slug ?? '') }}" class="search-bar w-full"
-                        placeholder="pc-android-ios" maxlength="80">
-                </label>
-
-                <button class="btn-footer h-12">
-                    <x-ui.icon name="{{ $isEditing ? 'save' : 'box' }}" class="h-4 w-4" />
-                    <span>{{ $isEditing ? 'Save Category' : 'Add Category' }}</span>
-                </button>
-            </form>
-        </section>
-
-        <section class="product-section mb-6 fade-up">
-            <form method="GET" action="{{ route('admin.categories.index') }}"
-                class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
-                    <input name="search" value="{{ request('search') }}" class="search-bar w-full"
-                        placeholder="Name or slug">
-                </label>
-
-                <div class="flex gap-2">
-                    <button class="btn-footer h-12">
-                        <x-ui.icon name="filter" class="h-4 w-4" />
-                        <span>Filter</span>
-                    </button>
-                    <a href="{{ route('admin.categories.index') }}" class="btn-footer-secondary h-12">
-                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
-                        <span>Reset</span>
-                    </a>
-                </div>
-            </form>
-        </section>
-
-        <div class="orders-table-wrap hidden lg:block">
-            <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">Category Records</h2>
-                    <p class="mt-1 text-xs text-gray-500">Icons are inferred from slug/name for PC, Android, and iOS.</p>
-                </div>
-                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
-                    {{ $categories->total() }} records
-                </span>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px] text-sm">
-                    <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
-                        <tr>
-                            <th class="p-4 text-left">Category</th>
-                            <th class="p-4 text-left">Slug</th>
-                            <th class="p-4 text-left">Products</th>
-                            <th class="p-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($categories as $category)
-                            <tr class="orders-table-row">
-                                <td class="p-4">
-                                    <div class="inline-flex items-center gap-2">
-                                        <span class="product-category-pill">
-                                            <x-ui.icon :name="$iconFor($category->slug, $category->name)" class="h-4 w-4" />
-                                            <span>{{ $category->name }}</span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="p-4">
-                                    <span class="font-mono text-xs text-gray-300">{{ $category->slug }}</span>
-                                </td>
-                                <td class="p-4 text-gray-300">
-                                    {{ $category->products_count }} {{ \Illuminate\Support\Str::plural('product', $category->products_count) }}
-                                </td>
-                                <td class="p-4 text-right">
-                                    <div class="inline-flex justify-end gap-2">
-                                        <a href="{{ route('admin.categories.index', array_merge(request()->query(), ['edit' => $category->id])) }}"
-                                            class="order-action">
-                                            <x-ui.icon name="edit-3" class="h-4 w-4" />
-                                            <span>Edit</span>
-                                        </a>
-                                        <form action="{{ route('admin.categories.destroy', $category) }}" method="POST"
-                                            data-confirm="Delete this category?">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="order-action order-action-danger" @disabled($category->products_count > 0)>
-                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
-                                                <span>Delete</span>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="p-8">
-                                    <div class="empty-state">No categories found</div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+        <div id="categoryAddPanel" class="catalog-disclosure-panel" @if (! $addingCategory) hidden @endif>
+            <div class="catalog-disclosure-spacing">
+                <section class="product-section">
+                    <h2 class="mb-4 text-sm font-semibold text-white">Add category</h2>
+                    <form action="{{ route('admin.categories.store') }}" method="POST" class="grid items-end gap-4 md:grid-cols-[1fr_1fr_auto]">
+                        @csrf
+                        <input type="hidden" name="category_action" value="create">
+                        <label class="block text-xs text-gray-400">Name
+                            <input name="name" value="{{ $addingCategory ? old('name') : '' }}" class="search-bar mt-2 w-full" placeholder="PC, Android, iOS" required maxlength="80">
+                        </label>
+                        <label class="block text-xs text-gray-400">Slug (optional)
+                            <input name="slug" value="{{ $addingCategory ? old('slug') : '' }}" class="search-bar mt-2 w-full" placeholder="Generated from name if empty" maxlength="80">
+                        </label>
+                        <button type="submit" class="btn-footer h-12">Add category</button>
+                    </form>
+                </section>
             </div>
         </div>
 
-        <div class="space-y-4 lg:hidden">
-            @forelse ($categories as $category)
-                <article class="order-mobile-card motion-card">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <span class="product-category-pill">
-                                <x-ui.icon :name="$iconFor($category->slug, $category->name)" class="h-4 w-4" />
-                                <span>{{ $category->name }}</span>
-                            </span>
-                            <div class="mt-2 font-mono text-xs text-gray-500">{{ $category->slug }}</div>
+        <div id="categorySearchPanel" class="catalog-disclosure-panel" hidden>
+            <div class="catalog-disclosure-spacing">
+                <section class="product-section">
+                    <form method="GET" action="{{ route('admin.categories.index') }}" class="grid items-end gap-3 md:grid-cols-[1fr_auto]">
+                        <label class="block text-xs text-gray-400">Search
+                            <input name="search" value="{{ request('search') }}" class="search-bar mt-2 w-full" placeholder="Name or slug">
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-footer h-12">Search</button>
+                            <a href="{{ route('admin.categories.index') }}" class="btn-footer-secondary h-12">Reset</a>
                         </div>
-                        <span class="status-pill status-pill-paid">
-                            {{ $category->products_count }} products
-                        </span>
-                    </div>
+                    </form>
+                </section>
+            </div>
+        </div>
 
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <a href="{{ route('admin.categories.index', array_merge(request()->query(), ['edit' => $category->id])) }}"
-                            class="order-action">
-                            <x-ui.icon name="edit-3" class="h-4 w-4" />
-                            <span>Edit</span>
-                        </a>
-                        <form action="{{ route('admin.categories.destroy', $category) }}" method="POST"
-                            data-confirm="Delete this category?">
+        <section class="space-y-4">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-white">Category Records</h2>
+                    <p class="mt-1 text-xs text-gray-500">Click a category name to manage it. Icons follow the category name/slug.</p>
+                </div>
+                <span class="text-xs text-aksa-accent">{{ $categories->total() }} records</span>
+            </div>
+            @forelse ($categories as $category)
+                @php
+                    $editingCategory = (string) old('edit_category_id') === (string) $category->id;
+                    $categoryOpen = $editingCategory || (string) request('edit') === (string) $category->id
+                        || (string) old('delete_category_id') === (string) $category->id;
+                @endphp
+                <details class="product-section catalog-accordion" data-catalog-accordion @if ($categoryOpen) open @endif>
+                    <summary class="catalog-accordion-summary text-sm font-semibold text-white">
+                        <span class="inline-flex items-center gap-2">
+                            <x-ui.icon :name="$iconFor($category->slug, $category->name)" class="h-4 w-4" />
+                            {{ $category->name }}
+                        </span>
+                        <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+                    </summary>
+                    <p class="mt-3 text-xs text-gray-400">{{ $category->products_count }} {{ \Illuminate\Support\Str::plural('product', $category->products_count) }}</p>
+                    <form data-catalog-edit-form action="{{ route('admin.categories.update', ['category' => $category, ...$categoryQuery]) }}" method="POST" class="mt-4 space-y-4">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="edit_category_id" value="{{ $category->id }}">
+                        <fieldset data-catalog-fields class="grid gap-4 md:grid-cols-2" @disabled(! $editingCategory)>
+                            <label class="block text-xs text-gray-400">Name
+                                <input name="name" value="{{ $editingCategory ? old('name', $category->name) : $category->name }}" class="search-bar mt-2 w-full" required maxlength="80">
+                            </label>
+                            <label class="block text-xs text-gray-400">Slug (optional)
+                                <input name="slug" value="{{ $editingCategory ? old('slug', $category->slug) : $category->slug }}" class="search-bar mt-2 w-full" maxlength="80" placeholder="Generated from name if empty">
+                            </label>
+                        </fieldset>
+                        <button type="button" data-catalog-edit-button class="btn-footer">{{ $editingCategory ? 'Save' : 'Edit' }}</button>
+                    </form>
+                    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#27272A] pt-4">
+                        <p class="text-xs text-gray-500">{{ $category->products_count > 0 ? 'Move products to another category before deleting.' : 'This category has no products.' }}</p>
+                        <form action="{{ route('admin.categories.destroy', ['category' => $category, ...$categoryQuery]) }}" method="POST" data-confirm="Delete this category?">
                             @csrf
                             @method('DELETE')
-                            <button class="order-action order-action-danger" @disabled($category->products_count > 0)>
-                                <x-ui.icon name="trash-2" class="h-4 w-4" />
-                                <span>Delete</span>
-                            </button>
+                            <input type="hidden" name="delete_category_id" value="{{ $category->id }}">
+                            <button type="submit" class="order-action order-action-danger disabled:opacity-50" @disabled($category->products_count > 0)>Delete category</button>
                         </form>
                     </div>
-                </article>
+                </details>
             @empty
                 <div class="empty-state">No categories found</div>
             @endforelse
-        </div>
+        </section>
 
         @include('partials.pagination', [
             'paginator' => $categories,

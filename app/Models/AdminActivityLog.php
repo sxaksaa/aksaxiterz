@@ -33,6 +33,7 @@ class AdminActivityLog extends Model
         return [
             'admin.products.store' => 'Created product',
             'admin.products.update' => 'Updated product',
+            'admin.products.quick-update' => 'Updated catalog product and prices',
             'admin.products.destroy' => 'Deleted product',
             'admin.products.important-note.update' => 'Updated product note',
             'admin.products.packages.store' => 'Added product package',

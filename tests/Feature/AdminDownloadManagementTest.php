@@ -62,6 +62,28 @@ class AdminDownloadManagementTest extends TestCase
         $this->assertDatabaseMissing('download_items', ['id' => $download->id]);
     }
 
+    public function test_inline_download_edit_preserves_filters_and_recovers_invalid_links(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $download = DownloadItem::create(['name' => 'Test tool', 'links' => []]);
+        $query = ['search' => 'Test', 'page' => 1];
+        $catalog = route('admin.downloads.index', $query);
+        $update = route('admin.downloads.update', ['download' => $download, ...$query]);
+        $this->actingAs($admin)->get($catalog)->assertOk()->assertSee('data-catalog-edit-button', false);
+        $this->from($catalog)->patch($update, [
+            'edit_download_id' => $download->id, 'name' => 'Test changed', 'links_text' => 'Invalid URL',
+        ])->assertRedirect($catalog)->assertSessionHasErrors('links_text')->assertSessionHasInput('edit_download_id', $download->id);
+        $this->get($catalog)->assertOk()->assertSee('Invalid URL')->assertSee('>Save</button>', false);
+        $this->assertSame('Test tool', $download->fresh()->name);
+        $this->patch($update, [
+            'edit_download_id' => $download->id, 'name' => 'Test changed', 'links_text' => 'Setup | https://example.com/setup.zip',
+        ])->assertRedirect($catalog)->assertSessionHasNoErrors();
+        $this->assertSame('https://example.com/setup.zip', $download->fresh()->links[0]['url']);
+        $this->delete(route('admin.downloads.destroy', ['download' => $download, ...$query]))->assertRedirect($catalog);
+        $this->assertDatabaseMissing('download_items', ['id' => $download->id]);
+    }
+
     public function test_public_downloads_use_database_items_alphabetically(): void
     {
         DownloadItem::create([

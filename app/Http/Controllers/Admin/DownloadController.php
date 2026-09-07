@@ -23,18 +23,12 @@ class DownloadController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        $editDownload = null;
-
-        if ($request->filled('edit')) {
-            $editDownload = DownloadItem::find($request->integer('edit'));
-        }
-
         $stats = [
             'total' => DownloadItem::count(),
             'links' => DownloadItem::all()->sum(fn ($download) => count($download->links ?: [])),
         ];
 
-        return view('admin.downloads.index', compact('downloads', 'editDownload', 'stats'));
+        return view('admin.downloads.index', compact('downloads', 'stats'));
     }
 
     public function store(Request $request)
@@ -55,16 +49,16 @@ class DownloadController extends Controller
         $download->update($validated);
 
         return redirect()
-            ->route('admin.downloads.index')
+            ->route('admin.downloads.index', $request->only(['search', 'page']))
             ->with('info', 'Download item updated.');
     }
 
-    public function destroy(DownloadItem $download)
+    public function destroy(Request $request, DownloadItem $download)
     {
         $download->delete();
 
         return redirect()
-            ->route('admin.downloads.index')
+            ->route('admin.downloads.index', $request->only(['search', 'page']))
             ->with('info', 'Download item deleted.');
     }
 

@@ -27,17 +27,13 @@ class CategoryController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $editCategory = $request->filled('edit')
-            ? Category::withCount('products')->find($request->integer('edit'))
-            : null;
-
         $stats = [
             'categories' => Category::count(),
             'used_categories' => Category::has('products')->count(),
             'products' => Product::count(),
         ];
 
-        return view('admin.categories.index', compact('categories', 'editCategory', 'stats'));
+        return view('admin.categories.index', compact('categories', 'stats'));
     }
 
     public function store(Request $request)
@@ -58,11 +54,11 @@ class CategoryController extends Controller
         $category->update($validated);
 
         return redirect()
-            ->route('admin.categories.index')
+            ->route('admin.categories.index', $request->only(['search', 'page']))
             ->with('info', 'Category updated.');
     }
 
-    public function destroy(Category $category)
+    public function destroy(Request $request, Category $category)
     {
         if ($category->products()->exists()) {
             return back()->withErrors([
@@ -73,7 +69,7 @@ class CategoryController extends Controller
         $category->delete();
 
         return redirect()
-            ->route('admin.categories.index')
+            ->route('admin.categories.index', $request->only(['search', 'page']))
             ->with('info', 'Category deleted.');
     }
 

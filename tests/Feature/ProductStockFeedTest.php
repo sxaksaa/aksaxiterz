@@ -153,7 +153,7 @@ class ProductStockFeedTest extends TestCase
                 '<strong data-home-count-up="'.($existingVisibleStock + 1).'" data-total-ready-stock>'.($existingVisibleStock + 1).'</strong>',
                 false,
             )
-            ->assertSee('available licenses')
+            ->assertSee('Licenses in stock')
             ->assertSee('available · Auto delivery')
             ->assertSee('product-status-badge-static hidden', false);
 

@@ -111,6 +111,35 @@ class AdminCategoryManagementTest extends TestCase
             ->assertSee('Console Tool');
     }
 
+    public function test_inline_category_updates_preserve_search_and_page(): void
+    {
+        $admin = $this->adminUser();
+        $category = Category::create(['name' => 'Test category', 'slug' => 'test-category']);
+        $query = ['search' => 'Test', 'page' => 1];
+        $catalog = route('admin.categories.index', $query);
+        $this->actingAs($admin)->get($catalog)->assertOk()->assertSee('data-catalog-edit-button', false);
+        $this->patch(route('admin.categories.update', ['category' => $category, ...$query]), [
+            'edit_category_id' => $category->id, 'name' => 'Test renamed', 'slug' => '',
+        ])->assertRedirect($catalog)->assertSessionHasNoErrors();
+        $this->assertSame('test-renamed', $category->fresh()->slug);
+        $this->delete(route('admin.categories.destroy', ['category' => $category, ...$query]))->assertRedirect($catalog);
+        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
+
+    public function test_invalid_inline_category_edit_keeps_values_without_updating_record(): void
+    {
+        $admin = $this->adminUser();
+        $category = Category::create(['name' => 'Unique category', 'slug' => 'unique-category']);
+        Category::create(['name' => 'Taken category', 'slug' => 'taken-category']);
+        $catalog = route('admin.categories.index');
+        $this->actingAs($admin)->from($catalog)->patch(route('admin.categories.update', $category), [
+            'edit_category_id' => $category->id, 'name' => 'Taken category', 'slug' => 'unsaved-slug',
+        ])->assertRedirect($catalog)->assertSessionHasErrors('name')->assertSessionHasInput('edit_category_id', $category->id);
+        $this->get($catalog)->assertOk()->assertSee('value="unsaved-slug"', false)->assertSee('>Save</button>', false);
+        $this->assertSame('Unique category', $category->fresh()->name);
+        $this->assertSame('unique-category', $category->fresh()->slug);
+    }
+
     private function adminUser(): User
     {
         config(['admin.emails' => ['admin@example.com']]);

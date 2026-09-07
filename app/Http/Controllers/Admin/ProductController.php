@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -28,11 +29,11 @@ class ProductController extends Controller
         $products = Product::with([
             'category',
             'packages' => fn ($query) => $query
-                ->withCount('availableLicenseStocks')
+                ->withCount(['availableLicenseStocks', 'licenseStocks', 'orders', 'orderItems'])
                 ->orderBy('price')
                 ->orderBy('name'),
         ])
-            ->withCount(['packages', 'licenseStocks', 'availableLicenseStocks'])
+            ->withCount(['packages', 'licenseStocks', 'availableLicenseStocks', 'orders', 'orderItems'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->string('search')->toString();
 
@@ -61,7 +62,9 @@ class ProductController extends Controller
         ];
         $statusOptions = Product::statusOptions();
 
-        return view('admin.products.index', compact('products', 'categories', 'stats', 'statusOptions'));
+        $packageOptions = $products->mapWithKeys(fn ($product) => [$product->id => $this->packageNameOptions($product)]);
+
+        return view('admin.products.index', compact('products', 'categories', 'stats', 'statusOptions', 'packageOptions'));
     }
 
     public function store(Request $request)
@@ -79,7 +82,7 @@ class ProductController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.products.edit', $product)
+            ->route('admin.products.index', ['search' => $product->name])
             ->with('info', 'Product created. Add package prices before selling it.');
     }
 
@@ -128,7 +131,55 @@ class ProductController extends Controller
             ->with('info', 'Product details updated.');
     }
 
-    public function destroy(Product $product)
+    public function quickUpdate(Request $request, Product $product)
+    {
+        $validated = $this->validateProduct($request, $product);
+        $note = $request->validate(['important_note' => ['sometimes', 'nullable', 'string', 'max:5000']]);
+        $prices = $request->validate([
+            'packages' => ['sometimes', 'array'],
+            'packages.*' => ['array:id,name,price,price_usdt'],
+            'packages.*.id' => ['required', 'integer', 'distinct', Rule::exists('packages', 'id')->where('product_id', $product->id)],
+            'packages.*.name' => ['sometimes', 'required', 'string', 'max:80'],
+            'packages.*.price' => ['required', 'integer', 'min:0', 'max:999999999'],
+            'packages.*.price_usdt' => ['nullable', 'numeric', 'min:0', 'max:999999.9999'],
+        ]);
+
+        foreach ($prices['packages'] ?? [] as $key => $price) {
+            $request->validate([
+                "packages.$key.name" => ['sometimes', 'required', 'string', 'max:80',
+                    Rule::in($this->packageNameOptions($product)),
+                    Rule::unique('packages', 'name')->where('product_id', $product->id)->ignore($price['id']),
+                ],
+            ]);
+        }
+        $request->validate(['packages.*.name' => ['sometimes', 'distinct']]);
+
+        DB::transaction(function () use ($product, $validated, $prices, $note) {
+            $wasVisible = $product->is_visible;
+            $product->update([
+                ...$validated,
+                ...(array_key_exists('important_note', $note) ? ['important_note' => filled($note['important_note']) ? trim($note['important_note']) : null] : []),
+                'slug' => $this->uniqueSlug(null, $validated['name'], $product),
+            ]);
+
+            foreach ($prices['packages'] ?? [] as $price) {
+                $product->packages()->findOrFail($price['id'])->update([
+                    ...(isset($price['name']) ? ['name' => $price['name']] : []),
+                    'price' => $price['price'],
+                    'price_usdt' => $price['price_usdt'] ?? null,
+                ]);
+            }
+
+            if ($wasVisible && ! $product->is_visible) {
+                $product->cartItems()->delete();
+            }
+        });
+
+        return redirect()->route('admin.products.index', $request->query())
+            ->with('info', $product->name.' updated.');
+    }
+
+    public function destroy(Request $request, Product $product)
     {
         if (Order::where('product_id', $product->id)->exists() || $product->orderItems()->exists()) {
             return back()->withErrors(['product' => 'Products with orders cannot be deleted. Rename or edit it instead.']);
@@ -141,7 +192,7 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()
-            ->route('admin.products.index')
+            ->route('admin.products.index', $request->only(['search', 'category_id', 'visibility', 'page']))
             ->with('info', 'Product deleted.');
     }
 
@@ -168,8 +219,9 @@ class ProductController extends Controller
 
         $product->packages()->create($validated);
 
-        return redirect()
-            ->route('admin.products.edit', $product)
+        return ($request->boolean('from_catalog')
+            ? redirect()->route('admin.products.index', $request->query())
+            : redirect()->route('admin.products.edit', $product))
             ->with('info', 'Package price added.');
     }
 
@@ -184,7 +236,7 @@ class ProductController extends Controller
             ->with('info', 'Package price updated.');
     }
 
-    public function destroyPackage(Package $package)
+    public function destroyPackage(Request $request, Package $package)
     {
         if ($package->orders()->exists() || $package->orderItems()->exists()) {
             return back()->withErrors(['package' => 'Packages with orders cannot be deleted. Edit the price/name instead.']);
@@ -197,8 +249,9 @@ class ProductController extends Controller
         $product = $package->product;
         $package->delete();
 
-        return redirect()
-            ->route('admin.products.edit', $product)
+        return ($request->boolean('from_catalog')
+            ? redirect()->route('admin.products.index', $request->query())
+            : redirect()->route('admin.products.edit', $product))
             ->with('info', 'Package deleted.');
     }
 
@@ -252,7 +305,7 @@ class ProductController extends Controller
         $names = collect(self::PACKAGE_NAME_OPTIONS);
 
         if ($product) {
-            $names = $names->merge($product->packages()->pluck('name')->map(fn ($name) => $this->canonicalPackageName((string) $name)));
+            $names = $names->merge($product->packages->pluck('name')->map(fn ($name) => $this->canonicalPackageName((string) $name)));
         }
 
         if ($currentName) {

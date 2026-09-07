@@ -2,11 +2,8 @@
 
 @section('content')
     @php
-        $isEditing = (bool) $editDownload;
-        $formAction = $isEditing
-            ? route('admin.downloads.update', $editDownload)
-            : route('admin.downloads.store');
-        $linksText = $isEditing ? $editDownload->links_text : '';
+        $addingDownload = old('download_action') === 'create';
+        $downloadQuery = request()->only(['search', 'page']);
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -45,208 +42,117 @@
             </div>
         @endif
 
-        <section class="product-section mb-6 fade-up">
-            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
-                        {{ $isEditing ? 'Edit Download' : 'New Download' }}
-                    </p>
-                    <h2 class="mt-1 text-xl font-semibold text-white">
-                        {{ $isEditing ? $editDownload->name : 'Add Download Card' }}
-                    </h2>
-                </div>
+        <div class="mb-4 flex flex-wrap gap-3">
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="downloadAddPanel" aria-expanded="{{ $addingDownload ? 'true' : 'false' }}">
+                <x-ui.icon name="box" class="h-4 w-4" />
+                <span>Add download</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+            <button type="button" class="btn-footer-secondary" data-catalog-panel-toggle aria-controls="downloadSearchPanel" aria-expanded="false">
+                <x-ui.icon name="search" class="h-4 w-4" />
+                <span>Search{{ request()->filled('search') ? ' (active)' : '' }}</span>
+                <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+            </button>
+        </div>
 
-                @if ($isEditing)
-                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary w-fit">
-                        <x-ui.icon name="x" class="h-4 w-4" />
-                        <span>Cancel Edit</span>
-                    </a>
-                @endif
+        <div id="downloadAddPanel" class="catalog-disclosure-panel" @if (! $addingDownload) hidden @endif>
+            <div class="catalog-disclosure-spacing">
+                <section class="product-section">
+                    <h2 class="mb-4 text-sm font-semibold text-white">Add download</h2>
+                    <form action="{{ route('admin.downloads.store') }}" method="POST" class="grid gap-4">
+                        @csrf
+                        <input type="hidden" name="download_action" value="create">
+                        <label class="block text-xs text-gray-400">Name
+                            <input name="name" value="{{ $addingDownload ? old('name') : '' }}" class="search-bar mt-2 w-full" placeholder="Download name" required maxlength="120">
+                        </label>
+                        <label class="block text-xs text-gray-400">Download links
+                            <textarea name="links_text" rows="4" maxlength="20000" class="search-bar mt-2 w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $addingDownload ? old('links_text') : '' }}</textarea>
+                            <span class="mt-2 block text-xs text-gray-500">One link per line: Label | URL. Leave empty for a card without links.</span>
+                        </label>
+                        <button type="submit" class="btn-footer h-12 w-fit">Add download</button>
+                    </form>
+                </section>
             </div>
+        </div>
 
-            <form action="{{ $formAction }}" method="POST" class="grid gap-4">
-                @csrf
-                @if ($isEditing)
-                    @method('PATCH')
-                @endif
+        <div id="downloadSearchPanel" class="catalog-disclosure-panel" hidden>
+            <div class="catalog-disclosure-spacing">
+                <section class="product-section">
+                    <form method="GET" action="{{ route('admin.downloads.index') }}" class="grid items-end gap-3 md:grid-cols-[1fr_auto]">
+                        <label class="block text-xs text-gray-400">Search
+                            <input name="search" value="{{ request('search') }}" class="search-bar mt-2 w-full" placeholder="Download name">
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-footer h-12">Search</button>
+                            <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary h-12">Reset</a>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </div>
 
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Name</span>
-                    <input name="name" value="{{ old('name', $editDownload->name ?? '') }}" class="search-bar w-full"
-                        placeholder="Enter download name" required maxlength="120">
-                </label>
-
-                <label class="block lg:col-span-2">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Download links</span>
-                    <textarea name="links_text" rows="5" class="search-bar min-h-32 w-full resize-y"
-                        placeholder="Download Loader | https://aksaxiterz.com/downloads/xg-team/xg-team-loader.exe&#10;Watch Tutorial | https://aksaxiterz.com/downloads/xg-team/tutorial.mp4&#10;Requirements | https://aksaxiterz.com/downloads/xg-team/requirements.zip">{{ old('links_text', $linksText) }}</textarea>
-                    <span class="mt-2 block text-xs text-gray-500">Use one link per line: Label | URL. Each line becomes one button inside the product accordion.</span>
-                </label>
-
-                <div class="flex flex-wrap items-center gap-3 lg:col-span-2">
-                    <button class="btn-footer h-12">
-                        <x-ui.icon name="{{ $isEditing ? 'save' : 'download' }}" class="h-4 w-4" />
-                        <span>{{ $isEditing ? 'Save Download' : 'Add Download' }}</span>
-                    </button>
-                </div>
-            </form>
-        </section>
-
-        <section class="product-section mb-6 fade-up">
-            <form method="GET" action="{{ route('admin.downloads.index') }}"
-                class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-                <label class="block">
-                    <span class="mb-2 block text-xs font-semibold text-gray-400">Search</span>
-                    <input name="search" value="{{ request('search') }}" class="search-bar w-full"
-                        placeholder="Name">
-                </label>
-
-                <div class="flex gap-2">
-                    <button class="btn-footer h-12">
-                        <x-ui.icon name="filter" class="h-4 w-4" />
-                        <span>Filter</span>
-                    </button>
-                    <a href="{{ route('admin.downloads.index') }}" class="btn-footer-secondary h-12">
-                        <x-ui.icon name="rotate-ccw" class="h-4 w-4" />
-                        <span>Reset</span>
-                    </a>
-                </div>
-            </form>
-        </section>
-
-        <div class="orders-table-wrap hidden lg:block">
-            <div class="flex items-center justify-between gap-3 border-b border-[#27272A] px-4 py-4">
+        <section class="space-y-4">
+            <div class="flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-sm font-semibold text-white">Download Cards</h2>
-                    <p class="mt-1 text-xs text-gray-500">Every item listed here appears on the public Downloads page.</p>
+                    <p class="mt-1 text-xs text-gray-500">Click a download name to manage it. Each item appears on the public Downloads page.</p>
                 </div>
-                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
-                    {{ $downloads->total() }} records
-                </span>
+                <span class="text-xs text-aksa-accent">{{ $downloads->total() }} records</span>
             </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px] text-sm">
-                    <thead class="bg-[#111115] text-xs uppercase tracking-normal text-gray-500">
-                        <tr>
-                            <th class="p-4 text-left">Download</th>
-                            <th class="p-4 text-left">Links</th>
-                            <th class="p-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($downloads as $download)
-                            @php
-                                $copyUrls = collect($download->links ?: [])
-                                    ->pluck('url')
-                                    ->map(fn ($url) => trim((string) $url))
-                                    ->filter()
-                                    ->implode("\n");
-                            @endphp
-                            <tr class="orders-table-row">
-                                <td class="p-4">
-                                    <div class="font-semibold text-white">{{ $download->name }}</div>
-                                </td>
-                                <td class="p-4">
-                                    <div class="grid gap-2">
-                                        @forelse ($download->links ?: [] as $link)
-                                            <a href="{{ $link['url'] ?? '#' }}" target="_blank" rel="noopener noreferrer"
-                                                class="max-w-[320px] truncate text-xs font-semibold text-aksa-accent-soft hover:text-white">
-                                                {{ $link['label'] ?? 'Download' }}
-                                            </a>
-                                        @empty
-                                            <span class="text-xs text-gray-500">No link</span>
-                                        @endforelse
-                                    </div>
-                                </td>
-                                <td class="p-4 text-right">
-                                    <div class="inline-flex justify-end gap-2">
-                                        <a href="{{ route('admin.downloads.index', array_merge(request()->query(), ['edit' => $download->id])) }}"
-                                            class="order-action">
-                                            <x-ui.icon name="edit-3" class="h-4 w-4" />
-                                            <span>Edit</span>
-                                        </a>
-                                        <form action="{{ route('admin.downloads.destroy', $download) }}" method="POST"
-                                            data-confirm="Delete this download item?">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="order-action order-action-danger">
-                                                <x-ui.icon name="trash-2" class="h-4 w-4" />
-                                                <span>Delete</span>
-                                            </button>
-                                        </form>
-                                        @if ($copyUrls !== '')
-                                            <button type="button" data-download-copy="{{ $download->id }}"
-                                                data-copy-value="{{ $copyUrls }}"
-                                                data-copy-title="Download link copied"
-                                                data-copy-message="The download URL is ready to paste."
-                                                class="order-action btn-press">
-                                                <x-ui.icon name="copy" class="h-4 w-4" />
-                                                <span data-button-label>Copy</span>
-                                            </button>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="p-8">
-                                    <div class="empty-state">No download items found</div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="space-y-4 lg:hidden">
             @forelse ($downloads as $download)
                 @php
-                    $copyUrls = collect($download->links ?: [])
-                        ->pluck('url')
-                        ->map(fn ($url) => trim((string) $url))
-                        ->filter()
-                        ->implode("\n");
+                    $editingDownload = (string) old('edit_download_id') === (string) $download->id;
+                    $downloadOpen = $editingDownload || (string) request('edit') === (string) $download->id
+                        || (string) old('delete_download_id') === (string) $download->id;
                 @endphp
-                <article class="order-mobile-card motion-card">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="font-semibold text-white">{{ $download->name }}</div>
+                <details class="product-section catalog-accordion" data-catalog-accordion @if ($downloadOpen) open @endif>
+                    <summary class="catalog-accordion-summary text-sm font-semibold text-white">
+                        <span class="inline-flex items-center gap-2">
+                            <x-ui.icon name="download" class="h-4 w-4" />
+                            {{ $download->name }}
+                        </span>
+                        <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
+                    </summary>
+                    <p class="mt-3 text-xs text-gray-400">{{ count($download->links ?: []) }} links</p>
+                    <form data-catalog-edit-form action="{{ route('admin.downloads.update', ['download' => $download, ...$downloadQuery]) }}" method="POST" class="mt-4 space-y-4">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="edit_download_id" value="{{ $download->id }}">
+                        <fieldset data-catalog-fields class="grid gap-4" @disabled(! $editingDownload)>
+                            <label class="block text-xs text-gray-400">Name
+                                <input name="name" value="{{ $editingDownload ? old('name', $download->name) : $download->name }}" class="search-bar mt-2 w-full" required maxlength="120">
+                            </label>
+                            <label class="block text-xs text-gray-400">Download links
+                                <textarea name="links_text" rows="5" maxlength="20000" class="search-bar mt-2 w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $editingDownload ? old('links_text', $download->links_text) : $download->links_text }}</textarea>
+                                <span class="mt-2 block text-xs text-gray-500">One link per line: Label | URL. Leave empty for a card without links.</span>
+                            </label>
+                        </fieldset>
+                        <button type="button" data-catalog-edit-button class="btn-footer">{{ $editingDownload ? 'Save' : 'Edit' }}</button>
+                    </form>
+                    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#27272A] pt-4">
+                        <div class="flex flex-wrap items-center gap-3">
+                            @foreach ($download->links ?: [] as $link)
+                                <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs text-aksa-accent-soft hover:text-white">{{ $link['label'] ?? 'Download' }}</a>
+                            @endforeach
+                            @if (count($download->links ?: []) > 0)
+                                <button type="button" data-download-copy="{{ $download->id }}" data-copy-value="{{ collect($download->links)->pluck('url')->implode("\n") }}" data-copy-title="Download links copied" data-copy-message="The download URLs are ready to paste." class="order-action btn-press">
+                                    <x-ui.icon name="copy" class="h-4 w-4" />
+                                    <span data-button-label>Copy</span>
+                                </button>
+                            @endif
                         </div>
-                    </div>
-
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <a href="{{ route('admin.downloads.index', array_merge(request()->query(), ['edit' => $download->id])) }}"
-                            class="order-action">
-                            <x-ui.icon name="edit-3" class="h-4 w-4" />
-                            <span>Edit</span>
-                        </a>
-                        <form action="{{ route('admin.downloads.destroy', $download) }}" method="POST"
-                            data-confirm="Delete this download item?">
+                        <form action="{{ route('admin.downloads.destroy', ['download' => $download, ...$downloadQuery]) }}" method="POST" data-confirm="Delete this download?">
                             @csrf
                             @method('DELETE')
-                            <button class="order-action order-action-danger">
-                                <x-ui.icon name="trash-2" class="h-4 w-4" />
-                                <span>Delete</span>
-                            </button>
+                            <input type="hidden" name="delete_download_id" value="{{ $download->id }}">
+                            <button type="submit" class="order-action order-action-danger disabled:opacity-50">Delete download</button>
                         </form>
-                        @if ($copyUrls !== '')
-                            <button type="button" data-download-copy="{{ $download->id }}"
-                                data-copy-value="{{ $copyUrls }}"
-                                data-copy-title="Download link copied"
-                                data-copy-message="The download URL is ready to paste."
-                                class="order-action btn-press">
-                                <x-ui.icon name="copy" class="h-4 w-4" />
-                                <span data-button-label>Copy</span>
-                            </button>
-                        @endif
                     </div>
-                </article>
+                </details>
             @empty
-                <div class="empty-state">No download items found</div>
+                <div class="empty-state">No downloads found</div>
             @endforelse
-        </div>
+        </section>
 
         @include('partials.pagination', [
             'paginator' => $downloads,
