@@ -43,7 +43,7 @@ class XgTeamLicenseResetTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Reset HWID')
-            ->assertSee('HWID reset license: AksaXg-x5NUdJ')
+            ->assertDontSee('HWID reset license:')
             ->assertSee(route('licenses.reset-hwid', $license))
             ->assertSee('once every 48 hours')
             ->assertDontSee('xg-seller-key-test');

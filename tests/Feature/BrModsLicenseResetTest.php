@@ -44,7 +44,7 @@ class BrModsLicenseResetTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Reset HWID')
-            ->assertSee('HWID reset username: v9xwndt9')
+            ->assertDontSee('HWID reset username:')
             ->assertSee(route('licenses.reset-hwid', $brLicense))
             ->assertSee('once every 24 hours')
             ->assertDontSee('secret-test-api-key');

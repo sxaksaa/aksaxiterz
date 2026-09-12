@@ -223,10 +223,6 @@ Route::get('/guides/{slug}', function (string $slug) {
 
     return view('guides.show', [
         'guide' => $guide,
-        'relatedGuides' => collect(config('guides.items', []))
-            ->where('slug', '!=', $slug)
-            ->take(3)
-            ->values(),
         'updatedAt' => config('guides.updated_at'),
     ]);
 })->name('guides.show');

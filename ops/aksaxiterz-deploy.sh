@@ -166,6 +166,10 @@ php artisan migrate --force
 
 # A pre-existing storage path must be the expected symlink.
 install -d -o www-data -g www-data -m 0775 "${APP_DIR}/storage/app/public"
+install -d -o www-data -g www-data -m 0775 "${APP_DIR}/storage/app/public/guides"
+install -o www-data -g www-data -m 0644 \
+    "${APP_DIR}/resources/guide-downloads/DisableVBS.reg" \
+    "${APP_DIR}/storage/app/public/guides/DisableVBS.reg"
 storage_link="${APP_DIR}/public/storage"
 expected_storage_target="$(realpath -e -- "${APP_DIR}/storage/app/public")"
 

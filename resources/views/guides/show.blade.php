@@ -6,30 +6,12 @@
 @section('content')
     <section class="page-shell pb-8 pt-6 md:pt-10">
         <div class="download-hero mx-auto max-w-5xl fade-up">
-            <div class="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end">
-                <div>
-                    <div class="mb-3 flex flex-wrap items-center gap-2">
-                        <a href="{{ route('guides.index') }}" class="btn-footer-secondary">
-                            <x-ui.icon name="book-open" class="h-4 w-4" />
-                            <span>All Guides</span>
-                        </a>
-                        <span class="support-pill">{{ $guide['category'] ?? 'Guide' }}</span>
-                    </div>
-
-                    <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
-                        {{ $guide['title'] }}
-                    </h1>
-                    <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
-                        {{ $guide['summary'] }}
-                    </p>
-                </div>
-
-                @include('guides._visual', [
-                    'variant' => $guide['visual'] ?? 'default',
-                    'title' => $guide['title'],
-                    'image' => $guide['image'] ?? null,
-                ])
-            </div>
+            <h1 class="text-3xl font-bold tracking-normal md:text-5xl">
+                {{ $guide['title'] }}
+            </h1>
+            <p class="mt-4 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
+                {{ $guide['summary'] }}
+            </p>
         </div>
     </section>
 
@@ -51,6 +33,14 @@
                                 </div>
                                 <h2 class="mt-2 text-xl font-semibold text-white">{{ $step['title'] }}</h2>
                                 <p class="mt-3 text-sm leading-6 text-gray-400">{{ $step['body'] }}</p>
+                                @if (! empty($step['download_url']) || ! empty($step['download_path']))
+                                    <a href="{{ ! empty($step['download_path']) ? asset($step['download_path']) : $step['download_url'] }}"
+                                        class="btn-footer mt-4 inline-flex items-center gap-2"
+                                        @if (! empty($step['download_path'])) download @else target="_blank" rel="noopener noreferrer" @endif>
+                                        <x-ui.icon name="download" class="h-4 w-4" />
+                                        <span>{{ $step['download_label'] ?? 'Download' }}</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
                     </article>
@@ -58,18 +48,5 @@
             </div>
         </div>
 
-        @if ($relatedGuides->isNotEmpty())
-            <div class="mx-auto mt-8 max-w-5xl">
-                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">More Guides</p>
-                <div class="mt-3 grid gap-3 md:grid-cols-3">
-                    @foreach ($relatedGuides as $related)
-                        <a href="{{ route('guides.show', $related['slug']) }}" data-scroll-reveal class="download-feature block">
-                            <div class="text-sm font-semibold text-white">{{ $related['title'] }}</div>
-                            <div class="mt-1 text-xs leading-5 text-gray-400">{{ $related['summary'] }}</div>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-        @endif
     </section>
 @endsection

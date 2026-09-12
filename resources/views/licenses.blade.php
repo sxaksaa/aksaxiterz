@@ -12,19 +12,6 @@
             ['1 Day', '7 Days', '30 Days', 'Days'],
             (string) $duration,
         );
-        $formatPackageLabel = static function ($duration): string {
-            $duration = trim((string) $duration);
-
-            if ($duration === '') {
-                return 'Paket tidak tersedia';
-            }
-
-            if (preg_match('/^(\d+)\s*(?:days?|hari)?$/i', $duration, $matches)) {
-                return 'Paket '.$matches[1].' Hari';
-            }
-
-            return 'Paket '.$duration;
-        };
         $licenseGroups = $licenses->groupBy(static fn ($license) =>
             'product:' . ($license->product_id ?: 'unknown-' . $license->id)
         );
@@ -177,7 +164,6 @@
                                 ];
                                 $resetProviderLabel = $resetState['provider_label'] ?? 'HWID';
                                 $resetIdentifier = $resetState['identifier'] ?? $resetState['username'] ?? null;
-                                $resetIdentifierLabel = $resetState['identifier_label'] ?? 'license';
                                 $resetCooldownHours = max(1, (int) ($resetState['cooldown_hours'] ?? 24));
                                 $resetMinutes = max(0, (int) ceil(($resetState['remaining_seconds'] ?? 0) / 60));
                                 $resetHours = intdiv($resetMinutes, 60);
@@ -202,7 +188,7 @@
                                             {{ $license->product->name ?? 'Product' }}
                                         </span>
                                         <span class="rounded-md border border-aksa-accent-30 bg-aksa-accent-10 px-2 py-0.5 text-[11px] font-semibold text-aksa-accent-soft">
-                                            {{ $formatPackageLabel($license->duration) }}
+                                            {{ $formatDuration($license->duration) }}
                                         </span>
                                     </div>
                                     <span id="key-{{ $license->id }}"
@@ -219,11 +205,6 @@
                                         </p>
                                     @endif
 
-                                    @if ($resetState['supported'] && $resetIdentifier)
-                                        <p class="mt-2 text-[11px] text-gray-500">
-                                            HWID reset {{ $resetIdentifierLabel }}: {{ $resetIdentifier }} · once every {{ $resetCooldownHours }} hours
-                                        </p>
-                                    @endif
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-end gap-2 self-end shrink-0 sm:self-auto">
