@@ -86,6 +86,21 @@ return [
         'self_service_verify_minutes' => (int) env('CRYPTO_DIRECT_SELF_SERVICE_VERIFY_MINUTES', 60),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
         'networks' => [
+            'usdtavaxc' => [
+                'token' => 'USDT',
+                'label' => 'USDT Avalanche C-Chain (AVAXC)',
+                'short_label' => 'USDT AVAXC',
+                'address' => env('CRYPTO_AVAXC_ADDRESS'),
+                'contract' => env('AVAXC_USDT_CONTRACT', '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7'),
+                'rpc_url' => env('AVAXC_RPC_URL', 'https://api.avax.network/ext/bc/C/rpc'),
+                'rpc_scan_blocks' => (int) env('AVAXC_RPC_SCAN_BLOCKS', 40000),
+                'rpc_chunk_blocks' => (int) env('AVAXC_RPC_CHUNK_BLOCKS', 1000),
+                'rpc_block_seconds' => (float) env('AVAXC_RPC_BLOCK_SECONDS', 0.4),
+                'rpc_confirmations' => (int) env('AVAXC_RPC_CONFIRMATIONS', 12),
+                'rpc_overlap_blocks' => (int) env('AVAXC_RPC_OVERLAP_BLOCKS', 100),
+                'decimals' => 6,
+                'binance_network' => env('BINANCE_AVAXC_NETWORK', 'AVAXC'),
+            ],
             'usdttrc20' => [
                 'token' => 'USDT',
                 'label' => 'USDT Tron (TRC20)',

@@ -55,3 +55,13 @@ php artisan schedule:list
 curl --fail https://aksaxiterz.com/up
 curl --fail https://aksaxiterz.com/sitemap.xml
 ```
+
+## USDT Avalanche C-Chain
+
+Set `CRYPTO_AVAXC_ADDRESS` to the receiving wallet's USDT Avalanche C-Chain address in the production environment. Do not assume a BSC exchange deposit address also accepts AVAXC. Checkout shows AVAXC only after this address is configured.
+
+Defaults use native USDT (6 decimals), contract `0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7`, and the Avalanche mainnet RPC. USDT.e is not supported. Sources: https://tether.to/es/supported-protocols/ and https://build.avax.network/docs/dapps.
+
+Optional RPC settings and `BINANCE_AVAXC_NETWORK=AVAXC` are in `.env.example`. Existing Binance deposit verification settings also apply; the receiving address must belong to the account queried by those credentials when using Binance as the primary verifier.
+
+After deployment, run `php artisan config:cache` and ensure the existing crypto verification scheduler is running. Verify an actual small AVAXC payment before announcing availability. No new cron job or database migration is required.

@@ -113,6 +113,44 @@ class PaymentServiceTest extends TestCase
         $this->assertLessThanOrEqual(300000, $scanBlocks);
     }
 
+    public function test_direct_avaxc_scanner_matches_six_decimal_usdt_transfer(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtavaxc.rpc_url' => 'https://avaxc-rpc.test',
+            'services.crypto_direct.networks.usdtavaxc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdtavaxc.rpc_chunk_blocks' => 100,
+        ]);
+
+        Http::fake([
+            'https://avaxc-rpc.test' => $this->fakeBscRpcTransfer('0xabc', '1100123', '0x58'),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-CHAIN',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtavaxc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7',
+                'amount' => '1.100123',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('0xabc', $transfer['tx_hash'] ?? null);
+        $this->assertSame('usdtavaxc', $transfer['network'] ?? null);
+        $this->assertSame('1.100123', $transfer['amount'] ?? null);
+        Http::assertSent(fn ($request) => $request->url() === 'https://avaxc-rpc.test' &&
+            $request['method'] === 'eth_getLogs' &&
+            $request['params'][0]['address'] === '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7' &&
+            $request['params'][0]['topics'][2] === '0x'.str_pad(str_repeat('1', 40), 64, '0', STR_PAD_LEFT)
+        );
+    }
+
     public function test_direct_bep20_scanner_matches_exact_usdt_transfer(): void
     {
         config([
@@ -788,6 +826,156 @@ class PaymentServiceTest extends TestCase
             $inspection['binance_diagnostics']['message'] ?? null
         );
         Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'https://bsc-rpc.test/'));
+    }
+
+    public function test_direct_avaxc_scanner_ignores_unattributable_amount_mismatch(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtavaxc.rpc_url' => 'https://avaxc-rpc.test',
+            'services.crypto_direct.networks.usdtavaxc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdtavaxc.rpc_chunk_blocks' => 100,
+        ]);
+
+        Http::fake([
+            'https://avaxc-rpc.test' => $this->fakeBscRpcTransfer('0xunderpaid', '1000000'),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-CHAIN',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtavaxc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7',
+                'amount' => '1.100123',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $inspection = (new PaymentService)->inspectDirectCryptoPayment($order);
+
+        $this->assertNull($inspection['transfer']);
+        $this->assertSame([], $inspection['mismatches']);
+    }
+
+    public function test_direct_avaxc_scanner_waits_for_configured_confirmations(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtavaxc.rpc_url' => 'https://avaxc-rpc.test',
+            'services.crypto_direct.networks.usdtavaxc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdtavaxc.rpc_chunk_blocks' => 100,
+            'services.crypto_direct.networks.usdtavaxc.rpc_confirmations' => 12,
+        ]);
+
+        Http::fake([
+            'https://avaxc-rpc.test' => $this->fakeBscRpcTransfer('0xunconfirmed', '1100123', '0x59'),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-UNCONFIRMED',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtavaxc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7',
+                'amount' => '1.100123',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertNull($transfer);
+    }
+
+    public function test_direct_avaxc_scanner_ignores_removed_reorg_logs(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtavaxc.rpc_url' => 'https://avaxc-rpc.test',
+            'services.crypto_direct.networks.usdtavaxc.rpc_scan_blocks' => 20,
+            'services.crypto_direct.networks.usdtavaxc.rpc_chunk_blocks' => 100,
+        ]);
+
+        Http::fake([
+            'https://avaxc-rpc.test' => $this->fakeBscRpcTransfer('0xremoved', '1100123', '0x58', true),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-REMOVED',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'network' => 'usdtavaxc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7',
+                'amount' => '1.100123',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinute();
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertNull($transfer);
+    }
+
+    public function test_direct_crypto_binance_fallback_uses_usdt_coin_for_avaxc(): void
+    {
+        config([
+            'services.crypto_direct.networks.usdtavaxc.binance_network' => 'AVAXC',
+            'services.binance.deposit_fallback.enabled' => true,
+            'services.binance.deposit_fallback.primary' => true,
+            'services.binance.deposit_fallback.api_key' => 'test-key',
+            'services.binance.deposit_fallback.api_secret' => 'test-secret',
+            'services.binance.deposit_fallback.base_url' => 'https://binance.test',
+            'services.binance.deposit_fallback.recv_window' => 5000,
+        ]);
+
+        Http::fake([
+            'https://binance.test/*' => Http::response([[
+                'id' => 'usdc-deposit-1',
+                'amount' => '2.10012300',
+                'coin' => 'USDT',
+                'network' => 'AVAXC',
+                'status' => 1,
+                'address' => '0x1111111111111111111111111111111111111111',
+                'txId' => '0xbinanceusdc',
+                'insertTime' => now()->subMinute()->timestamp * 1000,
+                'completeTime' => now()->subMinute()->timestamp * 1000,
+            ]], 200),
+        ]);
+
+        $order = new Order([
+            'order_id' => 'ORDER-USDT-BINANCE',
+            'payment_method' => 'crypto',
+            'payment_payload' => [
+                'type' => 'direct_crypto',
+                'token' => 'USDT',
+                'network' => 'usdtavaxc',
+                'address' => '0x1111111111111111111111111111111111111111',
+                'contract' => '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7',
+                'amount' => '2.100123',
+                'decimals' => 6,
+            ],
+        ]);
+        $order->created_at = now()->subMinutes(5);
+
+        $transfer = (new PaymentService)->findDirectCryptoTransfer($order);
+
+        $this->assertSame('0xbinanceusdc', $transfer['tx_hash'] ?? null);
+        $this->assertSame('usdtavaxc', $transfer['network'] ?? null);
+        $this->assertSame('2.100123', $transfer['amount'] ?? null);
+        $this->assertSame('binance_deposit_history', $transfer['source'] ?? null);
+
+        Http::assertSent(function ($request) {
+            return str_starts_with($request->url(), 'https://binance.test/sapi/v1/capital/deposit/hisrec?') &&
+                str_contains($request->url(), 'coin=USDT') &&
+                str_contains($request->url(), 'signature=');
+        });
     }
 
     private function fakeBscRpcTransfer(

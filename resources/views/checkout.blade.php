@@ -228,6 +228,19 @@
                                             <span id="checkoutCryptoNetworkPrompt" class="text-xs text-gray-500">Select a coin first</span>
                                         </div>
                                         <div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Select crypto network">
+                                    @if(filled(config('services.crypto_direct.networks.usdtavaxc.address')))
+                                    <label class="crypto-coin-option cursor-pointer text-left"
+                                        data-checkout-crypto-network-option data-token="usdt">
+                                        <input class="sr-only" type="radio" name="coin" value="usdtavaxc" disabled>
+                                        <span class="crypto-coin-header">
+                                            <x-ui.icon name="tether" class="crypto-token-icon" />
+                                            <span class="crypto-token-copy">
+                                                <span class="crypto-token-title">Avalanche C-Chain</span>
+                                                <span class="crypto-token-subtitle">AVAXC</span>
+                                            </span>
+                                        </span>
+                                    </label>
+                                    @endif
                                     <label class="crypto-coin-option cursor-pointer text-left"
                                         data-checkout-crypto-network-option data-token="usdt">
                                         <input class="sr-only" type="radio" name="coin" value="usdtbsc" disabled>

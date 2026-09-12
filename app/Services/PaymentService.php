@@ -28,6 +28,7 @@ class PaymentService
         'usdttrc20',
         'usdtbsc',
         'usdcbsc',
+        'usdtavaxc',
     ];
 
     public function __construct(
@@ -569,6 +570,7 @@ class PaymentService
                 'usdttrc20' => $this->inspectDirectTrc20Transfers($order, $payload),
                 'usdtbsc' => $this->inspectDirectBep20Transfers($order, $payload, 'usdtbsc'),
                 'usdcbsc' => $this->inspectDirectBep20Transfers($order, $payload, 'usdcbsc'),
+                'usdtavaxc' => $this->inspectDirectBep20Transfers($order, $payload, 'usdtavaxc'),
                 default => [
                     'transfer' => null,
                     'mismatches' => [],
@@ -1582,7 +1584,7 @@ class PaymentService
             throw new \Exception('Direct crypto checkout is not configured');
         }
 
-        if (str_ends_with($coin, 'bsc') && blank($network['rpc_url'] ?? null)) {
+        if (in_array($coin, ['usdtbsc', 'usdcbsc', 'usdtavaxc'], true) && blank($network['rpc_url'] ?? null)) {
             throw new \Exception('Direct crypto checkout is not configured');
         }
     }
