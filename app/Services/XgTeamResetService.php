@@ -186,12 +186,13 @@ class XgTeamResetService
         });
 
         try {
-            $response = Http::acceptJson()
+            $response = Http::asForm()->acceptJson()
                 ->connectTimeout(max(1, (int) config('services.xgteam.connect_timeout_seconds', 5)))
                 ->timeout(max(2, (int) config('services.xgteam.timeout_seconds', 15)))
-                ->get((string) config('services.xgteam.reset_url'), [
-                    'secret' => (string) config('services.xgteam.secret'),
-                    'license' => $licenseKey,
+                ->post((string) config('services.xgteam.reset_url'), [
+                    'key' => (string) config('services.xgteam.seller_key'),
+                    'type' => 'resetuser',
+                    'user' => $licenseKey,
                 ]);
         } catch (ConnectionException $exception) {
             $attempt->update([
@@ -203,7 +204,7 @@ class XgTeamResetService
                 'license_id' => $lockedLicense->id,
                 'user_id' => $user->id,
                 'attempt_id' => $attempt->id,
-                'exception' => $exception->getMessage(),
+                'exception' => $exception::class,
             ]);
 
             throw new LicenseResetException(
@@ -255,7 +256,7 @@ class XgTeamResetService
         $url = trim((string) config('services.xgteam.reset_url'));
         $scheme = Str::lower((string) parse_url($url, PHP_URL_SCHEME));
 
-        return filled(config('services.xgteam.secret')) &&
+        return filled(config('services.xgteam.seller_key')) &&
             filter_var($url, FILTER_VALIDATE_URL) !== false &&
             $scheme === 'https';
     }
@@ -268,43 +269,7 @@ class XgTeamResetService
 
         $data = $response->json();
 
-        if (! is_array($data)) {
-            return true;
-        }
-
-        foreach (['success', 'ok'] as $field) {
-            if (array_key_exists($field, $data)) {
-                return $this->truthy($data[$field]);
-            }
-        }
-
-        if (array_key_exists('error', $data) && $this->truthy($data['error'])) {
-            return false;
-        }
-
-        $status = Str::lower(trim((string) ($data['status'] ?? '')));
-
-        if (in_array($status, ['error', 'failed', 'failure', 'rejected', 'unauthorized'], true)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function truthy(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (float) $value !== 0.0;
-        }
-
-        $normalized = Str::lower(trim((string) $value));
-
-        return $normalized !== '' &&
-            ! in_array($normalized, ['0', 'false', 'no', 'null', 'error', 'failed', 'failure', 'unauthorized'], true);
+        return is_array($data) && ($data['success'] ?? null) === true;
     }
 
     private function providerMessage(Response $response): ?string

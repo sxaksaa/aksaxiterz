@@ -172,8 +172,8 @@ return [
     ],
 
     'xgteam' => [
-        'reset_url' => env('XGTEAM_RESET_URL', 'https://xgteam.pythonanywhere.com/resethwid'),
-        'secret' => env('XGTEAM_RESET_SECRET'),
+        'reset_url' => env('XGTEAM_RESET_URL', 'https://xgteams.com/reseller/1.0/'),
+        'seller_key' => env('XGTEAM_SELLER_KEY'),
         'product_slug' => env('XGTEAM_PRODUCT_SLUG', 'xg-team'),
         'cooldown_hours' => (int) env('XGTEAM_RESET_COOLDOWN_HOURS', 48),
         'connect_timeout_seconds' => (int) env('XGTEAM_CONNECT_TIMEOUT_SECONDS', 5),

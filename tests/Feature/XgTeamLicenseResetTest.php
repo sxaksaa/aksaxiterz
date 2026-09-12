@@ -26,8 +26,8 @@ class XgTeamLicenseResetTest extends TestCase
         parent::setUp();
 
         config([
-            'services.xgteam.reset_url' => 'https://xgteam.test/resethwid',
-            'services.xgteam.secret' => 'xg-secret-test',
+            'services.xgteam.reset_url' => 'https://xgteam.test/reseller/1.0/',
+            'services.xgteam.seller_key' => 'xg-seller-key-test',
             'services.xgteam.product_slug' => 'xg-team',
             'services.xgteam.cooldown_hours' => 48,
         ]);
@@ -46,7 +46,7 @@ class XgTeamLicenseResetTest extends TestCase
             ->assertSee('HWID reset license: AksaXg-x5NUdJ')
             ->assertSee(route('licenses.reset-hwid', $license))
             ->assertSee('once every 48 hours')
-            ->assertDontSee('xg-secret-test');
+            ->assertDontSee('xg-seller-key-test');
 
         $this->assertSame(1, substr_count($response->getContent(), 'data-license-reset-form'));
     }
@@ -57,9 +57,9 @@ class XgTeamLicenseResetTest extends TestCase
         $license = $this->makePaidLicense($user, 'xg-team', 'AksaXg-x5NUdJ');
 
         Http::fake([
-            'https://xgteam.test/resethwid*' => Http::response([
+            'https://xgteam.test/reseller/1.0/*' => Http::response([
                 'success' => true,
-                'message' => 'License reset successfully',
+                'message' => 'Successfully reset user HWID.',
             ]),
         ]);
 
@@ -71,12 +71,14 @@ class XgTeamLicenseResetTest extends TestCase
             ->assertSessionHas('license_reset_success');
 
         Http::assertSent(function ($request): bool {
-            parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
-
-            return $request->method() === 'GET' &&
-                str_starts_with($request->url(), 'https://xgteam.test/resethwid?') &&
-                ($query['secret'] ?? null) === 'xg-secret-test' &&
-                ($query['license'] ?? null) === 'AksaXg-x5NUdJ';
+            return $request->method() === 'POST' &&
+                $request->url() === 'https://xgteam.test/reseller/1.0/' &&
+                $request->hasHeader('Content-Type', 'application/x-www-form-urlencoded') &&
+                $request->data() === [
+                    'key' => 'xg-seller-key-test',
+                    'type' => 'resetuser',
+                    'user' => 'AksaXg-x5NUdJ',
+                ];
         });
 
         $this->assertDatabaseHas('license_resets', [
@@ -96,9 +98,9 @@ class XgTeamLicenseResetTest extends TestCase
         $license = $this->makePaidLicense($user, 'xg-team', 'AksaXg-x5NUdJ');
 
         Http::fake([
-            'https://xgteam.test/resethwid*' => Http::response([
+            'https://xgteam.test/reseller/1.0/*' => Http::response([
                 'success' => false,
-                'message' => 'Unauthorized: Invalid IP address for this secret.',
+                'message' => 'User HWID is already reset.',
             ]),
         ]);
 
@@ -111,9 +113,50 @@ class XgTeamLicenseResetTest extends TestCase
             'license_id' => $license->id,
             'provider' => 'xgteam',
             'status' => 'failed',
-            'provider_message' => 'Unauthorized: Invalid IP address for this secret.',
+            'provider_message' => 'User HWID is already reset.',
         ]);
         $this->assertNull($license->resetAttempts()->first()?->succeeded_at);
+    }
+
+    public function test_unconfirmed_responses_never_start_the_cooldown(): void
+    {
+        Http::preventStrayRequests();
+        $user = User::factory()->create();
+        $license = $this->makePaidLicense($user, 'xg-team', 'AksaXg-x5NUdJ');
+
+        Http::fakeSequence()
+            ->push('<html>Login required</html>', 200)
+            ->push(['message' => 'Unknown response'], 200)
+            ->push(['success' => 'false'], 200)
+            ->push(['success' => true], 500);
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->actingAs($user)
+                ->from('/licenses')
+                ->post(route('licenses.reset-hwid', $license))
+                ->assertSessionHasErrors('license_reset');
+        }
+
+        $this->assertSame(4, $license->resetAttempts()->where('status', 'failed')->count());
+        $this->assertSame(0, $license->resetAttempts()->whereNotNull('succeeded_at')->count());
+    }
+
+    public function test_old_secret_does_not_enable_the_new_api(): void
+    {
+        config([
+            'services.xgteam.seller_key' => '',
+            'services.xgteam.secret' => 'legacy-secret',
+        ]);
+        Http::fake();
+        $user = User::factory()->create();
+        $license = $this->makePaidLicense($user, 'xg-team', 'AksaXg-x5NUdJ');
+
+        $this->actingAs($user)
+            ->post(route('licenses.reset-hwid', $license))
+            ->assertSessionHasErrors('license_reset');
+
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('license_resets', 0);
     }
 
     private function makePaidLicense(
