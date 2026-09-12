@@ -1,9 +1,50 @@
 <?php
 
 return [
-    'updated_at' => 'April 28, 2026',
+    'updated_at' => 'September 12, 2026',
 
     'items' => [
+        [
+            'slug' => 'sync-windows-date-time',
+            'title' => 'Sync Windows Date & Time',
+            'category' => 'Windows setup',
+            'read_time' => '3 min read',
+            'summary' => 'Keep your PC clock accurate before signing in or opening your tools. Enable automatic time, check your time zone, and sync the clock with Windows.',
+            'visual' => 'date-time',
+            'requirements' => [
+                'Windows 11 or Windows 10; labels may vary slightly',
+                'An active internet connection',
+                'Use the time zone for your actual location',
+                'No restart is normally needed',
+            ],
+            'steps' => [
+                [
+                    'title' => 'Open Date & time',
+                    'body' => 'Press Win + I to open Settings. Go to Time & language, then Date & time. You can also right-click the taskbar clock and choose Adjust date and time.',
+                    'visual' => 'date-time-open',
+                ],
+                [
+                    'title' => 'Enable automatic time',
+                    'body' => 'Turn on Set time automatically. Leave it on so Windows can keep your clock updated instead of relying on a manually entered date and time.',
+                    'visual' => 'date-time-auto',
+                ],
+                [
+                    'title' => 'Check your time zone',
+                    'body' => 'Turn on Set time zone automatically and check the detected location. If this option is unavailable or the zone is wrong, turn it off and choose your zone manually. For WIB, select (UTC+07:00) Bangkok, Hanoi, Jakarta. Use your own local zone if you live elsewhere.',
+                    'visual' => 'date-time-zone',
+                ],
+                [
+                    'title' => 'Click Sync now',
+                    'body' => 'Scroll to Additional settings or Synchronize your clock, then click Sync now. Wait for Windows to finish; the button may be disabled while synchronization is running.',
+                    'visual' => 'date-time-sync',
+                ],
+                [
+                    'title' => 'Confirm the sync succeeded',
+                    'body' => 'Check that Last successful time synchronization shows a recent time and that the taskbar date and time are correct. Reopen your app and try again. If sync fails, check your internet connection and retry. On a work or school PC with locked settings, ask your administrator.',
+                    'visual' => 'date-time-done',
+                ],
+            ],
+        ],
         [
             'slug' => 'disable-hyper-v-windows',
             'title' => 'Disable Hyper-V on Windows',
@@ -52,57 +93,6 @@ return [
                     'title' => 'Check your tool again',
                     'body' => 'Open the tool or emulator that needed Hyper-V disabled. If it still fails, run Command Prompt as administrator and use bcdedit /set hypervisorlaunchtype off, then restart again.',
                     'visual' => 'terminal',
-                ],
-            ],
-        ],
-        [
-            'slug' => 'clean-windows-temp-files',
-            'title' => 'Clean Windows Temporary Files',
-            'category' => 'Maintenance',
-            'read_time' => '5 min read',
-            'summary' => 'Clear temporary folders, Prefetch, Recent shortcuts, and cleanup tools to reduce setup errors caused by stale files.',
-            'visual' => 'cleanup',
-            'requirements' => [
-                'Windows 10 or Windows 11',
-                'Close active apps before cleaning',
-                'Skip files Windows says are in use',
-                'Do not delete personal files from Downloads unless you are sure',
-            ],
-            'steps' => [
-                [
-                    'title' => 'Clean the user temp folder',
-                    'body' => 'Press Win + R, type %temp%, then press Enter. Select the files inside the folder and delete what Windows allows. Skip anything that says it is in use.',
-                    'visual' => 'user-temp',
-                ],
-                [
-                    'title' => 'Clean the Windows temp folder',
-                    'body' => 'Press Win + R again, type temp, then press Enter. Delete the temporary files that Windows allows, then skip locked files.',
-                    'visual' => 'folder',
-                ],
-                [
-                    'title' => 'Clear Prefetch cache',
-                    'body' => 'Press Win + R, type prefetch, then press Enter. Approve the administrator prompt if it appears, select the contents, and delete what Windows allows. Windows will rebuild this cache automatically.',
-                    'visual' => 'prefetch',
-                ],
-                [
-                    'title' => 'Clear Recent shortcuts',
-                    'body' => 'Press Win + R, type recent, then press Enter. Delete the shortcuts in this folder. This clears recent file history shortcuts, not the original files.',
-                    'visual' => 'recent',
-                ],
-                [
-                    'title' => 'Use Disk Cleanup',
-                    'body' => 'Search Disk Cleanup from Start, select your Windows drive, then clean temporary files, thumbnails, DirectX shader cache, and recycle bin items if needed.',
-                    'visual' => 'cleanup-tool',
-                ],
-                [
-                    'title' => 'Empty Recycle Bin',
-                    'body' => 'Right-click Recycle Bin and choose Empty Recycle Bin after checking that you do not need anything inside it.',
-                    'visual' => 'recycle-bin',
-                ],
-                [
-                    'title' => 'Restart before reinstalling',
-                    'body' => 'Restart Windows before reinstalling or opening setup tools. This gives Windows a clean session and clears locked temporary files.',
-                    'visual' => 'restart',
                 ],
             ],
         ],

@@ -34,22 +34,7 @@
     </section>
 
     <section class="page-shell pb-16 md:pb-20">
-        <div class="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <aside class="product-section fade-up" data-scroll-reveal>
-                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Before You Start</p>
-                <div class="mt-4 grid gap-3">
-                    @foreach ($guide['requirements'] ?? [] as $requirement)
-                        <div class="rounded-lg border border-[#27272A] bg-black/20 px-3 py-3 text-sm text-gray-300">
-                            {{ $requirement }}
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="mt-5 rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-3 text-xs leading-5 text-aksa-accent-soft">
-                    Updated {{ $updatedAt }}. Follow the steps carefully and restart Windows when requested.
-                </div>
-            </aside>
-
+        <div class="mx-auto max-w-5xl">
             <div class="grid gap-4">
                 @foreach ($guide['steps'] ?? [] as $index => $step)
                     <article class="product-section motion-card" data-scroll-reveal>

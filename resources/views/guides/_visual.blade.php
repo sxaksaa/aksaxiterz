@@ -7,6 +7,12 @@
         : ($image ? asset($image) : null);
     $lines = match ($variant) {
         'overview' => ['Step-by-step fixes', 'Windows setup', 'Cleanup checklist', 'Troubleshooting notes'],
+        'date-time' => ['Date & time', 'Set time automatically: On', 'Check your time zone', 'Sync now'],
+        'date-time-open' => ['Windows Settings', 'Time & language', 'Date & time'],
+        'date-time-auto' => ['Date & time', 'Set time automatically: On', 'Keep your clock up to date'],
+        'date-time-zone' => ['Set time zone automatically: On', 'Check your local time zone', 'WIB example: UTC+07:00', 'Bangkok, Hanoi, Jakarta'],
+        'date-time-sync' => ['Additional settings', 'Synchronize your clock', 'Sync now'],
+        'date-time-done' => ['Sync complete', 'Last successful time synchronization', 'Check for a recent timestamp', 'Reopen your app'],
         'hyperv' => ['Windows Features', '[ ] Hyper-V', '[ ] Virtual Machine Platform', '[ ] Windows Hypervisor Platform'],
         'features' => ['Run', 'optionalfeatures', 'Open Windows Features'],
         'checkboxes' => ['Hyper-V', 'Virtual Machine Platform', 'Windows Hypervisor Platform'],
@@ -43,7 +49,21 @@
         <div class="grid gap-2 p-4">
             @foreach ($lines as $line)
                 <div class="rounded-lg border border-[#27272A] bg-[#15151B]/90 px-3 py-2 text-xs font-semibold text-gray-300">
-                    {{ $line }}
+                    @if (str_starts_with($variant, 'date-time') && str_ends_with($line, ': On'))
+                        <span class="flex items-center justify-between gap-3">
+                            <span>{{ substr($line, 0, -4) }}</span>
+                            <span class="flex shrink-0 items-center gap-2 text-aksa-accent-soft">
+                                On <span aria-hidden="true" class="flex h-4 w-7 items-center justify-end rounded-full bg-aksa-accent-soft px-0.5"><span class="h-3 w-3 rounded-full bg-[#111115]"></span></span>
+                            </span>
+                        </span>
+                    @elseif (str_starts_with($variant, 'date-time') && in_array($line, ['Sync now', 'Sync complete']))
+                        <span class="flex items-center gap-2 text-aksa-accent-soft">
+                            <x-ui.icon :name="$line === 'Sync complete' ? 'check' : 'rotate-ccw'" class="h-4 w-4" />
+                            {{ $line }}
+                        </span>
+                    @else
+                        {{ $line }}
+                    @endif
                 </div>
             @endforeach
         </div>

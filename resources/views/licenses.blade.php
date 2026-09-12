@@ -12,6 +12,19 @@
             ['1 Day', '7 Days', '30 Days', 'Days'],
             (string) $duration,
         );
+        $formatPackageLabel = static function ($duration): string {
+            $duration = trim((string) $duration);
+
+            if ($duration === '') {
+                return 'Paket tidak tersedia';
+            }
+
+            if (preg_match('/^(\d+)\s*(?:days?|hari)?$/i', $duration, $matches)) {
+                return 'Paket '.$matches[1].' Hari';
+            }
+
+            return 'Paket '.$duration;
+        };
         $licenseGroups = $licenses->groupBy(static fn ($license) =>
             'product:' . ($license->product_id ?: 'unknown-' . $license->id)
         );
@@ -189,7 +202,7 @@
                                             {{ $license->product->name ?? 'Product' }}
                                         </span>
                                         <span class="rounded-md border border-aksa-accent-30 bg-aksa-accent-10 px-2 py-0.5 text-[11px] font-semibold text-aksa-accent-soft">
-                                            {{ $formatDuration($license->duration) }}
+                                            {{ $formatPackageLabel($license->duration) }}
                                         </span>
                                     </div>
                                     <span id="key-{{ $license->id }}"
@@ -198,6 +211,13 @@
                                         {{ $maskedLicenseKey }}
                                     </span>
                                     <p class="mt-1 font-mono text-[10px] text-gray-500">Order: {{ $license->order_id }}</p>
+                                    @php($purchasedAt = $license->order?->paid_at ?? $license->created_at)
+                                    @if ($purchasedAt)
+                                        <p class="mt-1 text-xs text-gray-400">
+                                            Purchased
+                                            <time datetime="{{ $purchasedAt->toIso8601String() }}">{{ $purchasedAt->copy()->timezone('Asia/Jakarta')->format('d M Y, H:i') }} WIB</time>
+                                        </p>
+                                    @endif
 
                                     @if ($resetState['supported'] && $resetIdentifier)
                                         <p class="mt-2 text-[11px] text-gray-500">
