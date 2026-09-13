@@ -196,4 +196,14 @@ return [
         'pending_timeout_minutes' => (int) env('XGTEAM_PENDING_TIMEOUT_MINUTES', 2),
     ],
 
+    'aurora_vn' => [
+        'reset_url' => env('AURORA_VN_RESET_URL', 'https://aurora-license.vercel.app/api/reseller?action=resethwid'),
+        'api_key' => env('AURORA_VN_API_KEY'),
+        'product_slug' => env('AURORA_VN_PRODUCT_SLUG', 'aurora-vn'),
+        'cooldown_hours' => (int) env('AURORA_VN_RESET_COOLDOWN_HOURS', 24),
+        'connect_timeout_seconds' => (int) env('AURORA_VN_CONNECT_TIMEOUT_SECONDS', 5),
+        'timeout_seconds' => (int) env('AURORA_VN_TIMEOUT_SECONDS', 15),
+        'pending_timeout_minutes' => (int) env('AURORA_VN_PENDING_TIMEOUT_MINUTES', 2),
+    ],
+
 ];

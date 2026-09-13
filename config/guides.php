@@ -50,7 +50,7 @@ return [
             'title' => 'Disable Hyper-V on Windows',
             'category' => 'Windows setup',
             'read_time' => '3 min read',
-            'summary' => 'Download the Hyper-V tool, apply the DisableVBS registry file, and restart Windows for tools that require Hyper-V to be disabled.',
+            'summary' => 'Download the Hyper-V tool, apply DisableVBS.reg, turn off Memory integrity, and restart Windows for tools that require this compatibility setup.',
             'visual' => 'hyperv',
             'steps' => [
                 [
@@ -71,6 +71,11 @@ return [
                     'visual' => 'vbs-registry',
                     'download_path' => 'storage/guides/DisableVBS.reg',
                     'download_label' => 'Download DisableVBS.reg',
+                ],
+                [
+                    'title' => 'Turn off Memory integrity',
+                    'body' => 'Open Windows Security from Start. Select Device security, then Core isolation details. Turn Memory integrity off and approve the administrator prompt if it appears. If it is already off, leave it off for this setup. If the setting is managed by your organization, contact your administrator. Restart in the next step to apply the change.',
+                    'visual' => 'core-isolation',
                 ],
                 [
                     'title' => 'Restart and check the result',

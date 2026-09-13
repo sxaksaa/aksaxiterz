@@ -1,0 +1,298 @@
+<?php
+
+namespace App\Services;
+
+use App\Exceptions\LicenseResetException;
+use App\Models\License;
+use App\Models\LicenseReset;
+use App\Models\Product;
+use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+class AuroraVnResetService
+{
+    public const PROVIDER = 'aurora_vn';
+
+    public function supports(License $license): bool
+    {
+        $product = $license->relationLoaded('product')
+            ? $license->product
+            : $license->product()->first();
+
+        return $this->supportsProduct($product);
+    }
+
+    public function supportsProduct(?Product $product): bool
+    {
+        return $product && hash_equals(
+            Str::lower(trim((string) config('services.aurora_vn.product_slug', 'aurora-vn'))),
+            Str::lower(trim((string) $product->slug)),
+        );
+    }
+
+    public function extractLicenseKey(string $credential): ?string
+    {
+        $key = trim($credential);
+
+        return $key !== '' && mb_strlen($key) <= 120 &&
+            ! preg_match('/[\x00-\x1F\x7F\s]/u', $key)
+                ? $key
+                : null;
+    }
+
+    public function state(License $license): array
+    {
+        $supported = $this->supports($license);
+        $key = $supported ? $this->extractLicenseKey((string) $license->license_key) : null;
+        $order = $license->relationLoaded('order')
+            ? $license->order
+            : $license->order()->first();
+        $isPaidPurchase = $order && $order->status === 'paid' &&
+            (int) $order->user_id === (int) $license->user_id;
+        $lastReset = LicenseReset::query()
+            ->where('license_id', $license->id)
+            ->where('provider', self::PROVIDER)
+            ->where('status', LicenseReset::STATUS_SUCCEEDED)
+            ->whereNotNull('succeeded_at')
+            ->latest('succeeded_at')
+            ->first();
+        $availableAt = $lastReset?->succeeded_at
+            ? $lastReset->succeeded_at->copy()->addHours($this->cooldownHours())
+            : null;
+        $remainingSeconds = $availableAt?->isFuture()
+            ? max(0, (int) now()->diffInSeconds($availableAt, false))
+            : 0;
+
+        return [
+            'supported' => $supported,
+            'provider' => self::PROVIDER,
+            'provider_label' => 'Aurora VN',
+            'identifier' => $key === null ? null : $this->maskedKey($key),
+            'identifier_label' => 'license',
+            'username' => $key === null ? null : $this->maskedKey($key),
+            'is_paid_purchase' => (bool) $isPaidPurchase,
+            'configured' => $this->isConfigured(),
+            'available_at' => $availableAt,
+            'remaining_seconds' => $remainingSeconds,
+            'cooldown_hours' => $this->cooldownHours(),
+            'can_reset' => $supported && $isPaidPurchase && $key !== null &&
+                $this->isConfigured() && $remainingSeconds === 0,
+        ];
+    }
+
+    public function reset(License $license, User $user): LicenseReset
+    {
+        [$lockedLicense, $key, $attempt] = DB::transaction(function () use ($license, $user): array {
+            $lockedLicense = License::with(['product', 'order'])
+                ->whereKey($license->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $lockedLicense->user_id !== (int) $user->id) {
+                throw new LicenseResetException('This license does not belong to your account.', 'not_owned');
+            }
+
+            if (! $this->supports($lockedLicense)) {
+                throw new LicenseResetException('HWID reset is not available for this product.', 'unsupported');
+            }
+
+            if (! $lockedLicense->order || $lockedLicense->order->status !== 'paid' ||
+                (int) $lockedLicense->order->user_id !== (int) $user->id) {
+                throw new LicenseResetException('Only a paid Aurora VN license can be reset.', 'not_paid');
+            }
+
+            if (! $this->isConfigured()) {
+                throw new LicenseResetException(
+                    'HWID reset is temporarily unavailable. Please contact support.',
+                    'not_configured',
+                );
+            }
+
+            $key = $this->extractLicenseKey((string) $lockedLicense->license_key);
+
+            if ($key === null) {
+                throw new LicenseResetException(
+                    'This Aurora VN license format cannot be reset automatically. Please contact support.',
+                    'invalid_credential',
+                );
+            }
+
+            $lastReset = LicenseReset::query()
+                ->where('license_id', $lockedLicense->id)
+                ->where('provider', self::PROVIDER)
+                ->where('status', LicenseReset::STATUS_SUCCEEDED)
+                ->whereNotNull('succeeded_at')
+                ->latest('succeeded_at')
+                ->lockForUpdate()
+                ->first();
+            $availableAt = $lastReset?->succeeded_at
+                ? $lastReset->succeeded_at->copy()->addHours($this->cooldownHours())
+                : null;
+
+            if ($availableAt?->isFuture()) {
+                throw new LicenseResetException(
+                    'This license can be reset again in '.$this->humanRemaining($availableAt).'.',
+                    'cooldown',
+                    $availableAt,
+                );
+            }
+
+            $hasRecentAttempt = LicenseReset::query()
+                ->where('license_id', $lockedLicense->id)
+                ->where('provider', self::PROVIDER)
+                ->where('status', LicenseReset::STATUS_PENDING)
+                ->where('created_at', '>=', now()->subMinutes($this->pendingTimeoutMinutes()))
+                ->lockForUpdate()
+                ->exists();
+
+            if ($hasRecentAttempt) {
+                throw new LicenseResetException(
+                    'An HWID reset for this license is already in progress.',
+                    'in_progress',
+                );
+            }
+
+            $attempt = LicenseReset::create([
+                'license_id' => $lockedLicense->id,
+                'user_id' => $user->id,
+                'provider' => self::PROVIDER,
+                'username' => $this->maskedKey($key),
+                'status' => LicenseReset::STATUS_PENDING,
+            ]);
+
+            return [$lockedLicense, $key, $attempt];
+        });
+
+        try {
+            $response = Http::asJson()
+                ->acceptJson()
+                ->withHeaders(['x-api-key' => (string) config('services.aurora_vn.api_key')])
+                ->connectTimeout(max(1, (int) config('services.aurora_vn.connect_timeout_seconds', 5)))
+                ->timeout(max(2, (int) config('services.aurora_vn.timeout_seconds', 15)))
+                ->post((string) config('services.aurora_vn.reset_url'), [
+                    'license_key' => $key,
+                ]);
+        } catch (ConnectionException $exception) {
+            $attempt->update([
+                'status' => LicenseReset::STATUS_FAILED,
+                'provider_message' => 'Connection failed',
+            ]);
+
+            Log::warning('Aurora VN HWID reset connection failed.', [
+                'license_id' => $lockedLicense->id,
+                'user_id' => $user->id,
+                'attempt_id' => $attempt->id,
+                'exception' => $exception::class,
+            ]);
+
+            throw new LicenseResetException(
+                'Aurora VN could not be reached. Please try again in a moment.',
+                'connection_failed',
+            );
+        }
+
+        $providerMessage = $this->providerMessage($response, $key);
+
+        if (! $this->responseSucceeded($response)) {
+            $attempt->update([
+                'status' => LicenseReset::STATUS_FAILED,
+                'http_status' => $response->status(),
+                'provider_message' => $providerMessage,
+            ]);
+
+            Log::warning('Aurora VN HWID reset was rejected.', [
+                'license_id' => $lockedLicense->id,
+                'user_id' => $user->id,
+                'attempt_id' => $attempt->id,
+                'http_status' => $response->status(),
+            ]);
+
+            throw new LicenseResetException(
+                'Aurora VN could not reset this HWID. Please try again later or contact support.',
+                'provider_rejected',
+            );
+        }
+
+        $attempt->update([
+            'status' => LicenseReset::STATUS_SUCCEEDED,
+            'http_status' => $response->status(),
+            'provider_message' => $providerMessage,
+            'succeeded_at' => now(),
+        ]);
+
+        Log::info('Aurora VN HWID reset completed.', [
+            'license_id' => $lockedLicense->id,
+            'user_id' => $user->id,
+            'attempt_id' => $attempt->id,
+        ]);
+
+        return $attempt->fresh();
+    }
+
+    public function isConfigured(): bool
+    {
+        $url = trim((string) config('services.aurora_vn.reset_url'));
+
+        return filled(config('services.aurora_vn.api_key')) &&
+            filter_var($url, FILTER_VALIDATE_URL) !== false &&
+            Str::lower((string) parse_url($url, PHP_URL_SCHEME)) === 'https';
+    }
+
+    private function responseSucceeded(Response $response): bool
+    {
+        if (! $response->successful()) {
+            return false;
+        }
+
+        $data = $response->json();
+
+        return is_array($data) && ($data['success'] ?? null) === true;
+    }
+
+    private function providerMessage(Response $response, string $key): ?string
+    {
+        $data = $response->json();
+        $message = is_array($data) ? ($data['message'] ?? $data['error'] ?? null) : null;
+
+        if (! is_scalar($message)) {
+            return null;
+        }
+
+        $clean = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $message)) ?? '');
+        $clean = str_replace($key, $this->maskedKey($key), $clean);
+
+        return $clean !== '' ? Str::limit($clean, 1000, '') : null;
+    }
+
+    private function maskedKey(string $key): string
+    {
+        return '••••'.mb_substr($key, -4);
+    }
+
+    private function cooldownHours(): int
+    {
+        return max(1, (int) config('services.aurora_vn.cooldown_hours', 24));
+    }
+
+    private function pendingTimeoutMinutes(): int
+    {
+        return max(1, (int) config('services.aurora_vn.pending_timeout_minutes', 2));
+    }
+
+    private function humanRemaining(CarbonInterface $availableAt): string
+    {
+        $minutes = max(1, (int) ceil(now()->diffInSeconds($availableAt, false) / 60));
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+
+        return $hours > 0
+            ? $hours.'h'.($remainingMinutes > 0 ? ' '.$remainingMinutes.'m' : '')
+            : $remainingMinutes.'m';
+    }
+}

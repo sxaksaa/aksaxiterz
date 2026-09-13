@@ -12,6 +12,7 @@ class LicenseResetManager
     public function __construct(
         private readonly BrModsResetService $brModsResetService,
         private readonly XgTeamResetService $xgTeamResetService,
+        private readonly AuroraVnResetService $auroraVnResetService,
     ) {}
 
     public function supports(License $license): bool
@@ -42,6 +43,7 @@ class LicenseResetManager
         return match ($provider) {
             BrModsResetService::PROVIDER => 'BR Mods',
             XgTeamResetService::PROVIDER => 'XG Team',
+            AuroraVnResetService::PROVIDER => 'Aurora VN',
             default => 'HWID',
         };
     }
@@ -50,6 +52,7 @@ class LicenseResetManager
     {
         return max(1, match ($provider) {
             XgTeamResetService::PROVIDER => (int) config('services.xgteam.cooldown_hours', 48),
+            AuroraVnResetService::PROVIDER => (int) config('services.aurora_vn.cooldown_hours', 24),
             default => (int) config('services.brmods.cooldown_hours', 24),
         });
     }
@@ -70,6 +73,7 @@ class LicenseResetManager
         return [
             $this->brModsResetService,
             $this->xgTeamResetService,
+            $this->auroraVnResetService,
         ];
     }
 

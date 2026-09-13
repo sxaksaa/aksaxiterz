@@ -188,7 +188,7 @@ class BrModsLicenseResetTest extends TestCase
     public function test_non_br_product_cannot_use_the_reset_endpoint(): void
     {
         $user = User::factory()->create();
-        $license = $this->makePaidLicense($user, 'aurora-vn', '👤notbr🔑password');
+        $license = $this->makePaidLicense($user, 'unsupported-product', '👤notbr🔑password');
 
         Http::fake();
 
