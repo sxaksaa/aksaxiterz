@@ -359,6 +359,7 @@
 
                     card.dataset.productStatus = status;
                     card.dataset.productStock = String(stock);
+                    card.classList.toggle('product-card-is-updating', isUpdating);
 
                     if (statusBadge) {
                         statusBadge.textContent = product.status_label || (isUpdating ? 'Updating' : 'Ready');

@@ -1224,11 +1224,43 @@
         color: #9ca3af;
         font-size: 0.6875rem;
         font-weight: 700;
-        transition: color 180ms ease;
+        scale: 1;
+        transition:
+            scale 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            color 220ms ease,
+            background-color 220ms ease,
+            box-shadow 280ms ease;
     }
 
-    .currency-toggle-option:hover {
+    [data-currency-switcher] .currency-toggle-option:hover,
+    [data-currency-switcher] .currency-toggle-option:focus-visible {
+        scale: 1.045;
+        background: rgba(180, 155, 255, 0.12);
         color: #ffffff;
+        box-shadow:
+            inset 0 0 0 1px rgba(180, 155, 255, 0.12),
+            0 0 16px rgba(180, 155, 255, 0.12);
+    }
+
+    [data-currency-switcher] .currency-toggle-option[aria-pressed="true"]:hover,
+    [data-currency-switcher] .currency-toggle-option[aria-pressed="true"]:focus-visible {
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 18px rgba(180, 155, 255, 0.2);
+    }
+
+    [data-currency-switcher] .currency-toggle-option:active {
+        scale: 0.97;
+        transition-duration: 100ms;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .currency-toggle-option,
+        [data-currency-switcher] .currency-toggle-option:hover,
+        [data-currency-switcher] .currency-toggle-option:focus-visible,
+        [data-currency-switcher] .currency-toggle-option:active {
+            scale: 1;
+            transition: none;
+        }
     }
 
     @keyframes aksa-dropdown-in {
@@ -6711,6 +6743,100 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
     }
 }
 
+.product-section-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #c4b5fd;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.product-section-status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 9999px;
+    background: #a78bfa;
+    box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.1), 0 0 14px rgba(167, 139, 250, 0.42);
+}
+
+.product-section-divider {
+    display: grid;
+    grid-template-columns: minmax(1.5rem, 1fr) auto minmax(1.5rem, 1fr);
+    align-items: center;
+    gap: 1rem;
+    margin-block: 1.35rem 0.2rem;
+}
+
+.product-section-divider-ready {
+    margin-block: 0 0.2rem;
+}
+
+.product-section-divider-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(180, 155, 255, 0.22));
+}
+
+.product-section-divider-line:last-child {
+    background: linear-gradient(90deg, rgba(180, 155, 255, 0.22), transparent);
+}
+
+.product-section-divider-copy {
+    max-width: 34rem;
+    text-align: center;
+}
+
+.product-section-eyebrow-updating {
+    color: #c4b5fd;
+}
+
+.product-section-divider-copy p {
+    margin-top: 0.35rem;
+    color: #71717a;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.product-card-is-updating {
+    opacity: 0.76;
+    filter: saturate(0.72);
+}
+
+.product-card .product-status-badge-updating {
+    border-color: rgba(161, 161, 170, 0.24);
+    background: rgba(63, 63, 70, 0.58);
+    color: #d4d4d8;
+    box-shadow: none;
+}
+
+.product-card-is-updating:hover,
+.product-card-is-updating:focus-visible {
+    opacity: 0.94;
+    filter: saturate(0.9);
+}
+
+@media (max-width: 639px) {
+    .product-section-divider {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .product-section-divider-line:last-child {
+        display: none;
+    }
+
+    .product-section-divider-copy {
+        text-align: left;
+    }
+
+    .product-section-divider-ready .product-section-divider-copy {
+        text-align: center;
+    }
+}
+
 /* Wide desktop composition: use 2K/4K space without stretching readable content edge-to-edge. */
 @media (min-width: 1920px) {
     .page-shell,
@@ -6776,22 +6902,24 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
         translate: 0 0;
         scale: 1;
         transition:
-            scale 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            translate 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            box-shadow 420ms cubic-bezier(0.22, 1, 0.36, 1);
+            scale 460ms cubic-bezier(0.22, 1, 0.36, 1),
+            translate 460ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 380ms ease,
+            box-shadow 460ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 320ms ease,
+            filter 320ms ease;
         will-change: auto;
     }
-    .product-card-storefront:hover,
-    .product-card-storefront:focus-visible {
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible {
         transform: none;
-        translate: 0 -4px;
-        scale: 1.025;
-        border-color: rgba(180, 155, 255, 0.28);
+        translate: 0 -8px !important;
+        scale: 1.05 !important;
+        border-color: rgba(180, 155, 255, 0.38);
         box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.045),
-            0 18px 42px rgba(0, 0, 0, 0.24),
-            0 0 32px rgba(180, 155, 255, 0.08);
+            inset 0 1px 0 rgba(255, 255, 255, 0.07),
+            0 24px 52px rgba(0, 0, 0, 0.34),
+            0 0 42px rgba(180, 155, 255, 0.14);
     }
     .product-card-storefront::before {
         transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -6803,14 +6931,74 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
             background-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
             color 420ms cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .product-card-storefront:hover .product-card-cta { transform: none; }
+    .product-card-storefront:hover .product-card-cta,
+    .product-card-storefront:focus-visible .product-card-cta {
+        transform: translateX(2px);
+    }
 }
+
+.product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
+    scale: 0.985 !important;
+    transition-duration: 120ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .product-card-storefront,
     .product-card-storefront::before,
     .product-card-storefront .product-card-cta { transition: none; }
-    .product-card-storefront:hover,
-    .product-card-storefront:focus-visible { translate: none; scale: 1; }
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
+        translate: none !important;
+        scale: 1 !important;
+    }
+}
+
+/* Product detail package cards use independent motion properties so the
+   scroll-reveal transform cannot make hover entry or exit feel abrupt. */
+@media (hover: hover) and (pointer: fine) {
+    .package-card[data-scroll-reveal].is-scroll-revealed {
+        transform: none;
+        translate: 0 0;
+        scale: 1;
+        transition:
+            translate 520ms cubic-bezier(0.16, 1, 0.3, 1),
+            scale 520ms cubic-bezier(0.16, 1, 0.3, 1),
+            border-color 360ms ease,
+            box-shadow 520ms cubic-bezier(0.16, 1, 0.3, 1),
+            background-color 360ms ease,
+            opacity 320ms ease;
+        will-change: translate, scale;
+    }
+
+    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:hover,
+    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:focus-visible {
+        transform: none;
+        translate: 0 -5px;
+        scale: 1.025;
+        border-color: rgba(180, 155, 255, 0.4);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.065),
+            0 24px 58px rgba(0, 0, 0, 0.3),
+            0 0 36px rgba(180, 155, 255, 0.11);
+    }
+}
+
+.package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:active {
+    scale: 0.99;
+    transition-duration: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .package-card[data-scroll-reveal].is-scroll-revealed,
+    .package-card[data-scroll-reveal].is-scroll-revealed:hover,
+    .package-card[data-scroll-reveal].is-scroll-revealed:focus-visible,
+    .package-card[data-scroll-reveal].is-scroll-revealed:active {
+        transform: none;
+        translate: none;
+        scale: 1;
+        transition: none;
+    }
 }
 
 .home-hero-section {

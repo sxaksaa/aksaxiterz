@@ -394,9 +394,15 @@ class ProductStockFeedTest extends TestCase
             $this->get($url)
                 ->assertOk()
                 ->assertSeeInOrder([
+                    'data-product-section-heading="ready"',
                     'data-product-id="'.$readyProduct->id.'"',
+                    'data-product-section-heading="updating"',
                     'data-product-id="'.$updatingProduct->id.'"',
                 ], false)
+                ->assertSee('Available now')
+                ->assertDontSee('Ready to purchase')
+                ->assertSee('Currently updating')
+                ->assertSee('product-card-is-updating', false)
                 ->assertDontSee('UPDATING-ORDER-SENSITIVE-KEY');
         }
     }
