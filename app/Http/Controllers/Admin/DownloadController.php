@@ -19,6 +19,9 @@ class DownloadController extends Controller
                     $query->where('name', 'like', '%'.$search.'%');
                 });
             })
+            ->when(in_array($request->input('visibility'), ['visible', 'hidden'], true), function ($query) use ($request) {
+                $query->where('is_visible', $request->input('visibility') === 'visible');
+            })
             ->orderBy('name')
             ->paginate(12)
             ->withQueryString();
@@ -26,6 +29,7 @@ class DownloadController extends Controller
         $stats = [
             'total' => DownloadItem::count(),
             'links' => DownloadItem::all()->sum(fn ($download) => count($download->links ?: [])),
+            'hidden' => DownloadItem::where('is_visible', false)->count(),
         ];
 
         return view('admin.downloads.index', compact('downloads', 'stats'));
@@ -44,12 +48,12 @@ class DownloadController extends Controller
 
     public function update(Request $request, DownloadItem $download)
     {
-        $validated = $this->validateDownload($request);
+        $validated = $this->validateDownload($request, $download);
 
         $download->update($validated);
 
         return redirect()
-            ->route('admin.downloads.index', $request->only(['search', 'page']))
+            ->route('admin.downloads.index', $request->only(['search', 'visibility', 'page']))
             ->with('info', 'Download item updated.');
     }
 
@@ -58,20 +62,24 @@ class DownloadController extends Controller
         $download->delete();
 
         return redirect()
-            ->route('admin.downloads.index', $request->only(['search', 'page']))
+            ->route('admin.downloads.index', $request->only(['search', 'visibility', 'page']))
             ->with('info', 'Download item deleted.');
     }
 
-    private function validateDownload(Request $request): array
+    private function validateDownload(Request $request, ?DownloadItem $download = null): array
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'links_text' => ['nullable', 'string', 'max:20000'],
+            'is_visible' => ['sometimes', 'boolean'],
         ]);
 
         return [
             'name' => $validated['name'],
             'links' => $this->parseLinks($validated['links_text'] ?? ''),
+            'is_visible' => array_key_exists('is_visible', $validated)
+                ? (bool) $validated['is_visible']
+                : (bool) ($download?->is_visible ?? true),
         ];
     }
 

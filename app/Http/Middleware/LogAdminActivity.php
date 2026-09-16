@@ -156,6 +156,9 @@ class LogAdminActivity
             ],
             in_array($action, ['admin.downloads.store', 'admin.downloads.update'], true) => [
                 trim((string) $request->input('name')),
+                $request->has('is_visible')
+                    ? 'Visibility: '.($request->boolean('is_visible') ? 'public' : 'hidden')
+                    : null,
             ],
             in_array($action, ['admin.vouchers.store', 'admin.vouchers.update'], true) => [
                 strtoupper(trim((string) $request->input('code'))),

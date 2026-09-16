@@ -32,21 +32,25 @@ class AdminDownloadManagementTest extends TestCase
         $response = $this->actingAs($admin)->post(route('admin.downloads.store'), [
             'name' => 'Test Tool',
             'links_text' => 'Download Files | https://example.com/setup.zip',
+            'is_visible' => '0',
         ]);
 
         $response->assertRedirect(route('admin.downloads.index'));
         $download = DownloadItem::where('name', 'Test Tool')->firstOrFail();
         $this->assertSame('https://example.com/setup.zip', $download->links[0]['url']);
+        $this->assertFalse($download->is_visible);
 
         $response = $this->actingAs($admin)->patch(route('admin.downloads.update', $download), [
             'name' => 'Updated Tool',
             'links_text' => "Main | https://example.com/main.zip\nMirror | https://example.com/mirror.zip",
+            'is_visible' => '1',
         ]);
 
         $response->assertRedirect(route('admin.downloads.index'));
         $download->refresh();
         $this->assertSame('Updated Tool', $download->name);
         $this->assertCount(2, $download->links);
+        $this->assertTrue($download->is_visible);
 
         $this->actingAs($admin)
             ->get(route('admin.downloads.index'))
@@ -101,6 +105,12 @@ class AdminDownloadManagementTest extends TestCase
             'links' => [['label' => 'Setup', 'url' => 'https://example.com/alpha.zip']],
         ]);
 
+        DownloadItem::create([
+            'name' => 'Hidden Tool',
+            'links' => [['label' => 'Setup', 'url' => 'https://example.com/hidden.zip']],
+            'is_visible' => false,
+        ]);
+
         $response = $this->get('/downloads');
 
         $response->assertOk();
@@ -117,5 +127,22 @@ class AdminDownloadManagementTest extends TestCase
         $response->assertDontSee('>Files</p>', false);
         $response->assertSeeInOrder(['Alpha Tool', 'Visible Tool', 'Zeta Tool']);
         $response->assertSee('Visible Tool');
+        $response->assertDontSee('Hidden Tool');
+        $response->assertDontSee('https://example.com/hidden.zip', false);
+    }
+
+    public function test_hidden_downloads_do_not_trigger_the_config_fallback(): void
+    {
+        DownloadItem::query()->delete();
+        DownloadItem::create([
+            'name' => 'Private Tool',
+            'links' => [['label' => 'Setup', 'url' => 'https://example.com/private.zip']],
+            'is_visible' => false,
+        ]);
+
+        $this->get('/downloads')
+            ->assertOk()
+            ->assertDontSee('Private Tool')
+            ->assertSee('No public downloads have been configured yet.');
     }
 }

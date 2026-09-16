@@ -183,16 +183,19 @@ Route::get('/csrf-token', fn () => response()->json([
 
 Route::get('/downloads', function () {
     $downloads = collect();
+    $hasStoredDownloads = false;
 
     if (Schema::hasTable('download_items')) {
+        $hasStoredDownloads = DownloadItem::query()->exists();
         $downloads = DownloadItem::query()
+            ->visible()
             ->orderBy('name')
             ->get()
             ->map(fn (DownloadItem $download) => $download->publicPayload())
             ->values();
     }
 
-    if ($downloads->isEmpty()) {
+    if (! $hasStoredDownloads) {
         $downloads = collect(config('links.downloads', []))
             ->filter(fn ($download) => filled($download['name'] ?? null))
             ->sortBy(fn ($download) => Str::lower((string) ($download['name'] ?? '')))

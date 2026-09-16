@@ -3,7 +3,7 @@
 @section('content')
     @php
         $addingDownload = old('download_action') === 'create';
-        $downloadQuery = request()->only(['search', 'page']);
+        $downloadQuery = request()->only(['search', 'visibility', 'page']);
     @endphp
 
     <div class="page-shell py-6 md:py-10">
@@ -18,7 +18,7 @@
                 </div>
             </div>
 
-            <div class="admin-stat-grid mt-6 grid gap-3 sm:grid-cols-2">
+            <div class="admin-stat-grid mt-6 grid gap-3 sm:grid-cols-3">
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['total'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Download cards</div>
@@ -26,6 +26,10 @@
                 <div class="order-stat">
                     <div class="text-xl font-semibold text-white">{{ $stats['links'] }}</div>
                     <div class="mt-1 text-xs text-gray-400">Total links</div>
+                </div>
+                <div class="order-stat">
+                    <div class="text-xl font-semibold text-white">{{ $stats['hidden'] }}</div>
+                    <div class="mt-1 text-xs text-gray-400">Hidden cards</div>
                 </div>
             </div>
         </section>
@@ -69,6 +73,13 @@
                             <textarea name="links_text" rows="4" maxlength="20000" class="search-bar mt-2 w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $addingDownload ? old('links_text') : '' }}</textarea>
                             <span class="mt-2 block text-xs text-gray-500">One link per line: Label | URL. Leave empty for a card without links.</span>
                         </label>
+                        <label class="block text-xs text-gray-400">Visibility
+                            <select name="is_visible" class="search-bar mt-2 w-full" required>
+                                <option value="1" @selected((string) ($addingDownload ? old('is_visible', '1') : '1') === '1')>Public</option>
+                                <option value="0" @selected((string) ($addingDownload ? old('is_visible', '1') : '1') === '0')>Hidden</option>
+                            </select>
+                            <span class="mt-2 block text-xs text-gray-500">Hidden cards remain available here but do not appear on the public Downloads page.</span>
+                        </label>
                         <button type="submit" class="btn-footer h-12 w-fit">Add download</button>
                     </form>
                 </section>
@@ -78,9 +89,16 @@
         <div id="downloadSearchPanel" class="catalog-disclosure-panel" hidden>
             <div class="catalog-disclosure-spacing">
                 <section class="product-section">
-                    <form method="GET" action="{{ route('admin.downloads.index') }}" class="grid items-end gap-3 md:grid-cols-[1fr_auto]">
+                    <form method="GET" action="{{ route('admin.downloads.index') }}" class="grid items-end gap-3 md:grid-cols-[1fr_180px_auto]">
                         <label class="block text-xs text-gray-400">Search
                             <input name="search" value="{{ request('search') }}" class="search-bar mt-2 w-full" placeholder="Download name">
+                        </label>
+                        <label class="block text-xs text-gray-400">Visibility
+                            <select name="visibility" class="search-bar mt-2 w-full">
+                                <option value="">All</option>
+                                <option value="visible" @selected(request('visibility') === 'visible')>Public</option>
+                                <option value="hidden" @selected(request('visibility') === 'hidden')>Hidden</option>
+                            </select>
                         </label>
                         <div class="flex gap-2">
                             <button type="submit" class="btn-footer h-12">Search</button>
@@ -95,7 +113,7 @@
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-sm font-semibold text-white">Download Cards</h2>
-                    <p class="mt-1 text-xs text-gray-500">Click a download name to manage it. Each item appears on the public Downloads page.</p>
+                    <p class="mt-1 text-xs text-gray-500">Click a download name to manage it. Only public items appear on the public Downloads page.</p>
                 </div>
                 <span class="text-xs text-aksa-accent">{{ $downloads->total() }} records</span>
             </div>
@@ -110,6 +128,9 @@
                         <span class="inline-flex items-center gap-2">
                             <x-ui.icon name="download" class="h-4 w-4" />
                             {{ $download->name }}
+                            <span class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $download->is_visible ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-zinc-600 bg-zinc-800 text-zinc-400' }}">
+                                {{ $download->is_visible ? 'Public' : 'Hidden' }}
+                            </span>
                         </span>
                         <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
                     </summary>
@@ -125,6 +146,13 @@
                             <label class="block text-xs text-gray-400">Download links
                                 <textarea name="links_text" rows="5" maxlength="20000" class="search-bar mt-2 w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $editingDownload ? old('links_text', $download->links_text) : $download->links_text }}</textarea>
                                 <span class="mt-2 block text-xs text-gray-500">One link per line: Label | URL. Leave empty for a card without links.</span>
+                            </label>
+                            <label class="block text-xs text-gray-400">Visibility
+                                <select name="is_visible" class="search-bar mt-2 w-full" required>
+                                    <option value="1" @selected((string) ($editingDownload ? old('is_visible', $download->is_visible ? '1' : '0') : ($download->is_visible ? '1' : '0')) === '1')>Public</option>
+                                    <option value="0" @selected((string) ($editingDownload ? old('is_visible', $download->is_visible ? '1' : '0') : ($download->is_visible ? '1' : '0')) === '0')>Hidden</option>
+                                </select>
+                                <span class="mt-2 block text-xs text-gray-500">Set to Hidden to remove this card from the public Downloads page.</span>
                             </label>
                         </fieldset>
                         <button type="button" data-catalog-edit-button class="btn-footer">{{ $editingDownload ? 'Save' : 'Edit' }}</button>

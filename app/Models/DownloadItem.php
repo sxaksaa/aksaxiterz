@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class DownloadItem extends Model
@@ -9,11 +10,18 @@ class DownloadItem extends Model
     protected $fillable = [
         'name',
         'links',
+        'is_visible',
     ];
 
     protected $casts = [
         'links' => 'array',
+        'is_visible' => 'boolean',
     ];
+
+    public function scopeVisible(Builder $query): Builder
+    {
+        return $query->where('is_visible', true);
+    }
 
     public function publicPayload(): array
     {
