@@ -178,8 +178,19 @@
                         <div class="grid gap-3 text-sm">
                             @foreach ($order->licenses as $license)
                                 <div class="qris-detail-row">
-                                    <span>Key {{ $loop->iteration }}</span>
-                                    <span class="break-all text-right font-mono text-xs text-gray-200">{{ $license->license_key }}</span>
+                                    <span class="shrink-0">Key {{ $loop->iteration }}</span>
+                                    <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                                        <span class="break-all text-right font-mono text-xs text-gray-200">{{ $license->license_key }}</span>
+                                        <button type="button"
+                                            data-copy-value="{{ $license->license_key }}"
+                                            data-copy-title="License copied"
+                                            data-copy-message="The license key is ready to paste."
+                                            aria-label="Copy license key {{ $loop->iteration }}"
+                                            class="order-action btn-press shrink-0">
+                                            <x-ui.icon name="copy" class="h-4 w-4" />
+                                            <span data-button-label>Copy</span>
+                                        </button>
+                                    </div>
                                 </div>
                             @endforeach
                             <div class="qris-detail-row qris-total-row">
