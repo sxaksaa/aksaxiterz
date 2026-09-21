@@ -42,7 +42,9 @@
                 ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
                 : ($stateKey === 'pending'
                     ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
-                    : 'border-amber-400/30 bg-amber-400/10 text-amber-100') }}">
+                    : ($stateKey === 'expired'
+                        ? 'border-red-400/40 bg-red-400/10 text-red-100'
+                        : 'border-amber-400/30 bg-amber-400/10 text-amber-100')) }}">
             <div class="flex items-start gap-3">
                 <x-ui.icon :name="$stateKey === 'paid' ? 'check-circle' : ($stateKey === 'pending' ? 'shield-check' : 'life-buoy')"
                     class="mt-0.5 h-5 w-5 shrink-0" />
@@ -138,33 +140,42 @@
                                 </div>
 
                                 <div class="grid gap-3">
-                                    <div class="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
-                                        Scan this QRIS, then manually enter the exact total shown. A different amount cannot be matched automatically.
-                                    </div>
-                                    <div class="qris-detail-row">
-                                        <span>Base invoice</span>
-                                        <span class="font-semibold text-gray-200">Rp {{ number_format($payment['base_amount']) }}</span>
-                                    </div>
-                                    <div class="qris-detail-row">
-                                        <span>Platform fee</span>
-                                        <span class="font-semibold text-gray-200">Rp {{ number_format($payment['platform_fee']) }}</span>
-                                    </div>
-                                    <div class="qris-detail-row">
-                                        <span>Unique amount</span>
-                                        <span class="font-semibold text-gray-200">Rp {{ number_format($payment['unique_amount']) }}</span>
-                                    </div>
-                                    <div class="qris-detail-row qris-total-row">
-                                        <span class="min-w-0">Exact amount to enter</span>
-                                        <span class="flex shrink-0 items-center gap-2">
-                                            <strong class="qris-amount-value whitespace-nowrap" data-invoice-total>Rp {{ number_format($payment['amount']) }}</strong>
-                                            <button type="button" class="order-action shrink-0 px-2 py-1 text-[11px]"
+                                    <div class="qris-total-row rounded-xl border p-5">
+                                        <p class="text-sm font-semibold text-gray-200">Pay exactly this amount</p>
+                                        <div class="mt-3 flex flex-wrap items-center gap-3">
+                                            <strong class="qris-amount-value qris-pay-amount" data-invoice-total>Rp {{ number_format($payment['amount']) }}</strong>
+                                            <button type="button" class="order-action shrink-0"
                                                 data-copy-payment="{{ $payment['amount'] }}"
                                                 data-copy-label="Amount">
-                                                <x-ui.icon name="copy" class="h-3.5 w-3.5" />
+                                                <x-ui.icon name="copy" class="h-4 w-4" />
                                                 <span>Copy</span>
                                             </button>
-                                        </span>
+                                        </div>
+                                        <p class="mt-3 text-xs leading-5 text-gray-300">Enter this total manually after scanning the QRIS.</p>
                                     </div>
+                                    <div class="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
+                                        The QRIS does not fill in the amount automatically. A different amount cannot be matched automatically.
+                                    </div>
+                                    <details class="group rounded-xl border border-white/10 bg-black/15">
+                                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold text-gray-300 marker:hidden">
+                                            <span>View amount breakdown</span>
+                                            <x-ui.icon name="chevron-down" class="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+                                        </summary>
+                                        <div class="grid gap-2 px-4 pb-4">
+                                            <div class="qris-detail-row">
+                                                <span>Base invoice</span>
+                                                <span class="font-semibold text-gray-200">Rp {{ number_format($payment['base_amount']) }}</span>
+                                            </div>
+                                            <div class="qris-detail-row">
+                                                <span>Platform fee</span>
+                                                <span class="font-semibold text-gray-200">Rp {{ number_format($payment['platform_fee']) }}</span>
+                                            </div>
+                                            <div class="qris-detail-row">
+                                                <span>Unique amount</span>
+                                                <span class="font-semibold text-gray-200">Rp {{ number_format($payment['unique_amount']) }}</span>
+                                            </div>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                         @elseif ($payment['method'] === 'binance_pay')
@@ -340,14 +351,9 @@
                                 <div class="min-w-0">
                                     <h3 class="truncate font-semibold text-white">{{ $item['product_name'] }}</h3>
                                     <p class="mt-1 text-sm text-gray-400">
-                                        {{ $item['package_name'] }} · Qty {{ $item['quantity'] }}
+                                        {{ $item['package_name'] }} · Quantity: {{ $item['quantity'] }}
                                     </p>
                                 </div>
-                                <span class="shrink-0 text-sm font-semibold text-gray-200">
-                                    {{ $usesStablecoin
-                                        ? '$'.number_format($item['line_total_usdt'], 2)
-                                        : 'Rp '.number_format($item['line_total_idr']) }}
-                                </span>
                             </div>
                         </article>
                     @endforeach

@@ -87,6 +87,8 @@ let cryptoExpiryCountdownTimer = null;
 let binancePayExpiryCountdownTimer = null;
 let recentPurchaseToastCleanup = null;
 const MINI_CART_SHEET_BREAKPOINT = 768;
+const MINI_CART_SHEET_TRANSITION_DURATION = 420;
+let miniCartReturnTimer = null;
 
 function usesMiniCartSheet() {
     return window.innerWidth < MINI_CART_SHEET_BREAKPOINT;
@@ -2393,7 +2395,7 @@ function moveMiniCartOverlay(root, open) {
 
     if (open && usesMiniCartSheet()) {
         document.body.append(backdrop, panel);
-    } else if (!open && panel.parentElement !== root) {
+    } else if (!usesMiniCartSheet() && panel.parentElement !== root) {
         root.append(backdrop, panel);
     }
 }
@@ -2406,7 +2408,12 @@ function setMiniCartOpen(open, { auto = false } = {}) {
 
     if (open) document.getElementById('navbar')?.classList.remove('nav-hidden');
 
+    window.clearTimeout(miniCartReturnTimer);
     moveMiniCartOverlay(root, open);
+    if (open && usesMiniCartSheet()) {
+        // Establish the sheet's hidden position after moving it to body.
+        void miniCartOverlayParts().panel?.offsetHeight;
+    }
 
     clearTimeout(miniCartAutoCloseTimer);
     root.classList.toggle('is-open', open);
@@ -2415,7 +2422,16 @@ function setMiniCartOpen(open, { auto = false } = {}) {
     panel?.classList.toggle('is-visible', open);
     backdrop?.classList.toggle('is-visible', open);
     trigger.setAttribute('aria-expanded', String(open));
-    document.body.classList.toggle('mini-cart-sheet-open', open && shouldLockPageForMiniCart());
+    if (open) {
+        document.body.classList.toggle('mini-cart-sheet-open', shouldLockPageForMiniCart());
+    } else if (panel?.parentElement === document.body && usesMiniCartSheet()) {
+        miniCartReturnTimer = window.setTimeout(() => {
+            if (!root.classList.contains('is-open')) root.append(backdrop, panel);
+            document.body.classList.remove('mini-cart-sheet-open');
+        }, shouldReduceMotion() ? 0 : MINI_CART_SHEET_TRANSITION_DURATION);
+    } else {
+        document.body.classList.remove('mini-cart-sheet-open');
+    }
 
     if (open && auto) {
         miniCartAutoCloseTimer = window.setTimeout(() => {

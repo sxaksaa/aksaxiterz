@@ -2538,7 +2538,8 @@
             border-radius: 1.25rem 1.25rem 0 0;
             transform: translateY(calc(100% + 1.5rem));
             transform-origin: bottom center;
-            transition: opacity 280ms ease, transform 380ms var(--aksa-motion-ease), visibility 380ms ease;
+            will-change: transform;
+            transition: opacity 300ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1), visibility 420ms ease;
         }
 
         .mini-cart-root:hover .mini-cart-panel,
@@ -2560,6 +2561,7 @@
 
         .mini-cart-backdrop {
             position: fixed;
+            display: block;
             z-index: 70;
             inset: 0;
             width: 100vw;
@@ -2569,13 +2571,12 @@
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-            transition: opacity var(--aksa-motion-fast) ease, visibility var(--aksa-motion-fast) ease;
+            transition: opacity 300ms ease, visibility 300ms ease;
         }
 
         .mini-cart-root.is-open .mini-cart-backdrop,
         .mini-cart-root.is-auto-open .mini-cart-backdrop,
         .mini-cart-backdrop.is-visible {
-            display: block;
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
@@ -3973,6 +3974,11 @@
         text-align: right;
         overflow-wrap: anywhere;
         text-shadow: 0 0 18px rgba(180, 155, 255, 0.18);
+    }
+
+    .qris-pay-amount {
+        font-size: clamp(2rem, 5vw, 2.75rem);
+        text-align: left;
     }
 
     .payment-success-dialog {

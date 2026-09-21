@@ -565,7 +565,7 @@
                     !checkoutAvailable ? 'Checkout Paused' :
                     (voucherRequestPending ? 'Checking Voucher...' :
                         (!method ? 'Choose Payment Method' :
-                            (stablecoin && !stablecoinReady ? 'Complete Payment Selection' : 'Create Secure Invoice')))
+                            (stablecoin && !stablecoinReady ? 'Complete Payment Selection' : 'Create Invoice')))
                 );
             }
 
