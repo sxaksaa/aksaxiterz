@@ -14,13 +14,10 @@
 @endphp
 
 <div class="orders-filter-bar" data-orders-filter-bar>
-    <button type="button" class="category-chip active" data-order-filter="active">Active</button>
+    <button type="button" class="category-chip active" data-order-filter="needs-payment">Needs payment</button>
+    <button type="button" class="category-chip" data-order-filter="completed">Completed</button>
+    <button type="button" class="category-chip" data-order-filter="closed">Expired / Cancelled</button>
     <button type="button" class="category-chip" data-order-filter="all">All</button>
-    <button type="button" class="category-chip" data-order-filter="paid">Paid</button>
-    <button type="button" class="category-chip" data-order-filter="closed">Closed</button>
-    <button type="button" class="orders-previous-toggle" data-order-filter="previous">
-        Previous orders
-    </button>
 </div>
 <div class="empty-state mb-4 hidden" data-order-filter-empty>
     <span class="empty-state-title">No orders in this view</span>
@@ -182,7 +179,7 @@
         @endphp
 
         <article class="order-mobile-card motion-card" data-order-entry data-order-id="{{ $order->order_id }}"
-            data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
+            data-order-status="{{ $isPending ? 'needs-payment' : ($isPaid ? 'completed' : 'closed') }}">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                     <div class="text-[10px] uppercase tracking-normal text-gray-500">Order ID</div>
@@ -253,16 +250,16 @@
                             <span>Open Licenses</span>
                         </a>
                     @elseif ($canOpenCryptoAddress)
-                        <button type="button" class="order-action open-crypto-address-button w-full" data-crypto-checkout='@json($cryptoCheckout)'>
+                        <button type="button" class="order-action order-action-primary open-crypto-address-button w-full" data-crypto-checkout='@json($cryptoCheckout)'>
                             <x-ui.icon name="wallet" class="h-4 w-4" />
-                            <span>View Address</span>
+                            <span>Continue Payment</span>
                         </button>
                     @endif
 
                     @if ($canOpenBinancePay)
-                        <button type="button" class="order-action open-binance-pay-button w-full" data-binance-pay-checkout='@json($binancePayCheckout)'>
+                        <button type="button" class="order-action order-action-primary open-binance-pay-button w-full" data-binance-pay-checkout='@json($binancePayCheckout)'>
                             <x-ui.icon name="binance" class="h-4 w-4 text-[#F0B90B]" />
-                            <span>View Binance Pay</span>
+                            <span>Continue Payment</span>
                         </button>
                     @endif
 
@@ -283,15 +280,15 @@
                             </button>
                         </form>
                     @elseif ($canContinueCrypto)
-                        <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action w-full">
+                        <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action order-action-primary w-full">
                             <x-ui.icon name="external-link" class="h-4 w-4" />
                             <span>Continue Payment</span>
                         </a>
                     @elseif ($canSyncQris)
                         @if ($canOpenQris)
-                            <button type="button" class="order-action open-gopay-qris-button w-full" data-qris-checkout='@json($qrisCheckout)'>
+                            <button type="button" class="order-action order-action-primary open-gopay-qris-button w-full" data-qris-checkout='@json($qrisCheckout)'>
                                 <x-ui.icon name="qr-code" class="h-4 w-4" />
-                                <span>View QRIS</span>
+                                <span>Continue Payment</span>
                             </button>
                         @endif
                         <form action="/sync-gopay-qris-order/{{ $order->order_id }}" method="POST" class="sync-qris-form">
@@ -512,7 +509,7 @@
                     @endphp
 
                     <tr class="orders-table-row" data-order-entry data-order-id="{{ $order->order_id }}"
-                        data-order-status="{{ $isPending ? 'pending' : ($isPaid ? 'paid' : 'closed') }}">
+                        data-order-status="{{ $isPending ? 'needs-payment' : ($isPaid ? 'completed' : 'closed') }}">
                         <td class="p-4">
                             <div class="flex max-w-[210px] items-center gap-2">
                                 <span class="truncate font-mono text-xs text-gray-300">{{ $order->order_id }}</span>
@@ -566,9 +563,9 @@
                                     @endif
                                 @elseif ($canSyncCrypto)
                                     @if ($canOpenCryptoAddress)
-                                        <button type="button" class="order-action open-crypto-address-button" data-crypto-checkout='@json($cryptoCheckout)'>
+                                        <button type="button" class="order-action order-action-primary open-crypto-address-button" data-crypto-checkout='@json($cryptoCheckout)'>
                                             <x-ui.icon name="wallet" class="h-4 w-4" />
-                                            <span>Address</span>
+                                            <span>Continue Payment</span>
                                         </button>
                                     @endif
                                     <form action="/sync-crypto-order/{{ $order->order_id }}" method="POST" class="sync-crypto-form inline">
@@ -580,9 +577,9 @@
                                     </form>
                                 @elseif ($canSyncBinancePay)
                                     @if ($canOpenBinancePay)
-                                        <button type="button" class="order-action open-binance-pay-button" data-binance-pay-checkout='@json($binancePayCheckout)'>
+                                        <button type="button" class="order-action order-action-primary open-binance-pay-button" data-binance-pay-checkout='@json($binancePayCheckout)'>
                                             <x-ui.icon name="binance" class="h-4 w-4 text-[#F0B90B]" />
-                                            <span>Binance Pay</span>
+                                            <span>Continue Payment</span>
                                         </button>
                                     @endif
                                     <form action="/sync-binance-pay-order/{{ $order->order_id }}" method="POST" class="sync-binance-pay-form inline">
@@ -593,15 +590,15 @@
                                         </button>
                                     </form>
                                 @elseif ($canContinueCrypto)
-                                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action">
+                                    <a href="{{ $order->payment_url }}" target="_blank" rel="noopener" class="order-action order-action-primary">
                                         <x-ui.icon name="external-link" class="h-4 w-4" />
-                                        <span>Continue</span>
+                                        <span>Continue Payment</span>
                                     </a>
                                 @elseif ($canSyncQris)
                                     @if ($canOpenQris)
-                                        <button type="button" class="order-action open-gopay-qris-button" data-qris-checkout='@json($qrisCheckout)'>
+                                        <button type="button" class="order-action order-action-primary open-gopay-qris-button" data-qris-checkout='@json($qrisCheckout)'>
                                             <x-ui.icon name="qr-code" class="h-4 w-4" />
-                                            <span>QRIS</span>
+                                            <span>Continue Payment</span>
                                         </button>
                                     @endif
                                     <form action="/sync-gopay-qris-order/{{ $order->order_id }}" method="POST" class="sync-qris-form inline">

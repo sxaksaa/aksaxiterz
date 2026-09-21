@@ -40,6 +40,18 @@
             <span class="product-section-divider-line" aria-hidden="true"></span>
         </div>
 
-        @include('partials.product-card-items', ['products' => $updatingProducts])
+        @include('partials.product-card-items', ['products' => $updatingProducts->take(3)])
+
+        @if ($updatingProducts->count() > 3)
+            <details class="catalog-accordion group col-span-full">
+                <summary class="catalog-accordion-summary rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3 text-sm font-semibold text-gray-300">
+                    <span>Show {{ $updatingProducts->count() - 3 }} more updating products</span>
+                    <x-ui.icon name="chevron-down" class="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 md:gap-6">
+                    @include('partials.product-card-items', ['products' => $updatingProducts->skip(3)])
+                </div>
+            </details>
+        @endif
     @endif
 @endif

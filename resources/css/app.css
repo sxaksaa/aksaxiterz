@@ -133,6 +133,26 @@
         background-attachment: fixed;
     }
 
+    body.checkout-page [data-aksa-footer-shell] {
+        display: none;
+    }
+
+    @media (max-width: 639px) {
+        .payment-instruction-header {
+            flex-wrap: nowrap;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .payment-instruction-header > div:first-child {
+            min-width: 0;
+        }
+
+        .payment-instruction-countdown {
+            width: 7.5rem;
+        }
+    }
+
     input[type="date"],
     input[type="datetime-local"],
     input[type="month"],
@@ -4428,6 +4448,15 @@
         box-shadow: 0 0 0 1px rgba(180, 155, 255, 0.1);
     }
 
+    .crypto-coin-option.is-selecting,
+    .payment-card.is-selecting {
+        animation: checkout-selection-pop 360ms var(--aksa-motion-ease) both;
+    }
+
+    .checkout-network-reveal [data-checkout-crypto-network-option].is-network-entering {
+        animation: checkout-network-option-in 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+
     .crypto-coin-header {
         display: flex;
         min-width: 0;
@@ -4781,9 +4810,20 @@
 
     .checkout-payment-section .payment-card,
     .checkout-payment-section .crypto-coin-option {
-        transition-property: border-color, box-shadow, color, transform;
-        transition-duration: 260ms;
+        transition-property: border-color, box-shadow, color, background-color, transform;
+        transition-duration: 420ms;
         transition-timing-function: var(--aksa-motion-ease);
+    }
+
+    @keyframes checkout-options-switch-in {
+        from {
+            opacity: 0;
+            transform: translateY(-8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .checkout-options-reveal {
@@ -4810,6 +4850,10 @@
         pointer-events: auto;
         transform: translateY(0);
         transition-delay: 0s;
+    }
+
+    .checkout-options-reveal.is-switching > .checkout-options-reveal-inner {
+        animation: checkout-options-switch-in 480ms var(--aksa-motion-ease) both;
     }
 
     .checkout-options-reveal-inner {
@@ -4868,9 +4912,30 @@
         transition-delay: 0s;
     }
 
+    .checkout-network-reveal.is-switching > .checkout-network-reveal-inner {
+        animation: checkout-options-switch-in 420ms var(--aksa-motion-ease) both;
+    }
+
     .checkout-network-reveal-inner {
         min-height: 0;
         overflow: hidden;
+    }
+
+    #checkoutCryptoNetworkGrid {
+        overflow: hidden;
+        max-height: 20rem;
+        opacity: 1;
+        transform: translateY(0);
+        transition:
+            max-height 560ms cubic-bezier(0.4, 0, 0.2, 1),
+            opacity 420ms ease,
+            transform 560ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #checkoutCryptoNetworkGrid.is-swapping {
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(-8px);
     }
 
     .checkout-options-reveal .checkout-network-reveal [data-checkout-crypto-network-option] {
@@ -4946,6 +5011,7 @@
         box-shadow:
             0 0 0 5px rgba(180, 155, 255, 0.12),
             0 10px 18px rgba(180, 155, 255, 0.24);
+        animation: checkout-check-in 360ms var(--aksa-motion-ease) both;
     }
 
     .payment-card.active::before,
@@ -4961,6 +5027,17 @@
         border-right: 2px solid #ffffff;
         border-bottom: 2px solid #ffffff;
         transform: rotate(45deg);
+        animation: checkout-check-mark-in 300ms var(--aksa-motion-ease) 70ms both;
+    }
+
+    @keyframes checkout-check-in {
+        from { opacity: 0; transform: scale(0.62); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes checkout-check-mark-in {
+        from { opacity: 0; transform: rotate(45deg) scale(0.55); }
+        to { opacity: 1; transform: rotate(45deg) scale(1); }
     }
 
     .package.active::after {
@@ -5469,12 +5546,7 @@
         }
 
         .mobile-checkout-bar {
-            position: fixed;
-            z-index: 45;
-            right: 0.75rem;
-            bottom: 0.75rem;
-            left: 0.75rem;
-            display: flex;
+            display: none !important;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
@@ -5494,6 +5566,7 @@
         }
 
         .mobile-checkout-bar.is-visible {
+            display: flex;
             opacity: 1;
             visibility: visible;
             transform: translateY(0);
@@ -6830,6 +6903,23 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
         margin-top: 1rem;
     }
 
+    @keyframes checkout-selection-pop {
+        0% { transform: scale(1); }
+        45% { transform: scale(0.985); }
+        100% { transform: scale(1); }
+    }
+
+    @keyframes checkout-network-option-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.985);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
     .product-section-divider-line:last-child {
         display: none;
     }
@@ -7008,10 +7098,48 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
 }
 
 .home-hero-section {
-    padding-top: clamp(2rem, 4vw, 3.5rem);
-    padding-bottom: clamp(2.5rem, 5vw, 4rem);
+    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+    padding-bottom: clamp(1.75rem, 3.5vw, 2.75rem);
 }
 .home-hero-section .home-hero-compact {
     padding-top: 0;
     padding-bottom: 0;
+}
+
+.home-hero-compact .hero-title {
+    font-size: clamp(2.5rem, 5.2vw, 4.5rem);
+}
+
+.home-hero-compact .hero-actions {
+    margin-top: clamp(1.4rem, 2.5vw, 2rem);
+}
+
+.home-hero-compact .home-proof-strip {
+    margin-top: clamp(1.25rem, 2vw, 1.75rem);
+}
+
+.product-hero-compact {
+    padding-block: 1.15rem;
+}
+
+.pending-payment-reminder-cta,
+.order-action-primary {
+    border: 1px solid rgba(196, 181, 253, 0.5);
+    background: linear-gradient(135deg, rgba(124, 84, 220, 0.92), rgba(180, 155, 255, 0.9));
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(109, 40, 217, 0.2);
+}
+
+.order-action-primary:hover {
+    border-color: rgba(221, 214, 254, 0.8);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.98), rgba(196, 181, 253, 0.96));
+    color: #fff;
+}
+
+.catalog-accordion-summary::-webkit-details-marker {
+    display: none;
+}
+
+.catalog-accordion[open] .catalog-accordion-summary svg {
+    transform: rotate(180deg);
 }

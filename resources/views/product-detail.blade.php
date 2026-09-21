@@ -67,7 +67,7 @@
     <div id="content" class="page-shell py-6 md:py-10"
         data-product-checkout-ready="{{ $checkoutAvailable ? 'true' : 'false' }}"
         data-product-stock-endpoint="{{ route('products.stock-detail', $product, false) }}">
-        <div class="product-hero mb-6">
+        <div class="product-hero product-hero-compact mb-6">
             <div>
                 <a href="/" data-soft-nav data-soft-nav-back
                     class="text-sm text-aksa-accent transition hover:text-white">Back to products</a>
@@ -87,7 +87,7 @@
                         </span>
                     @endif
                 </div>
-                <h1 class="mt-4 text-3xl font-bold md:text-5xl">{{ $product->name }}</h1>
+                <h1 class="mt-3 text-3xl font-bold md:text-4xl">{{ $product->name }}</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-400 md:text-base">
                     {{ $product->description }}
                 </p>
@@ -109,7 +109,8 @@
             </div>
         @endif
 
-        <section class="product-section mb-6 fade-up">
+        <div class="product-purchase-layout grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <section class="product-section fade-up {{ $checkoutAvailable ? '' : 'lg:col-span-2' }}">
             <div class="mb-4">
                 <h2 class="text-xl font-semibold text-white">Select package</h2>
                 <p class="mt-1 text-sm text-gray-400">
@@ -122,7 +123,7 @@
                 Checkout is temporarily paused while this product is updating. Join Discord for availability alerts.
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 @foreach ($product->packages as $package)
                     @php
                         $packageStock = $package->available_license_stocks_count ?? 0;
@@ -215,13 +216,12 @@
             </div>
         </section>
 
-        <section id="summaryBox" class="product-summary-card product-summary-sticky hidden fade-up">
+        <section id="summaryBox" class="product-summary-card product-summary-sticky hidden fade-up lg:sticky lg:top-24">
             <div class="product-summary-heading mb-4">
-                <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">Step 2</p>
                 <h2 class="mt-1 text-xl font-semibold text-white">Ready to checkout</h2>
             </div>
 
-            <div class="product-summary-details grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+            <div class="product-summary-details grid grid-cols-1 gap-2">
                 <div class="summary-row summary-product-row">
                     <span>Product</span>
                     <span>{{ $product->name }}</span>
@@ -249,24 +249,25 @@
                 </div>
             </div>
 
-            <div class="product-summary-actions mt-5 grid grid-cols-2 gap-2 sm:gap-3">
-                <button id="addToCartBtn" type="button"
-                    class="btn-footer-secondary min-h-12 w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
-                    @disabled(! $checkoutAvailable)>
-                    <x-ui.icon name="shopping-cart" class="h-4 w-4" />
-                    <span data-button-label>{{ $checkoutAvailable ? 'Add to Cart' : 'Unavailable' }}</span>
-                </button>
+            <div class="product-summary-actions mt-5 grid gap-2 sm:gap-3">
                 <button id="buyNowBtn" type="button"
                     class="btn-main w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
                     @disabled(! $checkoutAvailable)>
                     <x-ui.icon name="arrow-right" class="h-4 w-4" />
                     <span data-button-label>{{ $checkoutAvailable ? 'Continue to Checkout' : 'Unavailable' }}</span>
                 </button>
+                <button id="addToCartBtn" type="button"
+                    class="btn-footer-secondary min-h-10 w-full text-xs {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
+                    @disabled(! $checkoutAvailable)>
+                    <x-ui.icon name="shopping-cart" class="h-4 w-4" />
+                    <span data-button-label>{{ $checkoutAvailable ? 'Add to Cart' : 'Unavailable' }}</span>
+                </button>
             </div>
             <p class="product-summary-helper mt-3 text-xs text-gray-500">
                 Continue to Checkout opens payment options. Add to Cart lets you combine packages first.
             </p>
         </section>
+        </div>
 
         <aside id="mobileCheckoutBar" class="mobile-checkout-bar" aria-hidden="true">
             <div class="min-w-0">

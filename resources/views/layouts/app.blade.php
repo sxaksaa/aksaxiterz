@@ -142,7 +142,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="text-white antialiased">
+<body class="text-white antialiased {{ request()->is('checkout', 'checkout/*') ? 'checkout-page' : '' }}">
 
     @if ($siteIntroEnabled)
         <div id="aksaSiteIntro" class="site-intro" aria-hidden="true">

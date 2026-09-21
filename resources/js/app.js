@@ -4637,7 +4637,7 @@ document.addEventListener('change', (event) => {
     if (event.target.matches('#licenseProductFilter')) filterLicenseGroups();
 });
 
-window.filterAksaOrderEntries = function(root, filter = 'active', { animate = false } = {}) {
+window.filterAksaOrderEntries = function(root, filter = 'needs-payment', { animate = false } = {}) {
     if (!(root instanceof Element)) return;
 
     const applyEntries = () => {
@@ -4646,10 +4646,7 @@ window.filterAksaOrderEntries = function(root, filter = 'active', { animate = fa
 
         root.querySelectorAll('[data-order-entry]').forEach(entry => {
             const status = entry.dataset.orderStatus;
-            const visible = filter === 'all' ||
-                (filter === 'active' && status === 'pending') ||
-                (filter === 'previous' && status !== 'pending') ||
-                status === filter;
+            const visible = filter === 'all' || status === filter;
 
             entry.classList.toggle('hidden', !visible);
             entry.classList.remove('filter-result-enter');
@@ -4823,7 +4820,7 @@ document.addEventListener('click', async (event) => {
 
     try {
         await navigator.clipboard.writeText(text);
-        setButtonLabel(button, 'Copied');
+        setButtonLabel(button, 'Copied ✓');
         button.classList.remove('text-green-400');
         button.classList.add('text-aksa-accent-soft');
         button.classList.add('is-copy-success');

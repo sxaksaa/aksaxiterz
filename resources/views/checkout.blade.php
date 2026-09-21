@@ -227,7 +227,7 @@
                                             <p class="text-xs font-semibold uppercase tracking-normal text-gray-400">Network</p>
                                             <span id="checkoutCryptoNetworkPrompt" class="text-xs text-gray-500">Select a coin first</span>
                                         </div>
-                                        <div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Select crypto network">
+                                        <div id="checkoutCryptoNetworkGrid" class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Select crypto network">
                                     @if(filled(config('services.crypto_direct.networks.usdtavaxc.address')))
                                     <label class="crypto-coin-option cursor-pointer text-left"
                                         data-checkout-crypto-network-option data-token="usdt">
@@ -305,32 +305,34 @@
                         <p id="checkoutVoucherFeedback" class="mt-2 hidden text-xs"></p>
                     </div>
 
-                    <div class="mt-5 summary-row mb-2">
-                        <span id="checkoutSubtotalLabel">Subtotal</span>
-                        <span id="checkoutSubtotal">Select payment</span>
-                    </div>
-                    <div id="checkoutDiscountRow" class="summary-row mb-2 hidden">
-                        <span>Voucher</span>
-                        <span id="checkoutDiscount" class="text-aksa-accent">-</span>
-                    </div>
-                    <div class="summary-row">
-                        <span id="checkoutTotalLabel">Total</span>
-                        <span id="checkoutTotal" class="font-semibold text-aksa-accent">Select payment</span>
-                    </div>
-                    <p id="checkoutCurrencyHint" class="mt-3 text-xs leading-5 text-gray-500">
-                        Choose a payment method to see the final payment currency.
-                    </p>
+                    <div id="checkoutSubmitPanel" class="checkout-submit-panel mt-5">
+                        <div class="summary-row mb-2" data-checkout-secondary-total>
+                            <span id="checkoutSubtotalLabel">Subtotal</span>
+                            <span id="checkoutSubtotal">Select payment</span>
+                        </div>
+                        <div id="checkoutDiscountRow" class="summary-row mb-2 hidden">
+                            <span>Voucher</span>
+                            <span id="checkoutDiscount" class="text-aksa-accent">-</span>
+                        </div>
+                        <div class="summary-row">
+                            <span id="checkoutTotalLabel">Total</span>
+                            <span id="checkoutTotal" class="font-semibold text-aksa-accent">Select payment</span>
+                        </div>
+                        <p id="checkoutCurrencyHint" class="mt-3 text-xs leading-5 text-gray-500">
+                            Choose a payment method to see the final payment currency.
+                        </p>
 
-                    <button id="checkoutSubmitButton" type="submit"
-                        class="btn-main mt-5 w-full {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
-                        @disabled($hasUnavailableItems)>
-                        <x-ui.icon name="lock-keyhole" class="h-4 w-4" />
-                        <span data-button-label>{{ $hasUnavailableItems ? 'Checkout Paused' : 'Choose Payment Method' }}</span>
-                    </button>
+                        <button id="checkoutSubmitButton" type="submit"
+                            class="btn-main mt-5 w-full {{ $hasUnavailableItems ? 'cursor-not-allowed opacity-60' : '' }}"
+                            @disabled($hasUnavailableItems)>
+                            <x-ui.icon name="lock-keyhole" class="h-4 w-4" />
+                            <span data-button-label>{{ $hasUnavailableItems ? 'Checkout Paused' : 'Choose Payment Method' }}</span>
+                        </button>
 
-                    <p class="mt-3 text-xs leading-5 text-gray-500">
-                        Stock is reserved only after the invoice is created. Payment instructions and live status appear on the next page.
-                    </p>
+                        <p class="mt-3 text-xs leading-5 text-gray-500">
+                            Stock is reserved only after the invoice is created. Payment instructions and live status appear on the next page.
+                        </p>
+                    </div>
                 </aside>
             </div>
         </form>
@@ -357,6 +359,7 @@
             let voucherRequestController = null;
             let voucherRequestSequence = 0;
             let voucherRequestPending = false;
+            let cryptoNetworkRefreshSequence = 0;
             let voucherMotionTimer = null;
 
             const formatIdr = value => `Rp ${Number(value).toLocaleString('id-ID')}`;
@@ -383,9 +386,26 @@
             function setCheckoutOptionsVisibility(element, visible) {
                 if (!element) return;
 
+                const wasVisible = element.classList.contains('is-open');
                 element.classList.toggle('is-open', visible);
                 element.setAttribute('aria-hidden', visible ? 'false' : 'true');
                 element.inert = !visible;
+
+                if (visible && !wasVisible) {
+                    element.classList.remove('is-switching');
+                    void element.offsetWidth;
+                    element.classList.add('is-switching');
+                    window.setTimeout(() => element.classList.remove('is-switching'), 520);
+                }
+            }
+
+            function replayCheckoutSelectionMotion(element, className = 'is-selecting', duration = 420) {
+                if (!element) return;
+
+                element.classList.remove(className);
+                void element.offsetWidth;
+                element.classList.add(className);
+                window.setTimeout(() => element.classList.remove(className), duration);
             }
 
             function setButtonLabel(button, label) {
@@ -489,6 +509,10 @@
                 const token = selectedCryptoToken();
                 const networkOptions = document.getElementById('checkoutCryptoNetworkOptions');
                 const prompt = document.getElementById('checkoutCryptoNetworkPrompt');
+                const networkGrid = document.getElementById('checkoutCryptoNetworkGrid');
+                const previousToken = networkGrid?.dataset.activeToken || '';
+                const shouldSwap = Boolean(token) && Boolean(previousToken) && token !== previousToken && networkOptions?.classList.contains('is-open');
+                const refreshSequence = ++cryptoNetworkRefreshSequence;
 
                 setCheckoutOptionsVisibility(networkOptions, Boolean(token));
 
@@ -496,18 +520,35 @@
                     prompt.textContent = token ? `Choose a network for ${token.toUpperCase()}` : 'Select a coin first';
                 }
 
-                form.querySelectorAll('[data-checkout-crypto-network-option]').forEach(option => {
-                    const input = option.querySelector('input[name="coin"]');
-                    const matchesToken = option.dataset.token === token;
+                const applyNetworkOptions = () => {
+                    if (refreshSequence !== cryptoNetworkRefreshSequence) return;
 
-                    option.classList.toggle('hidden', !matchesToken);
-                    input.disabled = !matchesToken;
+                    form.querySelectorAll('[data-checkout-crypto-network-option]').forEach(option => {
+                        const input = option.querySelector('input[name="coin"]');
+                        const matchesToken = option.dataset.token === token;
 
-                    if (!matchesToken) {
-                        input.checked = false;
-                        option.classList.remove('active');
-                    }
-                });
+                        option.classList.toggle('hidden', !matchesToken);
+                        input.disabled = !matchesToken;
+
+                        if (matchesToken) {
+                            replayCheckoutSelectionMotion(option, 'is-network-entering', 520);
+                        } else {
+                            option.classList.remove('is-network-entering');
+                            input.checked = false;
+                            option.classList.remove('active');
+                        }
+                    });
+
+                    if (networkGrid) networkGrid.dataset.activeToken = token || '';
+                    networkGrid?.classList.remove('is-swapping');
+                };
+
+                if (shouldSwap && networkGrid) {
+                    networkGrid.classList.add('is-swapping');
+                    window.setTimeout(applyNetworkOptions, 240);
+                } else {
+                    applyNetworkOptions();
+                }
             }
 
             function updateTotals() {
@@ -516,6 +557,9 @@
                 const stablecoinReady = stablecoin && Boolean(selectedStablecoin());
                 const paymentToken = selectedPaymentToken();
                 const qris = method === 'gopay_qris';
+                const selectionReady = qris ||
+                    (method === 'binance_pay' && Boolean(selectedToken())) ||
+                    (method === 'crypto' && Boolean(selectedCoin()));
                 const displayCurrency = window.getAksaDisplayCurrency?.() ||
                     document.documentElement.dataset.displayCurrency ||
                     'idr';
@@ -553,6 +597,7 @@
                             ? `Final payment uses ${String(paymentToken).toUpperCase()}. Send the exact invoice amount.`
                             : 'Choose a coin and network to calculate the final stablecoin amount.')
                         : `Catalog prices are shown in ${displayCurrency.toUpperCase()}. Choose a payment method to see the final payment currency.`);
+                document.getElementById('checkoutFinalSummary')?.classList.toggle('is-mobile-ready', selectionReady);
 
                 const submit = document.getElementById('checkoutSubmitButton');
                 submit.disabled = !checkoutAvailable ||
@@ -651,6 +696,7 @@
                     form.querySelectorAll('[data-checkout-payment-card]').forEach(card => {
                         card.classList.toggle('active', card.contains(input));
                     });
+                    replayCheckoutSelectionMotion(input.closest('[data-checkout-payment-card]'));
                     setCheckoutOptionsVisibility(
                         document.getElementById('checkoutBinanceOptions'),
                         paymentMethod() === 'binance_pay'
@@ -706,6 +752,7 @@
                     form.querySelectorAll('[data-checkout-crypto-token-option]').forEach(option => {
                         option.classList.toggle('active', option.contains(input) && input.checked);
                     });
+                    replayCheckoutSelectionMotion(input.closest('[data-checkout-crypto-token-option]'));
                     form.querySelectorAll('input[name="coin"]').forEach(networkInput => {
                         networkInput.checked = false;
                         networkInput.closest('[data-checkout-crypto-network-option]')?.classList.remove('active');
@@ -727,6 +774,7 @@
                     form.querySelectorAll('[data-checkout-crypto-network-option]').forEach(option => {
                         option.classList.toggle('active', option.contains(input) && input.checked);
                     });
+                    replayCheckoutSelectionMotion(input.closest('[data-checkout-crypto-network-option]'));
                     voucherQuote = null;
                     document.getElementById('checkoutVoucherValue').value = '';
                     updateTotals();

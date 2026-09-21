@@ -31,7 +31,7 @@ class PaymentPresentationTest extends TestCase
         $html = $this->renderOrders([$order]);
 
         $this->assertStringContainsString('USDT Address', $html);
-        $this->assertStringContainsString('View Address', $html);
+        $this->assertStringContainsString('Continue Payment', $html);
         $this->assertStringContainsString('data-crypto-checkout=', $html);
         $this->assertStringContainsString('class="sync-crypto-form"', $html);
         $this->assertStringContainsString('data-order-id="ORDER-VERIFYTEST"', $html);
@@ -225,7 +225,7 @@ class PaymentPresentationTest extends TestCase
         $html = $this->renderOrders([$order]);
 
         $this->assertStringContainsString('Binance Pay', $html);
-        $this->assertStringContainsString('View Binance Pay', $html);
+        $this->assertStringContainsString('Continue Payment', $html);
         $this->assertStringContainsString('data-binance-pay-checkout=', $html);
         $this->assertStringContainsString('class="sync-binance-pay-form"', $html);
         $this->assertStringContainsString('1.100123 USDT', $html);

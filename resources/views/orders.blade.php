@@ -37,7 +37,7 @@
         let orderStatusPolling = false;
         const ordersPageController = new AbortController();
         const ordersPageTimers = [];
-        let activeOrderFilter = 'active';
+        let activeOrderFilter = 'needs-payment';
 
         function applyOrderFilter(filter = activeOrderFilter, { animate = false } = {}) {
             activeOrderFilter = filter;
@@ -53,7 +53,7 @@
         document.addEventListener('click', (event) => {
             const button = event.target.closest('[data-order-filter]');
             if (!button || !document.getElementById('ordersContent')?.contains(button)) return;
-            applyOrderFilter(button.dataset.orderFilter || 'active', { animate: true });
+            applyOrderFilter(button.dataset.orderFilter || 'needs-payment', { animate: true });
         }, { signal: ordersPageController.signal });
 
         function trackOrdersInterval(callback, delay) {

@@ -102,10 +102,10 @@ test('branded intro plays once per tab session and releases the storefront', asy
     });
 
     expect(revealSequence.stages).toEqual([0, 0.18, 0.36, 0.6, 0.78]);
-    expect(revealSequence.cardDelays).toEqual([1, 1.11, 1.22, 1.33]);
+    expect(revealSequence.cardDelays).toEqual([1.11, 1.22, 1.33, 1.44]);
     expect(revealSequence.recentPurchaseHidden).toBe(true);
 
-    const deliveredCounter = page.locator('[data-home-count-up="5000"]');
+    const deliveredCounter = page.locator('[data-home-count-up="2500"]');
     await expect.poll(() => page.evaluate(() => window.__homeCounterStates.includes('running'))).toBe(true);
 
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
@@ -115,7 +115,7 @@ test('branded intro plays once per tab session and releases the storefront', asy
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
     await expect(deliveredCounter).toHaveAttribute('data-home-count-up-state', 'complete');
-    await expect(deliveredCounter).toHaveText('5000+');
+    await expect(deliveredCounter).toHaveText('2500');
 
     const releasedLayoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(releasedLayoutWidth).toBe(introOpeningState.layoutWidth);
@@ -135,7 +135,7 @@ test('branded intro skips motion when reduced motion is preferred', async ({ pag
     await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
-    await expect(page.locator('[data-home-count-up="5000"]')).toHaveText('5000+');
+    await expect(page.locator('[data-home-count-up="2500"]')).toHaveText('2500');
 
     const reducedCurrencySwap = await page.evaluate(() => {
         window.setAksaDisplayCurrency('usd', { source: 'manual' });
@@ -196,7 +196,7 @@ test('license actions and download launch feedback use the themed motion states'
     });
 
     await copyButton.click();
-    await expect(copyButton.locator('[data-button-label]')).toHaveText('Copied');
+    await expect(copyButton.locator('[data-button-label]')).toHaveText('Copied ✓');
     await expect(copyButton).toHaveClass(/text-aksa-accent-soft/);
     await expect(copyButton).not.toHaveClass(/text-green-400/);
     await expect(copyButton.locator('svg')).toHaveCSS('display', 'none');
@@ -332,8 +332,8 @@ test('license and order actions reveal their changed state one result at a time'
                 data-reset-final-label="Reset in 24h"><svg></svg><span data-button-label>Reset successful</span></button>
             <div id="ordersMotionFixture">
                 <div data-order-filter-empty class="hidden"></div>
-                <article data-order-entry data-order-status="pending">Pending order</article>
-                <article data-order-entry data-order-status="paid">Paid order</article>
+                <article data-order-entry data-order-status="needs-payment">Pending order</article>
+                <article data-order-entry data-order-status="completed">Paid order</article>
             </div>
         `;
         document.querySelector('main')?.append(fixture);
@@ -356,7 +356,7 @@ test('license and order actions reveal their changed state one result at a time'
     await expect(page.locator('[data-license-search="beta order-b"]')).toHaveClass(/filter-result-enter/);
 
     await page.evaluate(() => {
-        window.filterAksaOrderEntries(document.getElementById('ordersMotionFixture'), 'paid', { animate: true });
+        window.filterAksaOrderEntries(document.getElementById('ordersMotionFixture'), 'completed', { animate: true });
     });
     await expect(page.getByText('Pending order')).toHaveClass(/hidden/);
     await expect(page.getByText('Paid order')).toHaveClass(/filter-result-enter/);

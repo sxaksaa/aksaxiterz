@@ -9,7 +9,7 @@
                 </strong>
                 <span class="hidden text-gray-500 sm:inline"> · {{ $pendingOrder->order_id }}</span>
             </span>
-            <span class="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-aksa-accent-soft">
+            <span class="pending-payment-reminder-cta inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold">
                 Continue Payment
                 <x-ui.icon name="arrow-right" class="h-3.5 w-3.5" />
             </span>
