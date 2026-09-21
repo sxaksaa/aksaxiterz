@@ -17,8 +17,8 @@
         $isUpdating = $product->status === \App\Models\Product::STATUS_UPDATING;
         $hasReadyStock = ! $isUpdating && $stock > 0;
         $availabilityLabel = $isUpdating
-            ? 'Checkout paused Â· Discord alerts'
-            : ($stock > 0 ? $stock.' available Â· Auto delivery' : 'Manual order via Discord');
+            ? 'Checkout paused · Discord alerts'
+            : ($stock > 0 ? $stock.' available · Auto delivery' : 'Manual order via Discord');
         $salesBadgeLabel = $product->sales_badge_label;
         $salesBadgeVariant = $product->sales_badge_variant ?: 'popular';
     @endphp
