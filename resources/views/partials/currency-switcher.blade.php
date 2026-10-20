@@ -1,10 +1,11 @@
 @php
     $compact = (bool) ($compact ?? false);
+    $inline = (bool) ($inline ?? false);
 @endphp
 
 <div data-currency-switcher
-    class="{{ $compact ? 'hidden shrink-0 items-center gap-1 rounded-full border border-white/10 bg-black/20 p-1 lg:inline-flex' : 'flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3' }}">
-    @if (! $compact)
+    class="{{ $inline ? 'inline-flex shrink-0 items-center rounded-full border border-white/10 bg-black/20 p-1 lg:hidden' : ($compact ? 'hidden shrink-0 items-center gap-1 rounded-full border border-white/10 bg-black/20 p-1 lg:inline-flex' : 'flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3') }}">
+    @if (! $compact && ! $inline)
         <span class="text-xs font-semibold text-gray-300">Display prices</span>
     @else
         <span class="sr-only">Display prices</span>

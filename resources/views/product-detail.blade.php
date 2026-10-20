@@ -112,7 +112,10 @@
         <div class="product-purchase-layout grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <section class="product-section fade-up {{ $checkoutAvailable ? '' : 'lg:col-span-2' }}">
             <div class="mb-4">
-                <h2 class="text-xl font-semibold text-white">Select package</h2>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-xl font-semibold text-white">Select package</h2>
+                    @include('partials.currency-switcher', ['inline' => true])
+                </div>
                 <p class="mt-1 text-sm text-gray-400">
                     Choose a package to continue to checkout.
                 </p>
@@ -123,7 +126,7 @@
                 Checkout is temporarily paused while this product is updating. Join Discord for availability alerts.
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 @foreach ($product->packages as $package)
                     @php
                         $packageStock = $package->available_license_stocks_count ?? 0;
@@ -175,14 +178,14 @@
                                 <span class="package-per-day" data-display-price
                                     data-price-idr="{{ (int) $saving['per_day'] }}"
                                     data-price-usd="{{ $saving['per_day_usdt'] !== null ? (float) $saving['per_day_usdt'] : '' }}"
-                                    data-price-suffix=" per day">
-                                    {{ $formatIdr($saving['per_day']) }} per day
+                                    data-price-decimals="2" data-price-prefix="≈ " data-price-suffix=" per day">
+                                    ≈ {{ $formatIdr($saving['per_day']) }} per day
                                 </span>
                             @endif
                         </div>
 
                         @if (($saving['saving'] ?? 0) > 0 || ($saving['saving_usdt'] ?? 0) > 0)
-                            <div class="mt-3 {{ ($saving['saving'] ?? 0) > 0 ? '' : 'hidden' }}"
+                            <div class="package-saving-row mt-3 {{ ($saving['saving'] ?? 0) > 0 ? '' : 'hidden' }}"
                                 data-currency-visibility
                                 data-currency-visible-idr="{{ ($saving['saving'] ?? 0) > 0 ? 'true' : 'false' }}"
                                 data-currency-visible-usd="{{ ($saving['saving_usdt'] ?? 0) > 0 ? 'true' : 'false' }}">

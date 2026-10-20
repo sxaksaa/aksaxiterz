@@ -1,5 +1,45 @@
 import { expect, test } from '@playwright/test';
 
+test('catalog currency has one visible control and daily rounding preserves totals', async ({ page }) => {
+    await page.addInitScript(() => {
+        sessionStorage.setItem('aksa_site_intro_seen_v1', 'true');
+        localStorage.setItem('aksa_display_currency', 'idr');
+    });
+    await page.goto('/');
+    await expect(page.locator('[data-currency-switcher]:visible')).toHaveCount(1);
+    const menu = page.locator('[data-mobile-menu-toggle]');
+    if (await menu.isVisible()) {
+        await menu.click();
+        await expect(page.locator('[data-currency-switcher]:visible')).toHaveCount(1);
+        await menu.click();
+    }
+    await page.locator('[data-currency-option="usd"]:visible').click();
+    await expect(page.locator('html')).toHaveAttribute('data-display-currency', 'usd');
+    await page.locator('[data-product-stock-card]').first().click();
+    await expect(page.locator('[data-currency-switcher]:visible')).toHaveCount(1);
+    await expect(page.locator('[data-currency-option="usd"]:visible')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.package-per-day').first()).toHaveText(/^≈ \$[\d,]+\.\d{2} per day$/);
+    const formatted = await page.evaluate(() => {
+        const probe = document.createElement('div');
+        probe.innerHTML = '<span data-display-price data-price-idr="12345" data-price-usd="1.2345"></span>'
+            + '<span data-display-price data-price-idr="1764" data-price-usd="0.1764" data-price-decimals="2" data-price-prefix="≈ " data-price-suffix=" per day"></span>';
+        document.body.append(probe);
+        window.refreshAksaDisplayCurrency(probe);
+        const texts = [...probe.children].map(el => el.textContent);
+        probe.remove();
+        return texts;
+    });
+    expect(formatted).toEqual(['$1.2345', '≈ $0.18 per day']);
+    await page.locator('[data-package-checkout-enabled="true"]').first().click();
+    await expect(page.locator('#buyNowBtn')).toBeInViewport();
+    const cardHeight = await page.locator('[data-package-card]').first().evaluate(el => el.getBoundingClientRect().height);
+    if (page.viewportSize().width < 640) expect(cardHeight).toBeLessThan(180);
+    await page.setViewportSize({ width: 320, height: 568 });
+    await expect(page.locator('[data-currency-switcher]:visible')).toHaveCount(1);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+});
+
 test('touch counters wait for the home entrance and toast keeps its controls', async ({ page }) => {
     await page.addInitScript(() => {
         window.__counterOverlap = [];

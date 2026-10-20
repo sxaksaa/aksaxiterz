@@ -390,12 +390,12 @@ function detectedDisplayCurrency() {
     return INDONESIAN_TIMEZONES.has(browserTimezone) ? 'idr' : 'usd';
 }
 
-function formatDisplayUsd(amount) {
+function formatDisplayUsd(amount, maximumFractionDigits = 4) {
     const numericAmount = Number(amount || 0);
 
     return `$${numericAmount.toLocaleString('en-US', {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
+        maximumFractionDigits,
     })}`;
 }
 
@@ -406,17 +406,20 @@ function formatDisplayPrice(idrAmount, usdAmount, currency = activeDisplayCurren
 }
 
 function displayPriceText(element, currency) {
-        const idrAmount = element.dataset.priceIdr;
-        const usdAmount = element.dataset.priceUsd;
+    const idrAmount = element.dataset.priceIdr;
+    const usdAmount = element.dataset.priceUsd;
 
     if (idrAmount === undefined) return null;
 
-        const prefix = element.dataset.pricePrefix || '';
-        const suffix = element.dataset.priceSuffix || '';
+    const prefix = element.dataset.pricePrefix || '';
+    const suffix = element.dataset.priceSuffix || '';
+    const formattedPrice = currency === 'usd' && element.dataset.priceDecimals === '2'
+        ? formatDisplayUsd(usdAmount, 2)
+        : formatDisplayPrice(idrAmount, usdAmount, currency);
 
     return currency === 'usd' && (usdAmount === undefined || usdAmount === '')
         ? (element.dataset.priceUsdFallback || 'USD unavailable')
-        : `${prefix}${formatDisplayPrice(idrAmount, usdAmount, currency)}${suffix}`;
+        : `${prefix}${formattedPrice}${suffix}`;
 }
 
 function syncDisplayCurrencyContent(scope, currency) {

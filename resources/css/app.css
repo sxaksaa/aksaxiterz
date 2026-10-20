@@ -7148,6 +7148,49 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
     transform: rotate(180deg);
 }
 
+/* Keep the catalog and package comparisons within easier reach on phones. */
+@media (max-width: 639px) {
+    .home-hero-section {
+        padding-top: 1rem;
+        padding-bottom: 1.25rem;
+    }
+
+    .home-hero-compact .hero-title {
+        font-size: clamp(2rem, 8.2vw, 2.45rem);
+        line-height: 1.14;
+    }
+
+    .home-hero-compact .hero-actions,
+    .home-hero-compact .home-proof-strip {
+        margin-top: 1rem;
+    }
+
+    .package-card {
+        min-height: 9rem;
+        padding: 0.875rem;
+    }
+
+    .package-card-icon {
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+
+    .package-price-row {
+        margin-top: 0.625rem;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .package-card .package-saving-row {
+        margin-top: 0.5rem;
+    }
+
+    .package-card .package-availability {
+        margin-top: 0.625rem;
+        padding-top: 0.5rem;
+    }
+}
+
 /* Touch devices keep the motion sequence without repeatedly filtering moving
    layers or sampling the page behind every scrolling card. Desktop effects
    stay intact; viewport width alone does not select this rendering path. */

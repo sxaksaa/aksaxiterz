@@ -219,8 +219,10 @@
 
     <div class="flex flex-col gap-4 text-sm" data-mobile-menu-content>
 
-        @if ($showDisplayCurrencySwitcher ?? false)
-            @include('partials.currency-switcher')
+        @if (($showDisplayCurrencySwitcher ?? false) && ! request()->is('/', 'product/*'))
+            <div class="lg:hidden">
+                @include('partials.currency-switcher')
+            </div>
         @endif
 
         <a href="/" data-mobile-menu-link data-soft-nav class="nav-item">

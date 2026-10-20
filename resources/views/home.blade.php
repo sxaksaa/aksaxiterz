@@ -49,7 +49,10 @@
         <div class="home-toolbar">
             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-6">
                 <div data-home-reveal-item data-home-reveal-stage="tools">
-                    <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="mt-1 text-2xl font-semibold text-white">Find your tool</h2>
+                        @include('partials.currency-switcher', ['inline' => true])
+                    </div>
                     <p class="mt-1 text-sm text-gray-400">Search by product name or filter by category.</p>
                 </div>
 

@@ -2,6 +2,16 @@
 
 ## Storefront performance
 
+On phones below 640px, the homepage hero and package cards use a more compact
+layout. The existing two-option IDR/USD control sits beside the catalog/package
+heading below 1024px, and in the navbar above that width; catalog and product
+menus do not duplicate it. Other checkout/cart pages retain the menu control on
+small screens. Per-day USD estimates display two decimal places with an
+approximation mark; raw prices, full package totals, invoices, and payment
+calculations retain their original precision. Selecting a package continues to
+scroll to the existing checkout summary. Verification: 252 PHP tests and 20
+targeted desktop/mobile browser checks passed for these layout/currency changes.
+
 The full brand intro plays automatically on the homepage, without a query
 parameter, and respects reduced motion and the once-per-tab session setting.
 The intro intentionally delays the content reveal and can increase LCP.
