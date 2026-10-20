@@ -1,7 +1,7 @@
 import { runPhp } from './php-runtime.mjs';
 import { randomBytes } from 'node:crypto';
 
-runPhp(['artisan', 'test', ...process.argv.slice(2)], {
+runPhp(['artisan', 'test', '--fail-on-warning', ...process.argv.slice(2)], {
     env: {
         ...process.env,
         APP_ENV: 'testing',
