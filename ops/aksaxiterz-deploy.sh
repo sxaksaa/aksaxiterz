@@ -26,6 +26,11 @@ readonly APP_DIR
 [[ -f "${APP_DIR}/.env" ]] || fail "missing ${APP_DIR}/.env"
 [[ -x "${VPS_BACKUP_SCRIPT}" ]] || fail "missing executable VPS backup script: ${VPS_BACKUP_SCRIPT}"
 
+php -r 'exit(PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION === 3 ? 0 : 1);' \
+    || fail "PHP 8.3 is required for the production runtime"
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 24 && minor >= 22 ? 0 : 1)' \
+    || fail "Node.js 24.22+ LTS is required for asset builds"
+
 unexpected_env_file="$(find "${APP_DIR}" -maxdepth 1 -name '.env*' \
     ! -name '.env' ! -name '.env.example' -print -quit)"
 [[ -z "${unexpected_env_file}" ]] || fail \

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +24,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->environment('testing')) {
+            // Browser tests use the built assets even while a local Vite server runs.
+            Vite::useHotFile(storage_path('framework/vite.hot'));
+        }
+
         if ((bool) config('security.force_https')) {
             URL::forceScheme('https');
         }

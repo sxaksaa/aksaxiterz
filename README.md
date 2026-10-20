@@ -43,9 +43,10 @@ I designed and implemented the full Laravel application, including:
 ## Tech Stack
 
 - Laravel 12
-- PHP 8.2+
+- PHP 8.3 (production baseline; Composer resolves dependencies against 8.3)
+- Node.js 24.22 LTS / npm 11.19
 - Blade
-- Tailwind CSS
+- Tailwind CSS 4 (Chrome 111+, Safari 16.4+, Firefox 128+)
 - Vite
 - JavaScript
 - Laravel Socialite
@@ -94,6 +95,14 @@ Admins can access a protected management area to:
 - Working with third-party authentication and payment-style integrations.
 - Preparing a Laravel app for production deployment.
 - Writing maintainable service classes for business-critical flows.
+
+## Automated Checks
+
+`npm run quality` runs JavaScript linting, the production asset build, PHP tests, and desktop/mobile browser tests. Install the test browser once with `npx playwright install chromium` after installing dependencies.
+
+PHP tests use in-memory SQLite and a temporary application key. Browser tests migrate and seed their own temporary SQLite database and storage directory, then remove them when the server exits. They do not require a local MySQL service or production credentials.
+
+The same checks and Composer/npm dependency audits run in GitHub Actions on PHP 8.3 and Node.js 24.22 LTS. Dependency lockfiles and the runtime version files are committed together.
 
 ## Repository Status
 

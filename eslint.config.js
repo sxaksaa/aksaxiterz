@@ -6,7 +6,7 @@ export default [
         ignores: ['node_modules/**', 'public/build/**'],
     },
     {
-        files: ['resources/js/**/*.js', 'tests/Browser/**/*.js', 'playwright.config.js', 'vite.config.js'],
+        files: ['resources/js/**/*.js', 'tests/Browser/**/*.js', 'tests/Browser/**/*.mjs', 'scripts/**/*.mjs', 'playwright.config.js', 'vite.config.js'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',

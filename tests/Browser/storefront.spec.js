@@ -779,7 +779,8 @@ test('product checkout summary uses the restrained purple hierarchy', async ({ p
     const columnCount = await page.locator('.product-summary-details').evaluate((element) => (
         window.getComputedStyle(element).gridTemplateColumns.split(' ').length
     ));
-    expect(columnCount).toBe(page.viewportSize().width >= 1024 ? 4 : 1);
+    // Summary rows remain stacked inside the sidebar on every screen size.
+    expect(columnCount).toBe(1);
 });
 
 test('mini cart highlights only the item most recently added', async ({ page }) => {
@@ -899,10 +900,12 @@ test('safe footer navigation prefetches once and reuses the response', async ({ 
 });
 
 test('short product pages keep the footer at the viewport bottom naturally', async ({ page }) => {
-    await page.setViewportSize({ width: 2560, height: 1440 });
+    // Leave enough height for the real seeded content to be a short page.
+    await page.setViewportSize({ width: 2560, height: 1800 });
     await page.goto('/');
     await page.locator('[data-product-stock-card]').first().click();
     await expect(page).toHaveURL(/\/product\//);
+    await expect(page.locator('[data-aksa-page-content]')).not.toHaveClass(/aksa-soft-nav-entered/);
 
     const footer = page.locator('.site-footer');
     await expect(footer).toBeVisible();
