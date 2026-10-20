@@ -1,5 +1,41 @@
 import { expect, test } from '@playwright/test';
 
+test('touch rendering keeps the intro and scroll reveals without animated blur', async ({ page }) => {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/');
+    const touchRendering = await page.evaluate(() => (
+        matchMedia('(hover: none) and (pointer: coarse)').matches
+    ));
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'running');
+    const introFilter = await page.locator('[data-site-intro-lockup]').evaluate(el => getComputedStyle(el).filter);
+    if (touchRendering) expect(introFilter).toBe('none');
+    else expect(introFilter).not.toBe('none');
+
+    await expect(page.locator('html')).toHaveClass(/aksa-intro-docking/);
+    if (touchRendering) await expect(page.locator('[data-site-intro-lockup]')).toHaveCSS('filter', 'none');
+    await expect(page.locator('html')).toHaveClass(/aksa-home-reveal-ready/);
+    const heroFilters = await page.locator('h1').evaluate(el => el.getAnimations()
+        .filter(animation => animation.animationName === 'aksa-home-stage-in')
+        .flatMap(animation => animation.effect.getKeyframes().map(frame => frame.filter)));
+    expect(heroFilters).toHaveLength(2);
+    if (touchRendering) expect(heroFilters).toEqual(['none', 'none']);
+    else expect(heroFilters.every(filter => filter.includes('blur'))).toBe(true);
+
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete');
+    const styles = await page.evaluate(() => ({
+        background: [...new Set(getComputedStyle(document.body).backgroundAttachment.split(',').map(value => value.trim()))].join(','),
+        navbarBlur: getComputedStyle(document.querySelector('.site-navbar-pill')).backdropFilter,
+        cardBlur: getComputedStyle(document.querySelector('[data-product-stock-card]')).backdropFilter,
+    }));
+    if (touchRendering) expect(styles).toEqual({ background: 'scroll', navbarBlur: 'none', cardBlur: 'none' });
+    else {
+        expect(styles.background).toBe('fixed');
+        expect(styles.navbarBlur).toContain('blur');
+        expect(styles.cardBlur).toContain('blur');
+    }
+});
+
 test('storefront recovers if application JavaScript fails to load', async ({ page }) => {
     await page.route('**/build/assets/*.js', route => route.abort());
     await page.goto('/');

@@ -374,10 +374,10 @@
         width: min(31rem, 78vw);
         aspect-ratio: 612 / 195;
         opacity: 0;
-        filter: blur(10px) drop-shadow(0 0 38px rgba(124, 58, 237, 0.18));
+        filter: var(--aksa-intro-start-filter, blur(10px) drop-shadow(0 0 38px rgba(124, 58, 237, 0.18)));
         transform: translate(-50%, -50%) translateX(30%) scale(0.72);
         transform-origin: center;
-        will-change: transform, opacity, filter;
+        will-change: transform, opacity;
     }
 
     .site-intro-logo-layer {
@@ -426,7 +426,7 @@
 
     html.aksa-intro-mark-ready .site-intro-lockup {
         opacity: 1;
-        filter: blur(0) drop-shadow(0 0 38px rgba(124, 58, 237, 0.2));
+        filter: var(--aksa-intro-visible-filter, blur(0) drop-shadow(0 0 38px rgba(124, 58, 237, 0.2)));
         transform: translate(-50%, -50%) translateX(30%) scale(1);
         transition:
             opacity 560ms ease,
@@ -451,7 +451,7 @@
     }
 
     html.aksa-intro-docking .site-intro-lockup {
-        filter: blur(0) drop-shadow(0 0 24px rgba(124, 58, 237, 0.12));
+        filter: var(--aksa-intro-dock-filter, blur(0) drop-shadow(0 0 24px rgba(124, 58, 237, 0.12)));
         transform: translate(-50%, -50%) translate(var(--site-intro-dock-x), var(--site-intro-dock-y)) scale(var(--site-intro-dock-scale));
         transition:
             filter 900ms ease,
@@ -565,13 +565,13 @@
     @keyframes aksa-home-stage-in {
         from {
             opacity: 0;
-            filter: blur(3px);
+            filter: var(--aksa-home-reveal-start-filter, blur(3px));
             transform: translateY(18px);
         }
 
         to {
             opacity: 1;
-            filter: blur(0);
+            filter: var(--aksa-home-reveal-end-filter, blur(0));
             transform: translateY(0);
         }
     }
@@ -7142,4 +7142,44 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
 
 .catalog-accordion[open] .catalog-accordion-summary svg {
     transform: rotate(180deg);
+}
+
+/* Touch devices keep the motion sequence without repeatedly filtering moving
+   layers or sampling the page behind every scrolling card. Desktop effects
+   stay intact; viewport width alone does not select this rendering path. */
+@media (hover: none) and (pointer: coarse) {
+    html {
+        --aksa-intro-start-filter: none;
+        --aksa-intro-visible-filter: none;
+        --aksa-intro-dock-filter: none;
+        --aksa-home-reveal-start-filter: none;
+        --aksa-home-reveal-end-filter: none;
+    }
+
+    body {
+        background-attachment: scroll;
+    }
+
+    .site-navbar-pill {
+        background-color: rgba(12, 10, 20, 0.94);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .surface,
+    .card-glow,
+    .product-card,
+    .panel-card,
+    .product-section,
+    .checkout-card,
+    .package-card,
+    .license-card,
+    .order-mobile-card,
+    .orders-table-wrap,
+    .order-pagination,
+    .download-card,
+    .empty-state {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
 }

@@ -5,6 +5,13 @@
 The full brand intro plays automatically on the homepage, without a query
 parameter, and respects reduced motion and the once-per-tab session setting.
 The intro intentionally delays the content reveal and can increase LCP.
+Devices with a coarse pointer and no hover keep the same intro/reveal timing,
+but avoid animated intro/reveal filters, card/navbar backdrop blur, and fixed
+background attachment to reduce rendering work during motion and scrolling.
+The desktop effects remain unchanged. Intro, scroll, reduced-motion, menu,
+currency, and narrow-layout checks passed on Chromium desktop/mobile; the
+touch-rendering checks also ran with 4x CPU throttling. This does not measure
+GPU frame pacing on a physical phone, which still requires device testing.
 QR libraries load on demand when a payment QR
 is rendered. Navbar and footer use the compressed WebP logo; the original PNG
 assets remain available for payment integrations and social metadata.
