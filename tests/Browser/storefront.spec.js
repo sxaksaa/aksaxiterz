@@ -1,5 +1,53 @@
 import { expect, test } from '@playwright/test';
 
+test('storefront recovers if application JavaScript fails to load', async ({ page }) => {
+    await page.route('**/build/assets/*.js', route => route.abort());
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'recovered', { timeout: 7000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Search products' })).toBeVisible();
+    await expect(page.locator('[data-home-count-up="2500"]')).toHaveText('2500');
+    expect(await page.locator('h1').evaluate(el => getComputedStyle(el).opacity)).toBe('1');
+    await expect(page.locator('#mobileMenu')).toHaveAttribute('inert', '');
+});
+
+test('QR libraries load only when a payment QR is rendered', async ({ page }) => {
+    const qrRequests = [];
+    page.on('request', request => {
+        if (/\/(?:browser|qr-code-styling)-[^/]+\.js/.test(request.url())) qrRequests.push(request.url());
+    });
+    await page.goto('/');
+    await page.waitForFunction(() => typeof window.renderAksaStyledQrCode === 'function');
+    expect(qrRequests).toEqual([]);
+    const result = await page.evaluate(async () => {
+        const canvas = document.createElement('canvas');
+        const styled = document.createElement('div');
+        document.body.append(canvas, styled);
+        const plainReady = await window.renderAksaQrCode(canvas, 'performance-smoke-test');
+        const styledReady = await window.renderAksaStyledQrCode(styled, 'performance-smoke-test');
+        const drawn = canvas.width > 0 && styled.querySelector('canvas') !== null;
+        canvas.remove();
+        styled.remove();
+        return { plainReady, styledReady, drawn };
+    });
+    expect(result).toEqual({ plainReady: true, styledReady: true, drawn: true });
+    expect(qrRequests).toHaveLength(2);
+});
+
+test('mobile menu releases keyboard focus when closed', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const button = page.locator('[data-mobile-menu-toggle]');
+    const menu = page.locator('#mobileMenu');
+    await expect(menu).toHaveAttribute('inert', '');
+    await button.click();
+    await expect(menu).not.toHaveAttribute('inert', '');
+    await menu.getByRole('link', { name: 'Products', exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveAttribute('inert', '');
+    await expect(button).toBeFocused();
+});
+
 test('branded intro plays once per tab session and releases the storefront', async ({ page }) => {
     await page.addInitScript(() => {
         window.__homeCounterStates = [];

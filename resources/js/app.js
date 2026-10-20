@@ -1,6 +1,3 @@
-import QRCode from 'qrcode';
-import QRCodeStyling from 'qr-code-styling';
-
 let appToastTimer = null;
 let paymentSuccessRedirectTimer = null;
 let paymentSuccessCountdownTimer = null;
@@ -116,6 +113,7 @@ window.renderAksaQrCode = async function(target, value, options = {}) {
         return false;
     }
 
+    const { default: QRCode } = await import('qrcode');
     await QRCode.toCanvas(canvas, value, {
         errorCorrectionLevel: 'H',
         margin: 1,
@@ -169,6 +167,7 @@ window.renderAksaStyledQrCode = async function(target, value, options = {}) {
     const foreground = options.darkColor || '#171120';
     const background = options.lightColor || '#eee7ff';
 
+    const { default: QRCodeStyling } = await import('qr-code-styling');
     container.replaceChildren();
 
     const qrCode = new QRCodeStyling({
@@ -2336,6 +2335,7 @@ function openMobileMenu() {
     menu.classList.remove('opacity-0', '-translate-y-5', 'pointer-events-none');
     menu.classList.add('opacity-100', 'translate-y-0');
     menu.setAttribute('aria-hidden', 'false');
+    menu.removeAttribute('inert');
     button.setAttribute('aria-expanded', 'true');
     setNavButtonLabel(button, 'Close');
 }
@@ -2351,6 +2351,8 @@ function closeMobileMenu() {
     menu.classList.add('opacity-0', '-translate-y-5', 'pointer-events-none');
     menu.classList.remove('opacity-100', 'translate-y-0');
     menu.setAttribute('aria-hidden', 'true');
+    menu.setAttribute('inert', '');
+    if (menu.contains(document.activeElement)) button.focus();
     button.setAttribute('aria-expanded', 'false');
     setNavButtonLabel(button, 'Menu');
 }
@@ -3460,6 +3462,9 @@ function beginHomeStagedReveal(root = document) {
 
     if (!homeContent) return;
 
+    // Keep the server-rendered storefront visible unless the intro was requested.
+    if (!document.documentElement.hasAttribute('data-aksa-intro-page')) return;
+
     const documentRoot = document.documentElement;
     window.clearTimeout(homeStagedRevealTimer);
     documentRoot.classList.remove('aksa-home-reveal-ready');
@@ -3478,11 +3483,19 @@ function beginHomeStagedReveal(root = document) {
 
 function initializeMotionEnhancements(root = document) {
     const items = [...root.querySelectorAll('[data-scroll-reveal]:not([data-motion-reveal-ready])')];
+    const visibleItems = new Set(items.filter(item => {
+        const bounds = item.getBoundingClientRect();
+        return bounds.top < window.innerHeight && bounds.bottom > 0;
+    }));
 
     items.forEach((item, index) => {
         item.dataset.motionRevealReady = 'true';
         item.dataset.motionRevealFrom = 'bottom';
         item.style.setProperty('--motion-reveal-delay', `${Math.min(index % 4, 3) * 45}ms`);
+        // Content already in view must not disappear while the observer starts.
+        if (visibleItems.has(item)) {
+            item.classList.add('is-scroll-revealed');
+        }
     });
 
     if (items.length === 0 || shouldReduceMotion() || !('IntersectionObserver' in window)) {
@@ -3828,7 +3841,7 @@ function initializeGlobalPageEnhancements(root = document) {
     if (pageContent && pageContent.dataset.pageEntered !== 'true') {
         pageContent.dataset.pageEntered = 'true';
 
-        if (!siteIntroPlaying) {
+        if (!siteIntroPlaying && !pageContent.hasAttribute('data-aksa-home-content')) {
             pageContent.classList.add('aksa-page-entered');
             window.setTimeout(() => pageContent.classList.remove('aksa-page-entered'), 600);
         }

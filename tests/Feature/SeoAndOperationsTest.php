@@ -30,7 +30,6 @@ class SeoAndOperationsTest extends TestCase
             ->assertSee('data-aksa-intro-page="true"', false)
             ->assertSee('data-site-intro-prepaint', false)
             ->assertSee('id="aksaSiteIntro"', false)
-            ->assertSee('data-site-intro-lockup', false)
             ->assertSee('data-site-brand-logo', false)
             ->assertSee('aria-label="Main navigation"', false)
             ->assertSee('<label for="searchInput" class="sr-only">Search products</label>', false)
@@ -44,6 +43,12 @@ class SeoAndOperationsTest extends TestCase
 
     public function test_branded_intro_is_scoped_to_the_homepage(): void
     {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('data-aksa-intro-page="true"', false)
+            ->assertSee('data-site-intro-prepaint', false)
+            ->assertSee('id="aksaSiteIntro"', false);
+
         $this->get('/guides')
             ->assertOk()
             ->assertSee('<h1 class="text-3xl font-semibold text-white md:text-4xl">Guides</h1>', false)

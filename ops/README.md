@@ -1,5 +1,36 @@
 # Aksa Xiterz operations
 
+## Storefront performance
+
+The full brand intro plays automatically on the homepage, without a query
+parameter, and respects reduced motion and the once-per-tab session setting.
+The intro intentionally delays the content reveal and can increase LCP.
+QR libraries load on demand when a payment QR
+is rendered. Navbar and footer use the compressed WebP logo; the original PNG
+assets remain available for payment integrations and social metadata.
+
+Run `npm run build` during deployment. The deploy script installs the Nginx
+performance snippet, including seven-day caching for `/images/brand/` and
+one-year immutable caching for hashed Vite assets. Confirm response headers on
+the live server after deployment. Keep HTML and payment responses out of these
+static asset caching rules.
+
+Initial optimization verification on 20 October 2026: 252 PHP tests passed, lint and production
+build passed, and 58 browser checks passed across desktop and mobile. The wider
+browser suite also has a stale checkout-summary assertion (expects four columns;
+the existing template has one) and a timing-sensitive footer assertion. The
+checkout assertion also fails on the unchanged HEAD. A settled-layout comparison
+of HEAD and the optimized version produced the same 1487.45px body height at a
+2560x1440 viewport, although the footer test passed on HEAD during its animation.
+
+A single cold-context experiment with the intro disabled (390x844, localhost,
+without network/CPU throttling) measured LCP at 5468ms with the intro and 132ms
+without it. The automatic intro has since been restored at the user's request;
+the 132ms result does not describe the current default experience or predict
+production PageSpeed scores or real-user Core Web Vitals.
+Compare production Lighthouse results after deployment and monitor the rolling
+28-day field data separately.
+
 ## Monitoring
 
 The `/up` endpoint checks application boot, database access, cache read/write, and Laravel storage permissions. Add `https://aksaxiterz.com/up` to an external uptime monitor with a five-minute interval and enable email or Discord alerts.

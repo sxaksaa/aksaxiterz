@@ -498,7 +498,7 @@
         animation-delay: 120ms;
     }
 
-    html[data-aksa-intro-state="skipped"]:not(.aksa-home-reveal-consumed) [data-aksa-home-content] [data-home-reveal-item],
+    html[data-aksa-intro-page][data-aksa-intro-state="skipped"]:not(.aksa-home-reveal-consumed) [data-aksa-home-content] [data-home-reveal-item],
     html.aksa-home-reveal-ready [data-aksa-home-content] [data-home-reveal-item] {
         animation: aksa-home-stage-in var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
     }

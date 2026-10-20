@@ -14,7 +14,7 @@
     <main class="page-shell flex min-h-screen items-center justify-center px-4 py-12">
         <section class="product-section w-full max-w-2xl text-center" aria-labelledby="errorTitle">
             <a href="{{ url('/') }}" class="mx-auto inline-flex" aria-label="Aksa Xiterz home">
-                <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
+                <img src="{{ asset('images/brand/aksa-xiterz-logo.webp') }}" alt="Aksa Xiterz"
                     class="h-12 w-auto" width="612" height="195" decoding="async">
             </a>
 

@@ -26,7 +26,7 @@
 
 <!DOCTYPE html>
 <html lang="en" data-display-currency="idr" data-visitor-country="{{ $visitorCountry }}"
-    @if ($siteIntroEnabled) data-aksa-intro-page="true" @endif>
+    @if ($siteIntroEnabled) data-aksa-intro-page="true" @else data-aksa-intro-state="skipped" @endif>
 
 <head>
     <meta charset="utf-8">
@@ -47,8 +47,8 @@
     <meta name="twitter:description" content="{{ $seoDescription }}">
     <meta name="twitter:image" content="{{ $seoImage }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
-    <link rel="icon" type="image/png" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('images/brand/aksa-xiterz-mark.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/aksa-xiterz-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/brand/aksa-xiterz-touch.png') }}">
     @if (! $privatePage)
         <script type="application/ld+json" nonce="{{ request()->attributes->get('csp_nonce') }}">{!! json_encode([
             '@context' => 'https://schema.org',
@@ -147,9 +147,9 @@
     @if ($siteIntroEnabled)
         <div id="aksaSiteIntro" class="site-intro" aria-hidden="true">
             <div class="site-intro-lockup" data-site-intro-lockup>
-                <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt=""
+                <img src="{{ asset('images/brand/aksa-xiterz-logo.webp') }}" alt=""
                     class="site-intro-logo-layer site-intro-mark-layer" width="612" height="195" decoding="sync">
-                <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt=""
+                <img src="{{ asset('images/brand/aksa-xiterz-logo.webp') }}" alt=""
                     class="site-intro-logo-layer site-intro-wordmark-layer" width="612" height="195" decoding="sync">
             </div>
         </div>
@@ -163,7 +163,7 @@
         @include('partials.pending-payment-reminder')
     @endauth
 
-    <main id="aksaPageContent" data-aksa-page-content @if ($siteIntroEnabled) data-aksa-home-content @endif>
+    <main id="aksaPageContent" data-aksa-page-content @if (request()->is('/')) data-aksa-home-content @endif>
         @yield('content')
     </main>
 

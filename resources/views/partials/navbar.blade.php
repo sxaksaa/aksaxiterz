@@ -6,7 +6,7 @@
 
         <!-- LOGO -->
         <a href="/" class="site-brand-link flex shrink-0 items-center" aria-label="Aksa Xiterz home" data-soft-nav>
-            <img src="{{ asset('images/brand/aksa-xiterz-logo.png') }}" alt="Aksa Xiterz"
+            <img src="{{ asset('images/brand/aksa-xiterz-logo.webp') }}" alt="Aksa Xiterz"
                 data-site-brand-logo
                 class="block h-8 w-auto max-w-[136px] aksa-logo-glow sm:h-9 sm:max-w-[150px] md:h-10 md:max-w-[170px]"
                 width="612" height="195" decoding="async" fetchpriority="high" draggable="false">
@@ -215,7 +215,7 @@
 
 <div id="mobileMenu"
     class="mobile-nav-panel fixed inset-x-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.25rem)] overflow-y-auto rounded-[1.35rem] border px-4 py-4 opacity-0 -translate-y-5 pointer-events-none transition-all duration-[420ms] ease-out sm:left-auto sm:right-4 sm:w-[23rem] xl:hidden"
-    aria-hidden="true">
+    aria-hidden="true" inert>
 
     <div class="flex flex-col gap-4 text-sm" data-mobile-menu-content>
 
