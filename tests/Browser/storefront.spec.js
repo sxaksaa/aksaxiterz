@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test';
 
+test('guest checkout explains Google login and carries the selected package and quantity', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('aksa_site_intro_seen_v1', 'true'));
+    await page.route('**/auth/google?redirect=*', route => route.fulfill({
+        contentType: 'text/plain', body: 'Login redirect checked',
+    }));
+    await page.goto('/');
+    await page.locator('[data-product-stock-card]').first().click();
+    await expect(page).toHaveURL(/\/product\//);
+    const checkoutPath = new URL(page.url()).pathname.replace('/product/', '/checkout/');
+    const card = page.locator('[data-package-checkout-enabled="true"]').first();
+    const packageId = await card.getAttribute('data-package-id');
+    await card.click();
+    await page.locator('#quantityPlus').click();
+    const button = page.getByRole('button', { name: 'Continue with Google', exact: true });
+    await expect(button).toBeVisible();
+    await expect(page.locator('#checkoutLoginNote')).toBeVisible();
+    const loginRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/auth/google');
+    await button.click();
+    const request = await loginRequest;
+    const redirect = new URL(new URL(request.url()).searchParams.get('redirect'), page.url());
+    expect(redirect.pathname).toBe(checkoutPath);
+    expect(redirect.searchParams.get('package')).toBe(packageId);
+    expect(redirect.searchParams.get('quantity')).toBe('2');
+});
+
 test('catalog currency has one visible control and daily rounding preserves totals', async ({ page }) => {
     await page.addInitScript(() => {
         sessionStorage.setItem('aksa_site_intro_seen_v1', 'true');

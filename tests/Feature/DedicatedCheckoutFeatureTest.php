@@ -43,6 +43,22 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_product_checkout_explains_google_sign_in_only_to_guests(): void
+    {
+        [$user, $product] = $this->catalogItem('Checkout Login Label', 20_000, 1.25, 2);
+
+        $this->get(route('products.show', $product))
+            ->assertOk()
+            ->assertSee('<span data-button-label>Continue with Google</span>', false)
+            ->assertSee('aria-describedby="checkoutLoginNote"', false)
+            ->assertSee('Your selected package and quantity will be kept for checkout.');
+
+        $this->actingAs($user)->get(route('products.show', $product))
+            ->assertOk()
+            ->assertSee('<span data-button-label>Continue to Checkout</span>', false)
+            ->assertDontSee('id="checkoutLoginNote"', false);
+    }
+
     public function test_buy_now_renders_only_selected_package_without_mutating_cart(): void
     {
         [$user, $product, $package] = $this->catalogItem('Buy Now Target', 20_000, 1.25, 3);

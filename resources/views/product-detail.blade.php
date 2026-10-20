@@ -255,9 +255,10 @@
             <div class="product-summary-actions mt-5 grid gap-2 sm:gap-3">
                 <button id="buyNowBtn" type="button"
                     class="btn-main w-full {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
+                    @guest aria-describedby="checkoutLoginNote" @endguest
                     @disabled(! $checkoutAvailable)>
                     <x-ui.icon name="arrow-right" class="h-4 w-4" />
-                    <span data-button-label>{{ $checkoutAvailable ? 'Continue to Checkout' : 'Unavailable' }}</span>
+                    <span data-button-label>{{ $checkoutAvailable ? (auth()->check() ? 'Continue to Checkout' : 'Continue with Google') : 'Unavailable' }}</span>
                 </button>
                 <button id="addToCartBtn" type="button"
                     class="btn-footer-secondary min-h-10 w-full text-xs {{ ! $checkoutAvailable ? 'cursor-not-allowed opacity-60' : '' }}"
@@ -266,9 +267,15 @@
                     <span data-button-label>{{ $checkoutAvailable ? 'Add to Cart' : 'Unavailable' }}</span>
                 </button>
             </div>
-            <p class="product-summary-helper mt-3 text-xs text-gray-500">
-                Continue to Checkout opens payment options. Add to Cart lets you combine packages first.
-            </p>
+            @guest
+                <p id="checkoutLoginNote" class="mt-3 text-xs leading-5 text-gray-400">
+                    Sign in with Google to continue. Your selected package and quantity will be kept for checkout.
+                </p>
+            @else
+                <p class="product-summary-helper mt-3 text-xs text-gray-500">
+                    Continue to Checkout opens payment options. Add to Cart lets you combine packages first.
+                </p>
+            @endguest
         </section>
         </div>
 
@@ -408,7 +415,7 @@
                 if (!addRequestPending) {
                     buttonLabel(addButton, available ? 'Add to Cart' : 'Unavailable');
                 }
-                buttonLabel(buyButton, available ? 'Continue to Checkout' : 'Unavailable');
+                buttonLabel(buyButton, available ? (isAuthenticated ? 'Continue to Checkout' : 'Continue with Google') : 'Unavailable');
                 mobileBar?.classList.add('is-visible');
                 mobileBar?.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('mobile-checkout-open');
