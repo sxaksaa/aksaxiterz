@@ -4634,18 +4634,41 @@ function filterLicenseGroups() {
     }, shouldReduceMotion() ? 0 : 140);
 }
 
+function filterDownloads(input) {
+    const catalog = input.closest('[data-download-catalog]');
+    if (!catalog) return;
+
+    const query = String(input.value || '').trim();
+    const search = query.toLowerCase();
+    const cards = [...catalog.querySelectorAll('[data-download-search]')];
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const visible = !search || String(card.dataset.downloadSearch || '').includes(search);
+        card.classList.toggle('hidden', !visible);
+        if (visible) visibleCount++;
+    });
+    catalog.querySelector('[data-download-empty]')?.classList.toggle('hidden', !search || cards.length === 0 || visibleCount > 0);
+    const queryLabel = catalog.querySelector('[data-download-query]');
+    if (queryLabel) queryLabel.textContent = query;
+}
+
 document.addEventListener('input', (event) => {
     if (event.target.matches('#licenseSearch')) filterLicenseGroups();
-
-    if (event.target.matches('#downloadSearch')) {
-        const search = String(event.target.value || '').trim().toLowerCase();
-        document.querySelectorAll('[data-download-search]').forEach(card => {
-            card.classList.toggle('hidden', search && !String(card.dataset.downloadSearch || '').includes(search));
-        });
-    }
+    if (event.target.matches('#downloadSearch')) filterDownloads(event.target);
 });
 
 document.addEventListener('click', (event) => {
+    const clearSearch = event.target.closest('[data-clear-download-search]');
+    if (clearSearch) {
+        const input = clearSearch.closest('[data-download-catalog]')?.querySelector('#downloadSearch');
+        if (input) {
+            input.value = '';
+            filterDownloads(input);
+            input.focus();
+        }
+        return;
+    }
+
     const link = event.target.closest('[data-download-resource]');
 
     if (!link) return;

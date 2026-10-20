@@ -118,6 +118,10 @@ class AdminDownloadManagementTest extends TestCase
         $response->assertSee('download-accordion-panel', false);
         $response->assertSee('data-download-resource', false);
         $response->assertSee('data-download-complete-label=', false);
+        $response->assertSee('data-download-empty', false);
+        $response->assertSee('data-clear-download-search', false);
+        $response->assertSee('Download link opened');
+        $response->assertDontSee('Download started');
         $response->assertSee('<h1 class="text-3xl font-semibold text-white md:text-4xl">Downloads</h1>', false);
         $response->assertSee('id="downloadSearch"', false);
         $response->assertSee('page-shell pb-16 pt-14 md:pb-20 md:pt-16', false);

@@ -4,7 +4,7 @@
 @section('seo_description', 'Find official setup files and product downloads provided by Aksa Xiterz.')
 
 @section('content')
-    <section class="page-shell pb-16 pt-14 md:pb-20 md:pt-16">
+    <section class="page-shell pb-16 pt-14 md:pb-20 md:pt-16" data-download-catalog>
         <div class="mx-auto mb-6 flex max-w-5xl flex-col gap-0 fade-up">
             <h1 class="text-3xl font-semibold text-white md:text-4xl">Downloads</h1>
             <input id="downloadSearch" type="search" class="search-bar mt-4" placeholder="Search downloads..."
@@ -69,7 +69,7 @@
                         @forelse ($links as $link)
                             @php
                                 $linkIcon = $resourceIcon($link);
-                                $linkCompleteLabel = $linkIcon === 'download' ? 'Download started' : 'Opened';
+                                $linkCompleteLabel = $linkIcon === 'download' ? 'Download link opened' : 'Link opened';
                             @endphp
                             <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer"
                                 class="download-resource-link" data-download-resource
@@ -99,6 +99,13 @@
                     No public downloads have been configured yet.
                 </div>
             @endforelse
+        </div>
+        <div class="empty-state mx-auto mt-6 max-w-5xl hidden" data-download-empty>
+            <span class="empty-state-title" role="status" aria-live="polite">
+                No downloads found for “<span data-download-query></span>”.
+            </span>
+            <p class="empty-state-copy">Try another product name or clear your search.</p>
+            <button type="button" class="order-action mt-4" data-clear-download-search>Clear search</button>
         </div>
     </section>
 @endsection

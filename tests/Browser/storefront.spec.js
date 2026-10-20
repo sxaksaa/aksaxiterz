@@ -1,5 +1,42 @@
 import { expect, test } from '@playwright/test';
 
+test('downloads explain empty searches, restore results and report link opening honestly', async ({ page }, testInfo) => {
+    await page.goto('/downloads');
+    const cards = page.locator('[data-download-search]');
+    const originalCount = await cards.count();
+    expect(originalCount).toBeGreaterThan(0);
+    const search = page.getByRole('searchbox', { name: 'Search downloads...' });
+    const empty = page.locator('[data-download-empty]');
+    await expect(empty).toBeHidden();
+    const query = 'missing-download-<img src=x>';
+    await search.fill(query);
+    await expect(page.locator('[data-download-search]:visible')).toHaveCount(0);
+    await expect(empty).toBeVisible();
+    await expect(page.locator('[data-download-query]')).toHaveText(query);
+    await expect(empty.locator('img')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('downloads-empty.png') });
+    await empty.getByRole('button', { name: 'Clear search' }).click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(empty).toBeHidden();
+    await expect(page.locator('[data-download-search]:visible')).toHaveCount(originalCount);
+    const title = (await cards.first().locator('summary .truncate').textContent()).trim();
+    await search.fill(`  ${title.toUpperCase()}  `);
+    await expect(cards.first()).toBeVisible();
+    await expect(empty).toBeHidden();
+    await search.fill('');
+    await cards.first().locator('summary').click();
+    const link = cards.first().locator('[data-download-resource]').first();
+    const label = link.locator('[data-download-resource-label]');
+    const originalLabel = (await label.textContent()).trim();
+    const openedLabel = await link.getAttribute('data-download-complete-label');
+    expect(['Download link opened', 'Link opened']).toContain(openedLabel);
+    await link.evaluate(el => el.addEventListener('click', event => event.preventDefault()));
+    await link.click();
+    await expect(label).toHaveText(openedLabel);
+    await expect(label).toHaveText(originalLabel);
+});
+
 test('guest checkout explains Google login and carries the selected package and quantity', async ({ page }) => {
     await page.addInitScript(() => sessionStorage.setItem('aksa_site_intro_seen_v1', 'true'));
     await page.route('**/auth/google?redirect=*', route => route.fulfill({
@@ -403,7 +440,7 @@ test('license actions and download launch feedback use the themed motion states'
         link.href = '#download-motion-test';
         link.dataset.downloadMotionTest = 'true';
         link.dataset.downloadResource = '';
-        link.dataset.downloadCompleteLabel = 'Download started';
+        link.dataset.downloadCompleteLabel = 'Download link opened';
         link.className = 'download-resource-link';
         link.innerHTML = '<span class="download-resource-icon"><svg></svg></span><span data-download-resource-label>Download Loader</span>';
         link.addEventListener('click', event => event.preventDefault(), { capture: true });
@@ -414,7 +451,7 @@ test('license actions and download launch feedback use the themed motion states'
     await expect(downloadLink).toHaveClass(/is-download-launching/);
     await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Opening...');
     await expect(downloadLink).toHaveClass(/is-download-complete/);
-    await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Download started');
+    await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Download link opened');
 });
 
 test('cart removal commits and Undo restores the original package quantity', async ({ page }) => {
