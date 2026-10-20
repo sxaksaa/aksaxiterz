@@ -500,7 +500,7 @@
 
     html[data-aksa-intro-page][data-aksa-intro-state="skipped"]:not(.aksa-home-reveal-consumed) [data-aksa-home-content] [data-home-reveal-item],
     html.aksa-home-reveal-ready [data-aksa-home-content] [data-home-reveal-item] {
-        animation: aksa-home-stage-in var(--aksa-motion-reveal) var(--aksa-motion-ease) both;
+        animation: aksa-home-stage-in var(--aksa-home-reveal-duration, var(--aksa-motion-reveal)) var(--aksa-motion-ease) both;
     }
 
     html.aksa-home-reveal-ready [data-aksa-home-content] {
@@ -4642,6 +4642,10 @@
         will-change: opacity, transform;
     }
 
+    .recent-purchase-toast[hidden] {
+        display: none;
+    }
+
     .recent-purchase-toast::before {
         content: "";
         position: absolute;
@@ -7154,6 +7158,7 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
         --aksa-intro-dock-filter: none;
         --aksa-home-reveal-start-filter: none;
         --aksa-home-reveal-end-filter: none;
+        --aksa-home-reveal-duration: 420ms;
     }
 
     body {
@@ -7178,8 +7183,59 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
     .orders-table-wrap,
     .order-pagination,
     .download-card,
-    .empty-state {
+    .empty-state,
+    .recent-purchase-toast {
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
+    }
+
+    /* Cards use their one-time viewport reveal, not a second staged animation. */
+    [data-aksa-home-content] [data-home-reveal-stage="product-card"] {
+        animation-name: none !important;
+    }
+
+    [data-scroll-reveal].is-scroll-revealed {
+        transition-duration: 340ms;
+        transition-delay: 0ms;
+    }
+
+    .recent-purchase-toast,
+    .recent-purchase-toast.is-visible,
+    .recent-purchase-toast.is-leaving {
+        filter: none;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        transition: opacity 240ms ease, transform 320ms var(--aksa-motion-ease);
+        will-change: auto;
+    }
+
+    .recent-purchase-toast.is-visible {
+        animation: recentPurchaseTouchIn 320ms var(--aksa-motion-ease) both;
+    }
+
+    .recent-purchase-toast.is-leaving {
+        animation: recentPurchaseTouchOut 240ms ease both;
+    }
+
+    .recent-purchase-toast.is-visible .recent-purchase-eyebrow,
+    .recent-purchase-toast.is-visible .recent-purchase-title,
+    .recent-purchase-toast.is-visible .recent-purchase-product,
+    .recent-purchase-toast.is-visible .recent-purchase-meta {
+        animation: none;
+    }
+
+    .recent-purchase-toast::before,
+    .recent-purchase-icon::after {
+        display: none;
+        animation: none !important;
+    }
+
+    @keyframes recentPurchaseTouchIn {
+        from { opacity: 0; transform: translate3d(0, 10px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes recentPurchaseTouchOut {
+        from { opacity: 1; transform: translate3d(0, 0, 0); }
+        to { opacity: 0; transform: translate3d(0, 10px, 0); }
     }
 }

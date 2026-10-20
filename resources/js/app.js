@@ -1725,6 +1725,7 @@ function initializeRecentPurchaseToast(root = document) {
     const initialDelay = toast.closest('[data-aksa-home-content]')
         ? RECENT_PURCHASE_HOME_INITIAL_DELAY_MS
         : RECENT_PURCHASE_INITIAL_DELAY_MS;
+    const firstTouchAppearance = usesTouchMotion() ? performance.now() + initialDelay : 0;
     const closeButton = toast.querySelector('[data-recent-purchase-close]');
     let purchases = parseRecentPurchaseData(toast);
     let purchasesByKey = new Map(purchases.map((purchase) => [purchase.key, purchase]));
@@ -1870,7 +1871,7 @@ function initializeRecentPurchaseToast(root = document) {
         if (closed || paused || recentPurchaseSnoozed() || visibleTimer !== null) return;
 
         clearTimer(cycleTimer);
-        cycleTimer = window.setTimeout(cycle, delay);
+        cycleTimer = window.setTimeout(cycle, Math.max(delay, firstTouchAppearance - performance.now()));
     };
 
     const applyPurchaseSnapshot = (nextPurchases) => {
@@ -3382,6 +3383,10 @@ function shouldReduceMotion() {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
+function usesTouchMotion() {
+    return window.matchMedia?.('(hover: none) and (pointer: coarse)').matches === true;
+}
+
 let scrollRevealObserver = null;
 let homeStagedRevealTimer = null;
 let homeCountUpTimer = null;
@@ -3421,26 +3426,35 @@ function startHomeCountUps(content) {
         return;
     }
 
-    counters.forEach((counter) => {
-        counter.style.setProperty('--home-count-up-width', `${Math.ceil(counter.getBoundingClientRect().width)}px`);
+    const touchMotion = usesTouchMotion();
+    const widths = counters.map(counter => Math.ceil(counter.getBoundingClientRect().width));
+    const targets = counters.map(counter => Math.max(0, Number.parseInt(counter.dataset.homeCountUp || '0', 10) || 0));
+    counters.forEach((counter, index) => {
+        counter.style.setProperty('--home-count-up-width', `${widths[index]}px`);
         counter.textContent = `0${counter.dataset.homeCountUpSuffix || ''}`;
         counter.dataset.homeCountUpState = 'waiting';
     });
 
     homeCountUpTimer = window.setTimeout(() => {
         const startedAt = window.performance.now();
-        const duration = 1180;
+        const duration = touchMotion ? 600 : 1180;
+        let lastPaint = -Infinity;
 
         counters.forEach(counter => counter.dataset.homeCountUpState = 'running');
 
         const tick = (now) => {
             const progress = Math.min(1, (now - startedAt) / duration);
+            if (touchMotion && now - lastPaint < 32 && progress < 1) {
+                homeCountUpFrame = window.requestAnimationFrame(tick);
+                return;
+            }
+            lastPaint = now;
             const eased = 1 - ((1 - progress) ** 3);
 
-            counters.forEach((counter) => {
-                const target = Math.max(0, Number.parseInt(counter.dataset.homeCountUp || '0', 10) || 0);
+            counters.forEach((counter, index) => {
                 const suffix = counter.dataset.homeCountUpSuffix || '';
-                counter.textContent = `${Math.round(target * eased)}${suffix}`;
+                const nextText = `${Math.round(targets[index] * eased)}${suffix}`;
+                if (counter.textContent !== nextText) counter.textContent = nextText;
             });
 
             if (progress < 1) {
@@ -3454,7 +3468,7 @@ function startHomeCountUps(content) {
 
         homeCountUpTimer = null;
         homeCountUpFrame = window.requestAnimationFrame(tick);
-    }, 360);
+    }, touchMotion ? 1600 : 360);
 }
 
 function beginHomeStagedReveal(root = document) {
@@ -3462,7 +3476,7 @@ function beginHomeStagedReveal(root = document) {
 
     if (!homeContent) return;
 
-    // Keep the server-rendered storefront visible unless the intro was requested.
+    // Only apply the staged entrance to pages that include the homepage intro.
     if (!document.documentElement.hasAttribute('data-aksa-intro-page')) return;
 
     const documentRoot = document.documentElement;
@@ -3477,7 +3491,7 @@ function beginHomeStagedReveal(root = document) {
             documentRoot.classList.remove('aksa-home-reveal-ready');
             documentRoot.classList.add('aksa-home-reveal-consumed');
             homeStagedRevealTimer = null;
-        }, 2800);
+        }, usesTouchMotion() ? 1400 : 2800);
     });
 }
 
@@ -3503,10 +3517,17 @@ function initializeMotionEnhancements(root = document) {
         return;
     }
 
-    scrollRevealObserver ||= new IntersectionObserver(entries => {
+    scrollRevealObserver ||= new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('is-scroll-revealed');
+                if (usesTouchMotion()) observer.unobserve(entry.target);
+                return;
+            }
+
+            // Once visible on touch devices, keep the content stable on return.
+            if (usesTouchMotion() && entry.target.classList.contains('is-scroll-revealed')) {
+                observer.unobserve(entry.target);
                 return;
             }
 
@@ -3522,7 +3543,9 @@ function initializeMotionEnhancements(root = document) {
         });
     }, { threshold: [0, 0.08] });
 
-    items.forEach(item => scrollRevealObserver.observe(item));
+    items.forEach(item => {
+        if (!usesTouchMotion() || !visibleItems.has(item)) scrollRevealObserver.observe(item);
+    });
 }
 
 document.addEventListener('aksa:before-page-swap', () => {

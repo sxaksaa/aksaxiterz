@@ -1,5 +1,46 @@
 import { expect, test } from '@playwright/test';
 
+test('touch counters wait for the home entrance and toast keeps its controls', async ({ page }) => {
+    await page.addInitScript(() => {
+        window.__counterOverlap = [];
+        new MutationObserver(records => records.forEach(record => {
+            if (record.target.dataset.homeCountUpState === 'running') {
+                window.__counterOverlap.push(document.documentElement.classList.contains('aksa-home-reveal-ready'));
+            }
+        })).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-home-count-up-state'] });
+    });
+    await page.route('**/?toast-motion=1', async route => {
+        const response = await route.fetch();
+        const purchase = [{ key: 'motion-test', buyer: 'Test buyer', product: 'Test product', package: '7 Days', ago: 'recently' }];
+        const body = (await response.text()).replace(/(<template data-recent-purchase-data>).*?(<\/template>)/s,
+            `$1${JSON.stringify(purchase)}$2`);
+        await route.fulfill({ response, body });
+    });
+    await page.goto('/?toast-motion=1');
+    const touchRendering = await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
+    await expect(page.locator('[data-home-count-up="2500"]')).toHaveAttribute('data-home-count-up-state', 'complete', { timeout: 8000 });
+    const overlap = await page.evaluate(() => window.__counterOverlap);
+    expect(overlap.length).toBeGreaterThan(0);
+    expect(overlap.every(value => value === !touchRendering)).toBe(true);
+
+    const toast = page.locator('[data-recent-purchase-toast]');
+    await expect(toast).toHaveClass(/is-visible/, { timeout: 8000 });
+    await expect(toast).toContainText('Test product');
+    if (touchRendering) {
+        await expect(toast).toHaveCSS('backdrop-filter', 'none');
+        await expect(toast).toHaveCSS('filter', 'none');
+        await expect(toast.locator('.recent-purchase-title')).toHaveCSS('animation-name', 'none');
+        expect(await toast.evaluate(el => getComputedStyle(el, '::before').display)).toBe('none');
+    } else {
+        await expect(toast.locator('.recent-purchase-title')).toHaveCSS('animation-name', 'recentPurchaseContentIn');
+    }
+    await toast.getByRole('button', { name: 'Hide recent purchase notification' }).click();
+    await expect(toast).toBeHidden();
+    await page.reload();
+    await expect(toast).toBeHidden();
+    expect(await page.evaluate(() => Number(localStorage.getItem('aksa_recent_purchase_snoozed_until')) > Date.now())).toBe(true);
+});
+
 test('touch rendering keeps the intro and scroll reveals without animated blur', async ({ page }) => {
     const session = await page.context().newCDPSession(page);
     await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
@@ -708,9 +749,10 @@ test('product focus prefetches detail once and navigation reuses it', async ({ p
     expect(detailRequests).toBe(1);
 });
 
-test('scroll reveals repeat from the side an item re-enters', async ({ page }) => {
+test('scroll reveals stay visible on touch and repeat on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 500 });
     await page.goto('/');
+    const touchRendering = await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
 
     const product = page.locator('[data-product-stock-card]').first();
     await expect(product).toHaveAttribute('data-motion-reveal-from', 'bottom');
@@ -718,8 +760,14 @@ test('scroll reveals repeat from the side an item re-enters', async ({ page }) =
     await expect(product).toHaveClass(/is-scroll-revealed/);
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await expect(product).not.toHaveClass(/is-scroll-revealed/);
-    await expect(product).toHaveAttribute('data-motion-reveal-from', 'top');
+    await expect.poll(() => product.evaluate(el => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
+    if (touchRendering) {
+        await expect(product).toHaveClass(/is-scroll-revealed/);
+        await expect(product).toHaveAttribute('data-motion-reveal-from', 'bottom');
+    } else {
+        await expect(product).not.toHaveClass(/is-scroll-revealed/);
+        await expect(product).toHaveAttribute('data-motion-reveal-from', 'top');
+    }
 
     await product.scrollIntoViewIfNeeded();
     await expect(product).toHaveClass(/is-scroll-revealed/);

@@ -5,13 +5,25 @@
 The full brand intro plays automatically on the homepage, without a query
 parameter, and respects reduced motion and the once-per-tab session setting.
 The intro intentionally delays the content reveal and can increase LCP.
-Devices with a coarse pointer and no hover keep the same intro/reveal timing,
+Devices with a coarse pointer and no hover keep the automatic logo intro,
 but avoid animated intro/reveal filters, card/navbar backdrop blur, and fixed
 background attachment to reduce rendering work during motion and scrolling.
+On those devices, scrolling elements reveal once and stay visible; homepage
+cards use only the viewport reveal rather than a second staged animation.
+The text entrance uses 420ms animations and finishes its sequence after 1400ms;
+the counters start after 1600ms and update at most about 30 times per second
+for 600ms. Purchase notifications wait until the initial entrance settles and
+use one simple entrance/exit plus their progress bar, without the sheen, icon
+pulse, separate text animations, blur, or changing shadows. Hidden purchase
+notifications explicitly use `display: none`, including after dismiss/reload.
 The desktop effects remain unchanged. Intro, scroll, reduced-motion, menu,
 currency, and narrow-layout checks passed on Chromium desktop/mobile; the
 touch-rendering checks also ran with 4x CPU throttling. This does not measure
 GPU frame pacing on a physical phone, which still requires device testing.
+The follow-up motion changes passed 62 relevant browser checks across desktop
+and mobile, excluding the previously documented checkout-summary and footer
+layout cases. These include scrolling back to revealed cards, counter/entrance
+sequencing, notification dismissal and snooze across reload, and soft navigation.
 QR libraries load on demand when a payment QR
 is rendered. Navbar and footer use the compressed WebP logo; the original PNG
 assets remain available for payment integrations and social metadata.
