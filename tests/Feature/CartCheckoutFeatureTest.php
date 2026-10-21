@@ -12,6 +12,7 @@ use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Voucher;
+use App\Services\CartService;
 use App\Services\OrderFulfillmentService;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
@@ -229,8 +230,12 @@ class CartCheckoutFeatureTest extends TestCase
             'quantity' => 1,
         ]);
 
+        $review = $this->actingAs($user)->get(route('checkout.cart'))->assertOk();
+        $this->assertSame(1, preg_match('/name="cart_signature" value="([a-f0-9]{64})"/', $review->getContent(), $signature));
+
         $response = $this->actingAs($user)
             ->postJson(route('cart.checkout'), [
+                'cart_signature' => $signature[1],
                 'payment_method' => 'gopay_qris',
                 'voucher_code' => $voucher->code,
                 'price' => 1,
@@ -642,6 +647,7 @@ class CartCheckoutFeatureTest extends TestCase
 
         $binanceResponse = $this->actingAs($user)
             ->postJson(route('cart.checkout'), [
+                'cart_signature' => app(CartService::class)->signature(app(CartService::class)->items($user)),
                 'payment_method' => 'binance_pay',
                 'token' => 'usdc',
             ])
@@ -664,6 +670,7 @@ class CartCheckoutFeatureTest extends TestCase
 
         $cryptoResponse = $this->actingAs($user)
             ->postJson(route('cart.checkout'), [
+                'cart_signature' => app(CartService::class)->signature(app(CartService::class)->items($user)),
                 'payment_method' => 'crypto',
                 'coin' => 'usdcbsc',
             ])

@@ -124,13 +124,24 @@ class CartService
 
     public function signature(Collection $items): string
     {
-        return hash(
-            'sha256',
-            $items
-                ->map(fn ($item): string => (int) $item->package_id.':'.(int) $item->quantity)
-                ->sort()
-                ->implode('|')
-        );
+        $key = config('app.key');
+
+        if (! is_string($key) || $key === '') {
+            throw new \LogicException('An application key is required to sign the cart.');
+        }
+
+        $snapshot = $items->sortBy('id')->map(fn ($item): array => [
+            'id' => (int) $item->id,
+            'user_id' => (int) $item->user_id,
+            'product_id' => (int) $item->product_id,
+            'package_id' => (int) $item->package_id,
+            'quantity' => (int) $item->quantity,
+            'price_idr' => $item->package?->price === null ? null : (int) $item->package->price,
+            'price_usdt' => $item->package?->price_usdt === null
+                ? null : number_format((float) $item->package->price_usdt, 6, '.', ''),
+        ])->values()->all();
+
+        return hash_hmac('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR), $key);
     }
 
     private function ensureSellable(Product $product, Package $package): void

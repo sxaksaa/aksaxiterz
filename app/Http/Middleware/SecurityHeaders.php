@@ -29,7 +29,7 @@ class SecurityHeaders
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
 
         if ((bool) config('security.hsts') && $request->isSecure()) {
-            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000');
         }
 
         if ((bool) config('security.content_security_policy')) {

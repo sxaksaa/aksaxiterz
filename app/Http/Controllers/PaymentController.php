@@ -465,7 +465,7 @@ class PaymentController extends Controller
                 Rule::in(['usdt', 'usdc']),
             ],
             'voucher_code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
-            'cart_signature' => ['nullable', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+            'cart_signature' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
         ]);
 
         return $this->runCheckoutLocked($request, $user->id, function () use ($request, $user, $validated) {
@@ -481,7 +481,6 @@ class PaymentController extends Controller
 
             try {
                 if (
-                    filled($validated['cart_signature'] ?? null) &&
                     ! hash_equals(
                         (string) $validated['cart_signature'],
                         $this->cartService->signature($items)

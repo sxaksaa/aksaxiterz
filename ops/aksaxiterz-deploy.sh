@@ -67,6 +67,10 @@ environment_errors="$(
             $errors[] = "APP_DEBUG must be false";
         }
 
+        if (! $truthy($values["AKSA_HSTS"] ?? false)) {
+            $errors[] = "AKSA_HSTS must be true in production";
+        }
+
         if (strtolower(trim((string) ($values["LOG_LEVEL"] ?? ""))) === "debug") {
             $errors[] = "LOG_LEVEL cannot be debug in production";
         }
@@ -203,6 +207,9 @@ php artisan payments:verify-gopay-config
 php artisan schedule:list >/dev/null
 
 install -o root -g root -m 0644 \
+    "${APP_DIR}/ops/aksaxiterz-nginx-hsts.conf" \
+    "/etc/nginx/snippets/aksaxiterz-hsts.conf"
+install -o root -g root -m 0644 \
     "${APP_DIR}/ops/aksaxiterz-nginx-performance.conf" \
     "${NGINX_PERFORMANCE_SNIPPET}"
 install -o root -g root -m 0755 \
@@ -210,6 +217,25 @@ install -o root -g root -m 0755 \
     "${VPS_RESTORE_VERIFY_SCRIPT}"
 
 [[ -f "${NGINX_SITE_CONFIG}" ]] || fail "missing Nginx site config: ${NGINX_SITE_CONFIG}"
+# Keep exactly one public HSTS header; the HTTPS virtual host owns its scope.
+if ! grep -Fq 'fastcgi_hide_header Strict-Transport-Security;' "${NGINX_SITE_CONFIG}"; then
+    sed -i '/fastcgi_hide_header X-Powered-By;/a\        fastcgi_hide_header Strict-Transport-Security;' "${NGINX_SITE_CONFIG}"
+fi
+# This HTTPS-only download location has its own add_header directives, so it
+# must include HSTS explicitly instead of inheriting the virtual host's policy.
+if ! grep -Fq 'include /etc/nginx/snippets/aksaxiterz-hsts.conf;' "${NGINX_SITE_CONFIG}"; then
+    hsts_site_backup="$(mktemp /tmp/aksaxiterz-hsts-site.XXXXXX)"
+    cp --preserve=mode,ownership,timestamps "${NGINX_SITE_CONFIG}" "${hsts_site_backup}"
+    sed -i '/add_header X-Content-Type-Options nosniff;/a\        include /etc/nginx/snippets/aksaxiterz-hsts.conf;' "${NGINX_SITE_CONFIG}"
+
+    if ! nginx -t; then
+        cp --preserve=mode,ownership,timestamps "${hsts_site_backup}" "${NGINX_SITE_CONFIG}"
+        rm -f -- "${hsts_site_backup}"
+        fail "Nginx rejected the HSTS config; original site config restored"
+    fi
+
+    rm -f -- "${hsts_site_backup}"
+fi
 if ! grep -Fq "include ${NGINX_PERFORMANCE_SNIPPET};" "${NGINX_SITE_CONFIG}"; then
     nginx_site_backup="$(mktemp /tmp/aksaxiterz-nginx-site.XXXXXX)"
     cp --preserve=mode,ownership,timestamps "${NGINX_SITE_CONFIG}" "${nginx_site_backup}"

@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\CartService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
 use Tests\TestCase;
@@ -203,6 +204,7 @@ class DisplayCurrencyPresentationTest extends TestCase
 
         $this->actingAs($user)
             ->postJson(route('cart.checkout'), [
+                'cart_signature' => app(CartService::class)->signature(app(CartService::class)->items($user)),
                 'payment_method' => 'crypto',
                 'coin' => 'usdtbsc',
             ])

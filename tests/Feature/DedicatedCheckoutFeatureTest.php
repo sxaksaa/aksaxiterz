@@ -537,6 +537,55 @@ class DedicatedCheckoutFeatureTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_cart_checkout_requires_a_well_formed_signature_without_any_side_effects(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Required Signature', 20000, 1.25, 2);
+        CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        $this->enableGopayQris();
+
+        foreach ([[], ['cart_signature' => null], ['cart_signature' => ''], ['cart_signature' => ' '], ['cart_signature' => []], ['cart_signature' => str_repeat('a', 63)], ['cart_signature' => str_repeat('A', 64)]] as $payload) {
+            $this->actingAs($user)->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris'] + $payload)
+                ->assertUnprocessable()->assertJsonValidationErrors('cart_signature');
+            $this->assertDatabaseCount('orders', 0);
+            $this->assertDatabaseCount('cart_items', 1);
+            $this->assertSame(0, LicenseStock::whereNotNull('reserved_order_id')->count());
+        }
+    }
+
+    public function test_cart_signature_cannot_be_replayed_from_another_users_identical_selection_or_forged(): void
+    {
+        [$owner, $product, $package] = $this->catalogItem('Bound Signature', 20000, 1.25, 2);
+        $user = User::factory()->create();
+        foreach ([$owner, $user] as $customer) {
+            CartItem::create(['user_id' => $customer->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        }
+        $service = app(CartService::class);
+        $foreignSignature = $service->signature($service->items($owner));
+        $this->enableGopayQris();
+
+        foreach ([$foreignSignature, str_repeat('a', 64)] as $signature) {
+            $this->actingAs($user)->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris', 'cart_signature' => $signature])
+                ->assertStatus(409);
+            $this->assertDatabaseCount('orders', 0);
+        }
+        $this->assertDatabaseCount('cart_items', 2);
+    }
+
+    public function test_cart_checkout_rejects_a_price_change_after_the_review_page(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Changed Price', 20000, 1.25, 2);
+        CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        $service = app(CartService::class);
+        $signature = $service->signature($service->items($user));
+        $package->update(['price' => 25000]);
+        $this->enableGopayQris();
+
+        $this->actingAs($user)->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris', 'cart_signature' => $signature])
+            ->assertStatus(409);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('cart_items', 1);
+    }
+
     private function catalogItem(
         string $name,
         int $price,

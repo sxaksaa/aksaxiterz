@@ -55,12 +55,21 @@ class SecurityMiddlewareTest extends TestCase
 
         $this->assertSame('SAMEORIGIN', $response->headers->get('X-Frame-Options'));
         $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
-        $this->assertSame('max-age=31536000; includeSubDomains', $response->headers->get('Strict-Transport-Security'));
+        $this->assertSame('max-age=31536000', $response->headers->get('Strict-Transport-Security'));
         $this->assertStringContainsString("default-src 'self'", $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString("script-src 'self' 'nonce-", $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString("style-src 'self' 'nonce-", $response->headers->get('Content-Security-Policy'));
         $this->assertStringNotContainsString("'unsafe-inline'", $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->assertFalse($response->headers->has('X-Powered-By'));
+    }
+
+    public function test_hsts_is_not_sent_on_local_http(): void
+    {
+        config(['security.hsts' => true]);
+        $request = Request::create('http://127.0.0.1:8000/', 'GET');
+        $response = (new SecurityHeaders)->handle($request, fn () => new Response('ok'));
+
+        $this->assertFalse($response->headers->has('Strict-Transport-Security'));
     }
 }

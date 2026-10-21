@@ -22,6 +22,13 @@
         'checkout/*'
     );
     $siteIntroEnabled = request()->is('/');
+    $siteSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'WebSite',
+        'name' => 'Aksa Xiterz',
+        'url' => url('/'),
+        'description' => config('seo.description'),
+    ];
 @endphp
 
 <!DOCTYPE html>
@@ -50,13 +57,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/aksa-xiterz-icon.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/brand/aksa-xiterz-touch.png') }}">
     @if (! $privatePage)
-        <script type="application/ld+json" nonce="{{ request()->attributes->get('csp_nonce') }}">{!! json_encode([
-            '@context' => 'https://schema.org',
-            '@type' => 'WebSite',
-            'name' => 'Aksa Xiterz',
-            'url' => url('/'),
-            'description' => config('seo.description'),
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+        <script type="application/ld+json" nonce="{{ request()->attributes->get('csp_nonce') }}">{!! json_encode($siteSchema, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) !!}</script>
     @endif
     <script nonce="{{ request()->attributes->get('csp_nonce') }}" data-currency-prepaint>
         (() => {

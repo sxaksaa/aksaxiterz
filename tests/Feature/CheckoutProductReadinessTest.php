@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\CartService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
 use Tests\TestCase;
@@ -112,7 +113,10 @@ class CheckoutProductReadinessTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris'])
+            ->postJson(route('cart.checkout'), [
+                'payment_method' => 'gopay_qris',
+                'cart_signature' => app(CartService::class)->signature(app(CartService::class)->items($user)),
+            ])
             ->assertUnprocessable()
             ->assertJsonPath('message', 'This product is not ready for automatic checkout.');
 
