@@ -5411,6 +5411,11 @@
     .category-filter-row {
         position: relative;
         overflow-x: auto;
+        /* The scroll container also clips vertically: reserve room for hover
+           movement and the keyboard focus ring without shifting the chips. */
+        padding: 10px;
+        margin-inline: -10px;
+        margin-bottom: -10px;
         overscroll-behavior-x: contain;
         scrollbar-width: none;
     }
@@ -5427,7 +5432,7 @@
 
     .category-filter-glider {
         position: absolute;
-        inset-block: 0;
+        inset-block: 10px;
         left: 0;
         z-index: 0;
         width: 0;
