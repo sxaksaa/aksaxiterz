@@ -877,11 +877,11 @@ test('scroll reveals stay visible on touch and repeat on desktop', async ({ page
 });
 
 test('safe footer navigation prefetches once and reuses the response', async ({ page }) => {
-    let guideRequests = 0;
+    let termsRequests = 0;
 
-    await page.route('**/guides', async (route) => {
+    await page.route('**/terms', async (route) => {
         if (route.request().headers()['x-requested-with'] === 'XMLHttpRequest') {
-            guideRequests++;
+            termsRequests++;
         }
 
         await route.continue();
@@ -889,14 +889,14 @@ test('safe footer navigation prefetches once and reuses the response', async ({ 
 
     await page.goto('/');
 
-    const guidesLink = page.locator('footer a[data-soft-nav][href$="/guides"]');
-    await guidesLink.focus();
-    await expect.poll(() => guideRequests).toBe(1);
+    const termsLink = page.locator('footer a[data-soft-nav][href$="/terms"]');
+    await termsLink.focus();
+    await expect.poll(() => termsRequests).toBe(1);
 
-    await guidesLink.click();
-    await expect(page).toHaveURL(/\/guides$/);
+    await termsLink.click();
+    await expect(page).toHaveURL(/\/terms$/);
     await expect(page.locator('h1')).toBeVisible();
-    expect(guideRequests).toBe(1);
+    expect(termsRequests).toBe(1);
 });
 
 test('short product pages keep the footer at the viewport bottom naturally', async ({ page }) => {

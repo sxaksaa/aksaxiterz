@@ -1,5 +1,11 @@
 @php
     $discordUrl = config('links.discord_url');
+    $footerBinancePayAvailable = app()->environment('local') || (
+        (bool) config('services.binance.pay.enabled') &&
+        filled(config('services.binance.pay.pay_id')) &&
+        filled(config('services.binance.pay.api_key')) &&
+        filled(config('services.binance.pay.api_secret'))
+    );
 @endphp
 
 <footer class="site-footer mt-10">
@@ -29,16 +35,32 @@
             </div>
 
             <div class="footer-column">
-                <h2 class="footer-heading">Quick Links</h2>
-                <div class="mt-3 grid gap-2 text-sm">
-                    <a href="/" data-soft-nav class="footer-link">Products</a>
-                    <a href="{{ route('guides.index') }}" data-soft-nav class="footer-link">Guides</a>
-                    <a href="/downloads" data-soft-nav class="footer-link">Downloads</a>
-                    @auth
-                        <a href="/orders" data-soft-nav class="footer-link">Orders</a>
-                        <a href="/licenses" data-soft-nav class="footer-link">Licenses</a>
-                    @endauth
-                </div>
+                <h2 class="footer-heading">Payment Methods</h2>
+                <ul class="mt-3 grid gap-3 text-sm">
+                    <li class="flex items-start gap-2.5">
+                        <x-ui.icon name="qr-code" class="mt-0.5 h-4 w-4 shrink-0 text-aksa-accent" />
+                        <span>
+                            <span class="block text-gray-300">QRIS</span>
+                            <span class="block text-xs text-gray-400">{{ config('services.gopay_qris.enabled') ? 'Pay in IDR' : 'Temporarily unavailable' }}</span>
+                        </span>
+                    </li>
+                    @if ($footerBinancePayAvailable)
+                        <li class="flex items-start gap-2.5">
+                            <x-ui.icon name="binance" class="mt-0.5 h-4 w-4 shrink-0 text-aksa-accent" />
+                            <span>
+                                <span class="block text-gray-300">Binance Pay</span>
+                                <span class="block text-xs text-gray-400">USDT · USDC</span>
+                            </span>
+                        </li>
+                    @endif
+                    <li class="flex items-start gap-2.5">
+                        <x-ui.icon name="wallet" class="mt-0.5 h-4 w-4 shrink-0 text-aksa-accent" />
+                        <span>
+                            <span class="block text-gray-300">Crypto Address</span>
+                            <span class="block text-xs text-gray-400">USDT · USDC</span>
+                        </span>
+                    </li>
+                </ul>
             </div>
 
             <div class="footer-column">
