@@ -147,62 +147,70 @@ class LicenseStockController extends Controller
         LicenseStock $licenseStock,
         BrModsResetService $brModsResetService,
     ) {
-        if ($licenseStock->is_sold || $licenseStock->isReserved()) {
-            return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be edited.']);
-        }
+        return DB::transaction(function () use ($request, $licenseStock, $brModsResetService) {
+            $licenseStock = LicenseStock::whereKey($licenseStock->id)->lockForUpdate()->firstOrFail();
 
-        $validated = $request->validate([
-            'product_id' => ['required', 'integer', 'exists:products,id'],
-            'package_id' => ['required', 'integer', 'exists:packages,id'],
-            'license_key' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('license_stocks', 'license_key')->ignore($licenseStock->id),
-            ],
-        ]);
+            if ($licenseStock->is_sold || $licenseStock->isReserved()) {
+                return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be edited.']);
+            }
 
-        $package = $this->packageForProduct($validated['package_id'], $validated['product_id']);
+            $validated = $request->validate([
+                'product_id' => ['required', 'integer', 'exists:products,id'],
+                'package_id' => ['required', 'integer', 'exists:packages,id'],
+                'license_key' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('license_stocks', 'license_key')->ignore($licenseStock->id),
+                ],
+            ]);
 
-        if (! $package) {
-            return back()
-                ->withInput()
-                ->withErrors(['package_id' => 'Select a package from the chosen product.']);
-        }
+            $package = $this->packageForProduct($validated['package_id'], $validated['product_id']);
 
-        $licenseKey = trim($validated['license_key']);
+            if (! $package) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['package_id' => 'Select a package from the chosen product.']);
+            }
 
-        if (
-            $brModsResetService->supportsProduct($package->product) &&
-            $brModsResetService->extractUsername($licenseKey) === null
-        ) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'license_key' => 'BR Mods licenses must use the format 👤username🔑key.',
-                ]);
-        }
+            $licenseKey = trim($validated['license_key']);
 
-        $licenseStock->update([
-            'license_key' => $licenseKey,
-            'product_id' => $package->product_id,
-            'package_id' => $package->id,
-        ]);
+            if (
+                $brModsResetService->supportsProduct($package->product) &&
+                $brModsResetService->extractUsername($licenseKey) === null
+            ) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'license_key' => 'BR Mods licenses must use the format 👤username🔑key.',
+                    ]);
+            }
 
-        return redirect()
-            ->route('admin.license-stocks.index')
-            ->with('info', 'License stock updated.');
+            $licenseStock->update([
+                'license_key' => $licenseKey,
+                'product_id' => $package->product_id,
+                'package_id' => $package->id,
+            ]);
+
+            return redirect()
+                ->route('admin.license-stocks.index')
+                ->with('info', 'License stock updated.');
+        }, 3);
     }
 
     public function destroy(LicenseStock $licenseStock)
     {
-        if ($licenseStock->is_sold || $licenseStock->isReserved()) {
-            return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be deleted.']);
-        }
+        return DB::transaction(function () use ($licenseStock) {
+            $licenseStock = LicenseStock::whereKey($licenseStock->id)->lockForUpdate()->firstOrFail();
 
-        $licenseStock->delete();
+            if ($licenseStock->is_sold || $licenseStock->isReserved()) {
+                return back()->withErrors(['license_key' => 'Sold or reserved license keys cannot be deleted.']);
+            }
 
-        return back()->with('info', 'License stock deleted.');
+            $licenseStock->delete();
+
+            return back()->with('info', 'License stock deleted.');
+        }, 3);
     }
 
     private function editableStock(Request $request): ?LicenseStock
