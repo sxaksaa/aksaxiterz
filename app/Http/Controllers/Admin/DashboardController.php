@@ -10,7 +10,9 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Services\PendingOrderExpirationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -29,21 +31,28 @@ class DashboardController extends Controller
         $activePaymentMethod = $this->normalizePaymentMethod((string) $request->query('method', 'all'));
         $paymentMethodMeta = $paymentMethodOptions[$activePaymentMethod];
 
-        $paidOrders = Order::query()
-            ->with(['items', 'product', 'package'])
+        $paidQuery = Order::query()
             ->where('status', 'paid')
-            ->get(['id', 'order_id', 'product_id', 'package_id', 'status', 'payment_method', 'price', 'quantity', 'payment_payload', 'paid_at', 'created_at']);
+            ->when($activePaymentMethod !== 'all', fn ($query) => $query->where('payment_method', $activePaymentMethod));
 
-        $methodPaidOrders = $this->filterOrdersByPaymentMethod($paidOrders, $activePaymentMethod);
-
-        $firstPaidDate = $methodPaidOrders
-            ->map(fn (Order $order) => $this->paidDate($order))
-            ->filter()
-            ->sortBy(fn ($date) => $date->timestamp)
-            ->first();
+        $firstPaidAt = $activeRange === 'lifetime'
+            ? (clone $paidQuery)->min(DB::raw('COALESCE(paid_at, created_at)'))
+            : null;
+        $firstPaidDate = $firstPaidAt ? Carbon::parse($firstPaidAt, config('app.timezone')) : null;
 
         $rangeMeta = $this->rangeMeta($activeRange, $now, $firstPaidDate);
-        $filteredPaidOrders = $this->filterOrdersByRange($methodPaidOrders, $rangeMeta['from']);
+        $filteredPaidOrders = $paidQuery
+            ->when($rangeMeta['from'], fn ($query, $from) => $query->where(function ($query) use ($from): void {
+                $query->where('paid_at', '>=', $from)
+                    ->orWhere(fn ($fallback) => $fallback->whereNull('paid_at')->where('created_at', '>=', $from));
+            }))
+            ->with([
+                'items' => fn ($query) => $query->select('id', 'order_id', 'product_id', 'product_name', 'quantity', 'line_total_idr')->with('product:id,name'),
+                'product:id,name', 'package:id,price',
+            ])
+            ->select(['id', 'order_id', 'product_id', 'package_id', 'status', 'payment_method', 'price', 'quantity', 'paid_at', 'created_at'])
+            ->selectRaw('CASE WHEN payment_method IN (?, ?) THEN payment_payload ELSE NULL END AS payment_payload', ['crypto', 'binance_pay'])
+            ->get();
         $selectedStats = $this->periodStats($filteredPaidOrders);
         $salesTrend = $this->salesTrend($filteredPaidOrders, $activeRange, $rangeMeta['from'], $now, $firstPaidDate, $activePaymentMethod);
 
@@ -82,7 +91,7 @@ class DashboardController extends Controller
         $lowStockPackages = Package::query()
             ->whereHas('product', fn ($query) => $query->visible())
             ->with('product')
-            ->withCount(['licenseStocks', 'availableLicenseStocks'])
+            ->withCount('availableLicenseStocks')
             ->orderBy('product_id')
             ->orderBy('price')
             ->get()
@@ -101,10 +110,12 @@ class DashboardController extends Controller
             'low_stock' => $lowStockPackages->count(),
         ];
 
+        $statusCounts = $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)
+            ->select('status')->selectRaw('COUNT(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status');
         $orderStats = [
-            'pending' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'pending')->count(),
-            'paid' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'paid')->count(),
-            'cancelled' => $this->ordersInRange($rangeMeta['from'], $activePaymentMethod)->where('status', 'cancelled')->count(),
+            'pending' => (int) ($statusCounts['pending'] ?? 0),
+            'paid' => (int) ($statusCounts['paid'] ?? 0),
+            'cancelled' => (int) ($statusCounts['cancelled'] ?? 0),
             'delivery_issues' => $this->deliveryIssueCount($rangeMeta['from'], $activePaymentMethod),
         ];
 
@@ -123,7 +134,9 @@ class DashboardController extends Controller
 
         $lowStockPackages = $lowStockPackages->take(8)->values();
 
-        return view('admin.dashboard.index', compact(
+        $fragment = $request->ajax() && $request->header('X-Aksa-Dashboard-Fragment') === '1';
+
+        return response()->view($fragment ? 'admin.dashboard._fragment' : 'admin.dashboard.index', compact(
             'activeRange',
             'activePaymentMethod',
             'rangeOptions',
@@ -140,7 +153,8 @@ class DashboardController extends Controller
             'lowStockPackages',
             'lowStockThreshold',
             'qrisEventStats'
-        ));
+        ))->header('Cache-Control', 'no-store, private')
+            ->header('Vary', 'X-Aksa-Dashboard-Fragment, X-Requested-With');
     }
 
     private function rangeOptions(): array
@@ -240,32 +254,6 @@ class DashboardController extends Controller
             'from' => $from,
             'description' => $from->format('d M Y').' - '.$now->format('d M Y').' by paid day ('.$timezoneLabel.')',
         ];
-    }
-
-    private function filterOrdersByRange(Collection $orders, $from): Collection
-    {
-        return $orders
-            ->filter(function (Order $order) use ($from): bool {
-                if (! $from) {
-                    return true;
-                }
-
-                $date = $this->paidDate($order);
-
-                return $date && $date->gte($from);
-            })
-            ->values();
-    }
-
-    private function filterOrdersByPaymentMethod(Collection $orders, string $method): Collection
-    {
-        if ($method === 'all') {
-            return $orders->values();
-        }
-
-        return $orders
-            ->filter(fn (Order $order): bool => $order->payment_method === $method)
-            ->values();
     }
 
     private function periodStats(Collection $orders): array

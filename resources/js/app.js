@@ -3113,11 +3113,13 @@ function hideDashboardChartTooltip(point = null) {
 }
 
 async function requestSoftNavigationPage(url, signal = null) {
+    const dashboardFilter = window.location.pathname === '/admin' && url.pathname === '/admin';
     const response = await fetch(url.href, {
         credentials: 'same-origin',
         headers: {
             Accept: 'text/html',
             'X-Requested-With': 'XMLHttpRequest',
+            ...(dashboardFilter ? { 'X-Aksa-Dashboard-Fragment': '1' } : {}),
         },
         ...(signal ? { signal } : {}),
     });

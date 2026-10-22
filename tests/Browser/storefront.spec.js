@@ -1,5 +1,41 @@
 import { expect, test } from '@playwright/test';
 
+test('dashboard filters request private fragments, preserve the shell and allow changing a pending selection', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('aksa_site_intro_seen_v1', 'true'));
+    await page.goto('/');
+    const controls = '<a href="/admin?range=weekly" data-dashboard-range-link>Weekly</a> <a href="/admin?range=monthly" data-dashboard-range-link>Monthly</a>';
+    await page.evaluate(controls => {
+        history.replaceState({}, '', '/admin?range=daily');
+        document.querySelector('[data-aksa-page-content]').innerHTML = `<h1>Dashboard Daily</h1>${controls}`;
+        document.querySelector('#navbar').dataset.dashboardPreserved = 'true';
+        document.querySelector('footer').dataset.dashboardPreserved = 'true';
+    }, controls);
+    const requested = [];
+    let releaseWeekly;
+    const weeklyGate = new Promise(resolve => { releaseWeekly = resolve; });
+    await page.route('**/admin?range=*', async route => {
+        const range = new URL(route.request().url()).searchParams.get('range');
+        requested.push({ range, fragment: route.request().headers()['x-aksa-dashboard-fragment'] });
+        if (range === 'weekly') await weeklyGate;
+        await route.fulfill({
+            contentType: 'text/html',
+            body: `<main id="aksaPageContent" data-aksa-page-content><h1>Dashboard ${range}</h1>${controls}</main>`,
+        }).catch(() => {});
+    });
+    await page.getByRole('link', { name: 'Weekly', exact: true }).click();
+    await expect(page.locator('[data-aksa-page-content]')).toHaveAttribute('aria-busy', 'true');
+    await page.getByRole('link', { name: 'Monthly', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\?range=monthly$/);
+    await expect(page.locator('h1')).toHaveText('Dashboard monthly');
+    releaseWeekly();
+    await expect(page.locator('#navbar')).toHaveAttribute('data-dashboard-preserved', 'true');
+    await expect(page.locator('footer')).toHaveAttribute('data-dashboard-preserved', 'true');
+    expect(requested).toEqual([{ range: 'weekly', fragment: '1' }, { range: 'monthly', fragment: '1' }]);
+    await expect(page.locator('[data-aksa-page-content]')).not.toHaveAttribute('aria-busy');
+    await expect(page.locator('[data-aksa-page-content]')).not.toHaveClass(/aksa-soft-nav-entered/);
+    await expect(page.locator('h1')).toHaveText('Dashboard monthly');
+});
+
 test('downloads explain empty searches, restore results and report link opening honestly', async ({ page }, testInfo) => {
     await page.goto('/downloads');
     const cards = page.locator('[data-download-search]');

@@ -606,6 +606,10 @@
         pointer-events: none;
     }
 
+    body.aksa-soft-nav-active [data-dashboard-range-link] {
+        pointer-events: auto;
+    }
+
     [data-aksa-page-content].aksa-soft-nav-entered {
         animation: aksa-soft-page-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }

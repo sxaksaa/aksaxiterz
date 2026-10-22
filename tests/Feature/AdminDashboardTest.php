@@ -26,6 +26,66 @@ class AdminDashboardTest extends TestCase
         parent::setUp();
     }
 
+    public function test_daily_queries_only_hydrate_matching_paid_orders_with_legacy_date_fallback(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+        $this->travelTo(Carbon::parse('2026-06-24 14:30:00'));
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $category = Category::create(['name' => 'Query Test', 'slug' => 'query-test']);
+        $product = Product::create(['category_id' => $category->id, 'name' => 'Query Test', 'slug' => 'query-test', 'description' => 'Fixture']);
+        foreach ([
+            ['RECENT-PAID', 'pakasir', '2026-06-01', '2026-06-24', 10000],
+            ['RECENT-LEGACY', 'pakasir', '2026-06-18', null, 20000],
+            ['BEFORE-BOUNDARY', 'pakasir', '2026-06-17 23:59:59', null, 40000],
+            ['OLD-PAID', 'pakasir', '2026-06-24', '2026-06-01', 80000],
+            ['OTHER-METHOD', 'crypto', '2026-06-24', '2026-06-24', 10],
+        ] as [$id, $method, $created, $paid, $price]) {
+            $order = Order::create([
+                'order_id' => 'ORDER-'.$id, 'user_id' => $admin->id, 'product_id' => $product->id,
+                'status' => 'paid', 'payment_method' => $method, 'price' => $price,
+            ]);
+            $order->forceFill(['created_at' => Carbon::parse($created), 'paid_at' => $paid ? Carbon::parse($paid) : null])->save();
+        }
+
+        $retrieved = [];
+        $capture = true;
+        Order::retrieved(function (Order $order) use (&$retrieved, &$capture): void {
+            if ($capture && $order->status === 'paid') {
+                $retrieved[] = $order->order_id;
+            }
+        });
+        try {
+            $this->actingAs($admin)->get(route('admin.dashboard', ['range' => 'daily', 'method' => 'pakasir']))
+                ->assertOk()->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 2 && $stats['idr_revenue'] === 30000);
+        } finally {
+            $capture = false;
+        }
+        sort($retrieved);
+        $this->assertSame(['ORDER-RECENT-LEGACY', 'ORDER-RECENT-PAID'], $retrieved);
+
+        $this->actingAs($admin)->get(route('admin.dashboard', ['range' => 'lifetime', 'method' => 'pakasir']))
+            ->assertOk()->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 4 && $stats['idr_revenue'] === 150000)
+            ->assertSee('Since 01 Jun 2026');
+    }
+
+    public function test_dashboard_filter_fragment_keeps_metrics_and_access_controls_without_rebuilding_the_shell(): void
+    {
+        config(['admin.emails' => ['admin@example.com']]);
+        $headers = ['X-Requested-With' => 'XMLHttpRequest', 'X-Aksa-Dashboard-Fragment' => '1'];
+        $url = route('admin.dashboard', ['range' => 'lifetime']);
+        $this->withHeaders($headers)->get($url)->assertRedirect();
+        $this->actingAs(User::factory()->create())->withHeaders($headers)->get($url)->assertNotFound();
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $full = $this->actingAs($admin)->get($url, ['X-Requested-With' => '', 'X-Aksa-Dashboard-Fragment' => ''])
+            ->assertOk()->assertSee('id="navbar"', false);
+        $fragment = $this->actingAs($admin)->withHeaders($headers)->get($url)
+            ->assertOk()->assertSee('id="aksaPageContent"', false)
+            ->assertSee('Dashboard')->assertDontSee('id="navbar"', false)->assertDontSee('<footer', false);
+        $this->assertStringContainsString('no-store', $fragment->headers->get('Cache-Control'));
+        $this->assertSame($full->viewData('selectedStats'), $fragment->viewData('selectedStats'));
+        $this->assertLessThan(strlen($full->getContent()), strlen($fragment->getContent()));
+    }
+
     public function test_today_sales_trend_uses_hourly_buckets(): void
     {
         config(['admin.emails' => ['admin@example.com']]);
@@ -74,11 +134,11 @@ class AdminDashboardTest extends TestCase
             'package_id' => $package->id,
             'status' => 'paid',
             'payment_method' => 'binance_pay',
-            'price' => 1.10,
+            'price' => 1.11,
             'quantity' => 1,
             'payment_payload' => [
                 'base_amount' => '1.100000',
-                'final_amount' => '1.100000',
+                'final_amount' => '1.110000',
             ],
         ]);
         $binanceOrder->forceFill([
@@ -90,6 +150,7 @@ class AdminDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => '1']))
             ->assertOk()
+            ->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 2 && $stats['idr_revenue'] === 10000 && $stats['crypto_revenue'] === 1.1)
             ->assertSee('Hourly')
             ->assertSee('Daily')
             ->assertSee('Weekly')
@@ -112,6 +173,7 @@ class AdminDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['range' => '1', 'method' => 'binance_pay']))
             ->assertOk()
+            ->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 1 && $stats['idr_revenue'] === 0 && $stats['crypto_revenue'] === 1.1)
             ->assertSee('Binance Pay crypto revenue line')
             ->assertDontSee('Recent Orders');
     }
