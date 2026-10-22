@@ -221,6 +221,14 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="font-mono text-xs text-gray-300">{{ $order->order_id }}</div>
+                            <div class="mt-1 text-xs text-gray-400">
+                                Created:
+                                @if ($order->created_at)
+                                    <time datetime="{{ $order->created_at->toIso8601String() }}">{{ $order->created_at->timezone(config('app.timezone'))->format('d M Y, H:i') }} WIB</time>
+                                @else
+                                    -
+                                @endif
+                            </div>
                             <div class="mt-2">
                                 @include('partials.order-items-summary', ['order' => $order, 'compact' => true])
                             </div>
@@ -244,6 +252,9 @@
                             </span>
                         </div>
                         <div>Amount: <span class="font-semibold text-white">{{ $amountLabel }}</span></div>
+                        @if ($isPaid && $order->paid_at)
+                            <div>Paid at: <time datetime="{{ $order->paid_at->toIso8601String() }}" class="font-semibold text-white">{{ $order->paid_at->timezone(config('app.timezone'))->format('d M Y, H:i') }} WIB</time></div>
+                        @endif
                         <div>Items: <span class="font-semibold text-white">{{ $order->item_count }} package(s)</span></div>
                         <div>Quantity: <span class="font-semibold text-white">{{ $order->total_quantity }} {{ $order->total_quantity === 1 ? 'key' : 'keys' }}</span></div>
                         <div>Delivery:
