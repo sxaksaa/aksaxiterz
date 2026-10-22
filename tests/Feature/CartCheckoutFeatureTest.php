@@ -787,6 +787,27 @@ class CartCheckoutFeatureTest extends TestCase
         $this->assertSame($replacement->id, $oldOrder->fresh()->replaced_by);
     }
 
+    public function test_restore_returns_current_prices_duration_and_merged_quantity(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Restored Package', 20000, 1.25, 5);
+        $item = CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 2]);
+        $this->actingAs($user)->deleteJson(route('cart.items.destroy', $item))->assertOk();
+        $package->update(['name' => '7 Days', 'price' => 30000, 'price_usdt' => 2]);
+        // A second tab adds the same package before Undo restores the removed quantity.
+        $existing = CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+
+        $response = $this->postJson(route('cart.items.store', $product), ['package_id' => $package->id, 'quantity' => 2])
+            ->assertOk()->assertJsonPath('item_id', $existing->id)->assertJsonPath('cart_count', 3);
+        $html = $response->json('cart_item_html');
+        $this->assertStringContainsString('7 Days', $html);
+        $this->assertStringNotContainsString('30 Days', $html);
+        $this->assertStringContainsString('data-cart-item-quantity="3"', $html);
+        $this->assertStringContainsString('data-price-idr="90000"', $html);
+        $this->assertStringContainsString('data-price-usd="6"', $html);
+        $this->assertStringContainsString('value="4"', $html);
+        $this->assertDatabaseCount('cart_items', 1);
+    }
+
     private function catalogItem(
         string $name,
         int $price,

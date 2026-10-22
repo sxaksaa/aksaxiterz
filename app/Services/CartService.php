@@ -135,6 +135,8 @@ class CartService
             'user_id' => (int) $item->user_id,
             'product_id' => (int) $item->product_id,
             'package_id' => (int) $item->package_id,
+            'product_name' => $item->product?->name,
+            'package_name' => $item->package?->name,
             'quantity' => (int) $item->quantity,
             'price_idr' => $item->package?->price === null ? null : (int) $item->package->price,
             'price_usdt' => $item->package?->price_usdt === null

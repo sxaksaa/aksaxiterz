@@ -4218,7 +4218,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
 
 document.addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-cart-remove-form]');
-    const row = form?.closest('[data-cart-item]');
+    let row = form?.closest('[data-cart-item]');
 
     if (!form || !row || event.defaultPrevented || form.dataset.cartRemovalPending === 'true') return;
 
@@ -4226,11 +4226,11 @@ document.addEventListener('submit', async (event) => {
     if (row.querySelector('[data-cart-quantity-form]')?.dataset.cartUpdating === 'true') return;
     form.dataset.cartRemovalPending = 'true';
 
-    const quantity = Math.max(1, Number(row.dataset.cartItemQuantity || 1));
+    let quantity = Math.max(1, Number(row.dataset.cartItemQuantity || 1));
     const lineTotal = row.querySelector('[data-cart-line-total]');
-    const lineTotalIdr = Math.max(0, Number(lineTotal?.dataset.priceIdr || 0));
-    const lineTotalUsd = Math.max(0, Number(lineTotal?.dataset.priceUsd || 0));
-    const packageName = row.querySelector('.font-semibold.text-white')?.textContent?.trim() || 'Package';
+    let lineTotalIdr = Math.max(0, Number(lineTotal?.dataset.priceIdr || 0));
+    let lineTotalUsd = Math.max(0, Number(lineTotal?.dataset.priceUsd || 0));
+    let packageName = row.querySelector('.font-semibold.text-white')?.textContent?.trim() || 'Package';
     const action = form.action;
     const restoreUrl = row.dataset.cartRestoreUrl || '';
     const packageId = Number(row.dataset.cartPackageId || 0);
@@ -4256,7 +4256,15 @@ document.addEventListener('submit', async (event) => {
         row.removeAttribute('aria-hidden');
         row.removeAttribute('inert');
         updateCartRemovalSummary(1, quantity, lineTotalIdr, lineTotalUsd);
-        updateGroupCount(originalGroupCount);
+        const subtotal = document.querySelector('[data-cart-subtotal]');
+        const activeTotals = [...document.querySelectorAll('[data-cart-item]:not(.cart-item-removing) [data-cart-line-total]')];
+        if (subtotal && activeTotals.length > 0) {
+            subtotal.dataset.priceUsd = activeTotals.every(total => total.dataset.priceUsd !== '')
+                ? String(activeTotals.reduce((sum, total) => sum + Number(total.dataset.priceUsd || 0), 0))
+                : '';
+            window.refreshAksaDisplayCurrency?.(subtotal.parentElement || document);
+        }
+        updateGroupCount(group?.querySelectorAll('[data-cart-item]:not(.cart-item-removing)').length || 1);
         row.classList.add('cart-item-restored');
         window.setTimeout(() => row.classList.remove('cart-item-restored'), 1400);
     };
@@ -4317,6 +4325,22 @@ document.addEventListener('submit', async (event) => {
                 const restoreData = await restoreResponse.json().catch(() => ({}));
 
                 if (!restoreResponse.ok) throw new Error(restoreData.message || 'The package could not be restored.');
+
+                const template = document.createElement('template');
+                template.innerHTML = restoreData.cart_item_html || '';
+                const freshRow = template.content.querySelector('[data-cart-item]');
+                if (freshRow) {
+                    // Reuse the server-rendered row so price, duration, quantity and stock controls agree.
+                    freshRow.classList.add('cart-item-removing');
+                    row.replaceWith(freshRow);
+                    row = freshRow;
+                    quantity = Math.max(1, Number(row.dataset.cartItemQuantity || 1));
+                    const freshTotal = row.querySelector('[data-cart-line-total]');
+                    lineTotalIdr = Math.max(0, Number(freshTotal?.dataset.priceIdr || 0));
+                    lineTotalUsd = Math.max(0, Number(freshTotal?.dataset.priceUsd || 0));
+                    packageName = row.querySelector('.font-semibold.text-white')?.textContent?.trim() || 'Package';
+                    window.refreshAksaDisplayCurrency?.(row);
+                }
 
                 const restoredItemId = Number(restoreData.item_id || 0);
                 if (restoredItemId > 0) {

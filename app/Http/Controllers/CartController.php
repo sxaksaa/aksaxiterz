@@ -76,15 +76,20 @@ class CartController extends Controller
                 return $this->errorResponse($request, $error->getMessage());
             }
 
+            $items = $this->cartService->items($request->user());
+            $this->attachAvailability($items);
+            $this->loadRecommendationData($items);
+
             return $this->successResponse($request, [
                 'message' => $product->name.' - '.$package->name.' was added to your cart.',
-                'cart_count' => (int) $request->user()->cartItems()->sum('quantity'),
+                'cart_count' => (int) $items->sum('quantity'),
                 'item_id' => $item->id,
+                'cart_item_html' => view('partials.cart-package-row', [
+                    'cartItems' => $items,
+                    'item' => $items->firstWhere('id', $item->id),
+                ])->render(),
                 'cart_preview_html' => view('partials.mini-cart-content', [
-                    'miniCartItems' => tap($this->cartService->items($request->user()), function ($items): void {
-                        $this->attachAvailability($items);
-                        $this->loadRecommendationData($items);
-                    }),
+                    'miniCartItems' => $items,
                     'miniCartHighlightItemId' => $item->id,
                 ])->render(),
             ]);

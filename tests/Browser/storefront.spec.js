@@ -579,6 +579,56 @@ test('cart quantity updates survive removal and slow Undo without losing the row
     expect(restoreRequests).toBe(1);
 });
 
+for (const pricedInUsd of [true, false]) {
+    test(`Undo refreshes changed package details and ${pricedInUsd ? 'updated' : 'unavailable'} USD pricing`, async ({ page }) => {
+        const rowHtml = (id, quantity, priceIdr, priceUsd, name, disabled = false) => `
+            <div class="cart-package-row" data-cart-item="${id}" data-cart-item-quantity="${quantity}"
+                data-cart-package-id="44" data-cart-restore-url="/cart/items/restore-fresh">
+                <p class="font-semibold text-white">${name}</p>
+                <span data-cart-line-total data-display-price data-price-idr="${priceIdr}" data-price-usd="${priceUsd}"></span>
+                <form method="POST" action="/cart/items/${id}" data-cart-quantity-form>
+                    <input name="_method" value="PATCH">
+                    <span class="quantity-stepper-value">${quantity}</span>
+                    <button type="submit" name="quantity" value="${quantity - 1}" data-cart-quantity-direction="down">Less</button>
+                    <button type="submit" name="quantity" value="${quantity + 1}" data-cart-quantity-direction="up" ${disabled ? 'disabled' : ''}>More</button>
+                </form>
+                <form method="POST" action="/cart/items/${id}" data-cart-remove-form>
+                    <input name="_method" value="DELETE"><button type="submit">Remove package</button>
+                </form>
+            </div>`;
+        await page.route('**/cart/items/123', route => route.fulfill({ json: { message: 'Removed' } }));
+        await page.route('**/cart/items/restore-fresh', route => route.fulfill({ json: {
+            item_id: 456, cart_count: 3,
+            cart_item_html: rowHtml(456, 3, 90000, pricedInUsd ? 6 : '', '7 Days', true),
+        } }));
+        await page.goto('/');
+        await page.evaluate(html => {
+            document.querySelector('main').innerHTML = `
+                <h2 id="cartBundleCount" data-cart-distinct-items="1" data-cart-total-quantity="2">1 package · 2 licenses</h2>
+                <span data-cart-count>2</span>
+                <span data-cart-subtotal data-display-price data-price-idr="40000" data-price-usd="2"></span>
+                <article data-cart-product-group><p data-cart-group-count>1 package selected</p>${html}</article>`;
+        }, rowHtml(123, 2, 40000, 2, '30 Days'));
+
+        await page.getByRole('button', { name: 'Remove package' }).click();
+        await page.getByRole('button', { name: 'Undo' }).click();
+        const row = page.locator('[data-cart-item="456"]');
+        await expect(row).toBeVisible();
+        await expect(row).toHaveClass(/cart-item-restored/);
+        await expect(row).toHaveAttribute('data-cart-item-quantity', '3');
+        await expect(row.getByText('7 Days', { exact: true })).toBeVisible();
+        await expect(row.locator('[data-cart-line-total]')).toHaveAttribute('data-price-idr', '90000');
+        await expect(row.locator('[data-cart-line-total]')).toHaveAttribute('data-price-usd', pricedInUsd ? '6' : '');
+        await expect(row.getByRole('button', { name: 'More', exact: true })).toBeDisabled();
+        await expect(row.getByRole('button', { name: 'Less', exact: true })).toHaveAttribute('value', '2');
+        await expect(page.locator('#cartBundleCount')).toHaveText('1 package · 3 licenses');
+        await expect(page.locator('[data-cart-count]')).toHaveText('3');
+        await expect(page.locator('[data-cart-subtotal]')).toHaveAttribute('data-price-idr', '90000');
+        await expect(page.locator('[data-cart-subtotal]')).toHaveAttribute('data-price-usd', pricedInUsd ? '6' : '');
+        await expect(row.locator('[data-cart-remove-form]')).toHaveAttribute('action', /\/cart\/items\/456$/);
+    });
+}
+
 test('another removed row cannot reload the cart while Undo is pending', async ({ page }) => {
     await page.addInitScript(() => sessionStorage.setItem('aksa_site_intro_seen_v1', 'true'));
     let reloads = 0;

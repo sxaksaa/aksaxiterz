@@ -13,6 +13,7 @@ use App\Services\CartService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DedicatedCheckoutFeatureTest extends TestCase
@@ -584,6 +585,40 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertStatus(409);
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('cart_items', 1);
+    }
+
+    public static function changedPurchaseDetails(): array
+    {
+        return [['package'], ['product']];
+    }
+
+    #[DataProvider('changedPurchaseDetails')]
+    public function test_cart_checkout_requires_review_when_purchase_names_change(string $changed): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Changed Details', 20000, 1.25, 2);
+        CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        $service = app(CartService::class);
+        $signature = $service->signature($service->items($user));
+        if ($changed === 'package') {
+            $package->update(['name' => '1 Day']);
+        } else {
+            $product->update(['name' => 'Renamed Product']);
+        }
+        $this->enableGopayQris();
+
+        $this->actingAs($user)->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris', 'cart_signature' => $signature])
+            ->assertStatus(409);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('cart_items', 1);
+        $this->assertSame(0, LicenseStock::whereNotNull('reserved_order_id')->count());
+
+        $review = $this->get(route('checkout.cart'))->assertOk();
+        $this->assertSame(1, preg_match('/name="cart_signature" value="([a-f0-9]{64})"/', $review->getContent(), $fresh));
+        $this->assertNotSame($signature, $fresh[1]);
+        $this->postJson(route('cart.checkout'), ['payment_method' => 'gopay_qris', 'cart_signature' => $fresh[1]])->assertOk();
+        $this->assertDatabaseHas('order_items', [
+            'product_name' => $product->fresh()->name, 'package_name' => $package->fresh()->name,
+        ]);
     }
 
     private function catalogItem(
