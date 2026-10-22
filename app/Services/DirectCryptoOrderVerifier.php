@@ -129,6 +129,8 @@ class DirectCryptoOrderVerifier
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $lockedOrder->lockVoucherForSettlement();
+
             if (! $this->isDirectCryptoOrder($lockedOrder)) {
                 DB::rollBack();
 

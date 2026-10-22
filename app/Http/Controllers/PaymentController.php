@@ -13,6 +13,7 @@ use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\PendingOrderExpirationService;
 use App\Services\StockReservationService;
+use App\Services\VoucherService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -77,6 +78,27 @@ class PaymentController extends Controller
                     $request,
                     'This product is not ready for automatic checkout.'
                 );
+            }
+
+            if (($hasStoredItems || $oldOrder->package) && $oldOrder->voucher_id && filled($oldOrder->payment_match_key)
+                && Order::whereKey($oldOrder->id)->consumesVoucherQuota()->exists()) {
+                try {
+                    $vouchers = app(VoucherService::class);
+                    if ($hasStoredItems) {
+                        $vouchers->quoteCart($retryItems, $user, voucherId: $oldOrder->voucher_id,
+                            paymentMethod: $paymentMethod, coin: $paymentMethod === 'crypto' ? $cryptoNetwork : $binancePayToken);
+                    } else {
+                        $vouchers->quote($oldOrder->package, $user, voucherId: $oldOrder->voucher_id,
+                            paymentMethod: $paymentMethod, coin: $paymentMethod === 'crypto' ? $cryptoNetwork : $binancePayToken,
+                            quantity: max(1, (int) $oldOrder->quantity));
+                    }
+                } catch (VoucherException $error) {
+                    if (in_array($error->getMessage(), ['You have already used this voucher.', 'This voucher has reached its usage limit.'], true)) {
+                        return $this->paymentErrorResponse($request, new VoucherException(
+                            'This voucher is reserved by the original invoice during payment recovery. Verify the original payment or start a new checkout without this voucher.'
+                        ), 409);
+                    }
+                }
             }
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {

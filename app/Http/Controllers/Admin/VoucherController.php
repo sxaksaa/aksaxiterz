@@ -15,7 +15,7 @@ class VoucherController extends Controller
     {
         $vouchers = Voucher::query()
             ->withCount([
-                'orders as active_uses_count' => fn ($query) => $query->where('status', '!=', 'cancelled'),
+                'orders as active_uses_count' => fn ($query) => $query->consumesVoucherQuota(),
                 'orders as paid_uses_count' => fn ($query) => $query->where('status', 'paid'),
             ])
             ->when($request->filled('search'), function ($query) use ($request): void {
@@ -66,7 +66,7 @@ class VoucherController extends Controller
     public function show(Voucher $voucher)
     {
         $voucher->loadCount([
-            'orders as active_uses_count' => fn ($query) => $query->where('status', '!=', 'cancelled'),
+            'orders as active_uses_count' => fn ($query) => $query->consumesVoucherQuota(),
             'orders as paid_uses_count' => fn ($query) => $query->where('status', 'paid'),
         ]);
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\StorefrontCache;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
@@ -64,6 +65,36 @@ class Order extends Model
     public function voucher()
     {
         return $this->belongsTo(Voucher::class);
+    }
+
+    public function scopeConsumesVoucherQuota(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->where('status', '!=', 'cancelled')
+                ->orWhere(function (Builder $recoverable): void {
+                    $recoverable->where('status', 'cancelled')
+                        ->whereNotNull('payment_match_key')->where('payment_match_key', '!=', '')
+                        ->where(function (Builder $methods): void {
+                            foreach (['crypto' => 'services.crypto_direct.recovery_hours',
+                                'binance_pay' => 'services.binance.pay.recovery_hours',
+                                'gopay_qris' => 'services.gopay_qris.recovery_hours'] as $method => $setting) {
+                                $cutoff = now()->subHours(max(1, (int) config($setting, $method === 'gopay_qris' ? 72 : 24)));
+                                $methods->orWhere(fn (Builder $invoice) => $invoice->where('payment_method', $method)
+                                    ->where(fn (Builder $deadline) => $deadline->whereNull('expired_at')
+                                        ->orWhere('expired_at', $method === 'gopay_qris' ? '>=' : '>', $cutoff)));
+                            }
+                        });
+                });
+        });
+    }
+
+    public function lockVoucherForSettlement(): void
+    {
+        // Call inside the settlement transaction, before rechecking recovery eligibility.
+        // Quotes use the same voucher lock so expiry cannot release a slot mid-settlement.
+        if ($this->voucher_id) {
+            $this->voucher()->lockForUpdate()->first();
+        }
     }
 
     public function user()

@@ -219,7 +219,7 @@ class VoucherFeatureTest extends TestCase
             ->assertJsonPath('message', 'This product is not ready for automatic checkout.');
     }
 
-    public function test_cancelled_order_releases_voucher_for_the_same_account(): void
+    public function test_cancelled_order_without_a_matchable_invoice_releases_voucher_for_the_same_account(): void
     {
         [$user, $product, $package] = $this->makeCatalog(100000, 6);
         $voucher = $this->makeVoucher();

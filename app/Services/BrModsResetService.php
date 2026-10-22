@@ -269,43 +269,29 @@ class BrModsResetService
 
         $data = $response->json();
 
-        if (! is_array($data)) {
-            return true;
-        }
-
-        foreach (['success', 'ok'] as $field) {
-            if (array_key_exists($field, $data)) {
-                return $this->truthy($data[$field]);
-            }
-        }
-
-        if (array_key_exists('error', $data) && $this->truthy($data['error'])) {
+        if (! is_array($data) || array_is_list($data)) {
             return false;
         }
 
-        $status = Str::lower(trim((string) ($data['status'] ?? '')));
-
+        if (array_key_exists('error', $data) && ! in_array($data['error'], [null, false, 0, '', '0'], true)) {
+            return false;
+        }
+        $status = is_string($data['status'] ?? null) ? Str::lower(trim($data['status'])) : '';
         if (in_array($status, ['error', 'failed', 'failure', 'rejected', 'erro'], true)) {
             return false;
         }
 
-        return true;
-    }
-
-    private function truthy(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
+        $confirmed = in_array($status, ['success', 'ok'], true);
+        foreach (['success', 'ok'] as $field) {
+            if (array_key_exists($field, $data)) {
+                if (! in_array($data[$field], [true, 1, '1', 'true', 'success', 'ok'], true)) {
+                    return false;
+                }
+                $confirmed = true;
+            }
         }
 
-        if (is_numeric($value)) {
-            return (float) $value !== 0.0;
-        }
-
-        $normalized = Str::lower(trim((string) $value));
-
-        return $normalized !== '' &&
-            ! in_array($normalized, ['0', 'false', 'no', 'null', 'error', 'failed', 'failure', 'erro'], true);
+        return $confirmed;
     }
 
     private function providerMessage(Response $response): ?string

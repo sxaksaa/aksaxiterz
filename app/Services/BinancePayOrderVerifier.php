@@ -246,6 +246,8 @@ class BinancePayOrderVerifier
                     ->lockForUpdate()
                     ->first();
 
+                $lockedOrder?->lockVoucherForSettlement();
+
                 if (
                     ! $lockedOrder ||
                     ! $this->isBinancePayOrder($lockedOrder) ||

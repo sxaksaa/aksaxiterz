@@ -490,18 +490,32 @@ test('license actions and download launch feedback use the themed motion states'
     await expect(downloadLink.locator('[data-download-resource-label]')).toHaveText('Download link opened');
 });
 
-test('cart removal commits and Undo restores the original package quantity', async ({ page }) => {
+test('cart quantity updates survive removal and slow Undo without losing the row', async ({ page }) => {
     let removeRequests = 0;
     let restoreRequests = 0;
+    let releaseQuantity;
+    const quantityGate = new Promise(resolve => { releaseQuantity = resolve; });
+    let releaseRestore;
+    const restoreGate = new Promise(resolve => { releaseRestore = resolve; });
     await page.route('**/cart/items/123', async route => {
+        if (route.request().postData()?.includes('PATCH')) {
+            await quantityGate;
+            await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+                item: { quantity: 3, max_quantity: 5, line_total_idr: 60000, line_total_usdt: 3 },
+                cart: { distinct_items: 1, quantity: 3, subtotal_idr: 60000, subtotal_usdt: 3 },
+            }) });
+            return;
+        }
         removeRequests++;
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'Removed' }) });
     });
     await page.route('**/cart/items/product-slug', async route => {
         restoreRequests++;
+        expect(route.request().postData()).toMatch(/name="quantity"\r?\n\r?\n3/);
+        await restoreGate;
         await route.fulfill({
             contentType: 'application/json',
-            body: JSON.stringify({ cart_count: 2, item_id: 456 }),
+            body: JSON.stringify({ cart_count: 3, item_id: 456 }),
         });
     });
     await page.goto('/');
@@ -517,6 +531,12 @@ test('cart removal commits and Undo restores the original package quantity', asy
                     data-cart-package-id="44" data-cart-restore-url="/cart/items/product-slug">
                     <p class="font-semibold text-white">30 Days</p>
                     <span data-cart-line-total data-price-idr="40000" data-price-usd="2"></span>
+                    <form method="POST" action="/cart/items/123" data-cart-quantity-form>
+                        <input type="hidden" name="_method" value="PATCH">
+                        <span class="quantity-stepper-value">2</span>
+                        <button type="submit" name="quantity" value="1" data-cart-quantity-direction="down">Less</button>
+                        <button type="submit" name="quantity" value="3" data-cart-quantity-direction="up">More</button>
+                    </form>
                     <form method="POST" action="/cart/items/123" data-cart-remove-form>
                         <input type="hidden" name="_method" value="DELETE">
                         <button type="submit">Remove package</button>
@@ -528,6 +548,13 @@ test('cart removal commits and Undo restores the original package quantity', asy
     });
 
     const row = page.locator('[data-cart-product-group] .cart-package-row');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Remove package' })).toBeDisabled();
+    releaseQuantity();
+    await expect(row.locator('.quantity-stepper-value')).toHaveText('3');
+    await expect(row).toHaveAttribute('data-cart-item-quantity', '3');
+    await expect(page.locator('#cartBundleCount')).toHaveAttribute('data-cart-total-quantity', '3');
+    await page.clock.install();
     await page.getByRole('button', { name: 'Remove package' }).click();
     await expect(row).toHaveClass(/cart-item-removing/);
     await expect(page.locator('#cartBundleCount')).toHaveText('0 packages · 0 licenses');
@@ -535,14 +562,74 @@ test('cart removal commits and Undo restores the original package quantity', asy
     await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
     expect(removeRequests).toBe(1);
 
-    await page.getByRole('button', { name: 'Undo' }).click();
+    await page.clock.runFor(4500);
+    // The clock is paused while CSS animation stability cannot advance.
+    await page.getByRole('button', { name: 'Undo' }).dispatchEvent('click');
+    await expect.poll(() => restoreRequests).toBe(1);
+    await page.clock.runFor(1000);
+    await expect(row).toBeAttached();
+    releaseRestore();
+    await page.clock.resume();
     await expect(row).not.toHaveClass(/cart-item-removing/);
     await expect(row).toHaveClass(/cart-item-restored/);
     await expect(row).toHaveAttribute('data-cart-item', '456');
     await expect(row.locator('[data-cart-remove-form]')).toHaveAttribute('action', /\/cart\/items\/456$/);
-    await expect(page.locator('#cartBundleCount')).toHaveText('1 package · 2 licenses');
+    await expect(page.locator('#cartBundleCount')).toHaveText('1 package · 3 licenses');
     await expect(page.locator('[data-cart-group-count]')).toHaveText('1 package selected');
     expect(restoreRequests).toBe(1);
+});
+
+test('another removed row cannot reload the cart while Undo is pending', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('aksa_site_intro_seen_v1', 'true'));
+    let reloads = 0;
+    let restoring = false;
+    let releaseRestore;
+    const gate = new Promise(resolve => { releaseRestore = resolve; });
+    await page.route('**/cart', async route => {
+        reloads++;
+        await route.fulfill({ contentType: 'text/html', body: '<h1>Unexpected reload</h1>' });
+    });
+    await page.route('**/cart/items/*', async route => {
+        if (route.request().url().endsWith('/restore-b')) {
+            restoring = true;
+            await gate;
+            await route.fulfill({ json: { cart_count: 1, item_id: 789 } });
+        } else {
+            await route.fulfill({ json: { message: 'Removed' } });
+        }
+    });
+    await page.goto('/');
+    await page.clock.install();
+    await page.evaluate(() => {
+        history.replaceState({}, '', '/cart');
+        document.querySelector('main').innerHTML = `
+            <h2 id="cartBundleCount" data-cart-distinct-items="2" data-cart-total-quantity="2">2 packages · 2 licenses</h2>
+            <span data-cart-subtotal data-price-idr="20000" data-price-usd="2"></span>
+            ${['a', 'b'].map((id, index) => `<article data-cart-product-group>
+                <p data-cart-group-count>1 package selected</p>
+                <div data-cart-item="${index + 1}" data-cart-item-quantity="1"
+                    data-cart-package-id="44" data-cart-restore-url="/cart/items/restore-${id}">
+                    <p class="font-semibold text-white">Package ${id}</p>
+                    <span data-cart-line-total data-price-idr="10000" data-price-usd="1"></span>
+                    <form method="POST" action="/cart/items/${id}" data-cart-remove-form>
+                        <input name="_method" value="DELETE"><button type="submit">Remove ${id}</button>
+                    </form>
+                </div></article>`).join('')}`;
+    });
+    await page.locator('form[action$="/a"]').evaluate(form => form.requestSubmit());
+    await expect(page.locator('[data-cart-item="1"]')).toHaveAttribute('data-cart-removal-committed', 'true');
+    await page.clock.runFor(500);
+    await page.locator('form[action$="/b"]').evaluate(form => form.requestSubmit());
+    await expect(page.locator('[data-cart-item="2"]')).toHaveAttribute('data-cart-removal-committed', 'true');
+    await page.getByRole('button', { name: 'Undo' }).dispatchEvent('click');
+    await expect.poll(() => restoring).toBe(true);
+    await page.clock.runFor(5000);
+    expect(reloads).toBe(0);
+    await expect(page.locator('[data-cart-item="2"]')).toBeAttached();
+    releaseRestore();
+    await page.clock.resume();
+    await expect(page.locator('[data-cart-item="789"]')).toHaveClass(/cart-item-restored/);
+    await expect(page.locator('#cartBundleCount')).toHaveText('1 package · 1 license');
 });
 
 test('a server-confirmed checkout morphs into invoice ready before navigation', async ({ page }) => {

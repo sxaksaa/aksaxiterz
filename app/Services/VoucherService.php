@@ -225,7 +225,7 @@ class VoucherService
         }
 
         $activeOrders = $voucher->orders()
-            ->where('status', '!=', 'cancelled')
+            ->consumesVoucherQuota()
             ->when($excludeOrderId, fn ($query) => $query->whereKeyNot($excludeOrderId));
 
         if ($voucher->usage_limit !== null && (clone $activeOrders)->count() >= $voucher->usage_limit) {

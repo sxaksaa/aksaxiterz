@@ -49,7 +49,7 @@ use Laravel\Socialite\Two\InvalidStateException;
 $activePromoVoucher = function (?Product $product = null) {
     $vouchers = VoucherModel::query()
         ->withCount([
-            'orders as active_uses_count' => fn ($query) => $query->where('status', '!=', 'cancelled'),
+            'orders as active_uses_count' => fn ($query) => $query->consumesVoucherQuota(),
         ])
         ->where('is_active', true)
         ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
@@ -489,14 +489,26 @@ Route::middleware(['auth', 'admin', 'admin.activity'])
 |--------------------------------------------------------------------------
 */
 
-$isSafeLoginRedirect = function (Request $request, string $redirect): bool {
+$isSafeLoginRedirect = function (Request $request, mixed $redirect): bool {
+    if (! is_string($redirect) || $redirect === '' || strlen($redirect) > 2048 || preg_match('/[\x00-\x20\x7f\\\\]/', $redirect)) {
+        return false;
+    }
+
     if (str_starts_with($redirect, '/')) {
         return ! str_starts_with($redirect, '//');
     }
 
-    $redirectHost = parse_url($redirect, PHP_URL_HOST);
+    if (! filter_var($redirect, FILTER_VALIDATE_URL)) {
+        return false;
+    }
+    $parts = parse_url($redirect);
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
 
-    return $redirectHost && hash_equals($request->getHost(), $redirectHost);
+    return in_array($scheme, ['http', 'https'], true)
+        && ! isset($parts['user']) && ! isset($parts['pass'])
+        && $scheme === $request->getScheme()
+        && strtolower((string) ($parts['host'] ?? '')) === strtolower($request->getHost())
+        && (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80)) === $request->getPort();
 };
 
 Route::get('/auth/google', function (Request $request) use ($isSafeLoginRedirect) {

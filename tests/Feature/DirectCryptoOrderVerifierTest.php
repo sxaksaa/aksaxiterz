@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Voucher;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
@@ -321,6 +322,37 @@ class DirectCryptoOrderVerifierTest extends TestCase
             1,
             LicenseStock::where('reserved_order_id', $otherOrder->id)->count()
         );
+    }
+
+    public function test_recovery_deadline_is_rechecked_after_waiting_for_voucher_lock(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        config(['services.crypto_direct.recovery_hours' => 24]);
+        $voucher = Voucher::create(['code' => 'LOCK10', 'discount_percent' => 10,
+            'max_discount' => 10000, 'minimum_purchase' => 0, 'is_active' => true]);
+        $order = $this->directCryptoOrder(['status' => 'cancelled', 'voucher_id' => $voucher->id,
+            'expired_at' => now()->subHours(24)->addSecond()]);
+        $payment = Mockery::mock(PaymentService::class);
+        $payment->shouldReceive('inspectDirectCryptoPayment')->once()->andReturn([
+            'transfer' => ['tx_hash' => '0xdeadline', 'confirmed_at' => $order->expired_at,
+                'amount' => '1.100123', 'network' => 'usdtbsc'], 'mismatches' => [],
+        ]);
+        $waiting = true;
+        Voucher::retrieved(function (Voucher $locked) use ($voucher, &$waiting): void {
+            if ($waiting && $locked->id === $voucher->id) {
+                $waiting = false;
+                $this->travel(2)->seconds();
+            }
+        });
+        try {
+            $result = (new DirectCryptoOrderVerifier($payment, app(OrderFulfillmentService::class)))->verify($order);
+            $this->assertFalse($waiting, 'Settlement must take the same voucher lock as checkout.');
+            $this->assertSame('cancelled', $result['status']);
+            $this->assertNull($order->fresh()->payment_reference);
+            $this->assertDatabaseMissing('licenses', ['order_id' => $order->order_id]);
+        } finally {
+            $waiting = false;
+        }
     }
 
     private function directCryptoOrder(array $overrides = []): Order

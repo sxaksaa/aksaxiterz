@@ -4169,6 +4169,8 @@ document.addEventListener('submit', (event) => {
     }
 }, true);
 
+let pendingCartRestores = 0;
+
 function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDelta) {
     const bundleCount = document.getElementById('cartBundleCount');
     const subtotal = document.querySelector('[data-cart-subtotal]');
@@ -4221,6 +4223,7 @@ document.addEventListener('submit', async (event) => {
     if (!form || !row || event.defaultPrevented || form.dataset.cartRemovalPending === 'true') return;
 
     event.preventDefault();
+    if (row.querySelector('[data-cart-quantity-form]')?.dataset.cartUpdating === 'true') return;
     form.dataset.cartRemovalPending = 'true';
 
     const quantity = Math.max(1, Number(row.dataset.cartItemQuantity || 1));
@@ -4272,6 +4275,7 @@ document.addEventListener('submit', async (event) => {
         const bundleCount = document.getElementById('cartBundleCount');
         if (
             Number(bundleCount?.dataset.cartDistinctItems || 0) === 0 &&
+            pendingCartRestores === 0 &&
             window.location.pathname === '/cart'
         ) {
             window.location.reload();
@@ -4296,6 +4300,8 @@ document.addEventListener('submit', async (event) => {
             if (!restoreUrl || packageId <= 0 || row.dataset.cartRestoring === 'true') return;
 
             row.dataset.cartRestoring = 'true';
+            pendingCartRestores++;
+            window.clearTimeout(form._cartRemovalCleanupTimer);
             try {
                 const restoreBody = new FormData();
                 restoreBody.set('package_id', String(packageId));
@@ -4327,10 +4333,12 @@ document.addEventListener('submit', async (event) => {
                     variant: 'success',
                 });
             } catch (error) {
+                form._cartRemovalCleanupTimer = window.setTimeout(removeCommittedRow, 5100);
                 window.showAppToast?.('Undo failed', error.message || 'Add the package again from its product page.', {
                     variant: 'error',
                 });
             } finally {
+                pendingCartRestores--;
                 row.dataset.cartRestoring = 'false';
             }
         };
@@ -4365,6 +4373,9 @@ document.addEventListener('submit', async (event) => {
     const body = new FormData(form);
     body.set(submitter.name, submitter.value);
     form.dataset.cartUpdating = 'true';
+    const removeButtons = [...row.querySelectorAll('[data-cart-remove-form] button')];
+    const removeDisabled = removeButtons.map(button => button.disabled);
+    removeButtons.forEach(button => { button.disabled = true; });
     buttons.forEach(button => { button.disabled = true; });
     row.classList.add('cart-item-updating');
 
@@ -4384,6 +4395,7 @@ document.addEventListener('submit', async (event) => {
         const item = data.item || {};
         const cart = data.cart || {};
         const quantity = Number(item.quantity || 1);
+        row.dataset.cartItemQuantity = String(quantity);
         const maxQuantity = Number(item.max_quantity || quantity);
         const quantityOutput = form.querySelector('.quantity-stepper-value');
         window.animateAksaValue?.(quantityOutput, String(quantity));
@@ -4421,6 +4433,10 @@ document.addEventListener('submit', async (event) => {
         const distinctItems = Number(cart.distinct_items || 0);
         const totalQuantity = Number(cart.quantity || 0);
         const bundleCount = document.getElementById('cartBundleCount');
+        if (bundleCount) {
+            bundleCount.dataset.cartDistinctItems = String(distinctItems);
+            bundleCount.dataset.cartTotalQuantity = String(totalQuantity);
+        }
         window.animateAksaValue?.(
             bundleCount,
             `${distinctItems} ${distinctItems === 1 ? 'package' : 'packages'} · ${totalQuantity} ${totalQuantity === 1 ? 'license' : 'licenses'}`
@@ -4456,6 +4472,7 @@ document.addEventListener('submit', async (event) => {
             variant: 'error',
         });
     } finally {
+        removeButtons.forEach((button, index) => { button.disabled = removeDisabled[index]; });
         form.dataset.cartUpdating = 'false';
         row.classList.remove('cart-item-updating');
     }

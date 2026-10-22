@@ -78,6 +78,16 @@ class GopayWebhookService
                 $delayedRecovery = $orders->count() === 1;
             }
 
+            if ($orders->count() === 1) {
+                $candidate = $orders->first();
+                $candidate->lockVoucherForSettlement();
+                // The voucher lock may have waited for a quote across the recovery deadline.
+                $cutoff = now()->subHours(max(1, (int) config('services.gopay_qris.recovery_hours', 72)));
+                if ($candidate->expired_at && $candidate->expired_at->lt($cutoff)) {
+                    $orders = collect();
+                }
+            }
+
             if ($orders->count() !== 1) {
                 $status = $orders->isEmpty() ? 'unmatched' : 'ambiguous';
                 $stored->update(['status' => $status]);
