@@ -25,9 +25,10 @@ class OrderController extends Controller
             ->withCount('licenses')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = trim((string) $request->search);
-                $amount = $this->searchAmount($search);
+                $idrAmount = preg_match('/(?:usdt|usdc)\s*$/i', $search) ? null : $this->searchAmount($search);
+                $cryptoAmount = preg_match('/^\s*(?:rp|idr)/i', $search) ? null : $this->searchAmount($search, crypto: true);
 
-                $query->where(function ($query) use ($search, $amount) {
+                $query->where(function ($query) use ($search, $idrAmount, $cryptoAmount) {
                     $query->where('order_id', 'like', '%'.$search.'%')
                         ->orWhereHas('user', function ($userQuery) use ($search) {
                             $userQuery->where('name', 'like', '%'.$search.'%')
@@ -36,8 +37,15 @@ class OrderController extends Controller
                         ->orWhereHas('product', fn ($productQuery) => $productQuery->where('name', 'like', '%'.$search.'%'))
                         ->orWhereHas('items', fn ($itemQuery) => $itemQuery->where('product_name', 'like', '%'.$search.'%'));
 
-                    if ($amount !== null) {
-                        $query->orWhere('price', $amount);
+                    if ($idrAmount !== null) {
+                        $query->orWhere(fn ($amountQuery) => $amountQuery->where('price', $idrAmount)
+                            ->where(fn ($method) => $method->whereNull('payment_method')
+                                ->orWhereNotIn('payment_method', ['crypto', 'binance_pay'])));
+                    }
+
+                    if ($cryptoAmount !== null) {
+                        $query->orWhere(fn ($amountQuery) => $amountQuery->where('price', $cryptoAmount)
+                            ->whereIn('payment_method', ['crypto', 'binance_pay']));
                     }
                 });
             })
@@ -96,6 +104,10 @@ class OrderController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                if ($lockedOrder->status !== 'paid') {
+                    throw new \RuntimeException('Only paid orders can have their license delivery resynced.');
+                }
+
                 $this->orderFulfillmentService->fulfill($lockedOrder);
             });
         } catch (\Exception $e) {
@@ -116,7 +128,7 @@ class OrderController extends Controller
             );
     }
 
-    private function searchAmount(string $search): ?string
+    private function searchAmount(string $search, bool $crypto = false): ?string
     {
         $amount = preg_replace('/\s+/u', '', strtolower($search));
         $amount = preg_replace('/^(rp|idr)/', '', $amount);
@@ -128,6 +140,11 @@ class OrderController extends Controller
 
         if (preg_match('/^\d+$/', $amount) === 1) {
             return $amount;
+        }
+
+        // Crypto prices use decimal precision even when exactly three digits follow the separator.
+        if ($crypto && preg_match('/^\d+[.,]\d{1,6}$/', $amount) === 1) {
+            return str_replace(',', '.', $amount);
         }
 
         if (preg_match('/^\d{1,3}(?:[.,]\d{3})+$/', $amount) === 1) {

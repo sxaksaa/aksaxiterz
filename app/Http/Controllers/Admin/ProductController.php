@@ -107,7 +107,6 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $validated = $this->validateProduct($request, $product);
-        $slug = $this->uniqueSlug(null, $validated['name'], $product);
         $wasVisible = (bool) $product->is_visible;
         $isVisible = array_key_exists('is_visible', $validated)
             ? (bool) $validated['is_visible']
@@ -116,7 +115,6 @@ class ProductController extends Controller
         $product->update([
             'category_id' => $validated['category_id'],
             'name' => $validated['name'],
-            'slug' => $slug,
             'status' => $validated['status'],
             'is_visible' => $isVisible,
             'description' => $validated['description'],
@@ -159,7 +157,6 @@ class ProductController extends Controller
             $product->update([
                 ...$validated,
                 ...(array_key_exists('important_note', $note) ? ['important_note' => filled($note['important_note']) ? trim($note['important_note']) : null] : []),
-                'slug' => $this->uniqueSlug(null, $validated['name'], $product),
             ]);
 
             foreach ($prices['packages'] ?? [] as $price) {

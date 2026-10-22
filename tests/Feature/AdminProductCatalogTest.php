@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AdminProductCatalogTest extends TestCase
@@ -42,7 +43,7 @@ class AdminProductCatalogTest extends TestCase
 
         $response->assertRedirect(route('admin.products.edit', $product));
         $this->assertSame('Updated Product', $product->name);
-        $this->assertSame('updated-product', $product->slug);
+        $this->assertSame('test-product', $product->slug);
         $this->assertSame(Product::STATUS_UPDATING, $product->status);
 
         $response = $this->actingAs($admin)->patch(route('admin.packages.update', $package), [
@@ -335,6 +336,32 @@ class AdminProductCatalogTest extends TestCase
         $this->delete(route('admin.packages.destroy', ['package' => $package, ...$query]), ['from_catalog' => '1'])
             ->assertRedirect($catalog)->assertSessionHasErrors('package');
         $this->assertDatabaseHas('packages', ['id' => $package->id]);
+    }
+
+    public static function productUpdateRoutes(): array
+    {
+        return [['admin.products.update'], ['admin.products.quick-update']];
+    }
+
+    #[DataProvider('productUpdateRoutes')]
+    public function test_renaming_product_preserves_public_and_admin_links(string $route): void
+    {
+        [$admin, $product, , $category] = $this->makeCatalogProduct();
+        $publicUrl = route('products.show', $product);
+        $adminUrl = route('admin.products.edit', $product);
+        $updateUrl = route($route, $product);
+
+        foreach (['Renamed Product', 'Renamed Again'] as $name) {
+            $this->actingAs($admin)->patch($updateUrl, [
+                'category_id' => $category->id, 'name' => $name,
+                'description' => 'Updated product description.', 'status' => Product::STATUS_READY,
+            ])->assertSessionHasNoErrors();
+
+            $this->assertSame('test-product', $product->fresh()->slug);
+            $this->assertSame($name, $product->fresh()->name);
+            $this->get($publicUrl)->assertOk()->assertSee($name);
+            $this->get($adminUrl)->assertOk()->assertSee($name);
+        }
     }
 
     private function makeCatalogProduct(): array

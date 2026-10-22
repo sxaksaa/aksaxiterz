@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AdminOrderOperationsTest extends TestCase
@@ -217,6 +218,68 @@ class AdminOrderOperationsTest extends TestCase
             'license_key' => 'TEST-LICENSE-KEY',
             'is_sold' => false,
         ]);
+    }
+
+    public static function unpaidStatuses(): array
+    {
+        return [['pending'], ['cancelled']];
+    }
+
+    #[DataProvider('unpaidStatuses')]
+    public function test_resync_rejects_unpaid_orders_without_consuming_stock(string $status): void
+    {
+        [$admin, $order] = $this->makePendingOrder(['status' => $status]);
+
+        $this->actingAs($admin)->from(route('admin.orders.show', $order))
+            ->post(route('admin.orders.resync-license', $order))
+            ->assertRedirect(route('admin.orders.show', $order))->assertSessionHasErrors('order');
+
+        $this->assertSame($status, $order->fresh()->status);
+        $this->assertNull($order->fresh()->paid_at);
+        $this->assertSame(0, $order->licenses()->count());
+        $this->assertDatabaseHas('license_stocks', ['license_key' => 'TEST-LICENSE-KEY', 'is_sold' => false]);
+    }
+
+    public function test_resync_delivers_paid_orders_once_and_preserves_payment_date(): void
+    {
+        $paidAt = now()->subHour()->startOfSecond();
+        [$admin, $order] = $this->makePendingOrder(['status' => 'paid', 'paid_at' => $paidAt]);
+
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $this->actingAs($admin)->post(route('admin.orders.resync-license', $order))
+                ->assertRedirect(route('admin.orders.show', $order))->assertSessionHasNoErrors();
+        }
+
+        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertTrue($order->fresh()->paid_at->equalTo($paidAt));
+        $this->assertSame(1, $order->licenses()->count());
+        $this->assertDatabaseHas('license_stocks', ['license_key' => 'TEST-LICENSE-KEY', 'is_sold' => true]);
+    }
+
+    public static function amountSearches(): array
+    {
+        return [
+            ['1.234 USDT', 'crypto', '1.234', '1234'],
+            ['1,234 USDC', 'binance_pay', '1.234', '1234'],
+            ['1.234', 'crypto', '1.234', '1234'],
+            ['1,234', 'binance_pay', '1.234', '1234'],
+            ['3.05596 USDT', 'crypto', '3.05596', '305596'],
+            ['Rp 1.234', 'pakasir', '1234', '1.234'],
+            ['IDR 1,234', 'gopay_qris', '1234', '1.234'],
+        ];
+    }
+
+    #[DataProvider('amountSearches')]
+    public function test_amount_search_respects_decimal_precision(string $search, string $method, string $amount, string $otherAmount): void
+    {
+        [$admin, $order] = $this->makePendingOrder(['payment_method' => $method, 'price' => $amount]);
+        $other = $order->replicate();
+        $other->order_id = 'ORDER-AMOUNT-DECOY';
+        $other->price = $otherAmount;
+        $other->save();
+
+        $this->actingAs($admin)->get(route('admin.orders.index', ['search' => $search]))
+            ->assertOk()->assertSee($order->order_id)->assertDontSee($other->order_id);
     }
 
     private function makePendingOrder(array $orderOverrides = []): array
