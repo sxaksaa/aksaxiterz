@@ -10,6 +10,7 @@ use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\CartService;
+use App\Services\DirectCheckoutReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PDO;
 use Tests\TestCase;
@@ -113,9 +114,7 @@ class DisplayCurrencyPresentationTest extends TestCase
             ->assertSee('class="checkout-options-reveal-inner"', false)
             ->assertSee('id="checkoutCryptoNetworkOptions" class="checkout-network-reveal" aria-hidden="true" inert', false)
             ->assertSee('class="checkout-network-reveal-inner"', false)
-            ->assertSee("element.classList.toggle('is-open', visible)", false)
-            ->assertSee('Final payment is charged in IDR through QRIS.')
-            ->assertSee('Final payment uses ${String(paymentToken).toUpperCase()}')
+            ->assertSee('data-checkout-config=', false)
             ->assertDontSee('name="display_currency"', false);
 
         $this->assertDoesNotMatchRegularExpression(
@@ -137,6 +136,7 @@ class DisplayCurrencyPresentationTest extends TestCase
                 'payment_method' => 'gopay_qris',
                 'package_id' => $package->id,
                 'quantity' => 2,
+                'review_signature' => app(DirectCheckoutReview::class)->signature($user, $product, $package, 2),
                 'display_currency' => 'usd',
                 'currency' => 'USD',
                 'price' => 1,

@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
+use App\Models\Package;
 use App\Models\Product;
 use App\Services\BinancePayOrderVerifier;
 use App\Services\CartService;
 use App\Services\CheckoutLockService;
+use App\Services\DirectCheckoutReview;
 use App\Services\DirectCryptoOrderVerifier;
 use App\Services\PaymentService;
 use App\Services\PendingOrderExpirationService;
@@ -213,7 +215,27 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'payment_method' => ['required', Rule::in(['gopay_qris', 'crypto', 'binance_pay'])],
+            'package_id' => ['required', 'integer', 'exists:packages,id'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.CartService::MAX_TOTAL_QUANTITY],
+            'review_signature' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
         ]);
+
+        $package = Package::whereKey($validated['package_id'])
+            ->where('product_id', $product->id)->firstOrFail();
+        $quantity = (int) ($validated['quantity'] ?? 1);
+
+        if (! hash_equals($validated['review_signature'], app(DirectCheckoutReview::class)->signature(
+            $request->user(), $product, $package, $quantity
+        ))) {
+            $message = 'The product or price changed. Review the updated checkout before paying.';
+            $reviewUrl = route('checkout.product', ['product' => $product, 'package' => $package->id, 'quantity' => $quantity]);
+
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json(['message' => $message, 'review_url' => $reviewUrl], 409);
+            }
+
+            return redirect($reviewUrl)->withErrors(['checkout' => $message]);
+        }
 
         return match ($validated['payment_method']) {
             'gopay_qris' => $this->payGopayQris($request, $product->id),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Package;
 use App\Models\Product;
 use App\Services\CartService;
+use App\Services\DirectCheckoutReview;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -136,6 +137,9 @@ class CheckoutController extends Controller
             'package' => $package,
             'quantity' => $quantity,
             'cartSignature' => $cartSignature,
+            'reviewSignature' => $mode === 'direct'
+                ? app(DirectCheckoutReview::class)->signature(request()->user(), $product, $package, $quantity)
+                : null,
             'qrisAvailable' => (bool) config('services.gopay_qris.enabled'),
             'binancePayAvailable' => $binancePayAvailable,
             'stablecoinPricingAvailable' => $checkoutItems->every(

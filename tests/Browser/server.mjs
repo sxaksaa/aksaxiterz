@@ -49,6 +49,7 @@ function cleanup() {
 let server;
 try {
     runPhp(['artisan', 'migrate', '--seed', '--force', '--no-interaction'], { env });
+    runPhp(['tests/Browser/render-checkout.php', directory], { env });
     // Run directly so the process tracked by Playwright owns the actual server.
     server = spawn(phpBinary, ['-S', '127.0.0.1:8173', '../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php'], {
         cwd: resolve('public'), env, stdio: 'inherit',

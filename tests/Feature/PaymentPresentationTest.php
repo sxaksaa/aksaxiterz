@@ -270,7 +270,7 @@ class PaymentPresentationTest extends TestCase
 
     public function test_qris_renderer_preserves_scan_quiet_zone_and_order_redirect_copy(): void
     {
-        $javascript = file_get_contents(resource_path('js/app.js'));
+        $javascript = file_get_contents(resource_path('js/features/payments.js'));
 
         $this->assertIsString($javascript);
         $this->assertStringContainsString('margin: 20,', $javascript);

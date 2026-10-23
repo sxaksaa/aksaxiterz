@@ -10,6 +10,7 @@ use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\CartService;
+use App\Services\DirectCheckoutReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use PDO;
@@ -84,7 +85,7 @@ class DedicatedCheckoutFeatureTest extends TestCase
             ->assertSee('2 licenses')
             ->assertSee('Rp 40.000')
             ->assertSee('data-price-usd="2.5"', false)
-            ->assertSee('platform fee + unique amount')
+            ->assertSee('data-checkout-config=', false)
             ->assertSee('id="checkoutVoucherPanel"', false)
             ->assertSee('data-voucher-action', false)
             ->assertSee('action="'.route('checkout.product.process', $product).'"', false)
@@ -190,6 +191,7 @@ class DedicatedCheckoutFeatureTest extends TestCase
                 'payment_method' => 'gopay_qris',
                 'package_id' => $package->id,
                 'quantity' => 2,
+                'review_signature' => app(DirectCheckoutReview::class)->signature($user, $product, $package, 2),
             ])
             ->assertUnprocessable()
             ->assertJsonPath(
@@ -218,6 +220,7 @@ class DedicatedCheckoutFeatureTest extends TestCase
                 'payment_method' => 'gopay_qris',
                 'package_id' => $package->id,
                 'quantity' => 2,
+                'review_signature' => app(DirectCheckoutReview::class)->signature($user, $product, $package, 2),
             ])
             ->assertOk()
             ->assertJsonPath('method', 'gopay_qris')
@@ -619,6 +622,57 @@ class DedicatedCheckoutFeatureTest extends TestCase
         $this->assertDatabaseHas('order_items', [
             'product_name' => $product->fresh()->name, 'package_name' => $package->fresh()->name,
         ]);
+    }
+
+    public function test_direct_checkout_requires_an_authentic_review_before_creating_an_invoice(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Review Guard', 20000, 1.25, 3);
+        $this->enableGopayQris();
+        $this->actingAs($user);
+        $payload = ['payment_method' => 'gopay_qris', 'package_id' => $package->id, 'quantity' => 1];
+
+        foreach ([null, '', [], str_repeat('a', 63)] as $signature) {
+            $this->postJson(route('checkout.product.process', $product), $payload + ['review_signature' => $signature])
+                ->assertUnprocessable()->assertJsonValidationErrors('review_signature');
+        }
+
+        $this->postJson(route('checkout.product.process', $product), $payload + ['review_signature' => str_repeat('a', 64)])
+            ->assertConflict()->assertJsonStructure(['review_url']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(0, LicenseStock::whereNotNull('reserved_order_id')->count());
+    }
+
+    #[DataProvider('directReviewChanges')]
+    public function test_direct_checkout_requires_a_new_review_when_the_selection_changes(string $change): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Review Changes', 20000, 1.25, 3);
+        $this->enableGopayQris();
+        $this->actingAs($user);
+        $review = $this->get(route('checkout.product', ['product' => $product, 'package' => $package->id]))->assertOk();
+        $this->assertSame(1, preg_match('/name="review_signature" value="([a-f0-9]{64})"/', $review->getContent(), $signature));
+        $quantity = 1;
+        match ($change) {
+            'idr' => $package->update(['price' => 25000]),
+            'usd' => $package->update(['price_usdt' => 2]),
+            'package' => $package->update(['name' => '7 Days']),
+            'product' => $product->update(['name' => 'Updated Tool']),
+            'quantity' => $quantity = 2,
+        };
+        $payload = ['payment_method' => 'gopay_qris', 'package_id' => $package->id, 'quantity' => $quantity];
+        $response = $this->postJson(route('checkout.product.process', $product), $payload + ['review_signature' => $signature[1]])
+            ->assertConflict()->assertJsonStructure(['review_url']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(0, LicenseStock::whereNotNull('reserved_order_id')->count());
+
+        $updated = $this->get($response->json('review_url'))->assertOk();
+        $this->assertSame(1, preg_match('/name="review_signature" value="([a-f0-9]{64})"/', $updated->getContent(), $fresh));
+        $this->postJson(route('checkout.product.process', $product), $payload + ['review_signature' => $fresh[1]])->assertOk();
+        $this->assertSame((int) $package->fresh()->price * $quantity, (int) Order::firstOrFail()->payment_payload['base_amount']);
+    }
+
+    public static function directReviewChanges(): array
+    {
+        return array_map(fn ($value) => [$value], ['idr', 'usd', 'package', 'product', 'quantity']);
     }
 
     private function catalogItem(
