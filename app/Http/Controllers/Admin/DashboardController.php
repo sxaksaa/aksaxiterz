@@ -8,6 +8,7 @@ use App\Models\License;
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
+use App\Services\DashboardOrderReader;
 use App\Services\PendingOrderExpirationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -46,18 +47,12 @@ class DashboardController extends Controller
         $firstPaidDate = $firstPaidAt ? Carbon::parse($firstPaidAt, config('app.timezone')) : null;
 
         $rangeMeta = $this->rangeMeta($activeRange, $now, $firstPaidDate);
-        $filteredPaidOrders = $paidQuery
+        $paidQuery
             ->when($rangeMeta['from'], fn ($query, $from) => $query->where(function ($query) use ($from): void {
                 $query->where('paid_at', '>=', $from)
                     ->orWhere(fn ($fallback) => $fallback->whereNull('paid_at')->where('created_at', '>=', $from));
-            }))
-            ->with([
-                'items' => fn ($query) => $query->select('id', 'order_id', 'product_id', 'product_name', 'quantity', 'line_total_idr')->with('product:id,name'),
-                'product:id,name', 'package:id,price',
-            ])
-            ->select(['id', 'order_id', 'product_id', 'package_id', 'status', 'payment_method', 'price', 'quantity', 'paid_at', 'created_at'])
-            ->selectRaw('CASE WHEN payment_method IN (?, ?) THEN payment_payload ELSE NULL END AS payment_payload', ['crypto', 'binance_pay'])
-            ->get();
+            }));
+        $filteredPaidOrders = app(DashboardOrderReader::class)->read($paidQuery);
         $selectedStats = $this->periodStats($filteredPaidOrders);
         $salesTrend = $this->salesTrend($filteredPaidOrders, $activeRange, $rangeMeta['from'], $now, $firstPaidDate, $activePaymentMethod);
 
@@ -270,11 +265,11 @@ class DashboardController extends Controller
             'orders' => $orders->count(),
             'licenses' => $orderIds->isEmpty() ? 0 : License::whereIn('order_id', $orderIds)->count(),
             'idr_revenue' => (int) round($orders
-                ->reject(fn (Order $order) => $this->isCryptoOrder($order))
-                ->sum(fn (Order $order) => (float) ($order->price ?? 0))),
+                ->reject(fn (object $order) => $this->isCryptoOrder($order))
+                ->sum(fn (object $order) => (float) ($order->price ?? 0))),
             'crypto_revenue' => round((float) $orders
-                ->filter(fn (Order $order) => $this->isCryptoOrder($order))
-                ->sum(fn (Order $order) => $this->cryptoAmount($order)), 2),
+                ->filter(fn (object $order) => $this->isCryptoOrder($order))
+                ->sum(fn (object $order) => $this->cryptoAmount($order)), 2),
         ];
     }
 
@@ -340,18 +335,24 @@ class DashboardController extends Controller
         }
 
         foreach ($orders as $order) {
-            $date = $this->paidDate($order);
-
-            if (! $date) {
-                continue;
+            $timestamp = $order->paid_at ?: $order->created_at;
+            if ($bucketMode !== 'week' && is_string($timestamp) && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/D', $timestamp)) {
+                // SQL datetime values already use the application's timezone.
+                // Extract their bucket instead of allocating Carbon objects per sale.
+                $key = match ($bucketMode) {
+                    'hour' => substr($timestamp, 0, 10).'-'.substr($timestamp, 11, 2),
+                    'month' => substr($timestamp, 0, 7),
+                    default => substr($timestamp, 0, 10),
+                };
+            } else {
+                $date = $this->paidDate($order);
+                if (! $date) {
+                    continue;
+                }
+                $key = $bucketMode === 'week'
+                    ? $date->startOfWeek()->format($bucketFormat)
+                    : $date->format($bucketFormat);
             }
-
-            $key = match ($bucketMode) {
-                'hour' => $date->copy()->startOfHour()->format($bucketFormat),
-                'week' => $date->copy()->startOfWeek()->format($bucketFormat),
-                'month' => $date->copy()->startOfMonth()->format($bucketFormat),
-                default => $date->format($bucketFormat),
-            };
 
             if (! isset($buckets[$key])) {
                 continue;
@@ -407,20 +408,17 @@ class DashboardController extends Controller
 
     private function topProducts(Collection $orders): Collection
     {
-        return $orders
-            ->flatMap(function (Order $order) {
-                return $this->orderItems($order)->map(fn ($item) => [
-                    'product' => (string) ($item->product_name ?: $item->product?->name ?: $order->product?->name ?: 'Product'),
-                    'quantity' => max(1, (int) $item->quantity),
-                    'idr_total' => (int) ($item->line_total_idr ?? 0),
-                ]);
-            })
-            ->groupBy('product')
-            ->map(fn (Collection $rows, string $product) => [
-                'product' => $product,
-                'quantity' => (int) $rows->sum('quantity'),
-                'idr_total' => (int) $rows->sum('idr_total'),
-            ])
+        $products = [];
+        foreach ($orders as $order) {
+            foreach ($this->orderItems($order) as $item) {
+                $name = (string) ($item->product_name ?: $item->product?->name ?: $order->product?->name ?: 'Product');
+                $products[$name] ??= ['product' => $name, 'quantity' => 0, 'idr_total' => 0];
+                $products[$name]['quantity'] += max(1, (int) $item->quantity);
+                $products[$name]['idr_total'] += (int) ($item->line_total_idr ?? 0);
+            }
+        }
+
+        return collect($products)
             ->sortByDesc('quantity')
             ->take(5)
             ->values();
@@ -429,7 +427,7 @@ class DashboardController extends Controller
     private function paymentSplit(Collection $orders): Collection
     {
         return $orders
-            ->groupBy(fn (Order $order) => $this->paymentMethodLabel($order->payment_method))
+            ->groupBy(fn (object $order) => $this->paymentMethodLabel($order->payment_method))
             ->map(fn (Collection $orders, string $method) => [
                 'method' => $method,
                 'orders' => $orders->count(),
@@ -438,9 +436,9 @@ class DashboardController extends Controller
             ->values();
     }
 
-    private function orderItems(Order $order): Collection
+    private function orderItems(object $order): Collection
     {
-        if ($order->relationLoaded('items') && $order->items->isNotEmpty()) {
+        if ($order->items->isNotEmpty()) {
             return $order->items;
         }
 
@@ -477,11 +475,11 @@ class DashboardController extends Controller
             ->count();
     }
 
-    private function paidDate(Order $order)
+    private function paidDate(object $order)
     {
         $date = $order->paid_at ?: $order->created_at;
 
-        return $date?->copy()->timezone(config('app.timezone'));
+        return $date ? Carbon::parse($date, config('app.timezone')) : null;
     }
 
     private function timezoneLabel(): string
@@ -505,7 +503,7 @@ class DashboardController extends Controller
         return in_array($paymentMethod, ['crypto', 'binance_pay'], true) ? 'crypto' : 'idr';
     }
 
-    private function chartLineValue(Order $order, string $paymentMethod): float
+    private function chartLineValue(object $order, string $paymentMethod): float
     {
         if ($paymentMethod === 'all') {
             return (float) $this->orderIdrValue($order);
@@ -518,7 +516,7 @@ class DashboardController extends Controller
         return (float) ($order->price ?? 0);
     }
 
-    private function orderIdrValue(Order $order): int
+    private function orderIdrValue(object $order): int
     {
         $items = $this->orderItems($order);
 
@@ -529,12 +527,12 @@ class DashboardController extends Controller
         return $this->isCryptoOrder($order) ? 0 : (int) round((float) ($order->price ?? 0));
     }
 
-    private function isCryptoOrder(Order $order): bool
+    private function isCryptoOrder(object $order): bool
     {
         return in_array($order->payment_method, ['crypto', 'binance_pay'], true);
     }
 
-    private function cryptoAmount(Order $order): float
+    private function cryptoAmount(object $order): float
     {
         $payload = is_array($order->payment_payload) ? $order->payment_payload : [];
 

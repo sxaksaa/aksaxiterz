@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\GopayNotificationEvent;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
@@ -28,7 +29,7 @@ class AdminDashboardTest extends TestCase
         parent::setUp();
     }
 
-    public function test_daily_queries_only_hydrate_matching_paid_orders_with_legacy_date_fallback(): void
+    public function test_report_reads_matching_paid_orders_without_hydrating_models_and_keeps_legacy_date_fallback(): void
     {
         config(['admin.emails' => ['admin@example.com']]);
         $this->travelTo(Carbon::parse('2026-06-24 14:30:00'));
@@ -63,7 +64,7 @@ class AdminDashboardTest extends TestCase
             $capture = false;
         }
         sort($retrieved);
-        $this->assertSame(['ORDER-RECENT-LEGACY', 'ORDER-RECENT-PAID'], $retrieved);
+        $this->assertSame([], $retrieved);
 
         $this->actingAs($admin)->get(route('admin.dashboard', ['range' => 'lifetime', 'method' => 'pakasir']))
             ->assertOk()->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 4 && $stats['idr_revenue'] === 150000)
@@ -86,6 +87,51 @@ class AdminDashboardTest extends TestCase
         $this->assertStringContainsString('no-store', $fragment->headers->get('Cache-Control'));
         $this->assertSame($full->viewData('selectedStats'), $fragment->viewData('selectedStats'));
         $this->assertLessThan(strlen($full->getContent()), strlen($fragment->getContent()));
+    }
+
+    public function test_monthly_and_lifetime_keep_cart_snapshots_legacy_prices_and_crypto_fallback_amounts(): void
+    {
+        config(['admin.emails' => ['mixed-report@example.com']]);
+        $this->travelTo(Carbon::parse('2026-06-24 14:30:00'));
+        $admin = User::factory()->create(['email' => 'mixed-report@example.com']);
+        $category = Category::create(['name' => 'Mixed Report', 'slug' => 'mixed-report']);
+        $product = Product::create(['category_id' => $category->id, 'name' => 'Current Product', 'slug' => 'mixed-report', 'description' => 'Fixture']);
+        $package = Package::create(['product_id' => $product->id, 'name' => '30 Days', 'price' => 10000]);
+        $cart = Order::create([
+            'order_id' => 'ORDER-REPORT-CART', 'user_id' => $admin->id, 'product_id' => $product->id,
+            'package_id' => $package->id, 'status' => 'paid', 'payment_method' => 'crypto', 'price' => 2.51,
+            'quantity' => 3, 'payment_payload' => ['base_amount' => 'invalid', 'final_amount' => '2.500000'],
+            'paid_at' => Carbon::parse('2026-06-01 00:00:00'),
+        ]);
+        $otherPackage = Package::create(['product_id' => $product->id, 'name' => '7 Days', 'price' => 9000]);
+        foreach ([['Original Product', 2, 20000], ['', 1, 9000]] as $index => [$name, $quantity, $total]) {
+            OrderItem::create([
+                'order_id' => $cart->id, 'product_id' => $product->id, 'package_id' => $index === 0 ? $package->id : $otherPackage->id,
+                'product_name' => $name, 'package_name' => '30 Days', 'quantity' => $quantity,
+                'unit_price_idr' => 10000, 'line_total_idr' => $total,
+                'unit_price_usdt' => 1, 'line_total_usdt' => $quantity,
+            ]);
+        }
+        $legacy = Order::create([
+            'order_id' => 'ORDER-REPORT-LEGACY', 'user_id' => $admin->id, 'product_id' => $product->id,
+            'package_id' => $package->id, 'status' => 'paid', 'payment_method' => 'pakasir', 'price' => 15100, 'quantity' => 1,
+        ]);
+        $legacy->forceFill(['created_at' => Carbon::parse('2026-05-31 23:59:59'), 'paid_at' => null])->save();
+        $this->actingAs($admin);
+        foreach (['monthly', 'lifetime'] as $range) {
+            $response = $this->get(route('admin.dashboard', ['range' => $range]))->assertOk();
+            $this->assertSame(['orders' => 2, 'licenses' => 0, 'idr_revenue' => 15100, 'crypto_revenue' => 2.5], $response->viewData('selectedStats'));
+            $this->assertEquals(39000, $response->viewData('salesTrend')['points']->sum('line_revenue'));
+            $this->assertEquals(2, $response->viewData('salesTrend')['points']->sum('orders'));
+            $top = $response->viewData('topProducts')->keyBy('product');
+            $this->assertSame(20000, $top['Original Product']['idr_total']);
+            $this->assertSame(19000, $top['Current Product']['idr_total']);
+            $this->assertSame(2, $top['Current Product']['quantity']);
+            $this->assertSame(2, $response->viewData('paymentSplit')->sum('orders'));
+        }
+        $this->get(route('admin.dashboard', ['range' => 'monthly', 'method' => 'crypto']))
+            ->assertOk()->assertViewHas('selectedStats', fn ($stats) => $stats['orders'] === 1 && $stats['crypto_revenue'] === 2.5)
+            ->assertViewHas('salesTrend', fn ($trend) => $trend['points']->sum('line_revenue') === 2.5);
     }
 
     public function test_dashboard_fragment_performance_profile(): void
