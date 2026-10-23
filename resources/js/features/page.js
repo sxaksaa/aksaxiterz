@@ -1,4 +1,4 @@
-import { initializeCheckout } from './checkout.js';
+import { initializeOptionalFeatures } from './optional-features.js';
 import { initializeDisplayCurrency } from './currency.js';
 import { initializeRecentPurchaseToast } from './notifications.js';
 import { initializeCustomSelects, initializeLicenseResetSuccess } from './forms.js';
@@ -8,7 +8,7 @@ import { initializeSiteIntro } from './site-intro.js';
 
 function initializeGlobalPageEnhancements(root = document) {
     const siteIntroPlaying = root === document && initializeSiteIntro();
-    initializeCheckout(root);
+    void initializeOptionalFeatures(root).catch(() => { window.showAppToast?.('Checkout unavailable', 'Reload the page and try again.', { variant: 'error' }); });
     initializeDisplayCurrency(root);
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);

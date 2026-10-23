@@ -1,4 +1,4 @@
-import { initializeCheckout } from './checkout.js';
+import { initializeOptionalFeatures } from './optional-features.js';
 import { setButtonLabel } from './ui.js';
 import { initializeDisplayCurrency } from './currency.js';
 import { initializeRecentPurchaseToast } from './notifications.js';
@@ -755,8 +755,9 @@ async function softNavigate(url, options = {}) {
             restoreFallbackTimer = window.setTimeout(finishHistoryPositionRestore, 5000);
         }
 
+        await initializeOptionalFeatures(nextContent);
+        if (controller.signal.aborted || activeSoftNavigation !== controller) return;
         executeSoftPageScripts(nextPageScripts);
-        initializeCheckout(nextContent);
         initializeDisplayCurrency(document);
         initializeCustomSelects(nextContent);
         initializeRecentPurchaseToast(nextContent);

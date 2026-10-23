@@ -10,6 +10,8 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use PDO;
 use Tests\TestCase;
 
@@ -84,6 +86,46 @@ class AdminDashboardTest extends TestCase
         $this->assertStringContainsString('no-store', $fragment->headers->get('Cache-Control'));
         $this->assertSame($full->viewData('selectedStats'), $fragment->viewData('selectedStats'));
         $this->assertLessThan(strlen($full->getContent()), strlen($fragment->getContent()));
+    }
+
+    public function test_dashboard_fragment_performance_profile(): void
+    {
+        config(['admin.emails' => ['performance@example.com'], 'services.payments.traffic_cleanup_cache_store' => 'array']);
+        $admin = User::factory()->create(['email' => 'performance@example.com']);
+        $category = Category::create(['name' => 'Performance', 'slug' => 'performance']);
+        $product = Product::create(['category_id' => $category->id, 'name' => 'Performance', 'slug' => 'performance', 'description' => 'Fixture']);
+        $package = Package::create(['product_id' => $product->id, 'name' => '30 Days', 'price' => 20000]);
+        $now = now();
+        $rows = [];
+        for ($index = 0; $index < 500; $index++) {
+            $rows[] = [
+                'order_id' => 'ORDER-PERF-'.$index, 'user_id' => $admin->id,
+                'product_id' => $product->id, 'package_id' => $package->id,
+                'status' => $index < 50 ? 'pending' : 'paid', 'payment_method' => 'pakasir',
+                'price' => 20000, 'quantity' => 1, 'created_at' => $now, 'updated_at' => $now,
+                'paid_at' => $index < 50 ? null : $now, 'expired_at' => $now->copy()->subHour(),
+            ];
+        }
+        Order::insert($rows);
+        Cache::store('array')->put('orders:traffic-expiry-cleanup', true, 300);
+        $connection = DB::connection();
+        $connection->enableQueryLog();
+        try {
+            $response = $this->actingAs($admin)->withHeaders([
+                'X-Requested-With' => 'XMLHttpRequest', 'X-Aksa-Dashboard-Fragment' => '1',
+            ])->get(route('admin.dashboard', ['range' => 'lifetime']))->assertOk();
+            $queryCount = count($connection->getQueryLog());
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+        $response->assertHeader('Server-Timing');
+        $this->assertSame(450, $response->viewData('selectedStats')['orders']);
+        $this->assertSame(50, Order::where('status', 'pending')->count());
+        if ($path = getenv('AKSA_PERFORMANCE_REPORT')) {
+            file_put_contents($path, json_encode(['page' => 'dashboard-fragment', 'orders' => 500,
+                'queries' => $queryCount, 'timing' => $response->headers->get('Server-Timing')]).PHP_EOL, FILE_APPEND);
+        }
     }
 
     public function test_today_sales_trend_uses_hourly_buckets(): void

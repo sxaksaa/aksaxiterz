@@ -706,11 +706,11 @@
 
     @keyframes aksa-currency-price-out {
         from { opacity: 1; filter: blur(0); transform: translateY(0); }
-        to { opacity: 0; filter: blur(2px); transform: translateY(-5px); }
+        to { opacity: 0; filter: var(--aksa-currency-moving-filter, blur(2px)); transform: translateY(-5px); }
     }
 
     @keyframes aksa-currency-price-in {
-        from { opacity: 0; filter: blur(2px); transform: translateY(7px); }
+        from { opacity: 0; filter: var(--aksa-currency-moving-filter, blur(2px)); transform: translateY(7px); }
         to { opacity: 1; filter: blur(0); transform: translateY(0); }
     }
 
@@ -7235,6 +7235,7 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
         --aksa-home-reveal-start-filter: none;
         --aksa-home-reveal-end-filter: none;
         --aksa-home-reveal-duration: 420ms;
+        --aksa-currency-moving-filter: none;
     }
 
     body {

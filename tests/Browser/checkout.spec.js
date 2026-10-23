@@ -7,6 +7,7 @@ async function openCheckout(page, testInfo) {
     await page.route('**/checkout-review-fixture', r => r.fulfill({ contentType: 'text/html', body: html }));
     await page.goto('/checkout-review-fixture');
     await page.waitForFunction(() => typeof window.aksaFetchWithCsrf === 'function');
+    await expect(page.locator('#checkoutForm')).toHaveAttribute('data-checkout-ready', 'true');
     await page.locator('input[name="payment_method"][value="gopay_qris"]').evaluate(el => el.click());
     await expect(page.locator('#checkoutSubmitButton')).toBeEnabled();
     await expect(page.locator('#checkoutTotal')).toContainText('platform fee + unique amount');

@@ -154,28 +154,26 @@ function clearDisplayCurrencyAnimation() {
         .forEach(switcher => switcher.classList.remove('is-currency-switching'));
 }
 
-function measureDisplayPriceWidth(element, text) {
-    const currentWidth = element.getBoundingClientRect().width;
-    const computed = window.getComputedStyle(element);
-    const measurement = document.createElement('span');
-
-    measurement.textContent = text;
-    Object.assign(measurement.style, {
-        position: 'fixed',
-        left: '-10000px',
-        top: '0',
-        visibility: 'hidden',
-        whiteSpace: 'nowrap',
-        font: computed.font,
-        fontFeatureSettings: computed.fontFeatureSettings,
-        fontKerning: computed.fontKerning,
-        letterSpacing: computed.letterSpacing,
+function measureDisplayPriceWidths(prices) {
+    const measurements = prices.map(({ element, nextText }) => {
+        const currentWidth = element.getBoundingClientRect().width;
+        const computed = window.getComputedStyle(element);
+        const probe = document.createElement('span');
+        probe.textContent = nextText;
+        Object.assign(probe.style, {
+            position: 'fixed', left: '-10000px', top: '0', visibility: 'hidden',
+            whiteSpace: 'nowrap', font: computed.font,
+            fontFeatureSettings: computed.fontFeatureSettings,
+            fontKerning: computed.fontKerning, letterSpacing: computed.letterSpacing,
+        });
+        return { currentWidth, probe };
     });
-    document.body.appendChild(measurement);
-    const nextWidth = measurement.getBoundingClientRect().width;
-    measurement.remove();
-
-    return Math.ceil(Math.max(currentWidth, nextWidth));
+    const probes = document.createElement('div');
+    measurements.forEach(({ probe }) => probes.appendChild(probe));
+    document.body.appendChild(probes);
+    const widths = measurements.map(({ currentWidth, probe }) => Math.ceil(Math.max(currentWidth, probe.getBoundingClientRect().width)));
+    probes.remove();
+    return widths;
 }
 
 function animateDisplayCurrencyChange(currency, onComplete) {
@@ -204,13 +202,14 @@ function animateDisplayCurrencyChange(currency, onComplete) {
     };
     let completionDelay = 0;
 
+    const widths = measureDisplayPriceWidths(prices);
     prices.forEach(({ element, nextText }, index) => {
         const stagger = Math.min(index, 6) * 45;
         const leaveAt = 110 + stagger;
         const enterAt = leaveAt + 170;
         const finishAt = enterAt + 340;
 
-        element.style.setProperty('--aksa-currency-price-width', `${measureDisplayPriceWidth(element, nextText)}px`);
+        element.style.setProperty('--aksa-currency-price-width', `${widths[index]}px`);
         element.classList.add('aksa-currency-price-waiting');
         element.dataset.currencySwapState = 'waiting';
 

@@ -1,4 +1,4 @@
-import { modalFocusableElements, activePaymentModal, closePaymentModal } from './payments.js';
+import { modalFocusableElements, activePaymentModal, closePaymentModal } from './payment-modal.js';
 import { usesMiniCartSheet, miniCartRoot, setMiniCartOpen, closeMiniCart, ensureMiniCartLoaded } from './cart.js';
 import { clearRecentPurchaseToast } from './notifications.js';
 import { closeOtherCustomSelects } from './forms.js';
@@ -121,9 +121,14 @@ export function registerEvents() {
         updateCategoryFilterGlider();
     }, { passive: true });
 
+    let scrollFrame = null;
     window.addEventListener('scroll', () => {
-        updateNavbarOnScroll();
-        scheduleCurrentHistoryPosition();
+        if (scrollFrame !== null) return;
+        scrollFrame = window.requestAnimationFrame(() => {
+            scrollFrame = null;
+            updateNavbarOnScroll();
+            scheduleCurrentHistoryPosition();
+        });
     }, { passive: true });
 
     document.addEventListener('click', (event) => {

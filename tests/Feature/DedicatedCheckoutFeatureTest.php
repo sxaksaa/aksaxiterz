@@ -675,6 +675,18 @@ class DedicatedCheckoutFeatureTest extends TestCase
         return array_map(fn ($value) => [$value], ['idr', 'usd', 'package', 'product', 'quantity']);
     }
 
+    public function test_checkout_response_exposes_timings_only_after_authentication(): void
+    {
+        [$user, $product, $package] = $this->catalogItem('Timing Review', 20000, 1.25, 1);
+        $url = route('checkout.product', ['product' => $product, 'package' => $package->id]);
+        $this->get($url)->assertRedirect()->assertHeaderMissing('Server-Timing');
+        $response = $this->actingAs($user)->get($url)->assertOk()->assertHeader('Server-Timing');
+        $this->assertMatchesRegularExpression('/^app;dur=\d+\.\d+, db;dur=\d+\.\d+$/', $response->headers->get('Server-Timing'));
+        if ($path = getenv('AKSA_PERFORMANCE_REPORT')) {
+            file_put_contents($path, json_encode(['page' => 'checkout-review', 'timing' => $response->headers->get('Server-Timing')]).PHP_EOL, FILE_APPEND);
+        }
+    }
+
     private function catalogItem(
         string $name,
         int $price,

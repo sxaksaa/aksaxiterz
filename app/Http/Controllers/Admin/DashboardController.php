@@ -22,7 +22,12 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $this->pendingOrderExpirationService->expire(limit: 500);
+        $fragment = $request->ajax() && $request->header('X-Aksa-Dashboard-Fragment') === '1';
+        // Filtering is read-only. Scheduled cleanup and the bounded traffic fallback
+        // handle expiry; opening the full dashboard still performs its existing pass.
+        if (! $fragment) {
+            $this->pendingOrderExpirationService->expire(limit: 500);
+        }
 
         $now = now();
         $rangeOptions = $this->rangeOptions();
@@ -133,8 +138,6 @@ class DashboardController extends Controller
         $paymentSplit = $this->paymentSplit($filteredPaidOrders);
 
         $lowStockPackages = $lowStockPackages->take(8)->values();
-
-        $fragment = $request->ajax() && $request->header('X-Aksa-Dashboard-Fragment') === '1';
 
         return response()->view($fragment ? 'admin.dashboard._fragment' : 'admin.dashboard.index', compact(
             'activeRange',

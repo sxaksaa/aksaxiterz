@@ -1,6 +1,6 @@
 import { initializeGlobalPageEnhancements } from './features/page.js';
 import { registerNotifications } from './features/notifications.js';
-import { registerPayments } from './features/payments.js';
+import { registerPaymentApi } from './features/payment-api.js';
 import { registerCart } from './features/cart.js';
 import { registerHttp } from './features/http.js';
 import { registerCurrency } from './features/currency.js';
@@ -13,7 +13,7 @@ import { registerOrders } from './features/orders.js';
 import { registerCatalog } from './features/catalog.js';
 
 registerNotifications();
-registerPayments();
+registerPaymentApi();
 registerCart();
 registerHttp();
 registerCurrency();
