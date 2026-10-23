@@ -43,8 +43,8 @@ I designed and implemented the full Laravel application, including:
 ## Tech Stack
 
 - Laravel 12
-- PHP 8.3 (production baseline; Composer resolves dependencies against 8.3)
-- Node.js 24.22 LTS / npm 11.19
+- PHP 8.5.12+ (production, local development, and CI)
+- Node.js 24.22.1 LTS / npm 12.2.1
 - Blade
 - Tailwind CSS 4 (Chrome 111+, Safari 16.4+, Firefox 128+)
 - Vite
@@ -102,7 +102,7 @@ Admins can access a protected management area to:
 
 PHP tests use in-memory SQLite and a temporary application key. Browser tests migrate and seed their own temporary SQLite database and storage directory, then remove them when the server exits. They do not require a local MySQL service or production credentials.
 
-The same checks and Composer/npm dependency audits run in GitHub Actions on PHP 8.3 and Node.js 24.22 LTS. Dependency lockfiles and the runtime version files are committed together.
+The same checks and Composer/npm dependency audits run in GitHub Actions on PHP 8.5 and Node.js 24.22.1 LTS. Dependency lockfiles and the runtime version files are committed together.
 
 ## Repository Status
 

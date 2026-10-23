@@ -1,5 +1,27 @@
 # Aksa Xiterz operations
 
+## Runtime baseline: 23 October 2026
+
+The application uses PHP 8.5.12+, Laravel 13, Node.js 24.22.1 LTS and npm 12.2.1.
+Composer and npm lockfiles record the tested versions, including PHPUnit 13 and
+Vite 8. The Vite browser target remains Chrome/Edge 107, Firefox 104 and Safari 16
+to preserve the previous build's browser support. Cache payloads are arrays,
+with object unserialization disabled; existing session and cookie settings remain.
+
+Windows project commands and VS Code use `C:/tools/php85/php.exe`. Laragon uses
+the PHP 8.5.12 TS build with Apache 2.4.69. Production uses the signed
+`ppa:ondrej/php` packages on Ubuntu 24.04, restricted via
+`/etc/apt/preferences.d/aksaxiterz-php85` to the selected PHP branch. Node.js stays
+on the latest available production LTS release; newer Current releases are not
+the production baseline. Nginx and MariaDB use current Ubuntu vendor packages.
+
+Nginx must point to `/run/php/php8.5-fpm.sock` and both CLI and FPM must use PHP
+8.5 before running the updated deploy script. The script checks these conditions
+before replacing application code. PHP 8.3 remains installed for rollback only.
+An application rollback to the pre-upgrade revision also requires the previous
+Composer vendor tree or reinstalling its lockfile. Keep runtime config and data
+backups outside the web root. Never downgrade PHP while Laravel 13 is serving.
+
 ## Storefront performance
 
 On phones below 640px, the homepage hero and package cards use a more compact

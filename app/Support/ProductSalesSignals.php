@@ -14,16 +14,16 @@ class ProductSalesSignals
             return $products;
         }
 
-        $allTime = Cache::remember(
+        $allTime = collect(Cache::remember(
             StorefrontCache::SALES_ALL_TIME,
             now()->addMinutes(5),
-            fn () => $this->paidQuantities()
-        );
-        $recent = Cache::remember(
+            fn () => $this->paidQuantities()->all()
+        ));
+        $recent = collect(Cache::remember(
             StorefrontCache::SALES_RECENT,
             now()->addMinutes(5),
-            fn () => $this->paidQuantities(now()->subDays(30))
-        );
+            fn () => $this->paidQuantities(now()->subDays(30))->all()
+        ));
         $topAllTimeId = $allTime->filter(fn ($quantity) => $quantity > 0)->keys()->first();
         $topRecentId = $recent->filter(fn ($quantity) => $quantity > 0)->keys()->first();
 

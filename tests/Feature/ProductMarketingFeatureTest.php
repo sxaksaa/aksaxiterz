@@ -9,7 +9,9 @@ use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Voucher;
+use App\Support\StorefrontCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use PDO;
 use Tests\TestCase;
 
@@ -95,6 +97,24 @@ class ProductMarketingFeatureTest extends TestCase
             ->assertSee('legal-faq-accordion-panel', false)
             ->assertSee('Where will my license appear?')
             ->assertSee('What if the order is still pending?');
+    }
+
+    public function test_storefront_cache_round_trips_without_unserializing_objects(): void
+    {
+        [$product, $package] = $this->productWithPackage('Cached Sales', 'cached-sales', '7 Days');
+        $this->createPaidOrder($product, $package, ['quantity' => 3]);
+        config(['cache.default' => 'database', 'cache.serializable_classes' => false]);
+        Cache::purge('database');
+
+        // The second request must use persisted cache values, as production does.
+        for ($request = 0; $request < 2; $request++) {
+            $this->get('/')->assertOk()->assertSee('Best Seller')->assertSee('Cached Sales');
+            $this->get(route('products.show', $product))->assertOk()
+                ->assertViewHas('product', fn (Product $cachedProduct) => $cachedProduct->all_time_paid_quantity === 3);
+        }
+
+        $this->assertIsArray(Cache::get(StorefrontCache::SALES_ALL_TIME));
+        $this->assertIsArray(Cache::get(StorefrontCache::RECENT_PURCHASES_PREFIX.'all'));
     }
 
     private function productWithPackage(string $name, string $slug, string $packageName): array

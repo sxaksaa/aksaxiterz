@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: mbstring, pdo_sqlite, intl, zip
           coverage: none
       - uses: actions/setup-node@v7
@@ -23,6 +23,7 @@ jobs:
           cache: npm
       - run: cp .env.example .env
       - run: composer install --no-interaction --prefer-dist
+      - run: npm install --global npm@12.2.1
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: composer audit --locked

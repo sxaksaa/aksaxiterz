@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly EXPECTED_APP_DIR="/var/www/aksaxiterz"
 readonly DEPLOY_BRANCH="main"
-readonly PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
+readonly PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.5-fpm}"
 readonly WEB_SERVICE="${WEB_SERVICE:-nginx}"
 readonly VPS_BACKUP_SCRIPT="/usr/local/sbin/aksaxiterz-backup"
 readonly VPS_RESTORE_VERIFY_SCRIPT="/usr/local/sbin/aksaxiterz-verify-backup"
@@ -26,10 +26,13 @@ readonly APP_DIR
 [[ -f "${APP_DIR}/.env" ]] || fail "missing ${APP_DIR}/.env"
 [[ -x "${VPS_BACKUP_SCRIPT}" ]] || fail "missing executable VPS backup script: ${VPS_BACKUP_SCRIPT}"
 
-php -r 'exit(PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION === 3 ? 0 : 1);' \
-    || fail "PHP 8.3 is required for the production runtime"
-node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 24 && minor >= 22 ? 0 : 1)' \
-    || fail "Node.js 24.22+ LTS is required for asset builds"
+php -r 'exit(PHP_MAJOR_VERSION === 8 && PHP_MINOR_VERSION === 5 && version_compare(PHP_VERSION, "8.5.12", ">=") ? 0 : 1);' \
+    || fail "PHP 8.5.12+ is required for the production runtime"
+node -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); process.exit(major === 24 && (minor > 22 || (minor === 22 && patch >= 1)) ? 0 : 1)' \
+    || fail "Node.js 24.22.1+ LTS is required for asset builds"
+systemctl is-active --quiet "${PHP_FPM_SERVICE}" || fail "PHP 8.5 FPM service is not active"
+grep -Fq 'fastcgi_pass unix:/run/php/php8.5-fpm.sock;' "${NGINX_SITE_CONFIG}" \
+    || fail "Nginx must use the PHP 8.5 FPM socket before deploying"
 
 unexpected_env_file="$(find "${APP_DIR}" -maxdepth 1 -name '.env*' \
     ! -name '.env' ! -name '.env.example' -print -quit)"

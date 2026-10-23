@@ -17,11 +17,11 @@ class RecentPurchaseFeed
             $product ? 'product:'.$product->id : 'all'
         );
 
-        return Cache::remember(
+        return collect(Cache::remember(
             $cacheKey,
             now()->addMinute(),
-            fn () => $this->queryStorefront($product, $limit)
-        );
+            fn () => $this->queryStorefront($product, $limit)->all()
+        ));
     }
 
     private function queryStorefront(?Product $product, int $limit): Collection
