@@ -1938,19 +1938,12 @@ class PaymentService
         return $this->normalizeDecimalString($result);
     }
 
-    private function gatewayCurlOptions(): array
-    {
-        return [
-            CURLOPT_PROXY => '',
-            CURLOPT_NOPROXY => '*',
-        ];
-    }
-
     private function gatewayHttpOptions(): array
     {
+        // Guzzle manages proxy cURL options itself. An empty proxy explicitly
+        // disables environment proxies without passing conflicting CURLOPT_*.
         return [
             'proxy' => '',
-            'curl' => $this->gatewayCurlOptions(),
         ];
     }
 }

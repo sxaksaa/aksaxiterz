@@ -4,12 +4,40 @@ namespace Tests\Unit;
 
 use App\Models\Order;
 use App\Services\PaymentService;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\CurlHandler;
+use GuzzleHttp\HandlerStack;
 use Illuminate\Support\Facades\Http;
 use ReflectionMethod;
 use Tests\TestCase;
 
 class PaymentServiceTest extends TestCase
 {
+    public function test_gateway_options_reach_curl_transport_instead_of_failing_guzzle_validation(): void
+    {
+        if (! extension_loaded('curl')) {
+            $this->markTestSkipped('The production gateway uses cURL.');
+        }
+        $socket = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+        $this->assertIsResource($socket);
+        $address = stream_socket_get_name($socket, false);
+        fclose($socket);
+
+        $options = (new ReflectionMethod(PaymentService::class, 'gatewayHttpOptions'))->invoke(new PaymentService);
+        $this->assertSame('', $options['proxy']);
+        $options['connect_timeout'] = 0.5;
+        $options['timeout'] = 1;
+        $client = new Client([
+            'handler' => HandlerStack::create(new CurlHandler),
+        ]);
+
+        // A refused local connection proves that the real handler accepted the
+        // request options. Http::fake() bypasses that validation entirely.
+        $this->expectException(ConnectException::class);
+        $client->get('http://'.$address, $options);
+    }
+
     public function test_direct_crypto_amount_adds_small_unique_suffix(): void
     {
         config([
