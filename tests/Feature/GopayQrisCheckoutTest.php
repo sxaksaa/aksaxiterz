@@ -2,13 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\UnpaidInvoiceLimitException;
+use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\LicenseStock;
+use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\CartService;
+use App\Services\DirectCheckoutReview;
+use App\Services\OrderFulfillmentService;
 use App\Services\PaymentService;
 use App\Services\QrisPayloadService;
+use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use PDO;
@@ -222,6 +229,69 @@ class GopayQrisCheckoutTest extends TestCase
             ->assertJsonPath('status', 'paid')
             ->assertJsonPath('delivery_pending', true)
             ->assertJsonPath('message', 'Payment verified. Your license delivery is being prepared.');
+    }
+
+    public function test_unpaid_retries_are_bounded_without_closing_the_current_invoice_or_blocking_other_buyers(): void
+    {
+        config(['services.gopay_qris.max_unpaid_invoices' => 2, 'services.gopay_qris.unique_max' => 4]);
+        [$product, $package] = $this->catalogWithStock(2);
+        $user = User::factory()->create();
+        $first = app(PaymentService::class)->createGopayQrisPayment($user, $product->id, $package->id)['order'];
+        $heldKey = $first->payment_match_key;
+
+        $this->actingAs($user)->postJson('/pay-again/'.$first->id)->assertOk();
+        $current = Order::findOrFail($first->fresh()->replaced_by);
+        $this->postJson('/pay-again/'.$current->id)->assertStatus(429)
+            ->assertJsonPath('message', 'You have too many unpaid QRIS invoices. Continue an existing payment or contact support before creating another.');
+
+        $this->assertSame('pending', $current->fresh()->status);
+        $this->assertNull($current->fresh()->replaced_by);
+        $this->assertSame($heldKey, $first->fresh()->payment_match_key);
+        $this->assertSame(2, Order::where('user_id', $user->id)->count());
+        $this->assertSame(1, LicenseStock::where('reserved_order_id', $current->id)->count());
+        $other = app(PaymentService::class)->createGopayQrisPayment(User::factory()->create(), $product->id, $package->id)['order'];
+        $this->assertNotSame($current->payment_match_key, $other->payment_match_key);
+    }
+
+    public function test_direct_service_and_all_checkout_routes_share_the_retained_unpaid_budget(): void
+    {
+        config(['services.gopay_qris.max_unpaid_invoices' => 1]);
+        [$product, $package] = $this->catalogWithStock();
+        $user = User::factory()->create();
+        $held = app(PaymentService::class)->createGopayQrisPayment($user, $product->id, $package->id)['order'];
+        $this->actingAs($user)->postJson('/cancel-order/'.$held->id)->assertOk();
+        $this->postJson('/pay-gopay-qris/'.$product->id, ['package_id' => $package->id])->assertStatus(429);
+        $this->postJson(route('checkout.product.process', $product), [
+            'payment_method' => 'gopay_qris', 'package_id' => $package->id, 'quantity' => 1,
+            'review_signature' => app(DirectCheckoutReview::class)->signature($user, $product, $package, 1),
+        ])->assertStatus(429);
+        CartItem::create(['user_id' => $user->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
+        $cart = app(CartService::class);
+        $this->postJson(route('cart.checkout'), [
+            'payment_method' => 'gopay_qris', 'cart_signature' => $cart->signature($cart->items($user)),
+        ])->assertStatus(429);
+        $this->assertSame(1, Order::where('user_id', $user->id)->whereNotNull('payment_match_key')->count());
+        $this->assertSame(0, LicenseStock::whereNotNull('reserved_order_id')->count());
+        $this->expectException(UnpaidInvoiceLimitException::class);
+        app(PaymentService::class)->createGopayQrisPayment($user, $product->id, $package->id);
+    }
+
+    public function test_paid_and_quarantine_expired_invoices_do_not_use_the_unpaid_budget(): void
+    {
+        config(['services.gopay_qris.max_unpaid_invoices' => 1]);
+        [$product, $package] = $this->catalogWithStock(3);
+        $user = User::factory()->create();
+        $service = app(PaymentService::class);
+        $paid = $service->createGopayQrisPayment($user, $product->id, $package->id)['order'];
+        app(OrderFulfillmentService::class)->fulfill($paid);
+        $paidKey = $paid->fresh()->payment_match_key;
+        $expired = $service->createGopayQrisPayment($user, $product->id, $package->id)['order'];
+        $expired->update(['status' => 'cancelled', 'expired_at' => now()->subHours(169)]);
+        app(StockReservationService::class)->release($expired);
+        $next = $service->createGopayQrisPayment($user, $product->id, $package->id)['order'];
+        $this->assertNotNull($next->payment_match_key);
+        $this->assertSame($paidKey, $paid->fresh()->payment_match_key);
+        $this->assertNull($expired->fresh()->payment_match_key);
     }
 
     private function catalogWithStock(int $stockCount = 1): array

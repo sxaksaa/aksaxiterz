@@ -113,16 +113,14 @@ class BinancePayOrderVerifier
             return $summary;
         }
 
-        $orders = Order::query()
+        $eligible = Order::query()
             ->where('payment_method', 'binance_pay')
             ->whereIn('status', ['pending', 'cancelled'])
             ->where(function ($query): void {
                 $query->whereNull('expired_at')
                     ->orWhere('expired_at', '>', now()->subHours($this->recoveryHours()));
-            })
-            ->oldest()
-            ->limit(max(1, $limit))
-            ->get()
+            });
+        $orders = app(PaymentScanBatch::class)->next($eligible, 'binance_pay', $limit)
             ->filter(fn (Order $order) => $this->isBinancePayOrder($order))
             ->values();
 

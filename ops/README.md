@@ -129,6 +129,18 @@ Production includes a safe restore verifier. It validates the latest checksum, i
 
 ## Verification after deploy
 
+QRIS limits each customer to 20 retained unpaid invoices by default, including cancelled
+and replaced invoices. `GOPAY_QRIS_MAX_UNPAID_INVOICES` can lower this limit (maximum 50,
+also bounded below the configured unique-amount pool when possible). Paid invoices do
+not consume the customer budget. Existing amount quarantine and late-payment recovery
+remain in effect; cancelling another invoice does not immediately restore this budget.
+At the limit, continue an existing payment or reconcile it through support.
+
+Crypto and Binance scanners rotate through eligible order IDs using separate cursors
+in the shared Laravel cache. Progress is saved before provider calls, so failed calls
+and legacy payloads cannot pin the first batch. Keep the normal shared production cache
+configured; no additional cron job or database migration is required.
+
 Run these checks after every production deployment:
 
 ```text

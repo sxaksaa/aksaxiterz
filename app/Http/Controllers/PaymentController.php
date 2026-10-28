@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\UnpaidInvoiceLimitException;
 use App\Exceptions\VoucherException;
 use App\Models\License;
 use App\Models\Order;
@@ -101,6 +102,11 @@ class PaymentController extends Controller
                         ), 409);
                     }
                 }
+            }
+
+            if ($paymentMethod === 'gopay_qris') {
+                // A denied retry must leave the original invoice payable.
+                $this->paymentService->assertGopayInvoiceCapacity((int) $user->id);
             }
 
             if (! $this->cancelBeforeReplacement($oldOrder)) {
@@ -959,6 +965,8 @@ class PaymentController extends Controller
     {
         try {
             return $this->checkoutLockService->run($userId, $callback);
+        } catch (UnpaidInvoiceLimitException $error) {
+            return $this->paymentErrorResponse($request, $error);
         } catch (LockTimeoutException) {
             return $this->paymentErrorResponse(
                 $request,
@@ -997,6 +1005,17 @@ class PaymentController extends Controller
 
     private function paymentErrorResponse(Request $request, \Exception|string $error, int $status = 422)
     {
+        if ($error instanceof UnpaidInvoiceLimitException) {
+            if ($this->wantsPaymentJson($request)) {
+                return response()->json([
+                    'message' => $error->getMessage(),
+                    'redirect_url' => url('/orders'),
+                ], 429);
+            }
+
+            return back()->withErrors(['payment' => $error->getMessage()]);
+        }
+
         $message = $error instanceof \Exception ? $error->getMessage() : $error;
 
         if ($message === 'Direct crypto checkout is not configured') {

@@ -58,6 +58,7 @@ return [
         'recovery_hours' => $gopayRecoveryHours,
         'amount_quarantine_hours' => max(168, min(720, (int) env('GOPAY_QRIS_AMOUNT_QUARANTINE_HOURS', 168))),
         'unique_max' => (int) env('GOPAY_QRIS_UNIQUE_MAX', 999),
+        'max_unpaid_invoices' => (int) env('GOPAY_QRIS_MAX_UNPAID_INVOICES', 20),
         'webhook_token' => env('GOPAY_QRIS_WEBHOOK_TOKEN'),
         'webhook_secret' => env('GOPAY_QRIS_WEBHOOK_SECRET'),
         'allowed_devices' => array_values(array_filter(array_map(

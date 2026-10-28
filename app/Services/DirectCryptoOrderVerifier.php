@@ -102,6 +102,8 @@ class DirectCryptoOrderVerifier
             }
         }
 
+        $transactionLevel = DB::transactionLevel();
+
         try {
             $inspection = $this->paymentService->inspectDirectCryptoPayment($order);
             $transfer = $inspection['transfer'] ?? null;
@@ -213,8 +215,8 @@ class DirectCryptoOrderVerifier
 
             return $payload;
         } catch (\Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
+            if (DB::transactionLevel() > $transactionLevel) {
+                DB::rollBack($transactionLevel);
             }
 
             Log::warning('DIRECT CRYPTO VERIFY ERROR: '.$e->getMessage(), [
@@ -231,17 +233,15 @@ class DirectCryptoOrderVerifier
 
     public function scanPending(int $limit = 50): array
     {
-        $orders = Order::query()
+        $eligible = Order::query()
             ->where('payment_method', 'crypto')
             ->whereIn('status', ['pending', 'cancelled'])
             ->where('created_at', '>', now()->subHours($this->recoveryHours() + 2))
             ->where(function ($query): void {
                 $query->whereNull('expired_at')
                     ->orWhere('expired_at', '>', now()->subHours($this->recoveryHours()));
-            })
-            ->oldest()
-            ->limit(max(1, $limit))
-            ->get()
+            });
+        $orders = app(PaymentScanBatch::class)->next($eligible, 'crypto', $limit)
             ->filter(fn (Order $order) => $this->isDirectCryptoOrder($order));
 
         $summary = [

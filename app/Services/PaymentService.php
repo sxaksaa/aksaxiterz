@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\UnpaidInvoiceLimitException;
 use App\Models\LicenseStock;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -1133,10 +1135,48 @@ class PaymentService
         throw new \Exception('No unique Binance Pay amount is currently available');
     }
 
+    public function assertGopayInvoiceCapacity(int $userId, ?int $existingOrderId = null): void
+    {
+        $quarantineHours = max(168, (int) config('services.gopay_qris.amount_quarantine_hours', 168));
+        $uniqueMax = max(1, min(999, (int) config('services.gopay_qris.unique_max', 999)));
+        $limit = max(1, min(
+            50,
+            $uniqueMax - 1,
+            (int) config('services.gopay_qris.max_unpaid_invoices', 20)
+        ));
+        $count = Order::query()
+            ->where('user_id', $userId)
+            ->where('payment_method', 'gopay_qris')
+            ->where('status', '!=', 'paid')
+            ->whereNotNull('payment_match_key')->where('payment_match_key', '!=', '')
+            ->when($existingOrderId, fn ($query) => $query->whereKeyNot($existingOrderId))
+            ->where(function ($query) use ($quarantineHours): void {
+                $query->where('expired_at', '>', now()->subHours($quarantineHours))
+                    ->orWhere(fn ($missingExpiry) => $missingExpiry->whereNull('expired_at')
+                        ->where('created_at', '>', now()->subHours($quarantineHours + 1)));
+            })
+            ->count();
+
+        if ($count >= $limit) {
+            throw new UnpaidInvoiceLimitException;
+        }
+    }
+
     /**
      * @return array{platform_fee: int, unique_amount: int, total_amount: int}
      */
     private function claimGopayQrisAmount(Order $order, int $baseAmount): array
+    {
+        // Serialize the count and allocation across HTTP and direct service callers.
+        return DB::transaction(function () use ($order, $baseAmount): array {
+            User::whereKey($order->user_id)->lockForUpdate()->firstOrFail();
+            $this->assertGopayInvoiceCapacity((int) $order->user_id, (int) $order->id);
+
+            return $this->allocateGopayQrisAmount($order, $baseAmount);
+        });
+    }
+
+    private function allocateGopayQrisAmount(Order $order, int $baseAmount): array
     {
         if ($baseAmount < 1) {
             throw new \Exception('Invalid GoPay QRIS amount');
@@ -1185,10 +1225,11 @@ class PaymentService
             $matchKey = hash('sha256', implode('|', ['gopay_qris', $merchantReference, $amount]));
 
             try {
-                $order->update([
+                // A savepoint lets PostgreSQL recover from a candidate collision too.
+                DB::transaction(fn () => $order->update([
                     'price' => $amount,
                     'payment_match_key' => $matchKey,
-                ]);
+                ]));
 
                 return [
                     'platform_fee' => $platformFee,
