@@ -1,0 +1,7 @@
+Package: mariadb-* libmariadb* galera-4 mysql-common
+Pin: release o=MariaDB,n=noble
+Pin-Priority: 700
+
+Package: *
+Pin: release o=MariaDB
+Pin-Priority: 100

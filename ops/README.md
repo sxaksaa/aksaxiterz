@@ -13,7 +13,8 @@ the PHP 8.5.12 TS build with Apache 2.4.69. Production uses the signed
 `ppa:ondrej/php` packages on Ubuntu 24.04, restricted via
 `/etc/apt/preferences.d/aksaxiterz-php85` to the selected PHP branch. Node.js stays
 on the latest available production LTS release; newer Current releases are not
-the production baseline. Nginx and MariaDB use current Ubuntu vendor packages.
+the production baseline. Nginx uses Ubuntu vendor packages; MariaDB uses the
+official signed repository for the 10.11 LTS series described below.
 
 Windows security refresh on 29 October 2026: both the CLI NTS and Laragon TS
 PHP installations use the official `8.5.12-1` rebuild with Brotli 1.2.1.
@@ -31,6 +32,46 @@ backups outside the web root. Never downgrade PHP while Laravel 13 is serving.
 The backup root `/var/backups/aksaxiterz` is owned by root with mode 0700,
 including when older archives inside it have less restrictive file modes.
 Verify that `www-data` cannot traverse it after changes to backup handling.
+
+## SSH and database maintenance
+
+Verified on 29 October 2026: SSH accepts public-key authentication only, and
+MariaDB server/client/provider packages run 10.11.19. Password-only SSH was
+denied while a fresh key login succeeded. Database account/grant fingerprints
+and active server settings were preserved; all five compression providers and
+application health checks passed. A fresh backup restored successfully after
+the update, and the temporary restore database was removed.
+
+Install `aksaxiterz-sshd-hardening.conf` as
+`/etc/ssh/sshd_config.d/00-aksaxiterz-hardening.conf`. The early name is required
+because OpenSSH accepts the first value and cloud-init sets password login in
+`50-cloud-init.conf`. Root access uses the existing authorized SSH keys;
+password and keyboard-interactive login are disabled. Keep the current session
+open, arm a timed configuration rollback, validate with `sshd -t` and `sshd -T`,
+then reload `ssh.service`. Confirm a fresh key login and denial of password-only
+authentication before cancelling rollback. Do not remove authorized keys.
+
+MariaDB production updates stay within the 10.11 LTS series. The repository
+template `aksaxiterz-mariadb.sources` uses Ubuntu noble amd64 and a dedicated
+`Signed-By` keyring. Obtain the Community signing key from
+`https://mariadb.org/mariadb_release_signing_key.pgp` and verify its primary
+fingerprint is `177F4010FE56CA3336300305F1656F24C74CD1D8` before installing it
+as `/usr/share/keyrings/aksaxiterz-mariadb.gpg`. Install the sources template in
+`/etc/apt/sources.list.d/aksaxiterz-mariadb.sources` and the preferences template
+as `/etc/apt/preferences.d/aksaxiterz-mariadb`. Only the MariaDB package family,
+its client library, Galera and mysql-common receive the higher priority.
+
+Before updating, verify a fresh logical backup can restore, preserve system
+accounts and configuration, and save a cold datadir snapshot plus old packages
+inside the protected backup root. Review an APT simulation and require a 10.11
+server candidate, all installed compression providers, and no package removals.
+Use a brief application maintenance window, pause scheduling and allow running
+scheduled jobs to finish before stopping MariaDB for its snapshot. Preserve
+locally modified configuration during installation. Verify root socket login,
+application database access, account/grant fingerprints, compression providers,
+loopback binding, `mariadb-upgrade`, and backup restoration before completion.
+Keep a failed upgrade in maintenance; do not restart an old binary on upgraded
+data or restore a pre-upgrade snapshot over newer live writes.
 
 ## Storefront performance
 

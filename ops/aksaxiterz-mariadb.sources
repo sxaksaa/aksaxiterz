@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://mirror.mariadb.org/repo/10.11/ubuntu
+Suites: noble
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/aksaxiterz-mariadb.gpg
