@@ -42,7 +42,7 @@ I designed and implemented the full Laravel application, including:
 
 ## Tech Stack
 
-- Laravel 12
+- Laravel 13
 - PHP 8.5.12+ (production, local development, and CI)
 - Node.js 24.22.1 LTS / npm 12.2.1
 - Blade

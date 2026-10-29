@@ -15,12 +15,22 @@ the PHP 8.5.12 TS build with Apache 2.4.69. Production uses the signed
 on the latest available production LTS release; newer Current releases are not
 the production baseline. Nginx and MariaDB use current Ubuntu vendor packages.
 
+Windows security refresh on 29 October 2026: both the CLI NTS and Laragon TS
+PHP installations use the official `8.5.12-1` rebuild with Brotli 1.2.1.
+`php -v` still reports 8.5.12; check `curl_version()['brotli_version']` as well.
+Laragon 8.8.0 selects MySQL 9.7.4 LTS with its existing `mysql-9.7` data folder,
+Node.js 24.22.1 and Nginx 1.30.6. MySQL classic and X Protocol listeners bind
+to 127.0.0.1 for local development. Existing database directories are retained.
+
 Nginx must point to `/run/php/php8.5-fpm.sock` and both CLI and FPM must use PHP
 8.5 before running the updated deploy script. The script checks these conditions
 before replacing application code. PHP 8.3 remains installed for rollback only.
 An application rollback to the pre-upgrade revision also requires the previous
 Composer vendor tree or reinstalling its lockfile. Keep runtime config and data
 backups outside the web root. Never downgrade PHP while Laravel 13 is serving.
+The backup root `/var/backups/aksaxiterz` is owned by root with mode 0700,
+including when older archives inside it have less restrictive file modes.
+Verify that `www-data` cannot traverse it after changes to backup handling.
 
 ## Storefront performance
 
@@ -135,6 +145,14 @@ also bounded below the configured unique-amount pool when possible). Paid invoic
 not consume the customer budget. Existing amount quarantine and late-payment recovery
 remain in effect; cancelling another invoice does not immediately restore this budget.
 At the limit, continue an existing payment or reconcile it through support.
+
+Crypto and Binance Pay also limit each customer to 20 retained unpaid invoices
+per payment method, across all tokens/networks and checkout paths. Configure
+`CRYPTO_DIRECT_MAX_UNPAID_INVOICES` and `BINANCE_PAY_MAX_UNPAID_INVOICES` to lower
+the limit (maximum 50, also bounded below the configured amount pool when possible).
+Cancelled invoices count until their payment recovery window expires; paid
+invoices do not. A denied retry preserves the original invoice and reservation.
+Binance payment verification still runs before deciding whether to replace it.
 
 Crypto and Binance scanners rotate through eligible order IDs using separate cursors
 in the shared Laravel cache. Progress is saved before provider calls, so failed calls

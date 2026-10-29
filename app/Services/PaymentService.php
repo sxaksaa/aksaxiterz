@@ -1044,6 +1044,16 @@ class PaymentService
 
     private function claimDirectCryptoAmount(Order $order, array $network, string $coin, float $baseAmount): float
     {
+        return DB::transaction(function () use ($order, $network, $coin, $baseAmount): float {
+            User::whereKey($order->user_id)->lockForUpdate()->firstOrFail();
+            $this->assertUnpaidInvoiceCapacity((int) $order->user_id, 'crypto', (int) $order->id);
+
+            return $this->allocateDirectCryptoAmount($order, $network, $coin, $baseAmount);
+        });
+    }
+
+    private function allocateDirectCryptoAmount(Order $order, array $network, string $coin, float $baseAmount): float
+    {
         $recoveryHours = max(1, (int) config('services.crypto_direct.recovery_hours', 24));
 
         Order::where('payment_method', 'crypto')
@@ -1070,10 +1080,10 @@ class PaymentService
             $matchKey = $this->directCryptoMatchKey($network, $coin, $amount);
 
             try {
-                $order->update([
+                DB::transaction(fn () => $order->update([
                     'price' => $amount,
                     'payment_match_key' => $matchKey,
-                ]);
+                ]));
 
                 return $amount;
             } catch (QueryException $error) {
@@ -1087,6 +1097,16 @@ class PaymentService
     }
 
     private function claimBinancePayAmount(Order $order, float $baseAmount, string $token, string $payId): float
+    {
+        return DB::transaction(function () use ($order, $baseAmount, $token, $payId): float {
+            User::whereKey($order->user_id)->lockForUpdate()->firstOrFail();
+            $this->assertUnpaidInvoiceCapacity((int) $order->user_id, 'binance_pay', (int) $order->id);
+
+            return $this->allocateBinancePayAmount($order, $baseAmount, $token, $payId);
+        });
+    }
+
+    private function allocateBinancePayAmount(Order $order, float $baseAmount, string $token, string $payId): float
     {
         $recoveryHours = max(1, (int) config('services.binance.pay.recovery_hours', 24));
 
@@ -1119,10 +1139,10 @@ class PaymentService
             ]));
 
             try {
-                $order->update([
+                DB::transaction(fn () => $order->update([
                     'price' => $amount,
                     'payment_match_key' => $matchKey,
-                ]);
+                ]));
 
                 return $amount;
             } catch (QueryException $error) {
@@ -1133,6 +1153,56 @@ class PaymentService
         }
 
         throw new \Exception('No unique Binance Pay amount is currently available');
+    }
+
+    public function assertUnpaidInvoiceCapacity(int $userId, string $paymentMethod, ?int $existingOrderId = null): void
+    {
+        if ($paymentMethod === 'gopay_qris') {
+            $this->assertGopayInvoiceCapacity($userId, $existingOrderId);
+
+            return;
+        }
+
+        $config = match ($paymentMethod) {
+            'crypto' => 'services.crypto_direct',
+            'binance_pay' => 'services.binance.pay',
+            default => throw new \InvalidArgumentException('Unsupported invoice capacity method'),
+        };
+
+        // Reusing an already allocated row does not consume another pool slot,
+        // even when an operator lowers the budget below existing invoice counts.
+        if ($existingOrderId && Order::query()->whereKey($existingOrderId)
+            ->where('user_id', $userId)->where('payment_method', $paymentMethod)
+            ->where('status', 'pending')->whereNotNull('payment_match_key')
+            ->where('payment_match_key', '!=', '')->lockForUpdate()->first(['id'])) {
+            return;
+        }
+
+        $recoveryHours = max(1, (int) config($config.'.recovery_hours', 24));
+        $uniqueMax = max(1, min(9999, (int) config($config.'.unique_max', 9999)));
+        $limit = max(1, min(50, $uniqueMax - 1, (int) config($config.'.max_unpaid_invoices', 20)));
+        $count = Order::query()
+            ->where('user_id', $userId)
+            ->where('payment_method', $paymentMethod)
+            ->where('status', '!=', 'paid')
+            ->whereNotNull('payment_match_key')->where('payment_match_key', '!=', '')
+            ->when($existingOrderId, fn ($query) => $query->whereKeyNot($existingOrderId))
+            ->where(function ($retained) use ($recoveryHours): void {
+                // Pending/legacy keys remain allocated regardless of their age.
+                // Only cancelled keys eligible for the allocator's cleanup are free.
+                $retained->where('status', '!=', 'cancelled')
+                    ->orWhere('expired_at', '>', now()->subHours($recoveryHours))
+                    ->orWhere(fn ($missingExpiry) => $missingExpiry->whereNull('expired_at')
+                        ->where('created_at', '>', now()->subHours($recoveryHours + 1)));
+            })
+            ->limit($limit)
+            ->lockForUpdate()
+            ->get(['id'])
+            ->count();
+
+        if ($count >= $limit) {
+            throw new UnpaidInvoiceLimitException($paymentMethod);
+        }
     }
 
     public function assertGopayInvoiceCapacity(int $userId, ?int $existingOrderId = null): void

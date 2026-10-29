@@ -58,6 +58,7 @@ class PayAgainIsolationTest extends TestCase
         ]);
 
         $this->mock(PaymentService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('assertUnpaidInvoiceCapacity')->once()->passthru();
             $mock->shouldReceive('createCryptoPayment')
                 ->once()
                 ->andReturnUsing(fn ($user, $productId, $packageId, $coin, $order) => [
@@ -99,6 +100,7 @@ class PayAgainIsolationTest extends TestCase
                 ->andReturn(['status' => 'pending']);
         });
         $this->mock(PaymentService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('assertUnpaidInvoiceCapacity')->once()->passthru();
             $mock->shouldReceive('createBinancePayPayment')
                 ->once()
                 ->withArgs(fn ($user, $productId, $packageId, $order, $voucherCode, $quantity, $token): bool => (

@@ -8,6 +8,7 @@ use App\Models\License;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\BinancePayOrderVerifier;
 use App\Services\CartService;
 use App\Services\CheckoutLockService;
@@ -20,6 +21,7 @@ use App\Services\VoucherService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -104,108 +106,127 @@ class PaymentController extends Controller
                 }
             }
 
-            if ($paymentMethod === 'gopay_qris') {
-                // A denied retry must leave the original invoice payable.
-                $this->paymentService->assertGopayInvoiceCapacity((int) $user->id);
-            }
+            // Database-backed scanner locks must run outside the quota transaction.
+            if ($oldOrder->payment_method === 'binance_pay') {
+                $result = $this->binancePayOrderVerifier->verify($oldOrder);
+                $oldOrder->refresh();
 
-            if (! $this->cancelBeforeReplacement($oldOrder)) {
-                return $this->paymentErrorResponse(
-                    $request,
-                    'The previous payment could not be closed. Check its status before trying again.',
-                    409
-                );
-            }
-
-            $newOrder = Order::create([
-                'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
-                'user_id' => $user->id,
-                'product_id' => $oldOrder->product_id,
-                'package_id' => $oldOrder->package_id,
-                'quantity' => $oldOrder->quantity,
-                'voucher_id' => $oldOrder->voucher_id,
-                'status' => 'pending',
-                'payment_method' => $paymentMethod,
-                'price' => $oldOrder->price,
-                'expired_at' => now()->addMinutes(max(1, (int) match ($paymentMethod) {
-                    'crypto' => config('services.crypto_direct.expires_minutes', 10),
-                    'binance_pay' => config('services.binance.pay.expires_minutes', 10),
-                    default => config('services.gopay_qris.expires_minutes', 10),
-                })),
-            ]);
-
-            $oldOrder->update(['replaced_by' => $newOrder->id]);
-
-            try {
-                if ($newOrder->payment_method === 'gopay_qris') {
-                    $payment = $hasStoredItems
-                        ? $this->paymentService->createCartGopayQrisPayment($user, $retryItems, $newOrder)
-                        : $this->paymentService->createGopayQrisPayment(
-                            $user,
-                            $newOrder->product_id,
-                            $newOrder->package_id,
-                            $newOrder
-                        );
-
-                    return $this->checkoutSuccessResponse(
+                if (($result['status'] ?? null) === 'paid' || $oldOrder->status === 'paid') {
+                    return $this->paymentErrorResponse(
                         $request,
-                        $payment['order'],
-                        $this->gopayQrisCheckoutPayload($payment['order'])
+                        'The previous payment could not be closed. Check its status before trying again.',
+                        409
                     );
                 }
+            }
 
-                if ($newOrder->payment_method === 'binance_pay') {
+            return DB::transaction(function () use ($request, $user, $oldOrder, $paymentMethod, $hasStoredItems, $retryItems, $binancePayToken, $cryptoNetwork) {
+                // Share allocator serialization with direct service callers as well.
+                User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+                $oldOrder->refresh();
+
+                try {
+                    if (! $this->cancelBeforeReplacement($oldOrder, $paymentMethod)) {
+                        return $this->paymentErrorResponse(
+                            $request,
+                            'The previous payment could not be closed. Check its status before trying again.',
+                            409
+                        );
+                    }
+                } catch (UnpaidInvoiceLimitException $error) {
+                    return $this->paymentErrorResponse($request, $error);
+                }
+
+                $newOrder = Order::create([
+                    'order_id' => 'ORDER-'.strtoupper(Str::random(10)),
+                    'user_id' => $user->id,
+                    'product_id' => $oldOrder->product_id,
+                    'package_id' => $oldOrder->package_id,
+                    'quantity' => $oldOrder->quantity,
+                    'voucher_id' => $oldOrder->voucher_id,
+                    'status' => 'pending',
+                    'payment_method' => $paymentMethod,
+                    'price' => $oldOrder->price,
+                    'expired_at' => now()->addMinutes(max(1, (int) match ($paymentMethod) {
+                        'crypto' => config('services.crypto_direct.expires_minutes', 10),
+                        'binance_pay' => config('services.binance.pay.expires_minutes', 10),
+                        default => config('services.gopay_qris.expires_minutes', 10),
+                    })),
+                ]);
+
+                $oldOrder->update(['replaced_by' => $newOrder->id]);
+
+                try {
+                    if ($newOrder->payment_method === 'gopay_qris') {
+                        $payment = $hasStoredItems
+                            ? $this->paymentService->createCartGopayQrisPayment($user, $retryItems, $newOrder)
+                            : $this->paymentService->createGopayQrisPayment(
+                                $user,
+                                $newOrder->product_id,
+                                $newOrder->package_id,
+                                $newOrder
+                            );
+
+                        return $this->checkoutSuccessResponse(
+                            $request,
+                            $payment['order'],
+                            $this->gopayQrisCheckoutPayload($payment['order'])
+                        );
+                    }
+
+                    if ($newOrder->payment_method === 'binance_pay') {
+                        $payment = $hasStoredItems
+                            ? $this->paymentService->createCartBinancePayPayment(
+                                $user,
+                                $retryItems,
+                                $binancePayToken,
+                                $newOrder
+                            )
+                            : $this->paymentService->createBinancePayPayment(
+                                $user,
+                                $newOrder->product_id,
+                                $newOrder->package_id,
+                                $newOrder,
+                                null,
+                                (int) $newOrder->quantity,
+                                $binancePayToken
+                            );
+
+                        return $this->checkoutSuccessResponse(
+                            $request,
+                            $payment['order'],
+                            $this->binancePayCheckoutPayload($payment['order'])
+                        );
+                    }
+
                     $payment = $hasStoredItems
-                        ? $this->paymentService->createCartBinancePayPayment(
+                        ? $this->paymentService->createCartCryptoPayment(
                             $user,
                             $retryItems,
-                            $binancePayToken,
+                            $cryptoNetwork,
                             $newOrder
                         )
-                        : $this->paymentService->createBinancePayPayment(
+                        : $this->paymentService->createCryptoPayment(
                             $user,
                             $newOrder->product_id,
                             $newOrder->package_id,
-                            $newOrder,
-                            null,
-                            (int) $newOrder->quantity,
-                            $binancePayToken
+                            $cryptoNetwork,
+                            $newOrder
                         );
 
                     return $this->checkoutSuccessResponse(
                         $request,
                         $payment['order'],
-                        $this->binancePayCheckoutPayload($payment['order'])
+                        $this->cryptoCheckoutPayload($payment['order'])
                     );
+                } catch (\Exception $e) {
+                    $this->cancelPendingOrder($newOrder);
+
+                    Log::error('PAY AGAIN ERROR: '.$e->getMessage());
+
+                    return $this->paymentErrorResponse($request, $e);
                 }
-
-                $payment = $hasStoredItems
-                    ? $this->paymentService->createCartCryptoPayment(
-                        $user,
-                        $retryItems,
-                        $cryptoNetwork,
-                        $newOrder
-                    )
-                    : $this->paymentService->createCryptoPayment(
-                        $user,
-                        $newOrder->product_id,
-                        $newOrder->package_id,
-                        $cryptoNetwork,
-                        $newOrder
-                    );
-
-                return $this->checkoutSuccessResponse(
-                    $request,
-                    $payment['order'],
-                    $this->cryptoCheckoutPayload($payment['order'])
-                );
-            } catch (\Exception $e) {
-                $this->cancelPendingOrder($newOrder);
-
-                Log::error('PAY AGAIN ERROR: '.$e->getMessage());
-
-                return $this->paymentErrorResponse($request, $e);
-            }
+            });
         });
     }
 
@@ -869,15 +890,14 @@ class PaymentController extends Controller
         }
     }
 
-    private function cancelBeforeReplacement(Order $order): bool
+    private function cancelBeforeReplacement(Order $order, string $paymentMethod): bool
     {
-        if ($order->payment_method === 'binance_pay') {
-            $result = $this->binancePayOrderVerifier->verify($order);
-
-            if (($result['status'] ?? null) === 'paid') {
-                return false;
-            }
+        if ($order->status === 'paid') {
+            return false;
         }
+
+        // Deny excess retries before changing the original invoice.
+        $this->paymentService->assertUnpaidInvoiceCapacity((int) $order->user_id, $paymentMethod);
 
         return $this->cancelPendingOrder($order)->status === 'cancelled';
     }

@@ -86,6 +86,7 @@ return [
         'recovery_hours' => (int) env('CRYPTO_DIRECT_RECOVERY_HOURS', 24),
         'self_service_verify_minutes' => (int) env('CRYPTO_DIRECT_SELF_SERVICE_VERIFY_MINUTES', 60),
         'unique_max' => (int) env('CRYPTO_DIRECT_UNIQUE_MAX', 9999),
+        'max_unpaid_invoices' => (int) env('CRYPTO_DIRECT_MAX_UNPAID_INVOICES', 20),
         'networks' => [
             'usdtavaxc' => [
                 'token' => 'USDT',
@@ -170,6 +171,7 @@ return [
             'self_service_verify_minutes' => (int) env('BINANCE_PAY_SELF_SERVICE_VERIFY_MINUTES', 60),
             'scan_cooldown_seconds' => (int) env('BINANCE_PAY_SCAN_COOLDOWN_SECONDS', 20),
             'unique_max' => (int) env('BINANCE_PAY_UNIQUE_MAX', 9999),
+            'max_unpaid_invoices' => (int) env('BINANCE_PAY_MAX_UNPAID_INVOICES', 20),
             'api_key' => env('BINANCE_PAY_API_KEY') ?: env('BINANCE_API_KEY'),
             'api_secret' => env('BINANCE_PAY_API_SECRET') ?: env('BINANCE_API_SECRET'),
             'base_url' => env('BINANCE_API_URL', 'https://api.binance.com'),
