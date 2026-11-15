@@ -3,12 +3,6 @@
 @section('content')
     @php
         $stateKey = $paymentState['key'];
-        $statusClass = match ($stateKey) {
-            'paid' => 'status-pill-paid',
-            'pending' => 'status-pill-pending',
-            'expired' => 'status-pill-expired',
-            default => 'status-pill-cancelled',
-        };
         $usesStablecoin = in_array($payment['method'], ['crypto', 'binance_pay'], true);
         $token = $payment['token'] ?? 'USDT';
         $stablecoinAmount = function ($amount) use ($token): string {
@@ -25,18 +19,17 @@
                     <p class="account-eyebrow">Secure Checkout</p>
                     <h1 class="account-title">Payment Instruction</h1>
                     <p class="account-copy">
-                        Complete only this invoice using the exact payment details below.
+                        Review your invoice and payment details below.
                     </p>
                 </div>
 
                 <div class="flex flex-col items-start gap-2 md:items-end">
-                    <span class="status-pill {{ $statusClass }}">{{ $paymentState['label'] }}</span>
                     <span class="font-mono text-xs text-gray-400">{{ $orderSummary['order_id'] }}</span>
                 </div>
             </div>
         </section>
 
-        <div data-payment-status-banner class="mb-6 rounded-xl border px-4 py-3 text-sm {{ $stateKey === 'pending' ? 'payment-pending-panel' : '' }}
+        <div data-payment-status-banner role="status" aria-live="polite" aria-atomic="true" class="mb-6 rounded-xl border px-4 py-3 text-sm {{ $stateKey === 'pending' ? 'payment-pending-panel' : '' }}
             {{ $stateKey === 'paid' ? 'payment-status-verified-in' : '' }}
             {{ $stateKey === 'paid'
                 ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft'
@@ -60,13 +53,17 @@
             </div>
         </div>
 
-        <div data-client-expired-notice
-            class="mb-6 hidden rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-            This payment window has ended. The old QR code, address, or Pay ID has been hidden. Do not send a new payment.
-        </div>
-
         <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <section class="product-section fade-up">
+                @if ($paymentState['instruction_active'])
+                    <div data-client-closed-instructions class="hidden py-4">
+                        <h2 data-client-closed-heading class="text-xl font-semibold text-white">Payment instructions are closed</h2>
+                        <p data-client-closed-message class="mt-2 text-sm leading-6 text-gray-400">
+                            The old QR code, address, or Pay ID is hidden. If you already paid,
+                            check the payment status below or open Orders.
+                        </p>
+                    </div>
+                @endif
                 @if ($paymentState['is_paid'])
                     <div class="payment-confirmed-entrance flex flex-col items-center px-2 py-8 text-center">
                         <span class="payment-confirmed-mark inline-flex h-16 w-16 items-center justify-center rounded-full border" aria-hidden="true">
@@ -409,6 +406,7 @@
             if (!page) return;
 
             const context = {{ \Illuminate\Support\Js::from([
+                'state' => $stateKey,
                 'orderId' => $orderSummary['order_id'],
                 'method' => $payment['method'],
                 'syncUrl' => $paymentRoutes['sync'],
@@ -425,11 +423,29 @@
             let paymentCheckInFlight = false;
             let expiryHandled = false;
 
-            document.title = context.instructionActive
-                ? 'Waiting for Payment... | Aksa Xiterz'
-                : (@json($paymentState['is_paid'])
-                    ? 'Payment Verified \u2713 | Aksa Xiterz'
-                    : document.title);
+            const stateLabels = {
+                pending: 'Waiting for payment', paid: 'Payment verified',
+                expired: 'Payment window expired', cancelled: 'Checkout cancelled',
+                closed: 'Checkout closed',
+            };
+            document.title = `${stateLabels[context.state] || stateLabels.closed} | Aksa Xiterz`;
+
+            function updatePaymentStatus(state, message) {
+                const label = stateLabels[state] || stateLabels.closed;
+                page.dataset.paymentState = state;
+                document.title = `${label} | Aksa Xiterz`;
+                const banner = page.querySelector('[data-payment-status-banner]');
+                const output = page.querySelector('[data-payment-status-label]');
+                const description = page.querySelector('[data-payment-status-message]');
+                if (output) output.textContent = label;
+                if (description) description.textContent = message;
+                const colors = state === 'paid'
+                    ? 'border-aksa-accent-30 bg-aksa-accent-10 text-aksa-accent-soft payment-status-verified-in'
+                    : state === 'expired'
+                        ? 'border-red-400/40 bg-red-400/10 text-red-100'
+                        : 'border-amber-400/30 bg-amber-400/10 text-amber-100';
+                if (banner) banner.className = `mb-6 rounded-xl border px-4 py-3 text-sm ${colors}`;
+            }
 
             function toast(title, message, variant = 'info') {
                 window.showAppToast?.(title, message, { variant });
@@ -461,11 +477,14 @@
                 }
             }
 
-            function hideExpiredCredentials() {
-                if (expiryHandled) return;
-                expiryHandled = true;
+            function closePaymentInstructions(state, message) {
+                updatePaymentStatus(state, message);
                 page.querySelector('[data-payment-credentials]')?.classList.add('hidden');
-                page.querySelector('[data-client-expired-notice]')?.classList.remove('hidden');
+                page.querySelector('[data-client-closed-instructions]')?.classList.remove('hidden');
+                page.querySelector('[data-cancel-payment-form]')?.classList.add('hidden');
+                const check = page.querySelector('[data-check-payment]');
+                if (context.method === 'gopay_qris') check?.classList.add('hidden');
+                else setButtonLabel(check, 'Verify Sent Payment');
                 page.querySelectorAll('[data-copy-payment]').forEach(button => {
                     if (button.dataset.copyLabel !== 'Order ID') button.disabled = true;
                 });
@@ -483,7 +502,8 @@
                     if (difference <= 0) {
                         output.textContent = 'Expired';
                         output.classList.add('text-red-300');
-                        hideExpiredCredentials();
+                        expiryHandled = true;
+                        closePaymentInstructions('expired', 'Do not send a new payment using these expired instructions.');
                         if (countdownTimer) clearInterval(countdownTimer);
                         countdownTimer = null;
                         return;
@@ -499,7 +519,7 @@
                 };
 
                 update();
-                countdownTimer = setInterval(update, 1000);
+                if (!expiryHandled) countdownTimer = setInterval(update, 1000);
             }
 
             async function renderPaymentQr() {
@@ -556,36 +576,31 @@
 
             function handlePaymentResult(result, notifyPending = false) {
                 if (result?.status === 'paid') {
-                    document.title = 'Payment Verified \u2713 | Aksa Xiterz';
+                    if (countdownTimer) clearInterval(countdownTimer);
+                    if (statusPollTimer) clearInterval(statusPollTimer);
+                    closePaymentInstructions('paid', result.message || 'Your payment has been confirmed.');
+                    const heading = page.querySelector('[data-client-closed-heading]');
+                    const message = page.querySelector('[data-client-closed-message]');
+                    if (heading) heading.textContent = 'Payment confirmed';
+                    if (message) message.textContent = 'Opening your updated order details...';
+                    page.querySelector('[data-check-payment]')?.classList.add('hidden');
                     toast('Payment verified', result.message || 'Your payment has been confirmed.', 'success');
-                    const banner = page.querySelector('[data-payment-status-banner]');
-                    const total = page.querySelector('[data-invoice-total]');
-                    const label = page.querySelector('[data-payment-status-label]');
-                    const message = page.querySelector('[data-payment-status-message]');
-
-                    banner?.classList.add('payment-status-updating');
-                    total?.classList.add('invoice-total-verified');
-
-                    window.setTimeout(() => {
-                        if (label) label.textContent = 'Payment verified';
-                        if (message) message.textContent = result.message || 'Your payment has been confirmed.';
-                        banner?.classList.remove('payment-pending-panel');
-                        banner?.classList.remove('payment-status-updating');
-                        banner?.classList.add('payment-status-verified-in');
-                    }, 180);
 
                     window.setTimeout(() => window.location.reload(), 950);
                     return;
                 }
 
                 if (result?.status && result.status !== 'pending') {
+                    if (countdownTimer) clearInterval(countdownTimer);
+                    if (statusPollTimer) clearInterval(statusPollTimer);
+                    closePaymentInstructions(result.status, result.message || 'This payment window is closed. Do not send a new payment.');
                     toast('Checkout closed', result.message || 'This payment window is closed.', 'warning');
                     window.location.reload();
                     return;
                 }
 
                 if (notifyPending) {
-                    toast('Still waiting', result?.message || 'No matching payment has been found yet.', 'warning');
+                    toast(expiryHandled ? 'No payment found' : 'Still waiting', result?.message || 'No matching payment has been found yet.', 'warning');
                 }
             }
 
@@ -653,7 +668,7 @@
                 } finally {
                     paymentCheckInFlight = false;
                     button.disabled = false;
-                    setButtonLabel(button, originalLabel);
+                    setButtonLabel(button, expiryHandled ? 'Verify Sent Payment' : originalLabel);
                 }
             }, { signal: pageController.signal });
 

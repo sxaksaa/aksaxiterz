@@ -57,6 +57,12 @@ try {
     $paymentView = $app->make(PaymentInstructionController::class)
         ->show($paymentRequest, $order->order_id);
     file_put_contents($argv[1].'/payment.html', $paymentView->render());
+    foreach (['cancelled', 'expired', 'paid'] as $status) {
+        $order->update(['status' => $status]);
+        $view = $app->make(PaymentInstructionController::class)
+            ->show($paymentRequest, $order->order_id);
+        file_put_contents($argv[1].'/payment-'.$status.'.html', $view->render());
+    }
 
 } finally {
     DB::rollBack();
