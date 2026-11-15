@@ -18,6 +18,8 @@
         'check-circle' => '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>',
         'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
         'circle-dollar-sign' => '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
+        'circle-x' => '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+        'clock' => '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
         'copy' => '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
         'credit-card' => '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
         'download' => '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',

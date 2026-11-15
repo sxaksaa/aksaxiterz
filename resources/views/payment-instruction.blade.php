@@ -3,6 +3,11 @@
 @section('content')
     @php
         $stateKey = $paymentState['key'];
+        $paymentIcons = [
+            'pending' => 'shield-check', 'paid' => 'check-circle',
+            'expired' => 'clock', 'cancelled' => 'circle-x', 'closed' => 'circle-x',
+        ];
+        $paymentIcon = $paymentIcons[$stateKey] ?? $paymentIcons['closed'];
         $usesStablecoin = in_array($payment['method'], ['crypto', 'binance_pay'], true);
         $token = $payment['token'] ?? 'USDT';
         $stablecoinAmount = function ($amount) use ($token): string {
@@ -39,8 +44,9 @@
                         ? 'border-red-400/40 bg-red-400/10 text-red-100'
                         : 'border-amber-400/30 bg-amber-400/10 text-amber-100')) }}">
             <div class="flex items-start gap-3">
-                <x-ui.icon :name="$stateKey === 'paid' ? 'check-circle' : ($stateKey === 'pending' ? 'shield-check' : 'life-buoy')"
-                    class="mt-0.5 h-5 w-5 shrink-0" />
+                <span data-payment-icon data-payment-icon-name="{{ $paymentIcon }}" class="mt-0.5 h-5 w-5 shrink-0">
+                    <x-ui.icon :name="$paymentIcon" class="h-5 w-5" />
+                </span>
                 <div>
                     <p class="inline-flex items-center gap-2 font-semibold" data-payment-status-label>
                         @if ($stateKey === 'pending')
@@ -52,6 +58,12 @@
                 </div>
             </div>
         </div>
+
+        @foreach (array_unique($paymentIcons) as $iconName)
+            <template data-payment-icon-template="{{ $iconName }}">
+                <x-ui.icon :name="$iconName" class="h-5 w-5" />
+            </template>
+        @endforeach
 
         <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <section class="product-section fade-up">
@@ -266,8 +278,8 @@
                 @else
                     <div class="px-2 py-6">
                         <div class="flex items-start gap-4">
-                            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-200">
-                                <x-ui.icon name="life-buoy" class="h-5 w-5" />
+                            <span data-payment-icon data-payment-icon-name="{{ $paymentIcon }}" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-200">
+                                <x-ui.icon :name="$paymentIcon" class="h-5 w-5" />
                             </span>
                             <div>
                                 <h2 class="text-xl font-semibold text-white">Payment instructions are closed</h2>
@@ -407,6 +419,7 @@
 
             const context = {{ \Illuminate\Support\Js::from([
                 'state' => $stateKey,
+                'stateIcons' => $paymentIcons,
                 'orderId' => $orderSummary['order_id'],
                 'method' => $payment['method'],
                 'syncUrl' => $paymentRoutes['sync'],
@@ -433,6 +446,14 @@
             function updatePaymentStatus(state, message) {
                 const label = stateLabels[state] || stateLabels.closed;
                 page.dataset.paymentState = state;
+                const iconName = context.stateIcons[state] || context.stateIcons.closed;
+                const template = page.querySelector(`[data-payment-icon-template="${iconName}"]`);
+                if (template) {
+                    page.querySelectorAll('[data-payment-icon]').forEach(icon => {
+                        icon.replaceChildren(template.content.cloneNode(true));
+                        icon.dataset.paymentIconName = iconName;
+                    });
+                }
                 document.title = `${label} | Aksa Xiterz`;
                 const banner = page.querySelector('[data-payment-status-banner]');
                 const output = page.querySelector('[data-payment-status-label]');
