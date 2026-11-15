@@ -7,6 +7,63 @@ const MINI_CART_SHEET_BREAKPOINT = 768;
 const MINI_CART_SHEET_TRANSITION_DURATION = 420;
 
 let miniCartReturnTimer = null;
+let miniCartDrag = null;
+
+function resetMiniCartDrag() {
+    if (!miniCartDrag) return;
+    miniCartDrag.panel.style.removeProperty('transform');
+    miniCartDrag.panel.style.removeProperty('transition');
+    miniCartDrag = null;
+}
+
+function registerMiniCartSwipe() {
+    document.addEventListener('touchstart', event => {
+        resetMiniCartDrag();
+        const panel = event.target.closest('[data-mini-cart-panel]');
+        if (!usesMiniCartSheet() || !panel?.classList.contains('is-visible') ||
+            event.touches.length !== 1 || panel.scrollTop > 0 ||
+            event.target.closest('a, button, input, select, textarea')) return;
+        const touch = event.touches[0];
+        miniCartDrag = { panel, x: touch.clientX, y: touch.clientY, distance: 0, active: false };
+        clearTimeout(miniCartAutoCloseTimer);
+    }, { passive: true });
+
+    document.addEventListener('touchmove', event => {
+        if (!miniCartDrag) return;
+        if (event.touches.length !== 1 || !usesMiniCartSheet()) {
+            resetMiniCartDrag();
+            return;
+        }
+        const drag = miniCartDrag;
+        const dy = event.touches[0].clientY - drag.y;
+        const dx = Math.abs(event.touches[0].clientX - drag.x);
+        if (!drag.active) {
+            if (dy < -8 || dx > Math.max(8, dy)) {
+                resetMiniCartDrag();
+                return;
+            }
+            if (dy < 8) return;
+            drag.active = true;
+            drag.panel.style.transition = 'none';
+        }
+        if (event.cancelable) event.preventDefault();
+        drag.distance = Math.max(0, dy);
+        drag.panel.style.transform = `translateY(${drag.distance}px)`;
+    }, { passive: false });
+
+    document.addEventListener('touchend', event => {
+        if (!miniCartDrag) return;
+        const { active, distance, panel } = miniCartDrag;
+        if (active && event.cancelable) event.preventDefault();
+        if (active && distance >= Math.min(100, panel.offsetHeight * 0.25)) {
+            closeMiniCart();
+        } else {
+            resetMiniCartDrag();
+        }
+    }, { passive: false });
+    document.addEventListener('touchcancel', resetMiniCartDrag, { passive: true });
+    window.addEventListener('resize', resetMiniCartDrag, { passive: true });
+}
 
 function usesMiniCartSheet() {
     return window.innerWidth < MINI_CART_SHEET_BREAKPOINT;
@@ -44,6 +101,7 @@ function moveMiniCartOverlay(root, open) {
 }
 
 function setMiniCartOpen(open, { auto = false } = {}) {
+    resetMiniCartDrag();
     const root = miniCartRoot();
     const trigger = root?.querySelector('[data-mini-cart-trigger]');
 
@@ -165,6 +223,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
 export { usesMiniCartSheet, miniCartRoot, setMiniCartOpen, closeMiniCart, ensureMiniCartLoaded };
 
 export function registerCart() {
+    registerMiniCartSwipe();
     window.refreshAksaMiniCart = function(html, cartCount, options = {}) {
         const root = miniCartRoot();
         const panel = document.querySelector('[data-mini-cart-panel]');
