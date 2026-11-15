@@ -1,8 +1,10 @@
 <?php
 
 // CLI-only fixture renderer. The browser runner supplies an isolated SQLite database.
+use App\Http\Controllers\PaymentInstructionController;
 use App\Models\Category;
 use App\Models\LicenseStock;
+use App\Models\Order;
 use App\Models\Package;
 use App\Models\Product;
 use App\Models\User;
@@ -37,6 +39,25 @@ try {
         throw new RuntimeException('Could not render checkout fixture: '.$response->getStatusCode());
     }
     file_put_contents($argv[1].'/checkout.html', $response->getContent());
+
+    // Render the actual payment view; this order is rolled back with the fixture.
+    $order = Order::create([
+        'order_id' => 'ORDER-LAYOUT-FIXTURE', 'user_id' => $user->id,
+        'product_id' => $product->id, 'package_id' => $package->id,
+        'quantity' => 1, 'price' => 1.25, 'status' => 'pending',
+        'payment_method' => 'crypto', 'expired_at' => now()->addMinutes(10),
+        'payment_payload' => [
+            'type' => 'direct_crypto', 'token' => 'USDT', 'network' => 'usdtavaxc',
+            'network_label' => 'USDT Avalanche C-Chain (AVAXC)',
+            'address' => 'TEST-ADDRESS-NOT-FOR-PAYMENTS', 'amount' => '1.25',
+        ],
+    ]);
+    $paymentRequest = Request::create(route('orders.payment', $order->order_id));
+    $paymentRequest->setUserResolver(fn () => $user);
+    $paymentView = $app->make(PaymentInstructionController::class)
+        ->show($paymentRequest, $order->order_id);
+    file_put_contents($argv[1].'/payment.html', $paymentView->render());
+
 } finally {
     DB::rollBack();
 }

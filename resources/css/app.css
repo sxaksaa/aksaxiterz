@@ -156,21 +156,6 @@
         display: none;
     }
 
-    @media (max-width: 639px) {
-        .payment-instruction-header {
-            flex-wrap: nowrap;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .payment-instruction-header > div:first-child {
-            min-width: 0;
-        }
-
-        .payment-instruction-countdown {
-            width: 7.5rem;
-        }
-    }
 
     input[type="date"],
     input[type="datetime-local"],

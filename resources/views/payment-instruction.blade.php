@@ -101,7 +101,7 @@
                     </div>
                 @elseif ($paymentState['instruction_active'])
                     <div data-payment-credentials>
-                        <div class="payment-instruction-header mb-5 flex flex-wrap items-start justify-between gap-3">
+                        <div class="payment-instruction-header mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-normal text-aksa-accent">
                                     {{ $payment['method_label'] }}
@@ -116,13 +116,13 @@
                             </div>
 
                             @if ($paymentState['expires_at'])
-                                <div class="payment-instruction-countdown shrink-0 text-right">
+                                <div class="payment-instruction-countdown grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 sm:block sm:w-auto sm:shrink-0 sm:text-right">
                                     <p class="text-[11px] uppercase tracking-normal text-gray-500">Time remaining</p>
                                     <p data-payment-countdown
-                                        class="mt-1 font-mono text-sm font-semibold text-aksa-accent-soft">
+                                        class="font-mono text-sm font-semibold text-aksa-accent-soft sm:mt-1">
                                         Calculating...
                                     </p>
-                                    <p class="mt-1 text-[11px] text-gray-500">Status checks automatically every 15 seconds.</p>
+                                    <p class="col-span-2 mt-1 text-[11px] text-gray-500">Status checks automatically every 15 seconds.</p>
                                 </div>
                             @endif
                         </div>
