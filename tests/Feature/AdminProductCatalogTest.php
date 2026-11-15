@@ -246,7 +246,7 @@ class AdminProductCatalogTest extends TestCase
         $buyer = User::factory()->create();
         CartItem::create(['user_id' => $buyer->id, 'product_id' => $product->id, 'package_id' => $package->id, 'quantity' => 1]);
         $catalog = route('admin.products.index', ['search' => 'Test', 'visibility' => 'visible']);
-        $this->actingAs($admin)->get($catalog)->assertOk()->assertSee('data-catalog-edit-button', false)->assertSee('packages['.$package->id.'][price]', false);
+        $this->actingAs($admin)->get($catalog)->assertOk()->assertDontSee('data-catalog-edit-button', false)->assertSee('data-catalog-edit-form', false)->assertSee('packages['.$package->id.'][price]', false);
 
         $this->patch(route('admin.products.quick-update', ['product' => $product, 'search' => 'Test', 'visibility' => 'visible']), [
             'name' => $product->name,

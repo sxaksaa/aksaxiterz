@@ -177,14 +177,9 @@
         </div>
 
         <section class="space-y-4">
-            <div class="flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">Catalog Items</h2>
-                    <p class="mt-1 text-xs text-gray-500">Click a product name to manage it. Use Edit and Save to update its details.</p>
-                </div>
-                <span class="rounded-lg border border-aksa-accent-30 bg-aksa-accent-10 px-3 py-1 text-xs font-semibold text-aksa-accent">
-                    {{ $products->total() }} records
-                </span>
+            <div>
+                <h2 class="text-sm font-semibold text-white">Catalog Items</h2>
+                <p class="mt-1 text-xs text-gray-500">Open a product to edit its details and package prices.</p>
             </div>
             @forelse ($products as $product)
                 @include('admin.products.quick-edit')

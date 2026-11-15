@@ -19,7 +19,7 @@
             </div>
 
             <div class="home-proof-strip" data-home-reveal-item data-home-reveal-stage="proof">
-                <span>Over <strong data-home-count-up="2500">2500</strong> members</span>
+                <span>Over <strong data-home-count-up="2700">2700</strong> members</span>
                 <span><strong data-home-count-up="{{ $totalStock }}" data-total-ready-stock>{{ $totalStock }}</strong> Licenses in stock</span>
             </div>
         </div>

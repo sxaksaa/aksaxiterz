@@ -17,7 +17,7 @@
         @csrf
         @method('PATCH')
         <input type="hidden" name="quick_product_id" value="{{ $product->id }}">
-        <fieldset data-catalog-fields class="space-y-4" @disabled(! $editing)>
+        <fieldset data-catalog-fields class="space-y-4">
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <label class="block text-xs text-gray-400">Product name
                     <input name="name" value="{{ $value('name', $product->name) }}" required maxlength="120" class="search-bar mt-2 w-full">
@@ -89,7 +89,7 @@
             </details>
         </fieldset>
         <div>
-            <button type="button" data-catalog-edit-button class="btn-footer">{{ $editing ? 'Save' : 'Edit' }}</button>
+            <button type="submit" class="btn-footer">Save</button>
         </div>
     </form>
     @foreach ($product->packages as $package)

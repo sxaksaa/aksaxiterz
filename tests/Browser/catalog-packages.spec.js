@@ -12,6 +12,28 @@ async function openCatalog(page, testInfo) {
     return product;
 }
 
+test('product fields edit immediately and save folded package values', async ({ page }, testInfo) => {
+    const product = await openCatalog(page, testInfo);
+    await expect(page.getByText(/\d+ records/, { exact: true })).toHaveCount(0);
+    await expect(product.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+    const name = product.locator('input[name="name"]');
+    await expect(name).toBeEnabled();
+    await name.fill('Updated immediately');
+    await expect(product.locator('[data-package-prices]')).toHaveJSProperty('open', false);
+    const form = product.locator('[data-catalog-edit-form]');
+    let submitted;
+    await page.route(await form.getAttribute('action'), route => {
+        submitted = new URLSearchParams(route.request().postData());
+        return route.fulfill({ contentType: 'text/html', body: '<h1>Saved</h1>' });
+    });
+    await product.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
+    expect(submitted.get('_method')).toBe('PATCH');
+    expect(submitted.get('name')).toBe('Updated immediately');
+    const packagePrice = [...submitted].find(([key]) => key.endsWith('[price]'));
+    expect(packagePrice?.[1]).toBe('20000');
+});
+
 test('package prices and add package start folded and open independently', async ({ page }, testInfo) => {
     const product = await openCatalog(page, testInfo);
     const prices = product.locator('[data-package-prices]');
@@ -23,6 +45,7 @@ test('package prices and add package start folded and open independently', async
     await prices.locator(':scope > summary').press('Enter');
     await expect(prices).toHaveJSProperty('open', true);
     await expect(prices.locator('input[type="number"]').first()).toBeVisible();
+    await expect(prices.locator('input[type="number"]').first()).toBeEnabled();
     await add.locator(':scope > summary').click();
     await expect(add).toHaveJSProperty('open', true);
     await prices.locator(':scope > summary').click();
@@ -36,7 +59,7 @@ test('package prices and add package start folded and open independently', async
 
 test('saving a collapsed invalid package reveals and focuses its input', async ({ page }, testInfo) => {
     const product = await openCatalog(page, testInfo);
-    await product.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(product.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
     const prices = product.locator('[data-package-prices]');
     await prices.locator(':scope > summary').click();
     const input = prices.locator('input[name$="[price]"]');

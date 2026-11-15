@@ -156,7 +156,7 @@ test('touch counters wait for the home entrance and toast keeps its controls', a
     });
     await page.goto('/?toast-motion=1');
     const touchRendering = await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
-    await expect(page.locator('[data-home-count-up="2500"]')).toHaveAttribute('data-home-count-up-state', 'complete', { timeout: 8000 });
+    await expect(page.locator('[data-home-count-up="2700"]')).toHaveAttribute('data-home-count-up-state', 'complete', { timeout: 8000 });
     const overlap = await page.evaluate(() => window.__counterOverlap);
     expect(overlap.length).toBeGreaterThan(0);
     expect(overlap.every(value => value === !touchRendering)).toBe(true);
@@ -221,7 +221,7 @@ test('storefront recovers if application JavaScript fails to load', async ({ pag
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'recovered', { timeout: 7000 });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Search products' })).toBeVisible();
-    await expect(page.locator('[data-home-count-up="2500"]')).toHaveText('2500');
+    await expect(page.locator('[data-home-count-up="2700"]')).toHaveText('2700');
     expect(await page.locator('h1').evaluate(el => getComputedStyle(el).opacity)).toBe('1');
     await expect(page.locator('#mobileMenu')).toHaveAttribute('inert', '');
 });
@@ -368,7 +368,7 @@ test('branded intro plays once per tab session and releases the storefront', asy
     expect(revealSequence.cardDelays).toEqual([1.11, 1.22, 1.33, 1.44]);
     expect(revealSequence.recentPurchaseHidden).toBe(true);
 
-    const deliveredCounter = page.locator('[data-home-count-up="2500"]');
+    const deliveredCounter = page.locator('[data-home-count-up="2700"]');
     await expect.poll(() => page.evaluate(() => window.__homeCounterStates.includes('running'))).toBe(true);
 
     await expect(page.locator('html')).toHaveAttribute('data-aksa-intro-state', 'complete', {
@@ -378,7 +378,7 @@ test('branded intro plays once per tab session and releases the storefront', asy
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
     await expect(deliveredCounter).toHaveAttribute('data-home-count-up-state', 'complete');
-    await expect(deliveredCounter).toHaveText('2500');
+    await expect(deliveredCounter).toHaveText('2700');
 
     const releasedLayoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(releasedLayoutWidth).toBe(introOpeningState.layoutWidth);
@@ -398,7 +398,7 @@ test('branded intro skips motion when reduced motion is preferred', async ({ pag
     await expect(page.locator('#aksaSiteIntro')).toHaveCount(0);
     await expect(page.locator('.site-navbar-pill')).toBeVisible();
     await expect(page.locator('[data-aksa-page-content]')).toBeVisible();
-    await expect(page.locator('[data-home-count-up="2500"]')).toHaveText('2500');
+    await expect(page.locator('[data-home-count-up="2700"]')).toHaveText('2700');
 
     const reducedCurrencySwap = await page.evaluate(() => {
         window.setAksaDisplayCurrency('usd', { source: 'manual' });
