@@ -134,19 +134,28 @@
                         </span>
                         <x-ui.icon name="chevron-down" class="catalog-chevron h-4 w-4" />
                     </summary>
-                    <p class="mt-3 text-xs text-gray-400">{{ count($download->links ?: []) }} links</p>
-                    <form data-catalog-edit-form action="{{ route('admin.downloads.update', ['download' => $download, ...$downloadQuery]) }}" method="POST" class="mt-4 space-y-4">
+                    <form data-download-edit-form action="{{ route('admin.downloads.update', ['download' => $download, ...$downloadQuery]) }}" method="POST" class="mt-4 space-y-4">
                         @csrf
                         @method('PATCH')
                         <input type="hidden" name="edit_download_id" value="{{ $download->id }}">
-                        <fieldset data-catalog-fields class="grid gap-4" @disabled(! $editingDownload)>
+                        <fieldset class="grid gap-4">
                             <label class="block text-xs text-gray-400">Name
                                 <input name="name" value="{{ $editingDownload ? old('name', $download->name) : $download->name }}" class="search-bar mt-2 w-full" required maxlength="120">
                             </label>
-                            <label class="block text-xs text-gray-400">Download links
-                                <textarea name="links_text" rows="5" maxlength="20000" class="search-bar mt-2 w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $editingDownload ? old('links_text', $download->links_text) : $download->links_text }}</textarea>
-                                <span class="mt-2 block text-xs text-gray-500">One link per line: Label | URL. Leave empty for a card without links.</span>
-                            </label>
+                            <details data-download-links-editor class="rounded-2xl border border-[#27272A] px-4 py-3" @if ($editingDownload && $errors->has('links_text')) open @endif>
+                                <summary class="cursor-pointer text-xs font-semibold text-gray-300">Download links ({{ count($download->links ?: []) }})</summary>
+                                <label class="mt-3 block text-xs text-gray-400">Edit links
+                                    <textarea name="links_text" rows="4" maxlength="20000" class="search-bar mt-2 block w-full resize-y" placeholder="Setup | https://example.com/setup.zip">{{ $editingDownload ? old('links_text', $download->links_text) : $download->links_text }}</textarea>
+                                    <span class="mt-2 block text-xs text-gray-500">One per line: Label | URL. Leave empty for no links.</span>
+                                </label>
+                                @if (count($download->links ?: []) > 0)
+                                    <div class="mt-3 flex flex-wrap gap-3">
+                                        @foreach ($download->links as $link)
+                                            <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs text-aksa-accent-soft hover:text-white">{{ $link['label'] ?? 'Download' }}</a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </details>
                             <label class="block text-xs text-gray-400">Visibility
                                 <select name="is_visible" class="search-bar mt-2 w-full" required>
                                     <option value="1" @selected((string) ($editingDownload ? old('is_visible', $download->is_visible ? '1' : '0') : ($download->is_visible ? '1' : '0')) === '1')>Public</option>
@@ -155,13 +164,10 @@
                                 <span class="mt-2 block text-xs text-gray-500">Set to Hidden to remove this card from the public Downloads page.</span>
                             </label>
                         </fieldset>
-                        <button type="button" data-catalog-edit-button class="btn-footer">{{ $editingDownload ? 'Save' : 'Edit' }}</button>
+                        <button type="submit" class="btn-footer">Save</button>
                     </form>
                     <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#27272A] pt-4">
                         <div class="flex flex-wrap items-center gap-3">
-                            @foreach ($download->links ?: [] as $link)
-                                <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs text-aksa-accent-soft hover:text-white">{{ $link['label'] ?? 'Download' }}</a>
-                            @endforeach
                             @if (count($download->links ?: []) > 0)
                                 <button type="button" data-download-copy="{{ $download->id }}" data-copy-value="{{ collect($download->links)->pluck('url')->implode("\n") }}" data-copy-title="Download links copied" data-copy-message="The download URLs are ready to paste." class="order-action btn-press">
                                     <x-ui.icon name="copy" class="h-4 w-4" />

@@ -74,11 +74,25 @@ class AdminDownloadManagementTest extends TestCase
         $query = ['search' => 'Test', 'page' => 1];
         $catalog = route('admin.downloads.index', $query);
         $update = route('admin.downloads.update', ['download' => $download, ...$query]);
-        $this->actingAs($admin)->get($catalog)->assertOk()->assertSee('data-catalog-edit-button', false);
+        $response = $this->actingAs($admin)->get($catalog)->assertOk()
+            ->assertSee('data-download-edit-form', false)
+            ->assertSee('data-download-links-editor', false)
+            ->assertSee('>Save</button>', false)
+            ->assertDontSee('data-catalog-edit-button', false)
+            ->assertDontSee('data-catalog-fields', false);
+        $html = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $html->loadHTML($response->getContent());
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new \DOMXPath($html);
+        $this->assertSame(1, $xpath->query('//details[@data-download-links-editor and not(@open)]')->length);
+        $this->assertSame(0, $xpath->query('//form[@data-download-edit-form]//fieldset[@disabled]')->length);
         $this->from($catalog)->patch($update, [
             'edit_download_id' => $download->id, 'name' => 'Test changed', 'links_text' => 'Invalid URL',
         ])->assertRedirect($catalog)->assertSessionHasErrors('links_text')->assertSessionHasInput('edit_download_id', $download->id);
-        $this->get($catalog)->assertOk()->assertSee('Invalid URL')->assertSee('>Save</button>', false);
+        $this->get($catalog)->assertOk()->assertSee('Invalid URL')->assertSee('>Save</button>', false)
+            ->assertSee('data-download-links-editor', false);
         $this->assertSame('Test tool', $download->fresh()->name);
         $this->patch($update, [
             'edit_download_id' => $download->id, 'name' => 'Test changed', 'links_text' => 'Setup | https://example.com/setup.zip',
