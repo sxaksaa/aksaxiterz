@@ -1,3 +1,4 @@
+import { warmMiniCart } from './cart.js';
 import { initializeOptionalFeatures } from './optional-features.js';
 import { initializeDisplayCurrency } from './currency.js';
 import { initializeRecentPurchaseToast } from './notifications.js';
@@ -10,6 +11,7 @@ function initializeGlobalPageEnhancements(root = document) {
     const siteIntroPlaying = root === document && initializeSiteIntro();
     void initializeOptionalFeatures(root).catch(() => { window.showAppToast?.('Checkout unavailable', 'Reload the page and try again.', { variant: 'error' }); });
     initializeDisplayCurrency(root);
+    warmMiniCart();
     initializeCustomSelects(root);
     initializeRecentPurchaseToast(root);
     initializeDownloadAccordions(root);

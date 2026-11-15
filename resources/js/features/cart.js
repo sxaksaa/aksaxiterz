@@ -145,12 +145,39 @@ function closeMiniCart() {
     setMiniCartOpen(false);
 }
 
+const scheduledMiniCartWarmups = new WeakSet();
+
+function warmMiniCart() {
+    const root = miniCartRoot();
+    const connection = navigator.connection;
+    if (!root || scheduledMiniCartWarmups.has(root) || connection?.saveData ||
+        ['slow-2g', '2g'].includes(connection?.effectiveType)) return;
+    scheduledMiniCartWarmups.add(root);
+    const schedule = () => {
+        const load = () => {
+            if (!document.hidden && root === miniCartRoot()) void ensureMiniCartLoaded();
+        };
+        if (window.requestIdleCallback) window.requestIdleCallback(load, { timeout: 1500 });
+        else window.setTimeout(load, 300);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
+}
+
+function invalidateMiniCart(root) {
+    if (!root) return;
+    root.dataset.miniCartLoaded = 'false';
+    root.dataset.miniCartRevision = String(Number(root.dataset.miniCartRevision || 0) + 1);
+}
+
 async function ensureMiniCartLoaded() {
     const root = miniCartRoot();
 
     if (!root || root.dataset.miniCartLoaded === 'true' || root.dataset.miniCartLoading === 'true') return;
 
     root.dataset.miniCartLoading = 'true';
+    const revision = root.dataset.miniCartRevision || '0';
+    const isCurrent = () => root === miniCartRoot() && (root.dataset.miniCartRevision || '0') === revision;
 
     try {
         const response = await fetch(root.dataset.miniCartUrl, {
@@ -161,11 +188,13 @@ async function ensureMiniCartLoaded() {
         });
         const data = await response.json().catch(() => ({}));
 
-        if (!response.ok) throw new Error(data.message || 'Cart preview is unavailable.');
+        if (!isCurrent()) return;
+        if (!response.ok || typeof data.html !== 'string') throw new Error(data.message || 'Cart preview is unavailable.');
 
         window.refreshAksaMiniCart?.(data.html, data.cart_count);
         root.dataset.miniCartLoaded = 'true';
     } catch (error) {
+        if (!isCurrent()) return;
         const loading = document.querySelector('[data-mini-cart-content]');
         if (loading) loading.innerHTML = '<p class="mini-cart-load-error">Open the cart to review your items.</p>';
     } finally {
@@ -197,7 +226,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
 
         const miniCart = miniCartRoot();
         if (miniCart) {
-            miniCart.dataset.miniCartLoaded = 'false';
+            invalidateMiniCart(miniCart);
             miniCart.querySelector('[data-mini-cart-trigger]')?.setAttribute(
                 'aria-label',
                 `Open cart with ${totalQuantity} items`
@@ -220,7 +249,7 @@ function updateCartRemovalSummary(distinctDelta, quantityDelta, idrDelta, usdDel
     }
 }
 
-export { usesMiniCartSheet, miniCartRoot, setMiniCartOpen, closeMiniCart, ensureMiniCartLoaded };
+export { usesMiniCartSheet, miniCartRoot, setMiniCartOpen, closeMiniCart, ensureMiniCartLoaded, warmMiniCart };
 
 export function registerCart() {
     registerMiniCartSwipe();
@@ -236,6 +265,8 @@ export function registerCart() {
         const nextContent = template.content.querySelector('[data-mini-cart-content]');
 
         if (currentContent && nextContent) {
+            root.dataset.miniCartRevision = String(Number(root.dataset.miniCartRevision || 0) + 1);
+            root.dataset.miniCartLoaded = 'true';
             nextContent.classList.add('mini-cart-content-enter');
             currentContent.replaceWith(nextContent);
             window.setTimeout(() => nextContent.classList.remove('mini-cart-content-enter'), 560);
@@ -549,7 +580,7 @@ export function registerCart() {
 
             const miniCart = miniCartRoot();
             if (miniCart) {
-                miniCart.dataset.miniCartLoaded = 'false';
+                invalidateMiniCart(miniCart);
                 miniCart.querySelector('[data-mini-cart-trigger]')?.setAttribute(
                     'aria-label',
                     `Open cart with ${totalQuantity} items`
