@@ -111,6 +111,7 @@ export function registerEvents() {
     });
 
     window.addEventListener('resize', () => {
+        hideDashboardChartTooltip();
         if (window.innerWidth >= 1280 && mobileMenuOpen) {
             closeMobileMenu();
         }
@@ -120,6 +121,8 @@ export function registerEvents() {
         updateNavGlider();
         updateCategoryFilterGlider();
     }, { passive: true });
+
+    document.addEventListener('scroll', () => hideDashboardChartTooltip(), { capture: true, passive: true });
 
     let scrollFrame = null;
     window.addEventListener('scroll', () => {

@@ -822,6 +822,22 @@
         border-left: 1px solid rgba(180, 155, 255, 0.42);
     }
 
+    .dashboard-chart-tooltip.is-floating {
+        position: fixed;
+        z-index: 100;
+        min-width: min(12rem, calc(100vw - 1.5rem));
+        max-width: min(17rem, calc(100vw - 1.5rem));
+        transform: translateY(4px) scale(0.96);
+    }
+
+    .dashboard-chart-tooltip.is-floating.is-visible {
+        transform: none;
+    }
+
+    .dashboard-chart-tooltip.is-floating::after {
+        left: var(--dashboard-tooltip-arrow, 50%);
+    }
+
     .dashboard-chart-tooltip-title {
         margin-bottom: 0.55rem;
         color: #b49bff;

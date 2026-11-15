@@ -1,3 +1,5 @@
+let activeDashboardTooltip = null;
+
 function dashboardChartPointFromEvent(event) {
     const target = event.target;
 
@@ -43,9 +45,15 @@ function dashboardChartPointPosition(point, frame) {
 
 function showDashboardChartTooltip(point) {
     const frame = point.closest('[data-dashboard-chart]');
-    const tooltip = frame?.querySelector('[data-dashboard-chart-tooltip]');
+    if (activeDashboardTooltip && activeDashboardTooltip.frame !== frame) hideDashboardChartTooltip();
+    const tooltip = activeDashboardTooltip?.tooltip || frame?.querySelector('[data-dashboard-chart-tooltip]');
 
     if (!frame || !tooltip) return;
+
+    activeDashboardTooltip?.point.removeAttribute('aria-describedby');
+    activeDashboardTooltip = { frame, tooltip, point };
+    tooltip.classList.add('is-floating');
+    if (tooltip.parentElement !== document.body) document.body.append(tooltip);
 
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-title]', point.dataset.label || point.dataset.shortLabel);
     setDashboardChartTooltipText(tooltip, '[data-chart-tooltip-orders]', point.dataset.orders);
@@ -60,14 +68,17 @@ function showDashboardChartTooltip(point) {
     const position = dashboardChartPointPosition(point, frame);
     const tooltipWidth = tooltip.offsetWidth || 192;
     const tooltipHeight = tooltip.offsetHeight || 110;
-    const minLeft = Math.min((tooltipWidth / 2) + 12, Math.max(12, frameRect.width / 2));
-    const maxLeft = Math.max(minLeft, frameRect.width - (tooltipWidth / 2) - 12);
-    const left = Math.min(maxLeft, Math.max(minLeft, position.left));
-    const top = Math.max(16, position.top);
+    const anchorX = frameRect.left + position.left;
+    const anchorY = frameRect.top + position.top;
+    const left = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, anchorX - tooltipWidth / 2));
+    const below = anchorY - tooltipHeight - 16 < 12;
+    const preferredTop = below ? anchorY + 16 : anchorY - tooltipHeight - 16;
+    const top = Math.max(12, Math.min(window.innerHeight - tooltipHeight - 12, preferredTop));
 
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
-    tooltip.classList.toggle('is-below', top < tooltipHeight + 18);
+    tooltip.style.setProperty('--dashboard-tooltip-arrow', `${Math.max(12, Math.min(tooltipWidth - 12, anchorX - left))}px`);
+    tooltip.classList.toggle('is-below', below);
     tooltip.classList.add('is-visible');
 
     if (tooltip.id) {
@@ -76,6 +87,19 @@ function showDashboardChartTooltip(point) {
 }
 
 function hideDashboardChartTooltip(point = null) {
+    if (activeDashboardTooltip) {
+        if (point && point !== activeDashboardTooltip.point) return;
+        const { frame, tooltip, point: activePoint } = activeDashboardTooltip;
+        tooltip.classList.remove('is-visible', 'is-floating', 'is-below');
+        tooltip.setAttribute('aria-hidden', 'true');
+        tooltip.style.removeProperty('left');
+        tooltip.style.removeProperty('top');
+        tooltip.style.removeProperty('--dashboard-tooltip-arrow');
+        activePoint.removeAttribute('aria-describedby');
+        frame.prepend(tooltip);
+        activeDashboardTooltip = null;
+        return;
+    }
     const frame = point?.closest('[data-dashboard-chart]') || document.querySelector('[data-dashboard-chart]');
     const tooltip = frame?.querySelector('[data-dashboard-chart-tooltip]');
 
