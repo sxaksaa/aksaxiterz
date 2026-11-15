@@ -2,6 +2,7 @@
 @source "../views";
 @source "../js";
 @import "./tailwind-compat.css";
+@import "./interactions.css";
 
 @utility text-aksa-accent {
     color: var(--aksa-purple);
@@ -50,6 +51,7 @@
         --aksa-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.18);
         --aksa-motion-fast: 260ms;
         --aksa-motion-base: 360ms;
+        --aksa-motion-card: 460ms;
         --aksa-motion-slow: 560ms;
         --aksa-motion-reveal: 680ms;
         --aksa-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -902,25 +904,8 @@
         will-change: transform;
     }
 
-    .card-glow:hover,
-    .product-card:hover,
-    .glow-hover:hover {
-        border-color: rgba(180, 155, 255, 0.42);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.055),
-            0 0 0 1px rgba(180, 155, 255, 0.08),
-            0 26px 66px rgba(0, 0, 0, 0.32),
-            0 0 58px rgba(180, 155, 255, 0.12);
-        transform: translateY(-2px);
-    }
 
     .product-card:hover {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.055),
-            0 0 0 1px rgba(180, 155, 255, 0.08),
-            0 26px 66px rgba(0, 0, 0, 0.34),
-            0 0 58px rgba(180, 155, 255, 0.12);
-        transform: translateY(-2px);
         z-index: 2;
     }
 
@@ -1809,16 +1794,6 @@
         border-color: rgba(180, 155, 255, 0.08);
     }
 
-    .checkout-card:hover,
-    .package-card:hover,
-    .license-card:hover {
-        border-color: rgba(180, 155, 255, 0.36);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.045),
-            0 0 0 1px rgba(180, 155, 255, 0.06),
-            0 22px 54px rgba(0, 0, 0, 0.28);
-        transform: translateY(-2px);
-    }
 
     .license-card.is-select-open,
     .order-mobile-card.is-select-open {
@@ -3053,14 +3028,6 @@
         z-index: 1;
     }
 
-    .download-card:hover {
-        border-color: rgba(180, 155, 255, 0.42);
-        box-shadow:
-            0 0 0 1px rgba(180, 155, 255, 0.08),
-            0 18px 44px rgba(0, 0, 0, 0.28),
-            0 12px 30px rgba(180, 155, 255, 0.08);
-        transform: translateY(-2px);
-    }
 
     .download-card:hover::before {
         opacity: 1;
@@ -3385,13 +3352,6 @@
             var(--aksa-shadow-soft);
     }
 
-    .order-mobile-card:hover {
-        border-color: rgba(180, 155, 255, 0.36);
-        box-shadow:
-            0 0 0 1px rgba(180, 155, 255, 0.08),
-            0 18px 42px rgba(0, 0, 0, 0.24);
-        transform: translateY(-2px);
-    }
 
     .orders-table-wrap {
         @apply surface overflow-hidden rounded-xl;
@@ -6583,24 +6543,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-[data-scroll-reveal][data-motion-reveal-ready="true"] {
-    opacity: 0;
-    translate: 0 14px;
-    scale: 0.99;
-}
-
-[data-scroll-reveal][data-motion-reveal-ready="true"][data-motion-reveal-from="top"] {
-    translate: 0 -14px;
-}
-
-[data-scroll-reveal][data-motion-reveal-ready="true"].is-scroll-revealed {
-    opacity: 1;
-    translate: 0 0;
-    scale: 1;
-    transition: opacity var(--aksa-motion-reveal) var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
-        translate 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
-        scale 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms);
-}
 
 .cart-package-row {
     max-height: 12rem;
@@ -6827,26 +6769,6 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
     to { left: 125%; }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .btn-main,
-    .discord-cta,
-    .category-chip,
-    .product-card,
-    .panel-card,
-    .home-panel,
-    .home-stat,
-    .download-card,
-    .download-feature,
-    .download-resource-link,
-    .payment-card,
-    .package-card,
-    .nav-cart-link,
-    .nav-menu-button,
-    .nav-login-link {
-        transition-duration: var(--aksa-motion-base);
-        transition-timing-function: var(--aksa-motion-ease);
-    }
-}
 
 @media (prefers-reduced-motion: reduce) {
     [data-scroll-reveal][data-motion-reveal-ready="true"] {
@@ -7058,110 +6980,6 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
 .catalog-accordion { overflow-anchor: none; }
 .catalog-chevron { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
 
-/* Keep hover translation independent from the entrance animation's transform. */
-@media (hover: hover) and (pointer: fine) {
-    .product-card-storefront {
-        translate: 0 0;
-        scale: 1;
-        transition:
-            scale 460ms cubic-bezier(0.22, 1, 0.36, 1),
-            translate 460ms cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 380ms ease,
-            box-shadow 460ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 320ms ease,
-            filter 320ms ease;
-        will-change: auto;
-    }
-    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
-    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible {
-        transform: none;
-        translate: 0 -8px !important;
-        scale: 1.05 !important;
-        border-color: rgba(180, 155, 255, 0.38);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.07),
-            0 24px 52px rgba(0, 0, 0, 0.34),
-            0 0 42px rgba(180, 155, 255, 0.14);
-    }
-    .product-card-storefront::before {
-        transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .product-card-storefront:focus-visible::before { opacity: 1; }
-    .product-card-storefront .product-card-cta {
-        transition:
-            border-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            background-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
-            color 420ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .product-card-storefront:hover .product-card-cta,
-    .product-card-storefront:focus-visible .product-card-cta {
-        transform: translateX(2px);
-    }
-}
-
-.product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
-    scale: 0.985 !important;
-    transition-duration: 120ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .product-card-storefront,
-    .product-card-storefront::before,
-    .product-card-storefront .product-card-cta { transition: none; }
-    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
-    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible,
-    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
-        translate: none !important;
-        scale: 1 !important;
-    }
-}
-
-/* Product detail package cards use independent motion properties so the
-   scroll-reveal transform cannot make hover entry or exit feel abrupt. */
-@media (hover: hover) and (pointer: fine) {
-    .package-card[data-scroll-reveal].is-scroll-revealed {
-        transform: none;
-        translate: 0 0;
-        scale: 1;
-        transition:
-            translate 520ms cubic-bezier(0.16, 1, 0.3, 1),
-            scale 520ms cubic-bezier(0.16, 1, 0.3, 1),
-            border-color 360ms ease,
-            box-shadow 520ms cubic-bezier(0.16, 1, 0.3, 1),
-            background-color 360ms ease,
-            opacity 320ms ease;
-        will-change: translate, scale;
-    }
-
-    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:hover,
-    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:focus-visible {
-        transform: none;
-        translate: 0 -5px;
-        scale: 1.025;
-        border-color: rgba(180, 155, 255, 0.4);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.065),
-            0 24px 58px rgba(0, 0, 0, 0.3),
-            0 0 36px rgba(180, 155, 255, 0.11);
-    }
-}
-
-.package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:active {
-    scale: 0.99;
-    transition-duration: 120ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .package-card[data-scroll-reveal].is-scroll-revealed,
-    .package-card[data-scroll-reveal].is-scroll-revealed:hover,
-    .package-card[data-scroll-reveal].is-scroll-revealed:focus-visible,
-    .package-card[data-scroll-reveal].is-scroll-revealed:active {
-        transform: none;
-        translate: none;
-        scale: 1;
-        transition: none;
-    }
-}
 
 .home-hero-section {
     padding-top: clamp(1.5rem, 3vw, 2.5rem);

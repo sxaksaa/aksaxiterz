@@ -1,3 +1,4 @@
+import { positionGlider } from './glider.js';
 import { setButtonLabel } from './ui.js';
 import { shouldReduceMotion, usesTouchMotion } from './motion-preferences.js';
 
@@ -303,24 +304,15 @@ function updateCategoryFilterGlider(selectedChip = null) {
     const activeChip = selectedChip || row?.querySelector('[data-category-filter][aria-pressed="true"]');
 
     if (!row || !glider || !activeChip) {
-        glider?.classList.remove('is-visible');
+        positionGlider(glider, null);
         return;
     }
 
-    const firstPosition = glider.dataset.ready !== 'true';
-    if (firstPosition) glider.style.transition = 'none';
     row.querySelectorAll('[data-category-filter]').forEach(chip => {
         chip.classList.toggle('is-glider-target', chip === activeChip);
     });
-    glider.style.width = `${activeChip.offsetWidth}px`;
-    glider.style.transform = `translate3d(${activeChip.offsetLeft}px, 0, 0)`;
     row.classList.add('is-glider-ready');
-    glider.classList.add('is-visible');
-    if (firstPosition) {
-        glider.dataset.ready = 'true';
-        glider.getBoundingClientRect();
-        requestAnimationFrame(() => glider.style.removeProperty('transition'));
-    }
+    positionGlider(glider, activeChip);
 }
 
 export { beginHomeStagedReveal, initializeMotionEnhancements, initializeDownloadAccordions, updateCategoryFilterGlider };

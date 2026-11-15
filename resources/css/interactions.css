@@ -1,0 +1,176 @@
+/* Shared interaction policy. Layout and selected/disabled state styles stay in app.css.
+   These unlayered rules intentionally override the legacy component transitions. */
+@media (prefers-reduced-motion: no-preference) {
+    .btn-main,
+    .discord-cta,
+    .category-chip,
+    .product-card,
+    .panel-card,
+    .card-glow,
+    .license-card,
+    .order-mobile-card,
+    .license-stat,
+    .order-stat,
+    .home-panel,
+    .home-stat,
+    .download-card,
+    .download-feature,
+    .download-resource-link,
+    .payment-card,
+    .package-card,
+    .nav-cart-link,
+    .nav-menu-button,
+    .nav-login-link {
+        transition-duration: var(--aksa-motion-base);
+        transition-timing-function: var(--aksa-motion-ease);
+    }
+}
+
+[data-scroll-reveal][data-motion-reveal-ready="true"] {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.99;
+}
+
+[data-scroll-reveal][data-motion-reveal-ready="true"][data-motion-reveal-from="top"] {
+    translate: 0 -14px;
+}
+
+[data-scroll-reveal][data-motion-reveal-ready="true"].is-scroll-revealed {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+    transition: opacity var(--aksa-motion-reveal) var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
+        translate 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms),
+        scale 600ms var(--aksa-motion-ease) var(--motion-reveal-delay, 0ms);
+}
+
+
+/* Keep hover translation independent from the entrance animation's transform. */
+@media (hover: hover) and (pointer: fine) {
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed {
+        translate: 0 0;
+        scale: 1;
+        transition:
+            scale var(--aksa-motion-card) var(--aksa-motion-ease),
+            translate var(--aksa-motion-card) var(--aksa-motion-ease),
+            border-color var(--aksa-motion-base) var(--aksa-motion-ease),
+            box-shadow var(--aksa-motion-card) var(--aksa-motion-ease),
+            opacity 320ms ease,
+            filter 320ms ease;
+        will-change: auto;
+    }
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible {
+        transform: none;
+        translate: 0 -8px !important;
+        scale: 1.05 !important;
+        border-color: rgba(180, 155, 255, 0.38);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.07),
+            0 24px 52px rgba(0, 0, 0, 0.34),
+            0 0 42px rgba(180, 155, 255, 0.14);
+    }
+    .product-card-storefront::before {
+        transition: opacity var(--aksa-motion-card) var(--aksa-motion-ease);
+    }
+    .product-card-storefront:focus-visible::before { opacity: 1; }
+    .product-card-storefront .product-card-cta {
+        transition:
+            border-color var(--aksa-motion-card) var(--aksa-motion-ease),
+            background-color var(--aksa-motion-card) var(--aksa-motion-ease),
+            color var(--aksa-motion-card) var(--aksa-motion-ease);
+    }
+    .product-card-storefront:hover .product-card-cta,
+    .product-card-storefront:focus-visible .product-card-cta {
+        transform: translateX(2px);
+    }
+}
+
+.product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
+    scale: 0.985 !important;
+    transition-duration: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .product-card-storefront,
+    .product-card-storefront::before,
+    .product-card-storefront .product-card-cta { transition: none; }
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:hover,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:focus-visible,
+    .product-card-storefront[data-scroll-reveal].is-scroll-revealed:active {
+        translate: none !important;
+        scale: 1 !important;
+    }
+}
+
+/* Keep these properties separate from transform, including in the optimized
+   build, so the entrance animation and hover transition cannot overwrite them. */
+@media (hover: hover) and (pointer: fine) {
+    .package-card[data-scroll-reveal].is-scroll-revealed {
+        transform: none;
+        translate: 0 0 !important;
+        scale: 1 !important;
+        transition:
+            translate var(--aksa-motion-card) var(--aksa-motion-ease),
+            scale var(--aksa-motion-card) var(--aksa-motion-ease),
+            border-color var(--aksa-motion-base) var(--aksa-motion-ease),
+            box-shadow var(--aksa-motion-card) var(--aksa-motion-ease),
+            background-color var(--aksa-motion-base) var(--aksa-motion-ease),
+            opacity 320ms ease;
+        will-change: auto;
+    }
+
+    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:hover,
+    .package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:focus-visible {
+        transform: none;
+        translate: 0 -5px !important;
+        scale: 1.025 !important;
+        border-color: rgba(180, 155, 255, 0.4);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.065),
+            0 24px 58px rgba(0, 0, 0, 0.3),
+            0 0 36px rgba(180, 155, 255, 0.11);
+    }
+}
+
+.package-card[data-scroll-reveal].is-scroll-revealed[data-package-checkout-enabled="true"]:active {
+    scale: 0.99 !important;
+    transition-duration: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .package-card[data-scroll-reveal].is-scroll-revealed,
+    .package-card[data-scroll-reveal].is-scroll-revealed:hover,
+    .package-card[data-scroll-reveal].is-scroll-revealed:focus-visible,
+    .package-card[data-scroll-reveal].is-scroll-revealed:active {
+        transform: none;
+        translate: none !important;
+        scale: 1 !important;
+        transition: none;
+    }
+}
+
+
+/* Touch devices have no hover intent, including wide tablets. Keep tap/selection
+   feedback, but prevent cards from remaining lifted after a touch. */
+@media (hover: none) and (pointer: coarse) {
+    .card-glow:hover,
+    .product-card:hover,
+    .glow-hover:hover,
+    .checkout-card:hover,
+    .package-card:hover,
+    .license-card:hover,
+    .order-mobile-card:hover,
+    .download-card:hover,
+    .download-feature:hover,
+    .download-resource-link:hover,
+    .home-panel:hover,
+    .home-stat:hover,
+    .license-stat:hover,
+    .order-stat:hover,
+    .order-pagination-link:hover,
+    .card-hover:hover {
+        transform: none;
+    }
+}

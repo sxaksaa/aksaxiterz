@@ -1,3 +1,4 @@
+import { positionGlider } from './glider.js';
 import { initializeOptionalFeatures } from './optional-features.js';
 import { setButtonLabel } from './ui.js';
 import { initializeDisplayCurrency } from './currency.js';
@@ -135,23 +136,7 @@ function updateNavGlider(previewLink = null) {
         ? preferredLink
         : menu?.querySelector('.nav-item.active');
 
-    if (!menu || !glider || !activeLink) {
-        glider?.classList.remove('is-visible');
-        return;
-    }
-
-    const firstPosition = glider.dataset.ready !== 'true';
-
-    if (firstPosition) glider.style.transition = 'none';
-    glider.style.width = `${activeLink.offsetWidth}px`;
-    glider.style.transform = `translate3d(${activeLink.offsetLeft}px, 0, 0)`;
-    glider.classList.add('is-visible');
-
-    if (firstPosition) {
-        glider.dataset.ready = 'true';
-        glider.getBoundingClientRect();
-        requestAnimationFrame(() => glider.style.removeProperty('transition'));
-    }
+    positionGlider(glider, activeLink);
 }
 
 function setPendingNavGlider(link) {
