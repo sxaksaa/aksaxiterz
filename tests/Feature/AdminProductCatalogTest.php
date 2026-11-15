@@ -11,6 +11,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -361,6 +363,26 @@ class AdminProductCatalogTest extends TestCase
             $this->assertSame($name, $product->fresh()->name);
             $this->get($publicUrl)->assertOk()->assertSee($name);
             $this->get($adminUrl)->assertOk()->assertSee($name);
+        }
+    }
+
+    public function test_catalog_validation_opens_only_the_package_section_with_errors(): void
+    {
+        [$admin, $product, $package] = $this->makeCatalogProduct();
+        $cases = [
+            ['package-prices', ['quick_product_id' => $product->id], 'packages.'.$package->id.'.price'],
+            ['add-package', ['add_package_product_id' => $product->id], 'package_price'],
+        ];
+        foreach ($cases as [$section, $old, $error]) {
+            $errors = (new ViewErrorBag)->put('default', new MessageBag([$error => 'Enter a valid price.']));
+            $response = $this->actingAs($admin)->withSession(['_old_input' => $old, 'errors' => $errors])
+                ->get(route('admin.products.index', ['search' => $product->name]))->assertOk();
+            $this->assertSame($old, session()->getOldInput());
+            $this->assertSame([$error], app('view')->shared('errors')->keys());
+            foreach (['package-prices', 'add-package'] as $target) {
+                $this->assertSame(1, preg_match('/<details[^>]*data-'.$target.'[^>]*>/', $response->getContent(), $match));
+                $this->assertSame($section === $target, str_contains($match[0], ' open'), $section.': '.$match[0]);
+            }
         }
     }
 

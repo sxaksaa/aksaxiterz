@@ -1,6 +1,7 @@
 <?php
 
 // CLI-only fixture renderer. The browser runner supplies an isolated SQLite database.
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\PaymentInstructionController;
 use App\Models\Category;
 use App\Models\LicenseStock;
@@ -63,6 +64,11 @@ try {
             ->show($paymentRequest, $order->order_id);
         file_put_contents($argv[1].'/payment-'.$status.'.html', $view->render());
     }
+
+    config(['admin.emails' => [$user->email]]);
+    $catalogRequest = Request::create('/admin/products', 'GET', ['search' => $product->name]);
+    $catalogView = $app->make(ProductController::class)->index($catalogRequest);
+    file_put_contents($argv[1].'/catalog.html', $catalogView->render());
 
 } finally {
     DB::rollBack();

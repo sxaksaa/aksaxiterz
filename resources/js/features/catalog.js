@@ -40,6 +40,19 @@ function animateCatalogDisclosure(element, expanded) {
 }
 
 export function registerCatalog() {
+    // Native validation must reveal folded fields before the browser focuses them.
+    document.addEventListener('invalid', event => {
+        let details = event.target.closest('[data-catalog-accordion]');
+        while (details) {
+            catalogDisclosureAnimations.get(details)?.cancel();
+            catalogDisclosureAnimations.delete(details);
+            details.style.overflow = '';
+            details.open = true;
+            details.dataset.expanded = 'true';
+            details = details.parentElement?.closest('[data-catalog-accordion]');
+        }
+    }, true);
+
     document.addEventListener('click', (event) => {
         const button = event.target.closest('[data-license-show-all]');
         const group = button?.closest('[data-license-group]');

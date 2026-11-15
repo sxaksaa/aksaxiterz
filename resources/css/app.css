@@ -7005,14 +7005,6 @@ select:user-invalid + .aksa-select .aksa-select-trigger {
     color: #fff;
 }
 
-.catalog-accordion-summary::-webkit-details-marker {
-    display: none;
-}
-
-.catalog-accordion[open] .catalog-accordion-summary svg {
-    transform: rotate(180deg);
-}
-
 /* Keep the catalog and package comparisons within easier reach on phones. */
 @media (max-width: 639px) {
     .home-hero-section {
