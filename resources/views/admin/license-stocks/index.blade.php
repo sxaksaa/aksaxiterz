@@ -128,9 +128,9 @@
 
                 <label class="block">
                     <span class="mb-2 block text-xs font-semibold text-gray-400">License keys</span>
-                    <textarea name="license_keys" rows="1" class="search-bar stock-key-textarea w-full"
+                    <textarea name="license_keys" rows="1" class="search-bar stock-key-textarea block w-full"
                         data-stock-key-input
-                        placeholder="Put new license keys here&#10;One key per line" required>{{ old('license_keys') }}</textarea>
+                        placeholder="Paste license keys" required>{{ old('license_keys') }}</textarea>
                 </label>
 
                 <button class="btn-footer h-12">
