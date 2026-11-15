@@ -307,10 +307,20 @@ function updateCategoryFilterGlider(selectedChip = null) {
         return;
     }
 
+    const firstPosition = glider.dataset.ready !== 'true';
+    if (firstPosition) glider.style.transition = 'none';
+    row.querySelectorAll('[data-category-filter]').forEach(chip => {
+        chip.classList.toggle('is-glider-target', chip === activeChip);
+    });
     glider.style.width = `${activeChip.offsetWidth}px`;
-    glider.style.transform = `translateX(${activeChip.offsetLeft}px)`;
+    glider.style.transform = `translate3d(${activeChip.offsetLeft}px, 0, 0)`;
     row.classList.add('is-glider-ready');
     glider.classList.add('is-visible');
+    if (firstPosition) {
+        glider.dataset.ready = 'true';
+        glider.getBoundingClientRect();
+        requestAnimationFrame(() => glider.style.removeProperty('transition'));
+    }
 }
 
 export { beginHomeStagedReveal, initializeMotionEnhancements, initializeDownloadAccordions, updateCategoryFilterGlider };

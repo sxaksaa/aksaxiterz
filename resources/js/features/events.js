@@ -189,6 +189,11 @@ export function registerEvents() {
 
         if (navItem) updateNavGlider(navItem);
 
+        const categoryChip = event.target.closest('[data-category-filter]');
+        if (categoryChip && event.pointerType !== 'touch' && window.matchMedia('(hover: hover)').matches) {
+            updateCategoryFilterGlider(categoryChip);
+        }
+
         const point = dashboardChartPointFromEvent(event);
 
         if (point) {
@@ -212,6 +217,13 @@ export function registerEvents() {
 
         if (navItem && nextNavItem !== navItem) updateNavGlider();
 
+        const categoryChip = event.target.closest('[data-category-filter]');
+        const nextCategoryChip = event.relatedTarget instanceof Element
+            ? event.relatedTarget.closest('[data-category-filter]') : null;
+        if (categoryChip && event.pointerType !== 'touch' && nextCategoryChip !== categoryChip) {
+            updateCategoryFilterGlider(nextCategoryChip);
+        }
+
         const point = dashboardChartPointFromEvent(event);
 
         if (!point) return;
@@ -226,6 +238,8 @@ export function registerEvents() {
     });
 
     document.addEventListener('focusin', (event) => {
+        const categoryChip = event.target.closest('[data-category-filter]');
+        if (categoryChip) updateCategoryFilterGlider(categoryChip);
         prefetchSoftNavigationLink(softNavigationLinkForPrefetch(event));
 
         if (event.target.closest('[data-mini-cart-root]')) ensureMiniCartLoaded();
@@ -246,6 +260,11 @@ export function registerEvents() {
     }, { passive: true });
 
     document.addEventListener('focusout', (event) => {
+        if (event.target.closest('[data-category-filter]')) {
+            const nextChip = event.relatedTarget instanceof Element
+                ? event.relatedTarget.closest('[data-category-filter]') : null;
+            updateCategoryFilterGlider(nextChip);
+        }
         const navItem = navItemFromEvent(event);
 
         if (navItem) updateNavGlider();
