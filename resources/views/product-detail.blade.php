@@ -290,11 +290,6 @@
         </aside>
     </div>
 
-    @include('partials.recent-purchase-toast', [
-        'recentPurchases' => $recentPurchases ?? collect(),
-        'recentPurchaseEndpoint' => route('purchases.recent', [], false),
-        'recentPurchaseProductSlug' => $product->slug,
-    ])
 @endsection
 
 @push('scripts')

@@ -264,10 +264,9 @@ Route::get('/product/{product}', function (string $product) use ($activePromoVou
 
     app(ProductSalesSignals::class)->apply(collect([$product]));
 
-    $recentPurchases = app(RecentPurchaseFeed::class)->storefront($product);
     $promoVoucher = $activePromoVoucher($product);
 
-    return view('product-detail', compact('product', 'recentPurchases', 'promoVoucher'));
+    return view('product-detail', compact('product', 'promoVoucher'));
 })->where('product', '[A-Za-z0-9-]+')->name('products.show');
 
 /*

@@ -50,7 +50,7 @@ class RecentPurchaseSocialProofTest extends TestCase
             ->assertDontSee('P*****g', false);
     }
 
-    public function test_product_detail_recent_purchase_feed_is_scoped_to_current_product(): void
+    public function test_product_detail_does_not_render_recent_purchase_notifications(): void
     {
         [$targetProduct, $targetPackage] = $this->productWithPackage('Target Social Tool', 'target-social-tool', '7 Days');
         [$otherProduct, $otherPackage] = $this->productWithPackage('Outside Social Tool', 'outside-social-tool', '30 Days');
@@ -71,10 +71,8 @@ class RecentPurchaseSocialProofTest extends TestCase
 
         $this->get(route('products.show', $targetProduct))
             ->assertOk()
-            ->assertSee('data-recent-purchase-toast', false)
-            ->assertSee('data-recent-purchase-endpoint="'.route('purchases.recent', [], false).'"', false)
-            ->assertSee('data-recent-purchase-product-slug="'.$targetProduct->slug.'"', false)
-            ->assertSee('A***r', false)
+            ->assertDontSee('data-recent-purchase', false)
+            ->assertDontSee('A***r', false)
             ->assertDontSee('O***r', false)
             ->assertDontSee('Outside Social Tool', false);
     }
